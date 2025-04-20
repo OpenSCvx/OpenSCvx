@@ -49,7 +49,7 @@ markdown_extensions:
   - attr_list
   - toc:
       permalink: "¤"  # Adds a clickable permalink to each section heading
-      toc_depth: 3  # Prevents h5, h6 (i.e. methods) from showing up in the TOC.
+      toc_depth: 2  # Prevents h5, h6 (i.e. methods) from showing up in the TOC.
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
