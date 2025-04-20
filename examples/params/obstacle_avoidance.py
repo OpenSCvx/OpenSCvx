@@ -23,6 +23,9 @@ final_state.type[13] = "Minimize"
 
 initial_control = np.array([0.0, 0, 50, 0, 0, 0])
 
+max_control = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])
+min_control = np.array([0, 0, 0, -18.665, -18.665, -0.55562])
+
 
 def dynamics(x, u):
     m = 1.0  # Mass of the drone
@@ -92,12 +95,8 @@ problem = TrajOptProblem(
     final_state=final_state,
     x_max=max_state,
     x_min=min_state,
-    u_max=np.array(
-        [0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562]
-    ),  # Upper Bound on the controls
-    u_min=np.array(
-        [0, 0, 0, -18.665, -18.665, -0.55562]
-    ),  # Lower Bound on the controls
+    u_max=max_control,  # Upper Bound on the controls
+    u_min=min_control,  # Lower Bound on the controls
 )
 
 problem.params.scp.w_tr_adapt = 1.8

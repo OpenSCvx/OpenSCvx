@@ -1,0 +1,74 @@
+site_name: OpenSCvx
+site_url: https://haynec.github.io/OpenSCvx
+site_author: Chris Hayner
+site_description: Documentation for OpenSCvx, a Python library for solving nonconvex optimization trajectory optimization problems.
+repo_name: haynec/OpenSCvx
+repo_url: https://github.com/haynec/OpenSCvx
+theme:
+  name: material
+  icon:
+    admonition:
+      <type>: material/fire
+  features:
+    - navigation.sections
+    - announce.dismiss
+    - user_color_mode_toggle
+    - header.autohide
+    - toc.integrate
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/link
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch-off
+        name: Switch to system preference
+  font:
+    text: CMU Sans Serif
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+copyright: Copyright &copy; 2025 Chris Hayner
+
+nav:
+    - 'index.md'
+    - Usage:
+      - 'Usage/basic_api.md'
+      - 'Usage/advanced_api.md'
+      - 'Usage/tutorials.md'
+    - Foundations:
+      - 'Overview/scvx.md'
+      - 'Overview/ocp.md'
+      - 'Overview/ptr.md'
+      - 'Overview/discretization.md'
+      - 'Overview/constraint_reformulation.md'
+      - 'Overview/control_parameterization.md'
+      - 'Overview/time_dilation.md'
