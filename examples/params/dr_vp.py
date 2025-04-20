@@ -132,7 +132,6 @@ def dynamics(x, u):
 
 
 u_bar = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
-
 x_bar = np.linspace(initial_state.value, final_state.value, n)
 
 i = 0
@@ -187,7 +186,7 @@ problem.params.dis.custom_integrator = True
 
 problem.params.scp.w_tr = 2e0  # Weight on the Trust Reigon
 problem.params.scp.lam_cost = 1e-1  # 0e-1,  # Weight on the Minimal Time Objective
-problem.params.scp.lam_vc = 1e1  # 1e1,  # Weight on the Virtual Control Objective (not including CTCS Augmentation)
+problem.params.scp.lam_vc = 1e1  # 1e1,  # Weight on the Virtual Control Objective
 problem.params.scp.ep_tr = 1e-3  # Trust Region Tolerance
 problem.params.scp.ep_vb = 1e-4  # Virtual Control Tolerance
 problem.params.scp.ep_vc = 1e-8  # Virtual Control Tolerance
