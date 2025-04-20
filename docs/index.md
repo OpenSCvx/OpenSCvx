@@ -8,8 +8,8 @@ OpenSCvx :rocket: is an [JAX](https://github.com/jax-ml/jax)-based library for n
 
     - Go ahead and follow the installation instructions below.
     - Run through the "Tutorials" to get a feel for how to problems are instantiated. For a more complex problem, check out the "Drone LoS Guidance" example.
-    - The "Basic API" goes in depth into each neccesary element to setup your problem in detail.
-    - The "Advanced API" goes into more advanced features parameters and options to fine tune the performance of your problem. 
+    - The "Basic Problem Setup" goes in depth into each neccesary element to setup your problem in detail.
+    - The "Advanced Problem Setup" goes into more advanced features parameters and options to fine tune the performance of your problem. 
 
 
 The aim of this work is hopefully to make the lives of a few graduate students out there easier as this was hell to implement when I was just getting started. 
