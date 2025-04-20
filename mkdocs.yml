@@ -7,6 +7,7 @@ repo_url: https://github.com/haynec/OpenSCvx
 theme:
   name: material
   icon:
+    logo: material/rocket-launch-outline 
     admonition:
       <type>: material/fire
   features:
@@ -46,6 +47,9 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.superfences
   - attr_list
+  - toc:
+      permalink: "¤"  # Adds a clickable permalink to each section heading
+      toc_depth: 3  # Prevents h5, h6 (i.e. methods) from showing up in the TOC.
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
@@ -67,7 +71,6 @@ nav:
     - Foundations:
       - 'Overview/scvx.md'
       - 'Overview/ocp.md'
-      - 'Overview/ptr.md'
       - 'Overview/discretization.md'
       - 'Overview/constraint_reformulation.md'
       - 'Overview/control_parameterization.md'
