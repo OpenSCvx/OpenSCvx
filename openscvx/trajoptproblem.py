@@ -19,7 +19,6 @@ from openscvx.discretization import ExactDis, Diffrax_Prop
 from openscvx.constraints.boundary import BoundaryConstraint
 from openscvx.ptr import PTR_init, PTR_main, PTR_post
 
-
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
 class TrajOptProblem:
     def __init__(
@@ -47,9 +46,40 @@ class TrajOptProblem:
         time_dilation_factor_min=0.3,
         time_dilation_factor_max=3.0,
     ):
+        """Initializes the TrajOptProblem class.
 
-        # TODO (norrisg) move this into some augmentation function, if we want to make this be executed after the init (i.e. within problem.initialize) need to rethink how problem is defined
+        This constructor sets up a trajectory optimization problem by defining the system dynamics, 
+        constraints, and various configurations for solving the problem.
 
+        Args:
+            dynamics (callable): The system dynamics function, which defines the evolution of the state.
+            constraints (List[callable]): A list of constraint functions to be satisfied during optimization.
+            N (int): The number of discretization points for the trajectory.
+            time_init (float): The initial time for the trajectory.
+            x_guess (jnp.ndarray): Initial guess for the state trajectory.
+            u_guess (jnp.ndarray): Initial guess for the control trajectory.
+            initial_state (BoundaryConstraint): Boundary constraint for the initial state of the system.
+            final_state (BoundaryConstraint): Boundary constraint for the final state of the system.
+            x_max (jnp.ndarray): Maximum bounds for the state variables.
+            x_min (jnp.ndarray): Minimum bounds for the state variables.
+            u_max (jnp.ndarray): Maximum bounds for the control variables.
+            u_min (jnp.ndarray): Minimum bounds for the control variables.
+            scp (ScpConfig, optional): Configuration for the sequential convex programming solver.
+            dis (DiscretizationConfig, optional): Configuration for the discretization method.
+            prp (PropagationConfig, optional): Configuration for the propagation method.
+            sim (SimConfig, optional): Configuration for the simulation settings.
+            dev (DevConfig, optional): Configuration for device-specific settings.
+            cvx (ConvexSolverConfig, optional): Configuration for the convex solver.
+
+        Raises:
+            ValueError: If any of the input parameters are invalid or inconsistent.
+        !!! note
+
+            It is possible to have `t1 < t0`, in which case integration proceeds backwards
+            in time.
+        """
+
+        
         x_min_augmented = np.hstack([x_min, ctcs_augmentation_min])
         x_max_augmented = np.hstack([x_max, ctcs_augmentation_max])
 

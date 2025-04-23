@@ -60,13 +60,37 @@ extra_javascript:
   - javascripts/mathjax.js
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 
+extra_css:
+  - _static/custom_css.css
+
 copyright: Copyright &copy; 2025 Chris Hayner
+
+plugins:
+  - mkdocstrings:
+      setup_commands:
+            - import pytkdocs_tweaks
+            - pytkdocs_tweaks.main()
+            - import jax.tree_util
+            - jax.tree_util.Partial.__module__ = "jax.tree_util"
+      handlers:
+        python:
+          options:
+            show_root_heading: true
+            show_root_full_path: true
+            show_if_no_docstring: true
+            show_signature_annotations: true
+            show_source: false
+            members_order: source
+            heading_level: 4
+            inherited_members: false  # Allow looking up inherited methods
+          paths: [src]
 
 nav:
     - 'index.md'
     - Usage:
-      - 'Usage/basic_api.md'
-      - 'Usage/advanced_api.md'
+      - 'Usage/basic_problem_setup.md'
+      - 'Usage/advanced_problem_setup.md'
+      - 'Usage/api.md'
       - 'Usage/tutorials.md'
     - Foundations:
       - 'Overview/scvx.md'

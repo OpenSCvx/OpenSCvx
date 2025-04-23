@@ -120,6 +120,8 @@ problem.params.scp.w_tr = 1E0  # Weight on the Trust Reigon
 problem.params.scp.lam_cost = 0E0  # Weight on the Cost
 problem.params.scp.lam_vc = 1E1  # Weight on the Virtual Control Objective
 ```
+and if you have nonconvex nodal constraints
+
 
 If you have nonconvex nodal constraints then you will also need to include ``` params.scp.lam_vb = 1E0```. 
 

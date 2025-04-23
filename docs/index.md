@@ -1,6 +1,9 @@
 # **OpenSCvx**
 
-OpenSCvx :rocket: is an [JAX](https://github.com/jax-ml/jax)-based library for nonconvex trajectory planning in Python. 
+OpenSCvx :rocket: is an [JAX](https://github.com/jax-ml/jax)-based library for nonconvex trajectory planning in Python.
+
+!!! warning
+    This repository is still in alpha, here there be dragons :dragon:.
 
 !!! tip
 
@@ -10,9 +13,6 @@ OpenSCvx :rocket: is an [JAX](https://github.com/jax-ml/jax)-based library for n
     - Run through the "Tutorials" to get a feel for how to problems are instantiated. For a more complex problem, check out the "Drone LoS Guidance" example.
     - The "Basic Problem Setup" goes in depth into each neccesary element to setup your problem in detail.
     - The "Advanced Problem Setup" goes into more advanced features parameters and options to fine tune the performance of your problem. 
-
-
-The aim of this work is hopefully to make the lives of a few graduate students out there easier as this was hell to implement when I was just getting started. 
 
 We provide a simple interface to define the dynamics and constraints of your problem, all in continuous time no need for you to descritize your dynamics and constraints, while keeping the repo light enough that if the aspiring user wishes to delve a bit deeper and implement there own components they can do so with relative ease. 
 
