@@ -222,7 +222,7 @@ def PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params: Config):
     u = (params.sim.S_u @ prob.var_dict['u'].value.T + np.expand_dims(params.sim.c_u, axis = 1)).T
 
     i = 0
-    costs = 0
+    costs = [0]
     for type in params.dyn.final_state.type:
         if type == 'Minimize':
             costs = x[:,i]
