@@ -2,7 +2,7 @@ import jax.numpy as jnp
 from typing import List
 
 import cvxpy as cp
-from jax import jit
+import jax
 import numpy as np
 
 from openscvx.config import (
@@ -162,7 +162,7 @@ class TrajOptProblem:
 
         if not self.params.dev.debug:
             if self.params.dis.custom_integrator:
-                calculate_discretization_lower = jit(
+                calculate_discretization_lower = jax.jit(
                     self.dynamics_discretized.calculate_discretization
                 ).lower(
                     np.ones((self.params.scp.n, self.params.sim.n_states)),
@@ -172,7 +172,7 @@ class TrajOptProblem:
                     calculate_discretization_lower.compile()
                 )
             else:
-                dVdt_lower = jit(self.dynamics_discretized.dVdt).lower(
+                dVdt_lower = jax.jit(self.dynamics_discretized.dVdt).lower(
                     0.0,
                     np.ones(int(self.i5 * (self.params.scp.n - 1))),
                     np.ones((self.params.scp.n - 1, self.params.sim.n_controls)),
