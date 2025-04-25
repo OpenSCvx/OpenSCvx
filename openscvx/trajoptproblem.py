@@ -146,7 +146,7 @@ class TrajOptProblem:
         self.params.scp.__post_init__()
         self.params.sim.__post_init__()
 
-        self.ocp, self.dynamics_discretized, self.cpg_solve = PTR_init(self.params)
+        self.ocp, self.dynamics_discretized, self.cpg_solve = PTR_init(self.params.dyn.state_dot, self.params.dyn.A, self.params.dyn.B, self.params)
 
         # Extract the number of states and controls from the parameters
         n_x = self.params.sim.n_states

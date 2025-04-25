@@ -15,7 +15,7 @@ from openscvx.ocp import OCP
 import warnings
 warnings.filterwarnings("ignore")
 
-def PTR_init(params: Config) -> tuple[cp.Problem, ExactDis]:
+def PTR_init(state_dot, A, B, params: Config) -> tuple[cp.Problem, ExactDis]:
     intro()
 
     t_0_while = time.time()
@@ -29,7 +29,7 @@ def PTR_init(params: Config) -> tuple[cp.Problem, ExactDis]:
     else:
         cpg_solve = None
 
-    dynamics_discretized = ExactDis(params)
+    dynamics_discretized = ExactDis(state_dot, A, B, params)
 
     # Solve a dumb problem to intilize DPP and JAX jacobians
     _ = PTR_subproblem(cpg_solve, params.sim.x_bar, params.sim.u_bar, dynamics_discretized, ocp, params)
