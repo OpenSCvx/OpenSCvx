@@ -13,8 +13,6 @@ class Dynamics:
         dynamics: callable,
         constraints_ctcs: List[callable],
         constraints_nodal: List[callable],
-        initial_state,
-        final_state,
     ):
 
         self.dynamics = dynamics
@@ -25,9 +23,6 @@ class Dynamics:
         self.state_dot = jax.vmap(self.dyn_aug)
         self.A = jax.jit(jax.vmap(jax.jacfwd(self.dyn_aug, argnums=0), in_axes=(0, 0)))
         self.B = jax.jit(jax.vmap(jax.jacfwd(self.dyn_aug, argnums=1), in_axes=(0, 0)))
-
-        self.initial_state = initial_state
-        self.final_state = final_state
 
     def g_func(self, x: jnp.array, u: jnp.array) -> jnp.array:
         g_sum = 0

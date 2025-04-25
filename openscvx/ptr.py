@@ -163,12 +163,12 @@ def PTR_post(params: Config, result: dict, aug_dy: ExactDis) -> dict:
     print("Total CTCS Constraint Violation:", x_full[-1, params.dyn.y_inds])
     i = 0
     cost = np.zeros_like(x[-1, i])
-    for type in params.dyn.initial_state.type:
+    for type in params.sim.initial_state.type:
         if type == 'Minimize':
             cost += x[0, i]
         i +=1
     i = 0
-    for type in params.dyn.final_state.type:
+    for type in params.sim.final_state.type:
         if type == 'Minimize':
             cost += x[-1, i]
         i +=1
@@ -225,7 +225,7 @@ def PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params: Config):
 
     i = 0
     costs = 0
-    for type in params.dyn.final_state.type:
+    for type in params.sim.final_state.type:
         if type == 'Minimize':
             costs = x[:,i]
         i += 1

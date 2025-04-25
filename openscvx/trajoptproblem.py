@@ -125,8 +125,6 @@ class TrajOptProblem:
             dynamics,
             self.constraints_ctcs,
             self.constraints_nodal,  # TODO (norrisg) Maybe move this outside of the dynamics?
-            initial_state=initial_state,
-            final_state=final_state,
         )
 
         self.params = Config(
