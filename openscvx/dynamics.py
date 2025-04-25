@@ -56,6 +56,6 @@ def get_augmented_dynamics(dynamics: callable, g_func: callable):
     return dynamics_augmented
 
 def get_jacobians(dyn: callable):
-    A = jax.jacfwd(dyn, argnums=0), in_axes=(0, 0)
-    B = jax.jacfwd(dyn, argnums=1), in_axes=(0, 0)
+    A = jax.jacfwd(dyn, argnums=0)
+    B = jax.jacfwd(dyn, argnums=1)
     return A, B
