@@ -21,10 +21,6 @@ class Dynamics:
         self.constraints_ctcs = constraints_ctcs
         self.constraints_nodal = constraints_nodal
 
-        # CTCS Functions
-        self.g_jit = jax.jit(self.g_func)
-        self.g_vec = jax.vmap(self.g_jit, in_axes=(0, 0))
-
         # Dynamics Functions
         self.state_dot = jax.vmap(self.dyn_aug)
         self.A = jax.jit(jax.vmap(jax.jacfwd(self.dyn_aug, argnums=0), in_axes=(0, 0)))
@@ -47,5 +43,5 @@ class Dynamics:
 
         x_dot = self.dynamics(x[:-1], u)
         t_dot = 1
-        y_dot = self.g_jit(x, u)
+        y_dot = self.g_func(x, u)
         return jnp.hstack([x_dot, t_dot, y_dot])
