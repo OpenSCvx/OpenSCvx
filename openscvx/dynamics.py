@@ -45,3 +45,17 @@ class Dynamics:
         t_dot = 1
         y_dot = self.g_func(x, u)
         return jnp.hstack([x_dot, t_dot, y_dot])
+
+def get_augmented_dynamics(dynamics: callable, g_func: callable):
+    def dynamics_augmented(x: jnp.array, u: jnp.array) -> jnp.array:
+        # TODO: (norrisg) handle varying lengths of x and u due to augmentation more elegantly
+        x_dot = dynamics(x[:-1], u)
+        t_dot = 1
+        y_dot = g_func(x, u)
+        return jnp.hstack([x_dot, t_dot, y_dot])
+    return dynamics_augmented
+
+def get_jacobians(dyn: callable):
+    A = jax.jacfwd(dyn, argnums=0), in_axes=(0, 0)
+    B = jax.jacfwd(dyn, argnums=1), in_axes=(0, 0)
+    return A, B
