@@ -54,7 +54,7 @@ class DevConfig:
     def __init__(self, 
                  profiling: bool = False, 
                  debug: bool = False,
-                 debug_printing: bool = True):
+                 debug_printing: bool = False):
         """
         Configuration class for development settings.
 
@@ -68,7 +68,8 @@ class DevConfig:
             debug (bool): Disables all precompilation so you can place breakpoints and inspect values. Defaults to False.
         """
         self.profiling = profiling
-        self.debug = debug    debug_printing: bool = True
+        self.debug = debug    
+        self.debug_printing = debug_printing
 
 
 @dataclass

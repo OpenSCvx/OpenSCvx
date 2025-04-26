@@ -22,8 +22,8 @@ SOLVER_MAP = {
 }
 
 class RK45_Custom:
-    def __init__(self, params):
-        self.params = params
+    def __init__(self):
+        pass
 
     def rk45_step(self, f, t, y, h, *args):
         def compute_k(f, t, y, h, *args):
@@ -49,22 +49,15 @@ class RK45_Custom:
         V_result = jnp.zeros((len(t_eval), len(V0)))
         V_result = V_result.at[0].set(V0)
         
-        if self.params.dev.debug:
-            for i in range(1, len(t_eval)):
-                t = tau_grid[0] + i * h
-                y_next = self.rk45_step(dVdt, t, V_result[i-1], h, *args)
-                V_result = V_result.at[i].set(y_next)
-        else:
-            def body_fun(i, val):
-                t, y, V_result = val
-                y_next = self.rk45_step(dVdt, t, y, h, *args)
-                V_result = V_result.at[i].set(y_next)
-                return (t + h, y_next, V_result)
+        def body_fun(i, val):
+            t, y, V_result = val
+            y_next = self.rk45_step(dVdt, t, y, h, *args)
+            V_result = V_result.at[i].set(y_next)
+            return (t + h, y_next, V_result)
 
-            _, _, V_result = lax.fori_loop(1, len(t_eval), body_fun, (tau_grid[0], V0, V_result))
+        _, _, V_result = lax.fori_loop(1, len(t_eval), body_fun, (tau_grid[0], V0, V_result))
         
         return V_result
-
     
 class Diffrax_Prop:
     def __init__(self, params):
@@ -146,7 +139,7 @@ class ExactDis:
 
         
         if self.params.dis.custom_integrator:
-            self.integrator = RK45_Custom(self.params)
+            self.integrator = RK45_Custom()
         else:
             self.integrator = Diffrax(self.params)
 
