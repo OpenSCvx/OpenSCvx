@@ -6,17 +6,21 @@ repo_name: haynec/OpenSCvx
 repo_url: https://github.com/haynec/OpenSCvx
 theme:
   name: material
+  favicon: "overrides/_static/rocket.png"
   icon:
     logo: material/rocket-launch-outline 
     admonition:
       <type>: material/fire
   features:
     - navigation.sections
+    - navigation.instant.preview
     - announce.dismiss
     - user_color_mode_toggle
     - header.autohide
     - toc.integrate
     - content.code.copy
+    - navigation.instant
+    - navigation.instant.prefetch
   palette:
     - media: "(prefers-color-scheme)"
       toggle:
@@ -39,9 +43,6 @@ theme:
   font:
     text: CMU Sans Serif
 
-extra_css:
-  - stylesheets/extra.css
-
 markdown_extensions:
   - admonition
   - pymdownx.details
@@ -61,8 +62,8 @@ extra_javascript:
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 
 extra_css:
-  - _static/custom_css.css
-
+  - overrides/stylesheets/custom_css.css
+  
 copyright: Copyright &copy; 2025 Chris Hayner
 
 plugins:
@@ -86,7 +87,7 @@ plugins:
           paths: [src]
 
 nav:
-    - 'index.md'
+    - Home: index.md
     - Usage:
       - 'Usage/basic_problem_setup.md'
       - 'Usage/advanced_problem_setup.md'
