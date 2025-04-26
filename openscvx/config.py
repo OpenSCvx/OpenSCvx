@@ -53,7 +53,8 @@ class DiscretizationConfig:
 class DevConfig:
     def __init__(self, 
                  profiling: bool = False, 
-                 debug: bool = False):
+                 debug: bool = False,
+                 debug_printing: bool = True):
         """
         Configuration class for development settings.
 
@@ -67,7 +68,8 @@ class DevConfig:
             debug (bool): Disables all precompilation so you can place breakpoints and inspect values. Defaults to False.
         """
         self.profiling = profiling
-        self.debug = debug
+        self.debug = debug    debug_printing: bool = True
+
 
 @dataclass
 class ConvexSolverConfig:
