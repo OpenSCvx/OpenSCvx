@@ -93,7 +93,7 @@ def OCP(params: Config):
             cost += lam_cost * x_nonscaled[-1][i]
 
     if params.scp.uniform_time_grid:
-        constr += [x_nonscaled[i][params.dyn.t_inds] - x_nonscaled[i-1][params.dyn.t_inds] == x_nonscaled[i-1][params.dyn.t_inds] - x_nonscaled[i-2][params.dyn.t_inds] for i in range(2, params.scp.n)] # Uniform Time Step
+        constr += [x_nonscaled[i][params.sim.t_inds] - x_nonscaled[i-1][params.sim.t_inds] == x_nonscaled[i-1][params.sim.t_inds] - x_nonscaled[i-2][params.sim.t_inds] for i in range(2, params.scp.n)] # Uniform Time Step
 
     constr += [0 == la.inv(S_x) @ (x_nonscaled[i] - x_bar[i] - dx[i]) for i in range(params.scp.n)] # State Error
     constr += [0 == la.inv(S_u) @ (u_nonscaled[i] - u_bar[i] - du[i]) for i in range(params.scp.n)] # Control Error

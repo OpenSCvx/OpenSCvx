@@ -52,6 +52,9 @@ class SimConfig:
     total_time: float
     constraints_ctcs: List[callable] = field(default_factory=list)
     constraints_nodal: List[callable] = field(default_factory=list)
+    t_inds: int = -2
+    y_inds: int = -1
+    s_inds: int = -1
     n_states: int = None
     n_controls: int = None
     S_x: np.ndarray = None

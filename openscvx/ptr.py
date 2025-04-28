@@ -160,7 +160,7 @@ def PTR_post(params: Config, result: dict, aug_dy: ExactDis) -> dict:
 
     x_full = simulate_nonlinear_time(x[0], u_lam, tau_vals, t, aug_dy, params)
 
-    print("Total CTCS Constraint Violation:", x_full[-1, params.dyn.y_inds])
+    print("Total CTCS Constraint Violation:", x_full[-1, params.sim.y_inds])
     i = 0
     cost = np.zeros_like(x[-1, i])
     for type in params.sim.initial_state.type:
