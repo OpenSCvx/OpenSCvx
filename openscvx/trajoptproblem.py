@@ -14,7 +14,8 @@ from openscvx.config import (
     DevConfig,
     Config,
 )
-from openscvx.dynamics import Dynamics
+from openscvx.dynamics import Dynamics, get_augmented_dynamics
+from openscvx.constraints.ctcs import get_g_func
 from openscvx.discretization import ExactDis
 from openscvx.constraints.boundary import BoundaryConstraint
 from openscvx.ptr import PTR_init, PTR_main, PTR_post
@@ -121,8 +122,10 @@ class TrajOptProblem:
                     f"Unknown constraint type: {constraint.constraint_type}, All constraints must be decorated with @ctcs or @nodal"
                 )
 
+        g_func = get_g_func(self.constraints_ctcs)
+        dynamics_augmented = get_augmented_dynamics(dynamics, g_func)
         veh = Dynamics(
-            dynamics,
+            dynamics_augmented,
             self.constraints_ctcs,
             self.constraints_nodal,  # TODO (norrisg) Maybe move this outside of the dynamics?
         )

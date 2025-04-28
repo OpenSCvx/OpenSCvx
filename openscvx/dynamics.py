@@ -10,36 +10,18 @@ import jax.numpy as jnp
 class Dynamics:
     def __init__(
         self,
-        dynamics: callable,
+        dynamics_augmented: callable,
         constraints_ctcs: List[callable],
         constraints_nodal: List[callable],
     ):
 
-        self.dynamics = dynamics
         self.constraints_ctcs = constraints_ctcs
         self.constraints_nodal = constraints_nodal
 
         # Dynamics Functions
-        self.state_dot = jax.vmap(self.dyn_aug)
-        self.A = jax.jit(jax.vmap(jax.jacfwd(self.dyn_aug, argnums=0), in_axes=(0, 0)))
-        self.B = jax.jit(jax.vmap(jax.jacfwd(self.dyn_aug, argnums=1), in_axes=(0, 0)))
-
-    def g_func(self, x: jnp.array, u: jnp.array) -> jnp.array:
-        g_sum = 0
-        for g in self.constraints_ctcs:
-            g_sum += g(x, u)
-        return g_sum
-
-    def dyn_aug(self, x: jnp.array, u: jnp.array) -> jnp.array:
-        # TODO: (norrisg) handle varying lengths of x and u due to augmentation more elegantly
-        self.t_inds = -2
-        self.y_inds = -1
-        self.s_inds = -1
-
-        x_dot = self.dynamics(x[:-1], u)
-        t_dot = 1
-        y_dot = self.g_func(x, u)
-        return jnp.hstack([x_dot, t_dot, y_dot])
+        self.state_dot = jax.vmap(dynamics_augmented)
+        self.A = jax.jit(jax.vmap(jax.jacfwd(dynamics_augmented, argnums=0), in_axes=(0, 0)))
+        self.B = jax.jit(jax.vmap(jax.jacfwd(dynamics_augmented, argnums=1), in_axes=(0, 0)))
 
 def get_augmented_dynamics(dynamics: callable, g_func: callable):
     def dynamics_augmented(x: jnp.array, u: jnp.array) -> jnp.array:
