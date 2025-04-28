@@ -13,15 +13,17 @@ def get_affine_scaling_matrices(n, minimum, maximum):
 class DiscretizationConfig:
     dis_type: str = "FOH"
     custom_integrator: bool = True
-    diffrax: bool = False
-    diffrax_solver: str = "Tsit5"
-    diffrax_args: Dict = field(default_factory=dict)
+    solver: str = "Tsit5"
+    args: Dict = field(default_factory=dict)
+    atol: float = 1e-3
+    rtol: float = 1e-6
 
 
 @dataclass
 class DevConfig:
     profiling: bool = False
     debug: bool = False
+    debug_printing: bool = True
 
 
 @dataclass
@@ -35,6 +37,10 @@ class ConvexSolverConfig:
 class PropagationConfig:
     inter_sample: int = 30
     dt: float = 0.1
+    solver: str = "Dopri8"
+    args: Dict = field(default_factory=dict)
+    atol: float = 1e-3
+    rtol: float = 1e-6
 
 
 @dataclass

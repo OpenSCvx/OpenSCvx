@@ -9,7 +9,6 @@ from termcolor import colored
 
 from openscvx.discretization import ExactDis
 from openscvx.config import Config
-from openscvx.propagation import u_lambda, simulate_nonlinear_time
 from openscvx.ocp import OCP
 
 import warnings
@@ -68,6 +67,8 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: ExactDis, cpg_solve) -> d
         # Enable the profiler
         pr.enable()
 
+    log_data = []
+
     t_0_while = time.time()
     while k <= params.scp.k_max and ((J_tr >= params.scp.ep_tr) or (J_vb >= params.scp.ep_vb) or (J_vc >= params.scp.ep_vc)):
         x, u, t, J_total, J_vb_vec, J_vc_vec, J_tr_vec, prob_stat, V_multi_shoot, subprop_time, dis_time = PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params)
@@ -87,31 +88,46 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: ExactDis, cpg_solve) -> d
         if k > params.scp.cost_drop:
             params.scp.lam_cost = params.scp.lam_cost * params.scp.cost_relax
         
-        # remove bottom labels and line
-        if not k == 1:
-            sys.stdout.write('\x1b[1A\x1b[2K\x1b[1A\x1b[2K')
-        
-        if prob_stat[3] == 'f':
-            # Only show the first element of the string
-            prob_stat = prob_stat[0]
 
-        # Determine color for each value
-        iter_colored = colored("{:4d}".format(k))
-        J_tot_colored = colored("{:.1e}".format(J_total))
-        J_tr_colored = colored("{:.1e}".format(J_tr), col_pos if J_tr <= params.scp.ep_tr else col_neg)
-        J_vb_colored = colored("{:.1e}".format(J_vb), col_pos if J_vb <= params.scp.ep_vb else col_neg)
-        J_vc_colored = colored("{:.1e}".format(J_vc), col_pos if J_vc <= params.scp.ep_vc else col_neg)
-        cost_colored = colored("{:.1e}".format(t[-1]))
-        prob_stat_colored = colored(prob_stat, col_pos if prob_stat == 'optimal' else col_neg)
 
-        # Print with colors
-        print("{:^4} |     {:^6.2f}    |      {:^6.2F}     | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
-            iter_colored, dis_time*1000.0, subprop_time*1000.0, J_tot_colored, J_tr_colored, J_vb_colored, J_vc_colored, cost_colored, prob_stat_colored))
+        log_data.append({
+                "iter": k,
+                "dis_time": dis_time * 1000.0,
+                "subprop_time": subprop_time * 1000.0,
+                "J_total": J_total,
+                "J_tr": J_tr,
+                "J_vb": J_vb,
+                "J_vc": J_vc,
+                "cost": t[-1],
+                "prob_stat": prob_stat
+            })
 
-        print(colored("---------------------------------------------------------------------------------------------------------"))
-        print("{:^4} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
-            "Iter", "Dis Time (ms)", "Solve Time (ms)", "J_total", "J_tr", "J_vb", "J_vc", "Cost", "Solver Status"))
-        
+        if params.dev.debug_printing:
+            # remove bottom labels and line
+            if not k == 1:
+                sys.stdout.write('\x1b[1A\x1b[2K\x1b[1A\x1b[2K')
+            
+            if prob_stat[3] == 'f':
+                # Only show the first element of the string
+                prob_stat = prob_stat[0]
+
+            # Determine color for each value
+            iter_colored = colored("{:4d}".format(k))
+            J_tot_colored = colored("{:.1e}".format(J_total))
+            J_tr_colored = colored("{:.1e}".format(J_tr), col_pos if J_tr <= params.scp.ep_tr else col_neg)
+            J_vb_colored = colored("{:.1e}".format(J_vb), col_pos if J_vb <= params.scp.ep_vb else col_neg)
+            J_vc_colored = colored("{:.1e}".format(J_vc), col_pos if J_vc <= params.scp.ep_vc else col_neg)
+            cost_colored = colored("{:.1e}".format(t[-1]))
+            prob_stat_colored = colored(prob_stat, col_pos if prob_stat == 'optimal' else col_neg)
+
+            # Print with colors
+            print("{:^4} |     {:^6.2f}    |      {:^6.2F}     | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
+                iter_colored, dis_time*1000.0, subprop_time*1000.0, J_tot_colored, J_tr_colored, J_vb_colored, J_vc_colored, cost_colored, prob_stat_colored))
+
+            print(colored("---------------------------------------------------------------------------------------------------------"))
+            print("{:^4} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
+                "Iter", "Dis Time (ms)", "Solve Time (ms)", "J_total", "J_tr", "J_vb", "J_vc", "Cost", "Solver Status"))
+            
         k += 1
 
     t_f_while = time.time()
@@ -121,6 +137,25 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: ExactDis, cpg_solve) -> d
         
         # Save results so it can be viusualized with snakeviz
         pr.dump_stats('profiling_results.prof')
+    
+
+    # Print logged data once
+    if not params.dev.debug_printing:  
+        print(colored("---------------------------------------------------------------------------------------------------------"))
+        print("{:^4} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
+            "Iter", "Dis Time (ms)", "Solve Time (ms)", "J_total", "J_tr", "J_vb", "J_vc", "Cost", "Solver Status"))
+
+        for data in log_data:
+            iter_colored = colored("{:4d}".format(data["iter"]))
+            J_tot_colored = colored("{:.1e}".format(data["J_total"]))
+            J_tr_colored = colored("{:.1e}".format(data["J_tr"]), col_pos if data["J_tr"] <= params.scp.ep_tr else col_neg)
+            J_vb_colored = colored("{:.1e}".format(data["J_vb"]), col_pos if data["J_vb"] <= params.scp.ep_vb else col_neg)
+            J_vc_colored = colored("{:.1e}".format(data["J_vc"]), col_pos if data["J_vc"] <= params.scp.ep_vc else col_neg)
+            cost_colored = colored("{:.1e}".format(data["cost"]))
+            prob_stat_colored = colored(data["prob_stat"], col_pos if data["prob_stat"] == 'optimal' else col_neg)
+
+            print("{:^4} |     {:^6.2f}    |      {:^6.2F}     | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
+                iter_colored, data["dis_time"], data["subprop_time"], J_tot_colored, J_tr_colored, J_vb_colored, J_vc_colored, cost_colored, prob_stat_colored))
 
 
     print(colored("---------------------------------------------------------------------------------------------------------"))
@@ -153,12 +188,11 @@ def PTR_post(params: Config, result: dict, aug_dy: ExactDis) -> dict:
 
     t = np.array(aug_dy.s_to_t(u, params))
 
-    u_lam = u_lambda(u, t, params)
     t_full = np.arange(0, t[-1], params.prp.dt)
 
-    tau_vals, u_full = aug_dy.t_to_tau(u_lam, t_full, u, t, params)
+    tau_vals, u_full = aug_dy.t_to_tau(u, t_full, u, t, params)
 
-    x_full = simulate_nonlinear_time(x[0], u_lam, tau_vals, t, aug_dy, params)
+    x_full = aug_dy.simulate_nonlinear_time(x[0], u, tau_vals, t)
 
     print("Total CTCS Constraint Violation:", x_full[-1, params.sim.y_inds])
     i = 0
@@ -224,7 +258,7 @@ def PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params: Config):
     u = (params.sim.S_u @ prob.var_dict['u'].value.T + np.expand_dims(params.sim.c_u, axis = 1)).T
 
     i = 0
-    costs = 0
+    costs = [0]
     for type in params.sim.final_state.type:
         if type == 'Minimize':
             costs = x[:,i]

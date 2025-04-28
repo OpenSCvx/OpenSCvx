@@ -1184,7 +1184,6 @@ def plot_animation(result: dict,
     drone_positions = result["x_full"][:, :3]
     drone_velocities = result["x_full"][:, 3:6]
     drone_attitudes = result["x_full"][:, 6:10]
-    drone_forces = result["u_full"][:, :3]
     if "moving_subject" in result or "init_poses" in result:
         subs_positions, _, _, _ = full_subject_traj_time(result, params)
 
@@ -1221,7 +1220,6 @@ def plot_animation(result: dict,
         # Convert quaternion to rotation matrix
         rotation_matrix = qdcm(att)
 
-        force = 0.5 * rotation_matrix @ drone_forces[indices[i]]
 
         # Extract axes from rotation matrix
         axes = 20 * np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
@@ -1286,8 +1284,8 @@ def plot_animation(result: dict,
 
             data.append(go.Surface(x=X, y=Y, z=Z, opacity = 0.5, showscale=False, showlegend=True, name='Viewcone'))
 
-        colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFFFF']
-        labels = ['X', 'Y', 'Z', 'Force']
+        colors = ['#FF0000', '#00FF00', '#0000FF']
+        labels = ['X', 'Y', 'Z']
 
         for k in range(3):
             if k < 3:
@@ -1295,17 +1293,7 @@ def plot_animation(result: dict,
             color = colors[k]
             label = labels[k]
 
-            if label == 'Force':
-                data.append(go.Scatter3d(
-                    x=[drone_positions[indices[i], 0], drone_positions[indices[i], 0] + force[0]],
-                    y=[drone_positions[indices[i], 1], drone_positions[indices[i], 1] + force[1]],
-                    z=[drone_positions[indices[i], 2], drone_positions[indices[i], 2] + force[2]],
-                    mode='lines',
-                    line=dict(color=color, width=4),
-                    showlegend=False
-                ))
-            else:
-                data.append(go.Scatter3d(
+            data.append(go.Scatter3d(
                     x=[drone_positions[indices[i], 0], drone_positions[indices[i], 0] + axis[0]],
                     y=[drone_positions[indices[i], 1], drone_positions[indices[i], 1] + axis[1]],
                     z=[drone_positions[indices[i], 2], drone_positions[indices[i], 2] + axis[2]],
@@ -1313,7 +1301,6 @@ def plot_animation(result: dict,
                     line=dict(color=color, width=4),
                     showlegend=False
                 ))
-
         # Add subject position to data
         j = 0
         for sub_pose in subs_pose:
