@@ -14,7 +14,7 @@ from openscvx.config import (
     DevConfig,
     Config,
 )
-from openscvx.dynamics import Dynamics, get_augmented_dynamics, get_jacobians
+from openscvx.dynamics import get_augmented_dynamics, get_jacobians
 from openscvx.constraints.ctcs import get_g_func
 from openscvx.discretization import ExactDis
 from openscvx.constraints.boundary import BoundaryConstraint
@@ -146,7 +146,9 @@ class TrajOptProblem:
         self.params.scp.__post_init__()
         self.params.sim.__post_init__()
 
-        self.ocp, self.dynamics_discretized, self.cpg_solve = PTR_init(self.state_dot, self.A, self.B, self.params)
+        self.ocp, self.dynamics_discretized, self.cpg_solve = PTR_init(
+            self.state_dot, self.A, self.B, self.params
+        )
 
         # Extract the number of states and controls from the parameters
         n_x = self.params.sim.n_states
