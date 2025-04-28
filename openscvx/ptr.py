@@ -200,8 +200,8 @@ def PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params: Config):
     prob.param_dict['z_d'].value = z_bar.__array__()
     dis_time = time.time() - t0
 
-    if params.dyn.constraints_nodal:
-        for g_id, constraint in enumerate(params.dyn.constraints_nodal):
+    if params.sim.constraints_nodal:
+        for g_id, constraint in enumerate(params.sim.constraints_nodal):
             if not constraint.convex:
                 prob.param_dict['g_' + str(g_id)].value = np.asarray(constraint.g(x_bar, u_bar))
                 prob.param_dict['grad_g_x_' + str(g_id)].value = np.asarray(constraint.grad_g_x(x_bar, u_bar))
@@ -242,7 +242,7 @@ def PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params: Config):
     
     id_ncvx = 0
     J_vb_vec = 0
-    for constraint in params.dyn.constraints_nodal:
+    for constraint in params.sim.constraints_nodal:
         if constraint.convex == False:
             J_vb_vec += np.maximum(0, prob.var_dict['nu_vb_' + str(id_ncvx)].value)
             id_ncvx += 1

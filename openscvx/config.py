@@ -1,6 +1,6 @@
 import numpy as np
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, List
 
 from openscvx.dynamics import Dynamics
 
@@ -50,6 +50,8 @@ class SimConfig:
     max_control: np.ndarray
     min_control: np.ndarray
     total_time: float
+    constraints_ctcs: List[callable] = field(default_factory=list)
+    constraints_nodal: List[callable] = field(default_factory=list)
     n_states: int = None
     n_controls: int = None
     S_x: np.ndarray = None

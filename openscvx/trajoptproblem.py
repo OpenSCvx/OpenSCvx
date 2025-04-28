@@ -107,27 +107,22 @@ class TrajOptProblem:
         if prp is None:
             prp = PropagationConfig()
 
-        self.constraints_ctcs = []
-        self.constraints_nodal = []
-
         for constraint in constraints:
             if constraint.constraint_type == "ctcs":
-                self.constraints_ctcs.append(
+                sim.constraints_ctcs.append(
                     lambda x, u, func=constraint: jnp.sum(func.penalty(func(x, u)))
                 )
             elif constraint.constraint_type == "nodal":
-                self.constraints_nodal.append(constraint)
+                sim.constraints_nodal.append(constraint)
             else:
                 raise ValueError(
                     f"Unknown constraint type: {constraint.constraint_type}, All constraints must be decorated with @ctcs or @nodal"
                 )
 
-        g_func = get_g_func(self.constraints_ctcs)
+        g_func = get_g_func(sim.constraints_ctcs)
         dynamics_augmented = get_augmented_dynamics(dynamics, g_func)
         veh = Dynamics(
             dynamics_augmented,
-            self.constraints_ctcs,
-            self.constraints_nodal,  # TODO (norrisg) Maybe move this outside of the dynamics?
         )
 
         self.params = Config(

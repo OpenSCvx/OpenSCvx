@@ -11,13 +11,7 @@ class Dynamics:
     def __init__(
         self,
         dynamics_augmented: callable,
-        constraints_ctcs: List[callable],
-        constraints_nodal: List[callable],
     ):
-
-        self.constraints_ctcs = constraints_ctcs
-        self.constraints_nodal = constraints_nodal
-
         # Dynamics Functions
         self.state_dot = jax.vmap(dynamics_augmented)
         A_uncompiled, B_uncompiled = get_jacobians(dynamics_augmented)
