@@ -20,8 +20,9 @@ class Dynamics:
 
         # Dynamics Functions
         self.state_dot = jax.vmap(dynamics_augmented)
-        self.A = jax.jit(jax.vmap(jax.jacfwd(dynamics_augmented, argnums=0), in_axes=(0, 0)))
-        self.B = jax.jit(jax.vmap(jax.jacfwd(dynamics_augmented, argnums=1), in_axes=(0, 0)))
+        A_uncompiled, B_uncompiled = get_jacobians(dynamics_augmented)
+        self.A = jax.jit(jax.vmap(A_uncompiled, in_axes=(0, 0)))
+        self.B = jax.jit(jax.vmap(B_uncompiled, in_axes=(0, 0)))
 
 def get_augmented_dynamics(dynamics: callable, g_func: callable):
     def dynamics_augmented(x: jnp.array, u: jnp.array) -> jnp.array:
