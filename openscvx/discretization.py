@@ -67,9 +67,9 @@ class RK45_Custom:
 
     
 class Diffrax_Prop:
-    def __init__(self, params):
+    def __init__(self, state_dot, A, B, params):
         self.params = params
-        self.func = ExactDis(params).prop_aug_dy
+        self.func = ExactDis(state_dot, A, B, params).prop_aug_dy
     
     def solve_ivp(self, V0, tau_grid, u_cur, u_next, tau_init, idx_s):
         t_eval = jnp.linspace(tau_grid[0], tau_grid[1], 50)
@@ -338,7 +338,7 @@ class ExactDis:
             # Use count to grab the first count number of elements
             tau_cur = tau_vals[prev_count:prev_count + count]
 
-            sol = self.params.prp.integrator(x_0, (tau[k], tau[k + 1]), controls_current, controls_next, np.array([[tau[k]]]), params.dyn.s_inds)
+            sol = self.params.prp.integrator(x_0, (tau[k], tau[k + 1]), controls_current, controls_next, np.array([[tau[k]]]), params.sim.s_inds)
 
             x = sol.ys
             for tau_i in tau_cur:

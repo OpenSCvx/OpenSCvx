@@ -175,7 +175,7 @@ class TrajOptProblem:
                 np.ones((self.params.scp.n, self.params.sim.n_controls)),
             ).compile()
 
-        diff_prop = Diffrax_Prop(self.params)
+        diff_prop = Diffrax_Prop(self.state_dot, self.A, self.B, self.params)
         self.params.prp.integrator = jax.jit(diff_prop.solve_ivp).lower(
             np.ones((self.params.sim.n_states)),
             (0.0, 0.0),
