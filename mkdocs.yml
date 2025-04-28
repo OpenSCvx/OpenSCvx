@@ -6,7 +6,7 @@ repo_name: haynec/OpenSCvx
 repo_url: https://github.com/haynec/OpenSCvx
 theme:
   name: material
-  favicon: "overrides/_static/rocket.png"
+  favicon: "static/images/favicon.png"
   icon:
     logo: material/rocket-launch-outline 
     admonition:
@@ -19,8 +19,10 @@ theme:
     - header.autohide
     - toc.integrate
     - content.code.copy
+    - content.code.select
     - navigation.instant
     - navigation.instant.prefetch
+    - navigation.instant.progress
   palette:
     - media: "(prefers-color-scheme)"
       toggle:
@@ -47,7 +49,13 @@ markdown_extensions:
   - admonition
   - pymdownx.details
   - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
   - attr_list
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
   - toc:
       permalink: "¤"  # Adds a clickable permalink to each section heading
       toc_depth: 2  # Prevents h5, h6 (i.e. methods) from showing up in the TOC.
@@ -56,17 +64,19 @@ markdown_extensions:
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.arithmatex:
       generic: true
+      
 
 extra_javascript:
   - javascripts/mathjax.js
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 
-extra_css:
-  - overrides/stylesheets/custom_css.css
+# extra_css:
+#   - overrides/stylesheets/custom_css.css
   
 copyright: Copyright &copy; 2025 Chris Hayner
 
 plugins:
+  - optimize
   - mkdocstrings:
       setup_commands:
             - import pytkdocs_tweaks

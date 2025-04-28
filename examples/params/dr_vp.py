@@ -183,6 +183,8 @@ problem = TrajOptProblem(
 problem.params.prp.dt = 0.1
 problem.params.dis.custom_integrator = True
 
+problem.params.dev.debug_printing = False
+
 
 problem.params.scp.w_tr = 2e0  # Weight on the Trust Reigon
 problem.params.scp.lam_cost = 1e-1  # 0e-1,  # Weight on the Minimal Time Objective
