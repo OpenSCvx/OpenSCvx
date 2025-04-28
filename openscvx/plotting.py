@@ -1233,7 +1233,7 @@ def plot_animation(result: dict,
             x = np.linspace(-5, 5, 20)
             y = np.linspace(-5, 5, 20)
             z = np.linspace(-5, 5, 20)
-        elif hasattr(params.dyn, 'covariance') and params.dyn.covariance:
+        elif "covariance" in result:
             x = np.linspace(-2000, 2000, 20)
             y = np.linspace(-2000, 2000, 20)
             z = np.linspace(-2000, 2000, 20)
@@ -1459,8 +1459,8 @@ def plot_animation(result: dict,
     
     fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
     
-    # Check if params.dyn.covairance exists
-    if hasattr(params.dyn, 'covariance'):
+    # Check if covariance exists
+    if "covariance" in result:
         fig.update_layout(scene=dict(xaxis=dict(range=[0, 4000]), yaxis=dict(range=[0, 4000]), zaxis=dict(range=[-1000, 3000])))
     else:
         fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
