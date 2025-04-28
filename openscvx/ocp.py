@@ -45,12 +45,12 @@ def OCP(params: Config):
     nu  = cp.Variable((params.scp.n - 1, params.sim.n_states), name='nu') # Virtual Control
 
     # Linearized Nonconvex Nodal Constraints
-    if params.dyn.constraints_nodal:
+    if params.sim.constraints_nodal:
         g = []
         grad_g_x = []
         grad_g_u = []
         nu_vb = []
-        for idx_ncvx, constraint in enumerate(params.dyn.constraints_nodal):
+        for idx_ncvx, constraint in enumerate(params.sim.constraints_nodal):
             if not constraint.convex:
                 g.append(cp.Parameter(params.scp.n, name = 'g_' + str(idx_ncvx)))
                 grad_g_x.append(cp.Parameter((params.scp.n, params.sim.n_states), name='grad_g_x_' + str(idx_ncvx)))
@@ -71,8 +71,8 @@ def OCP(params: Config):
     # CONSTRAINTS
     #############
     idx_ncvx = 0
-    if params.dyn.constraints_nodal:
-        for constraint in params.dyn.constraints_nodal:
+    if params.sim.constraints_nodal:
+        for constraint in params.sim.constraints_nodal:
             if constraint.nodes is None:
                 nodes = range(params.scp.n)
             else:
@@ -96,7 +96,7 @@ def OCP(params: Config):
             cost += lam_cost * x_nonscaled[-1][i]
 
     if params.scp.uniform_time_grid:
-        constr += [x_nonscaled[i][params.dyn.t_inds] - x_nonscaled[i-1][params.dyn.t_inds] == x_nonscaled[i-1][params.dyn.t_inds] - x_nonscaled[i-2][params.dyn.t_inds] for i in range(2, params.scp.n)] # Uniform Time Step
+        constr += [x_nonscaled[i][params.sim.t_inds] - x_nonscaled[i-1][params.sim.t_inds] == x_nonscaled[i-1][params.sim.t_inds] - x_nonscaled[i-2][params.sim.t_inds] for i in range(2, params.scp.n)] # Uniform Time Step
 
     constr += [0 == la.inv(S_x) @ (x_nonscaled[i] - x_bar[i] - dx[i]) for i in range(params.scp.n)] # State Error
     constr += [0 == la.inv(S_u) @ (u_nonscaled[i] - u_bar[i] - du[i]) for i in range(params.scp.n)] # Control Error
@@ -123,8 +123,8 @@ def OCP(params: Config):
     cost += sum(params.scp.lam_vc * cp.sum(cp.abs(nu[i-1])) for i in range(1, params.scp.n)) # Virtual Control Slack
     
     idx_ncvx = 0
-    if params.dyn.constraints_nodal:
-        for constraint in params.dyn.constraints_nodal:
+    if params.sim.constraints_nodal:
+        for constraint in params.sim.constraints_nodal:
             if not constraint.convex:
                 cost += params.scp.lam_vb * cp.sum(cp.pos(nu_vb[idx_ncvx]))
                 idx_ncvx += 1

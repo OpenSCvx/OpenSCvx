@@ -1,8 +1,6 @@
 import numpy as np
 from dataclasses import dataclass, field
-from typing import Dict
-
-from openscvx.dynamics import Dynamics
+from typing import Dict, List
 
 
 def get_affine_scaling_matrices(n, minimum, maximum):
@@ -139,78 +137,33 @@ class PropagationConfig:
 
 @dataclass
 class SimConfig:
-    def __init__(self,
-                 x_bar: np.ndarray,
-                 u_bar: np.ndarray,
-                 initial_state: np.ndarray,
-                 final_state: np.ndarray,
-                 max_state: np.ndarray,
-                 min_state: np.ndarray,
-                 max_control: np.ndarray,
-                 min_control: np.ndarray,
-                 total_time: float,
-                 n_states: int = None,
-                 n_controls: int = None,
-                 S_x: np.ndarray = None,
-                 inv_S_x: np.ndarray = None,
-                 c_x: np.ndarray = None,
-                 S_u: np.ndarray = None,
-                 inv_S_u: np.ndarray = None,
-                 c_u: np.ndarray = None):
-        """
-        Configuration class for simulation settings.
+    x_bar: np.ndarray
+    u_bar: np.ndarray
+    initial_state: np.ndarray
+    final_state: np.ndarray
+    max_state: np.ndarray
+    min_state: np.ndarray
+    max_control: np.ndarray
+    min_control: np.ndarray
+    total_time: float
+    constraints_ctcs: List[callable] = field(
+        default_factory=list
+    )  # TODO (norrisg): clean this up, consider moving to dedicated `constraints` dataclass
+    constraints_nodal: List[callable] = field(default_factory=list)
+    t_inds: int = (
+        -2
+    )  # TODO (norrisg): clean this up, should be generated and tracked more elegantly
+    y_inds: int = -1
+    s_inds: int = -1
+    n_states: int = None
+    n_controls: int = None
+    S_x: np.ndarray = None
+    inv_S_x: np.ndarray = None
+    c_x: np.ndarray = None
+    S_u: np.ndarray = None
+    inv_S_u: np.ndarray = None
+    c_u: np.ndarray = None
 
-        Main arguments:
-        These are the arguments that are required 
-
-        Args:
-            x_bar (np.ndarray): Initial guess for the state trajectory.
-            u_bar (np.ndarray): Initial guess for the control trajectory.
-            initial_state (np.ndarray): The initial state of the system.
-            final_state (np.ndarray): The final state of the system.
-            max_state (np.ndarray): The maximum allowable state values.
-            min_state (np.ndarray): The minimum allowable state values.
-            max_control (np.ndarray): The maximum allowable control values.
-            min_control (np.ndarray): The minimum allowable control values.
-            total_time (float): Initial guess for the total simulation time.
-
-        Other arguments:
-        The state and control are scaled internally using a similar affine scaling method to that use in [Taylor et al. 2020](https://depts.washington.edu/uwrainlab/wordpress/wp-content/uploads/2020/01/AIAA_SciTech_2020.pdf), 
-
-        $$ 
-        \\begin{align*} 
-            \\tilde{x} = S_x x + c_x, \\
-            \\tilde{u} = S_u u + c_u,  
-        \\end{align*}    
-        $$
-
-        where 
-        
-        $$
-        \\begin{align}
-            S_{\\Box} = \mathrm{diag}\ \\max \\left(1, \\frac{\\Box_\\mathrm{min}^i - \\Box_\\mathrm{max}^i)}{2}\\right),\ \\
-            c_{\\Box}[i] = \\frac{\\Box_\\mathrm{min}^i + \\Box_\\mathrm{max}^i}{2}
-        \\end{align}
-        $$
-
-        This is done to ensure numerical stability. 
-
-        Args:
-            n_states (int, optional): TODO haynec depreciate and collect form x_bar size. 
-            n_controls (int, optional): TODO haynec depreciate and collect form u_bar size. 
-            S_x (np.ndarray, optional): State scaling matrix. Handeled internally. Defaults to `None`.
-            inv_S_x (np.ndarray, optional): Inverse of the state scaling matrix. Handeled internally. Defaults to `None`.
-            c_x (np.ndarray, optional): State offset vector. Handeled internally. Defaults to `None`.
-            S_u (np.ndarray, optional): Control scaling matrix. Handeled internally. Defaults to `None`.
-            inv_S_u (np.ndarray, optional): Inverse of the control scaling matrix. Handeled internally. Defaults to `None`.
-            c_u (np.ndarray, optional): Control offset vector. Handeled internally. Defaults to `None`.
-        """
-
-
-        for key, value in locals().items():
-            if key != "self":
-                setattr(self, key, value)
- 
     def __post_init__(self):
         self.n_states = len(self.max_state)
         self.n_controls = len(self.max_control)
@@ -305,7 +258,6 @@ class ScpConfig:
 class Config:
     sim: SimConfig
     scp: ScpConfig
-    dyn: Dynamics
     cvx: ConvexSolverConfig
     dis: DiscretizationConfig
     prp: PropagationConfig
