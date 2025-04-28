@@ -14,7 +14,7 @@ from openscvx.config import (
     DevConfig,
     Config,
 )
-from openscvx.dynamics import Dynamics, get_augmented_dynamics
+from openscvx.dynamics import Dynamics, get_augmented_dynamics, get_jacobians
 from openscvx.constraints.ctcs import get_g_func
 from openscvx.discretization import ExactDis
 from openscvx.constraints.boundary import BoundaryConstraint
@@ -121,14 +121,16 @@ class TrajOptProblem:
 
         g_func = get_g_func(sim.constraints_ctcs)
         dynamics_augmented = get_augmented_dynamics(dynamics, g_func)
-        veh = Dynamics(
-            dynamics_augmented,
-        )
+        A_uncompiled, B_uncompiled = get_jacobians(dynamics_augmented)
+        # compilation
+        # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
+        self.state_dot = jax.vmap(dynamics_augmented)
+        self.A = jax.jit(jax.vmap(A_uncompiled, in_axes=(0, 0)))
+        self.B = jax.jit(jax.vmap(B_uncompiled, in_axes=(0, 0)))
 
         self.params = Config(
             sim=sim,
             scp=scp,
-            dyn=veh,
             dis=dis,
             dev=dev,
             cvx=cvx,
@@ -144,7 +146,7 @@ class TrajOptProblem:
         self.params.scp.__post_init__()
         self.params.sim.__post_init__()
 
-        self.ocp, self.dynamics_discretized, self.cpg_solve = PTR_init(self.params.dyn.state_dot, self.params.dyn.A, self.params.dyn.B, self.params)
+        self.ocp, self.dynamics_discretized, self.cpg_solve = PTR_init(self.state_dot, self.A, self.B, self.params)
 
         # Extract the number of states and controls from the parameters
         n_x = self.params.sim.n_states
