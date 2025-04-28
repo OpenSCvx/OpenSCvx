@@ -120,13 +120,8 @@ class TrajOptProblem:
                 )
 
         g_func = get_g_func(sim.constraints_ctcs)
-        dynamics_augmented = get_augmented_dynamics(dynamics, g_func)
-        A_uncompiled, B_uncompiled = get_jacobians(dynamics_augmented)
-        # compilation
-        # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
-        self.state_dot = jax.vmap(dynamics_augmented)
-        self.A = jax.jit(jax.vmap(A_uncompiled, in_axes=(0, 0)))
-        self.B = jax.jit(jax.vmap(B_uncompiled, in_axes=(0, 0)))
+        self.dynamics_augmented = get_augmented_dynamics(dynamics, g_func)
+        self.A_uncompiled, self.B_uncompiled = get_jacobians(self.dynamics_augmented)
 
         self.params = Config(
             sim=sim,
@@ -141,10 +136,20 @@ class TrajOptProblem:
         self.dynamics_discretized: ExactDis = None
         self.cpg_solve = None
 
+    def compile(self):
+        # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
+        # TODO: (norrisg) Consider writing the compiled versions into the same variables?
+        # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
+        self.state_dot = jax.vmap(self.dynamics_augmented)
+        self.A = jax.jit(jax.vmap(self.A_uncompiled, in_axes=(0, 0)))
+        self.B = jax.jit(jax.vmap(self.B_uncompiled, in_axes=(0, 0)))
+
     def initialize(self):
         # Ensure parameter sizes and normalization are correct
         self.params.scp.__post_init__()
         self.params.sim.__post_init__()
+
+        self.compile()
 
         self.ocp, self.dynamics_discretized, self.cpg_solve = PTR_init(
             self.state_dot, self.A, self.B, self.params
