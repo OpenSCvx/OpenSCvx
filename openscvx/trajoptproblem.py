@@ -2,7 +2,7 @@ import jax.numpy as jnp
 from typing import List
 
 import cvxpy as cp
-from jax import jit
+import jax
 import numpy as np
 
 from openscvx.config import (
@@ -14,7 +14,8 @@ from openscvx.config import (
     DevConfig,
     Config,
 )
-from openscvx.dynamics import Dynamics
+from openscvx.dynamics import get_augmented_dynamics, get_jacobians
+from openscvx.constraints.ctcs import get_g_func
 from openscvx.discretization import ExactDis, Diffrax_Prop
 from openscvx.constraints.boundary import BoundaryConstraint
 from openscvx.ptr import PTR_init, PTR_main, PTR_post
@@ -106,33 +107,25 @@ class TrajOptProblem:
         if prp is None:
             prp = PropagationConfig()
 
-        self.constraints_ctcs = []
-        self.constraints_nodal = []
-
         for constraint in constraints:
             if constraint.constraint_type == "ctcs":
-                self.constraints_ctcs.append(
+                sim.constraints_ctcs.append(
                     lambda x, u, func=constraint: jnp.sum(func.penalty(func(x, u)))
                 )
             elif constraint.constraint_type == "nodal":
-                self.constraints_nodal.append(constraint)
+                sim.constraints_nodal.append(constraint)
             else:
                 raise ValueError(
                     f"Unknown constraint type: {constraint.constraint_type}, All constraints must be decorated with @ctcs or @nodal"
                 )
 
-        veh = Dynamics(
-            dynamics,
-            self.constraints_ctcs,
-            self.constraints_nodal,  # TODO (norrisg) Maybe move this outside of the dynamics?
-            initial_state=initial_state,
-            final_state=final_state,
-        )
+        g_func = get_g_func(sim.constraints_ctcs)
+        self.dynamics_augmented = get_augmented_dynamics(dynamics, g_func)
+        self.A_uncompiled, self.B_uncompiled = get_jacobians(self.dynamics_augmented)
 
         self.params = Config(
             sim=sim,
             scp=scp,
-            dyn=veh,
             dis=dis,
             dev=dev,
             cvx=cvx,
@@ -143,12 +136,24 @@ class TrajOptProblem:
         self.dynamics_discretized: ExactDis = None
         self.cpg_solve = None
 
+    def compile(self):
+        # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
+        # TODO: (norrisg) Consider writing the compiled versions into the same variables?
+        # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
+        self.state_dot = jax.vmap(self.dynamics_augmented)
+        self.A = jax.jit(jax.vmap(self.A_uncompiled, in_axes=(0, 0)))
+        self.B = jax.jit(jax.vmap(self.B_uncompiled, in_axes=(0, 0)))
+
     def initialize(self):
         # Ensure parameter sizes and normalization are correct
         self.params.scp.__post_init__()
         self.params.sim.__post_init__()
 
-        self.ocp, self.dynamics_discretized, self.cpg_solve = PTR_init(self.params)
+        self.compile()
+
+        self.ocp, self.dynamics_discretized, self.cpg_solve = PTR_init(
+            self.state_dot, self.A, self.B, self.params
+        )
 
         # Extract the number of states and controls from the parameters
         n_x = self.params.sim.n_states
@@ -163,15 +168,15 @@ class TrajOptProblem:
         self.i5 = self.i4 + n_x
 
         if not self.params.dev.debug:
-            self.dynamics_discretized.calculate_discretization = jit(
+            self.dynamics_discretized.calculate_discretization = jax.jit(
                 self.dynamics_discretized.calculate_discretization
             ).lower(
                 np.ones((self.params.scp.n, self.params.sim.n_states)),
                 np.ones((self.params.scp.n, self.params.sim.n_controls)),
             ).compile()
 
-        diff_prop = Diffrax_Prop(self.params)
-        self.params.prp.integrator = jit(diff_prop.solve_ivp).lower(
+        diff_prop = Diffrax_Prop(self.state_dot, self.A, self.B, self.params)
+        self.params.prp.integrator = jax.jit(diff_prop.solve_ivp).lower(
             np.ones((self.params.sim.n_states)),
             (0.0, 0.0),
             np.ones((1, self.params.sim.n_controls)), 

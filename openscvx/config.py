@@ -1,8 +1,6 @@
 import numpy as np
 from dataclasses import dataclass, field
-from typing import Dict
-
-from openscvx.dynamics import Dynamics
+from typing import Dict, List
 
 
 def get_affine_scaling_matrices(n, minimum, maximum):
@@ -56,6 +54,15 @@ class SimConfig:
     max_control: np.ndarray
     min_control: np.ndarray
     total_time: float
+    constraints_ctcs: List[callable] = field(
+        default_factory=list
+    )  # TODO (norrisg): clean this up, consider moving to dedicated `constraints` dataclass
+    constraints_nodal: List[callable] = field(default_factory=list)
+    t_inds: int = (
+        -2
+    )  # TODO (norrisg): clean this up, should be generated and tracked more elegantly
+    y_inds: int = -1
+    s_inds: int = -1
     n_states: int = None
     n_controls: int = None
     S_x: np.ndarray = None
@@ -133,7 +140,6 @@ class ScpConfig:
 class Config:
     sim: SimConfig
     scp: ScpConfig
-    dyn: Dynamics
     cvx: ConvexSolverConfig
     dis: DiscretizationConfig
     prp: PropagationConfig
