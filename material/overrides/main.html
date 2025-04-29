@@ -1,0 +1,34 @@
+{#-
+  This file was automatically generated - do not edit
+-#}
+{% extends "base.html" %}
+{% block styles %}
+  {{ super() }}
+  <link rel="stylesheet" href="{{ 'assets/stylesheets/custom.c27ceb93.min.css' | url }}">
+{% endblock %}
+{% block announce %}
+  For updates follow <strong>@squidfunk</strong> on
+  <a href="https://bsky.app/profile/squidfunk.com">
+    <span class="twemoji bluesky">
+      {% include ".icons/fontawesome/brands/bluesky.svg" %}
+    </span>
+    <strong>Bluesky</strong>
+  </a>,
+  <a rel="me" href="https://fosstodon.org/@squidfunk">
+    <span class="twemoji mastodon">
+      {% include ".icons/fontawesome/brands/mastodon.svg" %}
+    </span>
+    <strong>Fosstodon</strong>
+  </a>
+  and
+  <a href="https://x.com/squidfunk">
+    <span class="twemoji twitter">
+      {% include ".icons/fontawesome/brands/x-twitter.svg" %}
+    </span>
+    <strong>X</strong>
+  </a>.
+{% endblock %}
+{% block scripts %}
+  {{ super() }}
+  <script src="{{ 'assets/javascripts/custom.9a174ae7.min.js' | url }}"></script>
+{% endblock %}

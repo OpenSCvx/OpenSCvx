@@ -32,11 +32,6 @@ solver/*
 *.pkl
 *.pickle
 
-# YAML
-*.yaml
-
-# HTML
-*.html
 
 # CVXPYGEN
 ctcs/*
