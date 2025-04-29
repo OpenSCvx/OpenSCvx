@@ -87,9 +87,9 @@ class TrajOptProblem:
                 min_control=u_min_augmented,
                 total_time=time_init,
                 n_states=len(x_max),
-                t_inds=idx_time,
-                y_inds=idx_constraint_violation,
-                s_inds=idx_time_dilation,
+                idx_t=idx_time,
+                idx_y=idx_constraint_violation,
+                idx_s=idx_time_dilation,
             )
 
         if scp is None:
