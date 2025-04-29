@@ -54,9 +54,11 @@ class SimConfig:
     max_control: np.ndarray
     min_control: np.ndarray
     total_time: float
-    idx_t: int
-    idx_y: int
-    idx_s: int
+    idx_x_true: slice
+    idx_u_true: slice
+    idx_t: slice
+    idx_y: slice
+    idx_s: slice
     constraints_ctcs: List[callable] = field(
         default_factory=list
     )  # TODO (norrisg): clean this up, consider moving to dedicated `constraints` dataclass

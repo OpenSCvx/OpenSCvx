@@ -169,7 +169,7 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: ExactDis, cpg_solve) -> d
 
     result = dict(
         converged = k <= params.scp.k_max,
-        t_final = x[:,-2][-1],
+        t_final = x[:,params.sim.idx_t][-1],
         u = u,
         x = x,
         x_history = scp_trajs,
