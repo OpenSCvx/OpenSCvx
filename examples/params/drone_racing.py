@@ -124,6 +124,7 @@ for _ in range(n_gates + 1):
 problem = TrajOptProblem(
     dynamics=dynamics,
     constraints=constraints,
+    idx_time=len(max_state)-1,
     N=n,
     time_init=total_time,
     x_guess=x_bar,

@@ -173,6 +173,7 @@ for k in range(n):
 problem = TrajOptProblem(
     dynamics=dynamics,
     constraints=constraints,
+    idx_time=len(max_state)-1,
     N=n,
     time_init=total_time,
     x_guess=x_bar,

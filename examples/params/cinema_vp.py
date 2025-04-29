@@ -127,6 +127,7 @@ for k in range(n):
 problem = TrajOptProblem(
     dynamics=dynamics,
     constraints=constraints,
+    idx_time=t_inds,
     N=n,
     time_init=total_time,
     x_guess=x_bar,
