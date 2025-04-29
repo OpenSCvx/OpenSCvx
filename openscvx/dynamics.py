@@ -4,8 +4,8 @@ import jax.numpy as jnp
 
 def get_augmented_dynamics(dynamics: callable, g_func: callable):
     def dynamics_augmented(x: jnp.array, u: jnp.array) -> jnp.array:
-        # TODO: (norrisg) handle varying lengths of x and u due to augmentation more elegantly
-        x_dot = dynamics(x[:-1], u)
+        # TODO: (norrisg) only pass user-defined portion of x to dynamics in case user has `-1` or similar indexing in function
+        x_dot = dynamics(x, u)
         y_dot = g_func(x, u)
         return jnp.hstack([x_dot, y_dot])
 
