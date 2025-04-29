@@ -1,28 +1,71 @@
+# Copyright (c) 2016-2025 Martin Donath <martin.donath@squidfunk.com>
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to
+# deal in the Software without restriction, including without limitation the
+# rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+# sell copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+# IN THE SOFTWARE.
+
+# Project information
 site_name: OpenSCvx
-site_url: https://haynec.github.io/OpenSCvx
+site_url: https://haynec.github.io/OpenSCvx/
 site_author: Chris Hayner
-site_description: Documentation for OpenSCvx, a Python library for solving nonconvex optimization trajectory optimization problems.
+site_description: >-
+  Documentation for OpenSCvx, a JAX-based Python library for solving nonconvex trajectory optimization problems.
+# Repository
 repo_name: haynec/OpenSCvx
 repo_url: https://github.com/haynec/OpenSCvx
+
+# Copyright
+copyright: Copyright &copy; 2025 Chris Hayner
+
+# Configuration
 theme:
   name: material
-  favicon: "static/images/favicon.png"
-  icon:
-    logo: material/rocket-launch-outline 
-    admonition:
-      <type>: material/fire
+  custom_dir: material/overrides
+  logo: assets/logo.svg
   features:
-    - navigation.sections
-    - navigation.instant.preview
     - announce.dismiss
-    - user_color_mode_toggle
-    - header.autohide
-    - toc.integrate
+    - content.action.edit
+    - content.action.view
+    - content.code.annotate
     - content.code.copy
     - content.code.select
-    - navigation.instant
+    - content.footnote.tooltips
+    # - content.tabs.link
+    - content.tooltips
+    - header.autohide
+    # - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    # - navigation.instant
     - navigation.instant.prefetch
     - navigation.instant.progress
+    - navigation.instant.preview
+    # - navigation.path
+    # - navigation.prune
+    - navigation.sections
+    - navigation.tabs
+    # - navigation.tabs.sticky
+    - navigation.top
+    # - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+    # - toc.integrate
   palette:
     - media: "(prefers-color-scheme)"
       toggle:
@@ -44,39 +87,18 @@ theme:
         name: Switch to system preference
   font:
     text: CMU Sans Serif
+    code: Roboto Mono
+  favicon: assets/favicon.png
+  icon:
+    logo: logo
 
-markdown_extensions:
-  - admonition
-  - pymdownx.details
-  - pymdownx.superfences
-  - pymdownx.inlinehilite
-  - pymdownx.snippets
-  - attr_list
-  - pymdownx.highlight:
-      anchor_linenums: true
-      line_spans: __span
-      pygments_lang_class: true
-  - toc:
-      permalink: "¤"  # Adds a clickable permalink to each section heading
-      toc_depth: 2  # Prevents h5, h6 (i.e. methods) from showing up in the TOC.
-  - pymdownx.emoji:
-      emoji_index: !!python/name:material.extensions.emoji.twemoji
-      emoji_generator: !!python/name:material.extensions.emoji.to_svg
-  - pymdownx.arithmatex:
-      generic: true
-      
-
-extra_javascript:
-  - javascripts/mathjax.js
-  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
-
-# extra_css:
-#   - overrides/stylesheets/custom_css.css
-  
-copyright: Copyright &copy; 2025 Chris Hayner
-
+# Plugins
 plugins:
+  - meta
   - optimize
+  - search:
+      separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - typeset
   - mkdocstrings:
       setup_commands:
             - import pytkdocs_tweaks
@@ -94,8 +116,67 @@ plugins:
             members_order: source
             heading_level: 4
             inherited_members: false  # Allow looking up inherited methods
-          paths: [src]
+          paths: [openscvx.src]
 
+# Hooks
+hooks:
+  - material/overrides/hooks/shortcodes.py
+  - material/overrides/hooks/translations.py
+
+# Additional configuration
+extra:
+  favicon: assets/favicon.png
+  social:
+    - icon: fontawesome/brands/chrome
+      link: https://haynec.github.io/
+   
+# Extensions
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+# Page tree
 nav:
     - Home: index.md
     - Usage:
