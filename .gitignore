@@ -20,9 +20,7 @@ jax_compilation_cache/*
 solver/*
 
 # Images
-
 *.eps
-*.svg
 
 # Numpy files
 *.npy
