@@ -153,7 +153,8 @@ def dynamics(x, u):
     v_dot = (1 / m) * qdcm(q) @ f + jnp.array([0, 0, g_const])
     q_dot = 0.5 * SSMP(w) @ q
     w_dot = jnp.diag(1 / J_b) @ (tau - SSM(w) @ jnp.diag(J_b) @ w)
-    return jnp.hstack([r_dot, v_dot, q_dot, w_dot])
+    t_dot = 1
+    return jnp.hstack([r_dot, v_dot, q_dot, w_dot, t_dot])
 
 
 u_bar = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)

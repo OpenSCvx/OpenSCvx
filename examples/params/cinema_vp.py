@@ -78,7 +78,8 @@ def dynamics(x, u):
     q_dot = 0.5 * SSMP(w) @ q
     w_dot = jnp.diag(1 / J_b) @ (tau - SSM(w) @ jnp.diag(J_b) @ w)
     fuel_dot = jnp.linalg.norm(u)[None]
-    return jnp.hstack([r_dot, v_dot, q_dot, w_dot, fuel_dot])
+    t_dot = 1
+    return jnp.hstack([r_dot, v_dot, q_dot, w_dot, fuel_dot, t_dot])
 
 
 def g_vp(x):
