@@ -11,10 +11,9 @@ n = 12  # Number of Nodes
 total_time = 40.0  # Total time for the simulation
 
 
-fuel_inds = -3  # Fuel Index in State
-t_inds = -2  # Time Index in State
-y_inds = -1  # Constraint Violation Index in State
-s_inds = -1  # Time dilation index in Control
+fuel_inds = 13  # Fuel Index in State
+t_inds = 14
+s_inds = 6  # Time dilation index in Control
 
 
 max_state = np.array(
@@ -101,8 +100,8 @@ def g_max(x):
 
 constraints = [
     ctcs(lambda x, u: np.sqrt(2e1) * g_vp(x)),
-    ctcs(lambda x, u: x[:-1] - max_state),
-    ctcs(lambda x, u: min_state - x[:-1]),
+    ctcs(lambda x, u: x - max_state),
+    ctcs(lambda x, u: min_state - x),
     ctcs(lambda x, u: g_min(x)),
     ctcs(lambda x, u: g_max(x)),
 ]

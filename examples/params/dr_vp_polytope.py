@@ -118,8 +118,8 @@ def g_vp(p_s_I, x):
 
 
 constraints = []
-constraints.append(ctcs(lambda x, u: x[:-1] - max_state))
-constraints.append(ctcs(lambda x, u: min_state - x[:-1]))
+constraints.append(ctcs(lambda x, u: x - max_state))
+constraints.append(ctcs(lambda x, u: min_state - x))
 for pose in init_poses:
     constraints.append(ctcs(lambda x, u, p=pose: g_vp(p, x)))
 for node, cen in zip(gate_nodes, A_gate_cen):

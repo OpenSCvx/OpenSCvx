@@ -68,8 +68,8 @@ for center in gate_centers:
 
 
 constraints = [
-    ctcs(lambda x, u: (x[:-1] - max_state)),
-    ctcs(lambda x, u: (min_state - x[:-1])),
+    ctcs(lambda x, u: (x - max_state)),
+    ctcs(lambda x, u: (min_state - x)),
 ]
 for node, cen in zip(gate_nodes, A_gate_cen):
     constraints.append(

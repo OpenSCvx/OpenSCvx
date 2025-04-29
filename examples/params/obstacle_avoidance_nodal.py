@@ -74,8 +74,8 @@ constraints = []
 for center, A_obs_s in zip(obstacle_centers, A_obs):
     # constraints.append(ctcs(lambda x, u: g_obs(center, A, x)))
     constraints.append(nodal(lambda x, u, c=center, A=A_obs_s: g_obs(x, u, c, A), convex=False))
-constraints.append(ctcs(lambda x, u: x[:-1] - max_state))
-constraints.append(ctcs(lambda x, u: min_state - x[:-1]))
+constraints.append(ctcs(lambda x, u: x - max_state))
+constraints.append(ctcs(lambda x, u: min_state - x))
 
 
 u_bar = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)

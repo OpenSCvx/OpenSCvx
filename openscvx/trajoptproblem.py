@@ -51,6 +51,9 @@ class TrajOptProblem:
 
         # TODO (norrisg) move this into some augmentation function, if we want to make this be executed after the init (i.e. within problem.initialize) need to rethink how problem is defined
 
+        len_x_true = len(x_max)
+        len_u_true = len(u_max)
+
         x_min_augmented = np.hstack([x_min, ctcs_augmentation_min])
         x_max_augmented = np.hstack([x_max, ctcs_augmentation_max])
 
@@ -110,7 +113,7 @@ class TrajOptProblem:
         for constraint in constraints:
             if constraint.constraint_type == "ctcs":
                 sim.constraints_ctcs.append(
-                    lambda x, u, func=constraint: jnp.sum(func.penalty(func(x, u)))
+                    lambda x, u, func=constraint: jnp.sum(func.penalty(func(x[:len_x_true], u[:len_u_true])))
                 )
             elif constraint.constraint_type == "nodal":
                 sim.constraints_nodal.append(constraint)
