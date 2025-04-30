@@ -96,7 +96,7 @@ def OCP(params: Config):
             cost += lam_cost * x_nonscaled[-1][i]
 
     if params.scp.uniform_time_grid:
-        constr += [x_nonscaled[i][params.sim.t_inds] - x_nonscaled[i-1][params.sim.t_inds] == x_nonscaled[i-1][params.sim.t_inds] - x_nonscaled[i-2][params.sim.t_inds] for i in range(2, params.scp.n)] # Uniform Time Step
+        constr += [x_nonscaled[i][params.sim.idx_t] - x_nonscaled[i-1][params.sim.idx_t] == x_nonscaled[i-1][params.sim.idx_t] - x_nonscaled[i-2][params.sim.idx_t] for i in range(2, params.scp.n)] # Uniform Time Step
 
     constr += [0 == la.inv(S_x) @ (x_nonscaled[i] - x_bar[i] - dx[i]) for i in range(params.scp.n)] # State Error
     constr += [0 == la.inv(S_u) @ (u_nonscaled[i] - u_bar[i] - du[i]) for i in range(params.scp.n)] # Control Error
@@ -111,8 +111,8 @@ def OCP(params: Config):
     constr += [u_nonscaled[i] <= params.sim.max_control for i in range(params.scp.n)]
     constr += [u_nonscaled[i] >= params.sim.min_control for i in range(params.scp.n)] # Control Constraints
 
-    constr += [x_nonscaled[i][:-1] <= params.sim.max_state[:-1] for i in range(params.scp.n)]
-    constr += [x_nonscaled[i][:-1] >= params.sim.min_state[:-1] for i in range(params.scp.n)] # State Constraints (Also implemented in CTCS but included for numerical stability)
+    constr += [x_nonscaled[i][params.sim.idx_x_true] <= params.sim.max_state[params.sim.idx_x_true] for i in range(params.scp.n)]
+    constr += [x_nonscaled[i][params.sim.idx_x_true] >= params.sim.min_state[params.sim.idx_x_true] for i in range(params.scp.n)] # State Constraints (Also implemented in CTCS but included for numerical stability)
 
     ########
     # COSTS
@@ -129,8 +129,8 @@ def OCP(params: Config):
                 cost += params.scp.lam_vb * cp.sum(cp.pos(nu_vb[idx_ncvx]))
                 idx_ncvx += 1
 
-    constr += [cp.abs(x_nonscaled[i][-1] - x_nonscaled[i-1][-1]) <= params.sim.max_state[-1] for i in range(1, params.scp.n)] # LICQ Constraint
-    constr += [x_nonscaled[0][-1] == 0]
+    constr += [cp.abs(x_nonscaled[i][params.sim.idx_y] - x_nonscaled[i-1][params.sim.idx_y]) <= params.sim.max_state[params.sim.idx_y] for i in range(1, params.scp.n)] # LICQ Constraint
+    constr += [x_nonscaled[0][params.sim.idx_y] == 0]
     
     #########
     # PROBLEM

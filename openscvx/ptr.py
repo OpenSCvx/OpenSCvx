@@ -169,7 +169,7 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: ExactDis, cpg_solve) -> d
 
     result = dict(
         converged = k <= params.scp.k_max,
-        t_final = x[:,-2][-1],
+        t_final = x[:,params.sim.idx_t][-1],
         u = u,
         x = x,
         x_history = scp_trajs,
@@ -194,7 +194,7 @@ def PTR_post(params: Config, result: dict, aug_dy: ExactDis) -> dict:
 
     x_full = aug_dy.simulate_nonlinear_time(x[0], u, tau_vals, t)
 
-    print("Total CTCS Constraint Violation:", x_full[-1, params.sim.y_inds])
+    print("Total CTCS Constraint Violation:", x_full[-1, params.sim.idx_y])
     i = 0
     cost = np.zeros_like(x[-1, i])
     for type in params.sim.initial_state.type:
