@@ -49,8 +49,34 @@ class TrajOptProblem:
         time_dilation_factor_max=3.0,
     ):
 
-        # TODO (norrisg) move this into some augmentation function, if we want to make this be executed after the init (i.e. within problem.initialize) need to rethink how problem is defined
+        """Initializes the TrajOptProblem class.
 
+        This constructor sets up a trajectory optimization problem by defining the system dynamics, 
+        constraints, and various configurations for solving the problem.
+
+        Args:
+            dynamics (callable): The system dynamics function, which defines the evolution of the state.
+            constraints (List[callable]): A list of constraint functions to be satisfied during optimization.
+            N (int): The number of discretization points for the trajectory.
+            time_init (float): The initial time for the trajectory.
+            x_guess (jnp.ndarray): Initial guess for the state trajectory.
+            u_guess (jnp.ndarray): Initial guess for the control trajectory.
+            initial_state (BoundaryConstraint): Boundary constraint for the initial state of the system.
+            final_state (BoundaryConstraint): Boundary constraint for the final state of the system.
+            x_max (jnp.ndarray): Maximum bounds for the state variables.
+            x_min (jnp.ndarray): Minimum bounds for the state variables.
+            u_max (jnp.ndarray): Maximum bounds for the control variables.
+            u_min (jnp.ndarray): Minimum bounds for the control variables.
+            scp (ScpConfig, optional): Configuration for the sequential convex programming solver.
+            dis (DiscretizationConfig, optional): Configuration for the discretization method.
+            prp (PropagationConfig, optional): Configuration for the propagation method.
+            sim (SimConfig, optional): Configuration for the simulation settings.
+            dev (DevConfig, optional): Configuration for device-specific settings.
+            cvx (ConvexSolverConfig, optional): Configuration for the convex solver.
+
+        Raises:
+            ValueError: If any of the input parameters are invalid or inconsistent.
+        """
         # Index tracking
         idx_x_true = slice(0, len(x_max))
         idx_u_true = slice(0, len(u_max))
