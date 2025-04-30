@@ -11,10 +11,9 @@ n = 12  # Number of Nodes
 total_time = 40.0  # Total time for the simulation
 
 
-fuel_inds = -3  # Fuel Index in State
-t_inds = -2  # Time Index in State
-y_inds = -1  # Constraint Violation Index in State
-s_inds = -1  # Time dilation index in Control
+fuel_inds = 13  # Fuel Index in State
+t_inds = 14
+s_inds = 6  # Time dilation index in Control
 
 
 max_state = np.array(
@@ -25,11 +24,12 @@ min_state = np.array(
 )  # Lower Bound on the states
 
 initial_state = bc(jnp.array([8.0, -0.2, 2.2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]))
-initial_state.type[6:13] = "Free"
+initial_state.type[6:14] = "Free"
 
 final_state = bc(jnp.array([-10.0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 40]))
 final_state.type[0:13] = "Free"
-final_state.type[13] = "Minimize"
+final_state.type[13] = "Minimize" # Minimize fuel usage
+final_state.type[14] = "Minimize" # Minimize time
 
 max_control = np.array(
     [0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562]
@@ -78,7 +78,8 @@ def dynamics(x, u):
     q_dot = 0.5 * SSMP(w) @ q
     w_dot = jnp.diag(1 / J_b) @ (tau - SSM(w) @ jnp.diag(J_b) @ w)
     fuel_dot = jnp.linalg.norm(u)[None]
-    return jnp.hstack([r_dot, v_dot, q_dot, w_dot, fuel_dot])
+    t_dot = 1
+    return jnp.hstack([r_dot, v_dot, q_dot, w_dot, fuel_dot, t_dot])
 
 
 def g_vp(x):
@@ -99,8 +100,8 @@ def g_max(x):
 
 constraints = [
     ctcs(lambda x, u: np.sqrt(2e1) * g_vp(x)),
-    ctcs(lambda x, u: x[:-1] - max_state),
-    ctcs(lambda x, u: min_state - x[:-1]),
+    ctcs(lambda x, u: x - max_state),
+    ctcs(lambda x, u: min_state - x),
     ctcs(lambda x, u: g_min(x)),
     ctcs(lambda x, u: g_max(x)),
 ]
@@ -126,6 +127,7 @@ for k in range(n):
 problem = TrajOptProblem(
     dynamics=dynamics,
     constraints=constraints,
+    idx_time=t_inds,
     N=n,
     time_init=total_time,
     x_guess=x_bar,

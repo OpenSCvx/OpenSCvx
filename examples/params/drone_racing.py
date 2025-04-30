@@ -68,8 +68,8 @@ for center in gate_centers:
 
 
 constraints = [
-    ctcs(lambda x, u: (x[:-1] - max_state)),
-    ctcs(lambda x, u: (min_state - x[:-1])),
+    ctcs(lambda x, u: (x - max_state)),
+    ctcs(lambda x, u: (min_state - x)),
 ]
 for node, cen in zip(gate_nodes, A_gate_cen):
     constraints.append(
@@ -98,7 +98,8 @@ def dynamics(x, u):
     v_dot = (1 / m) * qdcm(q) @ f + jnp.array([0, 0, g_const])
     q_dot = 0.5 * SSMP(w) @ q
     w_dot = jnp.diag(1 / J_b) @ (tau - SSM(w) @ jnp.diag(J_b) @ w)
-    return jnp.hstack([r_dot, v_dot, q_dot, w_dot])
+    t_dot = 1
+    return jnp.hstack([r_dot, v_dot, q_dot, w_dot, t_dot])
 
 
 u_bar = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
@@ -123,6 +124,7 @@ for _ in range(n_gates + 1):
 problem = TrajOptProblem(
     dynamics=dynamics,
     constraints=constraints,
+    idx_time=len(max_state)-1,
     N=n,
     time_init=total_time,
     x_guess=x_bar,

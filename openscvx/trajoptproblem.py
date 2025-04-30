@@ -27,6 +27,7 @@ class TrajOptProblem:
         self,
         dynamics: callable,
         constraints: List[callable],
+        idx_time: int,
         N: int,
         time_init: float,
         x_guess: jnp.ndarray,
@@ -50,6 +51,16 @@ class TrajOptProblem:
     ):
 
         # TODO (norrisg) move this into some augmentation function, if we want to make this be executed after the init (i.e. within problem.initialize) need to rethink how problem is defined
+
+        # Index tracking
+        idx_x_true = slice(0, len(x_max))
+        idx_u_true = slice(0, len(u_max))
+        idx_constraint_violation = slice(idx_x_true.stop, idx_x_true.stop + 1)
+        idx_time_dilation = slice(idx_u_true.stop, idx_u_true.stop + 1)
+
+        # check that idx_time is in the correct range
+        assert(idx_time >= 0 and idx_time < len(x_max)), "idx_time must be in the range of the state vector and non-negative"
+        idx_time = slice(idx_time, idx_time + 1)
 
         x_min_augmented = np.hstack([x_min, ctcs_augmentation_min])
         x_max_augmented = np.hstack([x_max, ctcs_augmentation_max])
@@ -77,6 +88,11 @@ class TrajOptProblem:
                 min_control=u_min_augmented,
                 total_time=time_init,
                 n_states=len(x_max),
+                idx_x_true=idx_x_true,
+                idx_u_true=idx_u_true,
+                idx_t=idx_time,
+                idx_y=idx_constraint_violation,
+                idx_s=idx_time_dilation,
             )
 
         if scp is None:
@@ -110,7 +126,7 @@ class TrajOptProblem:
         for constraint in constraints:
             if constraint.constraint_type == "ctcs":
                 sim.constraints_ctcs.append(
-                    lambda x, u, func=constraint: jnp.sum(func.penalty(func(x, u)))
+                    lambda x, u, func=constraint: jnp.sum(func.penalty(func(x[idx_x_true], u[idx_u_true])))
                 )
             elif constraint.constraint_type == "nodal":
                 sim.constraints_nodal.append(constraint)

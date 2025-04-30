@@ -118,8 +118,8 @@ def g_vp(p_s_I, x):
 
 
 constraints = []
-constraints.append(ctcs(lambda x, u: x[:-1] - max_state))
-constraints.append(ctcs(lambda x, u: min_state - x[:-1]))
+constraints.append(ctcs(lambda x, u: x - max_state))
+constraints.append(ctcs(lambda x, u: min_state - x))
 for pose in init_poses:
     constraints.append(ctcs(lambda x, u, p=pose: g_vp(p, x)))
 for node, cen in zip(gate_nodes, A_gate_cen):
@@ -153,7 +153,8 @@ def dynamics(x, u):
     v_dot = (1 / m) * qdcm(q) @ f + jnp.array([0, 0, g_const])
     q_dot = 0.5 * SSMP(w) @ q
     w_dot = jnp.diag(1 / J_b) @ (tau - SSM(w) @ jnp.diag(J_b) @ w)
-    return jnp.hstack([r_dot, v_dot, q_dot, w_dot])
+    t_dot = 1
+    return jnp.hstack([r_dot, v_dot, q_dot, w_dot, t_dot])
 
 
 u_bar = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
@@ -193,6 +194,7 @@ for k in range(n):
 problem = TrajOptProblem(
     dynamics=dynamics,
     constraints=constraints,
+    idx_time=len(max_state)-1,
     N=n,
     time_init=total_time,
     x_guess=x_bar,

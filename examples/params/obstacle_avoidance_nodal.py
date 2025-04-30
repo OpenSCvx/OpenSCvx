@@ -44,7 +44,8 @@ def dynamics(x, u):
     v_dot = (1 / m) * qdcm(q) @ f + jnp.array([0, 0, g_const])
     q_dot = 0.5 * SSMP(w) @ q
     w_dot = jnp.diag(1 / J_b) @ (tau - SSM(w) @ jnp.diag(J_b) @ w)
-    return jnp.hstack([r_dot, v_dot, q_dot, w_dot])
+    t_dot = 1
+    return jnp.hstack([r_dot, v_dot, q_dot, w_dot, t_dot])
 
 def g_obs(x, u, center, A):
     value = 1 - (x[:3] - center).T @ A @ (x[:3] - center)
@@ -73,8 +74,8 @@ constraints = []
 for center, A_obs_s in zip(obstacle_centers, A_obs):
     # constraints.append(ctcs(lambda x, u: g_obs(center, A, x)))
     constraints.append(nodal(lambda x, u, c=center, A=A_obs_s: g_obs(x, u, c, A), convex=False))
-constraints.append(ctcs(lambda x, u: x[:-1] - max_state))
-constraints.append(ctcs(lambda x, u: min_state - x[:-1]))
+constraints.append(ctcs(lambda x, u: x - max_state))
+constraints.append(ctcs(lambda x, u: min_state - x))
 
 
 u_bar = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
@@ -83,6 +84,7 @@ x_bar = np.linspace(initial_state.value, final_state.value, n)
 problem = TrajOptProblem(
     dynamics=dynamics,
     constraints=constraints,
+    idx_time=len(max_state)-1,
     N=n,
     time_init=total_time,
     x_guess=x_bar,
