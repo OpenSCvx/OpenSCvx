@@ -338,7 +338,7 @@ class ExactDis:
             # Use count to grab the first count number of elements
             tau_cur = tau_vals[prev_count:prev_count + count]
 
-            sol = self.params.prp.integrator(x_0, (tau[k], tau[k + 1]), controls_current, controls_next, np.array([[tau[k]]]), params.sim.idx_s)
+            sol = self.params.prp.integrator(x_0, (tau[k], tau[k + 1]), controls_current, controls_next, np.array([[tau[k]]]), params.sim.idx_s.stop)
 
             x = sol.ys
             for tau_i in tau_cur:

@@ -13,6 +13,7 @@ def test_obstacle_avoidance():
     problem = obstacle_avoidance_problem
     problem.initialize()
     result = problem.solve()
+    result = problem.post_process(result)
     
     # Assuming PTR_main returns a dictionary
     output_dict = result
@@ -28,6 +29,7 @@ def test_dr_vp_nodal():
     problem.params.dis.custom_integrator = False
     problem.initialize()
     result = problem.solve()
+    result = problem.post_process(result)
     
     # Assuming PTR_main returns a dictionary
     output_dict = result
@@ -43,6 +45,7 @@ def test_dr_vp():
     problem.params.dis.custom_integrator = False
     problem.initialize()
     result = problem.solve()
+    result = problem.post_process(result)
     
     # Assuming PTR_main returns a dictionary
     output_dict = result
@@ -58,6 +61,7 @@ def test_cinema_vp():
     problem.params.dis.custom_integrator = False
     problem.initialize()
     result = problem.solve()
+    result = problem.post_process(result)
     
     # Assuming PTR_main returns a dictionary
     output_dict = result
