@@ -17,7 +17,7 @@ def params():
     p.scp = Dummy();  p.scp.n = 5
     p.dis = Dummy()
     p.dis.custom_integrator = True
-    p.dis.solver = "Euler"
+    p.dis.solver = "Tsit5"
     p.dis.rtol = 1e-3
     p.dis.atol = 1e-6
     p.dis.args = {}
@@ -73,7 +73,7 @@ def test_jit_dVdt_compiles(params):
 
     # bind out the Python callables & params
     def wrapped(tau_, V_):
-        return dVdt(tau_, V_, u_cur, u_next, state_dot, A, B, params)
+        return dVdt(tau_, V_, u_cur, u_next, state_dot, A, B, n_x, n_u, N, params.dis.dis_type)
 
     # now JIT only over (tau_, V_)
     jitted = jax.jit(wrapped)
