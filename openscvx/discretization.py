@@ -16,7 +16,7 @@ class RK45_Custom:
         if method != 'RK45':
             raise ValueError("Currently, only 'RK45' method is supported.")
         
-        return solve_ivp_rk45(dVdt, tau_grid, V0, args, self.params.dev.debug, t_eval)
+        return solve_ivp_rk45(dVdt, tau_grid[1], V0, args, is_compiled=self.params.dev.debug)
 
     
 class Diffrax_Prop:
@@ -56,7 +56,7 @@ class Diffrax:
         self.params = params
     
     def solve_ivp(self, dVdt, tau_grid, V0, args, t_eval=None):
-        return solve_ivp_diffrax(dVdt, tau_grid, V0, args, t_eval=t_eval, solver_name=self.params.dis.solver, rtol=self.params.dis.rtol, atol=self.params.dis.atol, extra_kwargs=self.params.dis.args)
+        return solve_ivp_diffrax(dVdt, tau_grid[1], V0, args, solver_name=self.params.dis.solver, rtol=self.params.dis.rtol, atol=self.params.dis.atol, extra_kwargs=self.params.dis.args)
 
 def s_to_t(u, params: Config):
     t = [0]
@@ -309,12 +309,8 @@ def calculate_discretization(
     i4 = i3 + n_x * n_u
     i5 = i4 + n_x
 
-    # build tau grid
-    tau_grid = jnp.linspace(0, 1, N)
-
     # initial augmented state
-    aug_dim = n_x + n_x*n_x + 2*n_x*n_u + n_x
-    V0 = jnp.zeros((N-1, aug_dim))
+    V0 = jnp.zeros((N-1, i5))
     V0 = V0.at[:, :n_x].set(x[:-1].astype(float))
     V0 = V0.at[:, n_x:n_x+n_x*n_x].set(
         jnp.eye(n_x).reshape(1,-1).repeat(N-1, axis=0)
@@ -324,16 +320,16 @@ def calculate_discretization(
     if custom_integrator:
         sol = solve_ivp_rk45(
             lambda t,y,*a: dVdt(t, y, *a),
-            (tau_grid[0], tau_grid[1]),
+            1.0/N,
             V0.reshape(-1),
             args=(u[:-1].astype(float), u[1:].astype(float),
                   state_dot, A, B, n_x, n_u, N, dis_type),
-            debug=debug,
+            is_compiled=debug,
         )
     else:
         sol = solve_ivp_diffrax(
             lambda t,y,*a: dVdt(t, y, *a),
-            (tau_grid[0], tau_grid[1]),
+            1.0/N,
             V0.reshape(-1),
             args=(u[:-1].astype(float), u[1:].astype(float),
                   state_dot, A, B, n_x, n_u, N, dis_type),

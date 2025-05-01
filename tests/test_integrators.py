@@ -15,7 +15,7 @@ def test_solve_ivp_rk45_decay(num_steps):
     t0, t1 = 0.0, 1.0
     times = jnp.linspace(t0, t1, num_steps)
     y0 = jnp.array([1.0])
-    sol = solve_ivp_rk45(decay, (t0, t1), y0, args=(), debug=False, num_steps=num_steps)
+    sol = solve_ivp_rk45(decay, t1, y0, args=(), is_compiled=False, num_substeps=num_steps)
     sol_np = np.array(sol[:, 0])
     expected = np.exp(-np.array(times))
     # allow ~1% relative error
@@ -30,14 +30,14 @@ def test_solve_ivp_diffrax_decay(solver_name, num_steps):
     y0 = jnp.array([1.0])
     sol = solve_ivp_diffrax(
         decay,
-        (t0, t1),
+        t1,
         y0,
         args=(),
         solver_name=solver_name,
         rtol=1e-3,
         atol=1e-6,
         extra_kwargs=None,
-        num_steps=num_steps,
+        num_substeps=num_steps,
     )
     sol_np = np.array(sol[:, 0])
     expected = np.exp(-np.array(times))

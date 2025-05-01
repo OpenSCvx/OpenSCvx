@@ -30,19 +30,25 @@ def rk45_step(f, t, y, h, *args):
 # fmt: on
 
 
-def solve_ivp_rk45(f, tau_grid, y_0, args, debug, t_eval=None, num_steps=50):
-    if t_eval is None:
-        t_eval = jnp.linspace(tau_grid[0], tau_grid[1], num_steps)
+def solve_ivp_rk45(
+    f,
+    tau_final: float,
+    y_0,
+    args,
+    tau_0: float = 0.0,
+    num_substeps: int = 50,
+    is_compiled: bool = False,
+):
+    substeps = jnp.linspace(tau_0, tau_final, num_substeps)
 
-    h = (tau_grid[1] - tau_grid[0]) / (len(t_eval) - 1)
-    V_result = jnp.zeros((len(t_eval), len(y_0)))
-    V_result = V_result.at[0].set(y_0)
+    h = (tau_final - tau_0) / (len(substeps) - 1)
+    solution = jnp.zeros((len(substeps), len(y_0)))
+    solution = solution.at[0].set(y_0)
 
-    if debug:
-        for i in range(1, len(t_eval)):
-            t = tau_grid[0] + i * h
-            y_next = rk45_step(f, t, V_result[i - 1], h, *args)
-            V_result = V_result.at[i].set(y_next)
+    if is_compiled:
+        for i in range(1, len(substeps)):
+            t = tau_0 + i * h
+            solution = solution.at[i].set(rk45_step(f, t, solution[i - 1], h, *args))
     else:
 
         def body_fun(i, val):
@@ -51,44 +57,42 @@ def solve_ivp_rk45(f, tau_grid, y_0, args, debug, t_eval=None, num_steps=50):
             V_result = V_result.at[i].set(y_next)
             return (t + h, y_next, V_result)
 
-        _, _, V_result = jax.lax.fori_loop(
-            1, len(t_eval), body_fun, (tau_grid[0], y_0, V_result)
-        )
+        _, _, solution = jax.lax.fori_loop(1, len(substeps), body_fun, (tau_0, y_0, solution))
 
-    return V_result
+    return solution
 
 
 def solve_ivp_diffrax(
-    dVdt,
-    tau_grid,
-    V0,
+    f,
+    tau_final,
+    y_0,
     args,
-    t_eval=None,
-    num_steps=50,
-    solver_name="Tsit5",
-    rtol=1e-3,
-    atol=1e-6,
+    tau_0: float=0.0,
+    num_substeps: int = 50,
+    solver_name="Dopri8",
+    rtol: float = 1e-3,
+    atol: float = 1e-6,
     extra_kwargs=None,
 ):
-    t_eval = jnp.linspace(tau_grid[0], tau_grid[1], num_steps)
+    substeps = jnp.linspace(tau_0, tau_final, num_substeps)
 
     solver_class = SOLVER_MAP.get(solver_name)
     if solver_class is None:
         raise ValueError(f"Unknown solver: {solver_name}")
     solver = solver_class()
 
-    term = dfx.ODETerm(lambda t, y, args: dVdt(t, y, *args))
+    term = dfx.ODETerm(lambda t, y, args: f(t, y, *args))
     stepsize_controller = dfx.PIDController(rtol=rtol, atol=atol)
     solution = dfx.diffeqsolve(
         term,
         solver=solver,
-        t0=tau_grid[0],
-        t1=tau_grid[1],
-        dt0=(tau_grid[1] - tau_grid[0]) / (len(t_eval) - 1),
-        y0=V0,
+        t0=tau_0,
+        t1=tau_final,
+        dt0=(tau_final - tau_0) / (len(substeps) - 1),
+        y0=y_0,
         args=args,
         stepsize_controller=stepsize_controller,
-        saveat=dfx.SaveAt(ts=t_eval),
+        saveat=dfx.SaveAt(ts=substeps),
         **(extra_kwargs or {}),
     )
 
