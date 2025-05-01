@@ -369,6 +369,15 @@ def calculate_discretization(
     atol,
     dis_type: str
 ):
+
+    # Define indices for slicing the augmented state vector
+    i0 = 0
+    i1 = n_x
+    i2 = i1 + n_x * n_x
+    i3 = i2 + n_x * n_u
+    i4 = i3 + n_x * n_u
+    i5 = i4 + n_x
+
     # build tau grid
     tau_grid = jnp.linspace(0, 1, N)
 
@@ -403,19 +412,13 @@ def calculate_discretization(
             num_steps=N, # unsure about this
         )
 
-    Vend   = sol[-1].reshape(-1, aug_dim)
+    Vend   = sol[-1].T.reshape(-1, i5)
     Vmulti = sol.T
 
-    A_bar = Vend[:, n_x:n_x+n_x*n_x] \
-        .reshape(N-1,n_x,n_x).transpose(1,2,0) \
-        .reshape(n_x*n_x, N-1, order='F').T
-    B_bar = Vend[:, n_x+n_x*n_x:n_x+n_x*n_x+n_x*n_u] \
-        .reshape(N-1,n_x,n_u).transpose(1,2,0) \
-        .reshape(n_x*n_u, N-1, order='F').T
-    C_bar = Vend[:, n_x+n_x*n_x+n_x*n_u:n_x+n_x*n_x+2*n_x*n_u] \
-        .reshape(N-1,n_x,n_u).transpose(1,2,0) \
-        .reshape(n_x*n_u, N-1, order='F').T
-    z_bar = Vend[:, -n_x:]
+    A_bar = Vend[:, i1:i2].reshape(N-1, n_x, n_x).transpose(1,2,0).reshape(n_x*n_x, -1, order='F').T
+    B_bar = Vend[:, i2:i3].reshape(N-1, n_x, n_u).transpose(1,2,0).reshape(n_x*n_u, -1, order='F').T
+    C_bar = Vend[:, i3:i4].reshape(N-1, n_x, n_u).transpose(1,2,0).reshape(n_x*n_u, -1, order='F').T
+    z_bar = Vend[:, i4:i5]
 
     return A_bar, B_bar, C_bar, z_bar, Vmulti
 
