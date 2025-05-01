@@ -393,23 +393,23 @@ def calculate_discretization(
     if custom_integrator:
         sol = solve_ivp_rk45(
             lambda t,y,*a: dVdt(t, y, *a),
-            (0,1), V0.reshape(-1),
+            (tau_grid[0], tau_grid[1]),
+            V0.reshape(-1),
             args=(u[:-1].astype(float), u[1:].astype(float),
                   state_dot, A, B, n_x, n_u, N, dis_type),
             debug=debug,
-            num_steps=N, # unsure about this
         )
     else:
         sol = solve_ivp_diffrax(
             lambda t,y,*a: dVdt(t, y, *a),
-            (0,1), V0.reshape(-1),
+            (tau_grid[0], tau_grid[1]),
+            V0.reshape(-1),
             args=(u[:-1].astype(float), u[1:].astype(float),
                   state_dot, A, B, n_x, n_u, N, dis_type),
             solver_name=solver,
             rtol=rtol,
             atol=atol,
             extra_kwargs=None,
-            num_steps=N, # unsure about this
         )
 
     Vend   = sol[-1].T.reshape(-1, i5)
