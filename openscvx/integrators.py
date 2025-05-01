@@ -37,7 +37,7 @@ def solve_ivp_rk45(
     args,
     tau_0: float = 0.0,
     num_substeps: int = 50,
-    is_compiled: bool = False,
+    is_not_compiled: bool = False,
 ):
     substeps = jnp.linspace(tau_0, tau_final, num_substeps)
 
@@ -45,7 +45,7 @@ def solve_ivp_rk45(
     solution = jnp.zeros((len(substeps), len(y_0)))
     solution = solution.at[0].set(y_0)
 
-    if is_compiled:
+    if is_not_compiled:
         for i in range(1, len(substeps)):
             t = tau_0 + i * h
             solution = solution.at[i].set(rk45_step(f, t, solution[i - 1], h, *args))

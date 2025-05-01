@@ -16,7 +16,7 @@ class RK45_Custom:
         if method != 'RK45':
             raise ValueError("Currently, only 'RK45' method is supported.")
         
-        return solve_ivp_rk45(dVdt, tau_grid[1], V0, args, is_compiled=self.params.dev.debug)
+        return solve_ivp_rk45(dVdt, tau_grid[1], V0, args, is_not_compiled=self.params.dev.debug)
 
     
 class Diffrax_Prop:
@@ -324,7 +324,7 @@ def calculate_discretization(
             V0.reshape(-1),
             args=(u[:-1].astype(float), u[1:].astype(float),
                   state_dot, A, B, n_x, n_u, N, dis_type),
-            is_compiled=debug,
+            is_not_compiled=debug,
         )
     else:
         sol = solve_ivp_diffrax(
