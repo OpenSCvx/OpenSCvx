@@ -81,16 +81,23 @@ def test_jit_dVdt_compiles(params):
     # compile will fail if there’s a trace issue
     lowered.compile()
 
-def test_jit_discretization_solver_compiles(params):
-    # build solver factory
+@pytest.mark.parametrize("integrator", ["custom_integrator", "diffrax"])
+def test_jit_discretization_solver_compiles(params, integrator):
+    # flip between the two modes
+    if integrator == "custom_integrator":
+        params.dis.custom_integrator = True
+    elif integrator == "diffrax":
+        params.dis.custom_integrator = False
+
+    # build the solver (captures only hashable primitives)
     solver = get_discretization_solver(state_dot, A, B, params)
 
-    # dummy x,u (including slack)
+    # dummy x,u (including slack column)
     x = jnp.ones((params.scp.n, params.sim.n_states))
     u = jnp.ones((params.scp.n, params.sim.n_controls + 1))
 
-    # JIT and compile the high-level solver
+    # jit & lower & compile
     jitted = jax.jit(solver)
     lowered = jitted.lower(x, u)
-    # will raise if compilation or lowering fails
+    # will raise if there’s any hash or trace error
     lowered.compile()
