@@ -21,7 +21,7 @@ def test_solve_ivp_rk45_decay(num_steps):
     # allow ~1% relative error
     np.testing.assert_allclose(sol_np, expected, rtol=1e-2, atol=1e-3)
 
-@pytest.mark.parametrize("solver_name", ["Tsit5", "Heun"])
+@pytest.mark.parametrize("solver_name", ["Tsit5", "Dopri5", "Dopri8", "Heun"])
 @pytest.mark.parametrize("num_steps", [11, 21])
 def test_solve_ivp_diffrax_decay(solver_name, num_steps):
     """Diffrax adaptive solver should approximate exp(-t)."""
