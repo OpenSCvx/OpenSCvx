@@ -116,45 +116,7 @@ class ExactDis:
 
         self.tau_grid = jnp.linspace(0, 1, self.params.scp.n)
 
-    def calculate_discretization(self,
-                                 x: jnp.ndarray,
-                                 u: jnp.ndarray):
-        """
-        Calculate discretization for given states, inputs and total time.
-        x: Matrix of states for all time points
-        u: Matrix of inputs for all time points
-        return: A_k, B_k, C_k, z_k
-        """
-
-        # Extract the number of states and controls from the parameters
-        n_x = self.params.sim.n_states
-        n_u = self.params.sim.n_controls
-        
-        # Initialize the augmented state vector
-        V0 = jnp.zeros((x.shape[0]-1, self.i5))
-
-        # Vectorized integration
-        V0 = V0.at[:, self.i0:self.i1].set(x[:-1, :].astype(float))
-        V0 = V0.at[:, self.i1:self.i2].set(np.eye(n_x).reshape(1, n_x * n_x).repeat(self.params.scp.n - 1, axis=0))
-        
-        int_result = self.integrator.solve_ivp(
-            dVdt,
-            (self.tau_grid[0], self.tau_grid[1]),
-            V0.flatten(),
-            args=(u[:-1, :].astype(float), u[1:, :].astype(float), self.state_dot, self.A, self.B, n_x, n_u, self.params.scp.n, self.params.dis.dis_type),
-            t_eval=self.tau_grid
-        )
-        
-
-        V = int_result[-1].T.reshape(-1, self.i5)
-        V_multi_shoot = int_result.T
-    
-        # Flatten matrices in column-major (Fortran) order for cvxpy
-        A_bar = V[:, self.i1:self.i2].reshape((self.params.scp.n - 1, n_x, n_x)).transpose(1, 2, 0).reshape(n_x * n_x, -1, order='F').T
-        B_bar = V[:, self.i2:self.i3].reshape((self.params.scp.n - 1, n_x, n_u)).transpose(1, 2, 0).reshape(n_x * n_u, -1, order='F').T
-        C_bar = V[:, self.i3:self.i4].reshape((self.params.scp.n - 1, n_x, n_u)).transpose(1, 2, 0).reshape(n_x * n_u, -1, order='F').T
-        z_bar = V[:, self.i4:self.i5]
-        return A_bar, B_bar, C_bar, z_bar, V_multi_shoot
+        self.calculate_discretization = get_discretization_solver(state_dot, A, B, params)
     
     def prop_aug_dy(self,
                     tau: float,
