@@ -280,3 +280,145 @@ class ExactDis:
             prev_count += count
 
         return states.T
+
+
+def dVdt(
+    tau: float,
+    V: jnp.ndarray,
+    u_cur: np.ndarray,
+    u_next: np.ndarray,
+    state_dot: callable,
+    A: callable,
+    B: callable,
+    params: Config,
+) -> jnp.ndarray:
+    
+    # Extract the number of states and controls from the parameters
+    n_x = params.sim.n_states
+    n_u = params.sim.n_controls
+
+    # Define indices for slicing the augmented state vector
+    i0 = 0
+    i1 = n_x
+    i2 = i1 + n_x * n_x
+    i3 = i2 + n_x * n_u
+    i4 = i3 + n_x * n_u
+    i5 = i4 + n_x
+
+    # Unflatten V
+    V = V.reshape(-1, i5)
+
+    # Compute the interpolation factor based on the discretization type
+    if params.dis.dis_type == 'ZOH':
+        beta = 0.
+    elif params.dis.dis_type == 'FOH':
+        beta = (tau) * params.scp.n
+    alpha = 1 - beta
+
+    # Interpolate the control input
+    u = u_cur + beta * (u_next - u_cur)
+    s = u[:,-1]
+
+    # Initialize the augmented Jacobians
+    dfdx = jnp.zeros((V.shape[0], n_x, n_x))
+    dfdu = jnp.zeros((V.shape[0], n_x, n_u))
+
+    # Ensure x_seq and u have the same batch size
+    x = V[:,:params.sim.n_states]
+    u = u[:x.shape[0]]
+
+    # Compute the nonlinear propagation term
+    f = state_dot(x, u[:,:-1])
+    F = s[:, None] * f
+
+    # Evaluate the State Jacobian
+    dfdx = A(x, u[:,:-1])
+    sdfdx = s[:, None, None] * dfdx
+
+    # Evaluate the Control Jacobian
+    dfdu_veh = B(x, u[:,:-1])
+    dfdu = dfdu.at[:, :, :-1].set(s[:, None, None] * dfdu_veh)
+    dfdu = dfdu.at[:, :, -1].set(f)
+    
+    # Compute the defect
+    z = F - jnp.einsum('ijk,ik->ij', sdfdx, x) - jnp.einsum('ijk,ik->ij', dfdu, u)
+
+    # Stack up the results into the augmented state vector
+    # fmt: off
+    dVdt = jnp.zeros_like(V)
+    dVdt = dVdt.at[:, i0:i1].set(F)
+    dVdt = dVdt.at[:, i1:i2].set(jnp.matmul(sdfdx, V[:, i1:i2].reshape(-1, n_x, n_x)).reshape(-1, n_x * n_x))
+    dVdt = dVdt.at[:, i2:i3].set((jnp.matmul(sdfdx, V[:, i2:i3].reshape(-1, n_x, n_u)) + dfdu * alpha).reshape(-1, n_x * n_u))
+    dVdt = dVdt.at[:, i3:i4].set((jnp.matmul(sdfdx, V[:, i3:i4].reshape(-1, n_x, n_u)) + dfdu * beta).reshape(-1, n_x * n_u))
+    dVdt = dVdt.at[:, i4:i5].set((jnp.matmul(sdfdx, V[:, i4:i5].reshape(-1, n_x)[..., None]).squeeze(-1) + z).reshape(-1, n_x))
+    # fmt: on
+    return dVdt.flatten()
+
+def calculate_discretization(x, u, state_dot, A, B, params):
+    """
+    x: (N, n_x) array of states
+    u: (N, n_u+1) array of controls (+ slack)
+    state_dot, A, B: callables matching your originals
+    params: must have sim.n_states, sim.n_controls, scp.n,
+            dis.custom_integrator (bool), dis.solver, dis.rtol, dis.atol, dis.args,
+            dev.debug (bool)
+    Returns A_bar, B_bar, C_bar, z_bar, Vmulti
+    """
+    n_x = params.sim.n_states
+    n_u = params.sim.n_controls
+    N   = params.scp.n
+
+    # build tau grid
+    tau_grid = jnp.linspace(0, 1, N)
+
+    # initial augmented state
+    aug_dim = n_x + n_x*n_x + 2*n_x*n_u + n_x
+    V0 = jnp.zeros((N-1, aug_dim))
+    V0 = V0.at[:, :n_x].set(x[:-1].astype(float))
+    V0 = V0.at[:, n_x:n_x+n_x*n_x].set(
+        jnp.eye(n_x).reshape(1,-1).repeat(N-1, axis=0)
+    )
+
+    # choose integrator
+    if params.dis.custom_integrator:
+        sol = solve_ivp_rk45(
+            lambda t,y,*a: dVdt(t, y, *a),
+            (0,1), V0.reshape(-1),
+            args=(u[:-1].astype(float), u[1:].astype(float),
+                  state_dot, A, B, params),
+            debug=params.dev.debug,
+            # num_steps=N,
+        )
+    else:
+        sol = solve_ivp_diffrax(
+            lambda t,y,*a: dVdt(t, y, *a),
+            (0,1), V0.reshape(-1),
+            args=(u[:-1].astype(float), u[1:].astype(float),
+                  state_dot, A, B, params),
+            solver_name=params.dis.solver,
+            rtol=params.dis.rtol,
+            atol=params.dis.atol,
+            extra_kwargs=params.dis.args,
+            # num_steps=N,
+        )
+
+    Vend   = sol[-1].reshape(-1, aug_dim)
+    Vmulti = sol.reshape(N, -1, aug_dim)
+
+    A_bar = Vend[:, n_x:n_x+n_x*n_x] \
+        .reshape(N-1,n_x,n_x).transpose(1,2,0) \
+        .reshape(n_x*n_x, N-1, order='F').T
+    B_bar = Vend[:, n_x+n_x*n_x:n_x+n_x*n_x+n_x*n_u] \
+        .reshape(N-1,n_x,n_u).transpose(1,2,0) \
+        .reshape(n_x*n_u, N-1, order='F').T
+    C_bar = Vend[:, n_x+n_x*n_x+n_x*n_u:n_x+n_x*n_x+2*n_x*n_u] \
+        .reshape(N-1,n_x,n_u).transpose(1,2,0) \
+        .reshape(n_x*n_u, N-1, order='F').T
+    z_bar = Vend[:, -n_x:]
+
+    return A_bar, B_bar, C_bar, z_bar, Vmulti
+
+
+def get_discretization_solver(state_dot, A, B, params):
+    return lambda x, u: calculate_discretization(x, u, state_dot, A, B, params)
+
