@@ -290,12 +290,11 @@ def dVdt(
     state_dot: callable,
     A: callable,
     B: callable,
-    params: Config,
+    n_x: int,
+    n_u: int,
+    N: int,
+    dis_type: str,
 ) -> jnp.ndarray:
-    
-    # Extract the number of states and controls from the parameters
-    n_x = params.sim.n_states
-    n_u = params.sim.n_controls
 
     # Define indices for slicing the augmented state vector
     i0 = 0
@@ -309,10 +308,10 @@ def dVdt(
     V = V.reshape(-1, i5)
 
     # Compute the interpolation factor based on the discretization type
-    if params.dis.dis_type == 'ZOH':
+    if dis_type == 'ZOH':
         beta = 0.
-    elif params.dis.dis_type == 'FOH':
-        beta = (tau) * params.scp.n
+    elif dis_type == 'FOH':
+        beta = (tau) * N
     alpha = 1 - beta
 
     # Interpolate the control input
@@ -324,7 +323,7 @@ def dVdt(
     dfdu = jnp.zeros((V.shape[0], n_x, n_u))
 
     # Ensure x_seq and u have the same batch size
-    x = V[:,:params.sim.n_states]
+    x = V[:,:n_x]
     u = u[:x.shape[0]]
 
     # Compute the nonlinear propagation term
@@ -354,20 +353,22 @@ def dVdt(
     # fmt: on
     return dVdt.flatten()
 
-def calculate_discretization(x, u, state_dot, A, B, params):
-    """
-    x: (N, n_x) array of states
-    u: (N, n_u+1) array of controls (+ slack)
-    state_dot, A, B: callables matching your originals
-    params: must have sim.n_states, sim.n_controls, scp.n,
-            dis.custom_integrator (bool), dis.solver, dis.rtol, dis.atol, dis.args,
-            dev.debug (bool)
-    Returns A_bar, B_bar, C_bar, z_bar, Vmulti
-    """
-    n_x = params.sim.n_states
-    n_u = params.sim.n_controls
-    N   = params.scp.n
-
+def calculate_discretization(
+    x,
+    u,
+    state_dot: callable,
+    A: callable,
+    B: callable,
+    n_x: int,
+    n_u: int,
+    N: int,
+    custom_integrator: bool,
+    debug: bool,
+    solver: str,
+    rtol,
+    atol,
+    dis_type: str
+):
     # build tau grid
     tau_grid = jnp.linspace(0, 1, N)
 
@@ -380,30 +381,30 @@ def calculate_discretization(x, u, state_dot, A, B, params):
     )
 
     # choose integrator
-    if params.dis.custom_integrator:
+    if custom_integrator:
         sol = solve_ivp_rk45(
             lambda t,y,*a: dVdt(t, y, *a),
             (0,1), V0.reshape(-1),
             args=(u[:-1].astype(float), u[1:].astype(float),
-                  state_dot, A, B, params),
-            debug=params.dev.debug,
-            # num_steps=N,
+                  state_dot, A, B, n_x, n_u, N, dis_type),
+            debug=debug,
+            num_steps=N, # unsure about this
         )
     else:
         sol = solve_ivp_diffrax(
             lambda t,y,*a: dVdt(t, y, *a),
             (0,1), V0.reshape(-1),
             args=(u[:-1].astype(float), u[1:].astype(float),
-                  state_dot, A, B, params),
-            solver_name=params.dis.solver,
-            rtol=params.dis.rtol,
-            atol=params.dis.atol,
-            extra_kwargs=params.dis.args,
-            # num_steps=N,
+                  state_dot, A, B, n_x, n_u, N, dis_type),
+            solver_name=solver,
+            rtol=rtol,
+            atol=atol,
+            extra_kwargs=None,
+            num_steps=N, # unsure about this
         )
 
     Vend   = sol[-1].reshape(-1, aug_dim)
-    Vmulti = sol.reshape(N, -1, aug_dim)
+    Vmulti = sol.T
 
     A_bar = Vend[:, n_x:n_x+n_x*n_x] \
         .reshape(N-1,n_x,n_x).transpose(1,2,0) \
@@ -420,5 +421,5 @@ def calculate_discretization(x, u, state_dot, A, B, params):
 
 
 def get_discretization_solver(state_dot, A, B, params):
-    return lambda x, u: calculate_discretization(x, u, state_dot, A, B, params)
+    return lambda x, u: calculate_discretization(x, u, state_dot, A, B, params.sim.n_states, params.sim.n_controls, params.scp.n, params.dis.custom_integrator, params.dev.debug, params.dis.solver, params.dis.rtol, params.dis.atol, params.dis.dis_type)
 
