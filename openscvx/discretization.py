@@ -58,6 +58,36 @@ class Diffrax:
     def solve_ivp(self, dVdt, tau_grid, V0, args, t_eval=None):
         return solve_ivp_diffrax(dVdt, tau_grid, V0, args, t_eval=t_eval, solver_name=self.params.dis.solver, rtol=self.params.dis.rtol, atol=self.params.dis.atol, extra_kwargs=self.params.dis.args)
 
+def s_to_t(u, params: Config):
+    t = [0]
+    tau = np.linspace(0, 1, params.scp.n)
+    for k in range(1, params.scp.n):
+        s_kp = u[k-1,-1]
+        s_k = u[k,-1]
+        if params.dis.dis_type == 'ZOH':
+            t.append(t[k-1] + (tau[k] - tau[k-1])*(s_kp))
+        else:
+            t.append(t[k-1] + 0.5 * (s_k + s_kp) * (tau[k] - tau[k-1]))
+    return t
+
+def t_to_tau(u, t, u_nodal, t_nodal, params: Config):
+    u_lam = lambda new_t: np.array([np.interp(new_t, t_nodal, u[:, i]) for i in range(u.shape[1])]).T
+    u = np.array([u_lam(t_i) for t_i in t])
+
+    tau = np.zeros(len(t))
+    tau_nodal = np.linspace(0, 1, params.scp.n)
+    for k in range(1, len(t)):
+        k_nodal = np.where(t_nodal < t[k])[0][-1]
+        s_kp = u_nodal[k_nodal, -1]
+        tp = t_nodal[k_nodal]
+        tau_p = tau_nodal[k_nodal]
+
+        s_k = u[k, -1]
+        if params.dis.dis_type == 'ZOH':
+            tau[k] = tau_p + (t[k] - tp) / s_kp
+        else:
+            tau[k] = tau_p + 2 * (t[k] - tp) / (s_k + s_kp)
+    return tau, u
 
 class ExactDis:
     def __init__(self, state_dot, A, B, params: Config) -> None:
@@ -86,37 +116,6 @@ class ExactDis:
 
         self.tau_grid = jnp.linspace(0, 1, self.params.scp.n)
 
-    def s_to_t(self, u, params: Config):
-        t = [0]
-        tau = np.linspace(0, 1, params.scp.n)
-        for k in range(1, params.scp.n):
-            s_kp = u[k-1,-1]
-            s_k = u[k,-1]
-            if params.dis.dis_type == 'ZOH':
-                t.append(t[k-1] + (tau[k] - tau[k-1])*(s_kp))
-            else:
-                t.append(t[k-1] + 0.5 * (s_k + s_kp) * (tau[k] - tau[k-1]))
-        return t
-    
-    def t_to_tau(self, u, t, u_nodal, t_nodal, params: Config):
-        u_lam = lambda new_t: np.array([np.interp(new_t, t_nodal, u[:, i]) for i in range(u.shape[1])]).T
-        u = np.array([u_lam(t_i) for t_i in t])
-
-        tau = np.zeros(len(t))
-        tau_nodal = np.linspace(0, 1, params.scp.n)
-        for k in range(1, len(t)):
-            k_nodal = np.where(t_nodal < t[k])[0][-1]
-            s_kp = u_nodal[k_nodal, -1]
-            tp = t_nodal[k_nodal]
-            tau_p = tau_nodal[k_nodal]
-
-            s_k = u[k, -1]
-            if params.dis.dis_type == 'ZOH':
-                tau[k] = tau_p + (t[k] - tp) / s_kp
-            else:
-                tau[k] = tau_p + 2 * (t[k] - tp) / (s_k + s_kp)
-        return tau, u
-    
     def calculate_discretization(self,
                                  x: jnp.ndarray,
                                  u: jnp.ndarray):

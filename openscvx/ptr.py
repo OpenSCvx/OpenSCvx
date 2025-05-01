@@ -7,7 +7,7 @@ import time
 import sys
 from termcolor import colored
 
-from openscvx.discretization import ExactDis
+from openscvx.discretization import ExactDis, s_to_t, t_to_tau
 from openscvx.config import Config
 from openscvx.ocp import OCP
 
@@ -186,11 +186,11 @@ def PTR_post(params: Config, result: dict, aug_dy: ExactDis) -> dict:
     x = result["x"]
     u = result["u"]
 
-    t = np.array(aug_dy.s_to_t(u, params))
+    t = np.array(s_to_t(u, params))
 
     t_full = np.arange(0, t[-1], params.prp.dt)
 
-    tau_vals, u_full = aug_dy.t_to_tau(u, t_full, u, t, params)
+    tau_vals, u_full = t_to_tau(u, t_full, u, t, params)
 
     x_full = aug_dy.simulate_nonlinear_time(x[0], u, tau_vals, t)
 
