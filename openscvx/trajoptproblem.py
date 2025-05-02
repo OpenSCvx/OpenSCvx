@@ -179,18 +179,6 @@ class TrajOptProblem:
             self.params,
         )
 
-        # Extract the number of states and controls from the parameters
-        n_x = self.params.sim.n_states
-        n_u = self.params.sim.n_controls
-
-        # Define indices for slicing the augmented state vector
-        self.i0 = 0
-        self.i1 = n_x
-        self.i2 = self.i1 + n_x * n_x
-        self.i3 = self.i2 + n_x * n_u
-        self.i4 = self.i3 + n_x * n_u
-        self.i5 = self.i4 + n_x
-
         if not self.params.dev.debug:
             self.discretization_solver = (
                 jax.jit(self.discretization_solver)
@@ -201,7 +189,7 @@ class TrajOptProblem:
                 .compile()
             )
 
-        self.params.prp.integrator = (
+        self.propagation_solver = (
             jax.jit(self.propagation_solver)
             .lower(
                 np.ones((self.params.sim.n_states)),
@@ -229,4 +217,4 @@ class TrajOptProblem:
         )
 
     def post_process(self, result):
-        return PTR_post(self.params, result, self.params.prp.integrator)
+        return PTR_post(self.params, result, self.propagation_solver)
