@@ -30,39 +30,39 @@ def dVdt(
     V = V.reshape(-1, i5)
 
     # Compute the interpolation factor based on the discretization type
-    if dis_type == 'ZOH':
-        beta = 0.
-    elif dis_type == 'FOH':
+    if dis_type == "ZOH":
+        beta = 0.0
+    elif dis_type == "FOH":
         beta = (tau) * N
     alpha = 1 - beta
 
     # Interpolate the control input
     u = u_cur + beta * (u_next - u_cur)
-    s = u[:,-1]
+    s = u[:, -1]
 
     # Initialize the augmented Jacobians
     dfdx = jnp.zeros((V.shape[0], n_x, n_x))
     dfdu = jnp.zeros((V.shape[0], n_x, n_u))
 
     # Ensure x_seq and u have the same batch size
-    x = V[:,:n_x]
-    u = u[:x.shape[0]]
+    x = V[:, :n_x]
+    u = u[: x.shape[0]]
 
     # Compute the nonlinear propagation term
-    f = state_dot(x, u[:,:-1])
+    f = state_dot(x, u[:, :-1])
     F = s[:, None] * f
 
     # Evaluate the State Jacobian
-    dfdx = A(x, u[:,:-1])
+    dfdx = A(x, u[:, :-1])
     sdfdx = s[:, None, None] * dfdx
 
     # Evaluate the Control Jacobian
-    dfdu_veh = B(x, u[:,:-1])
+    dfdu_veh = B(x, u[:, :-1])
     dfdu = dfdu.at[:, :, :-1].set(s[:, None, None] * dfdu_veh)
     dfdu = dfdu.at[:, :, -1].set(f)
-    
+
     # Compute the defect
-    z = F - jnp.einsum('ijk,ik->ij', sdfdx, x) - jnp.einsum('ijk,ik->ij', dfdu, u)
+    z = F - jnp.einsum("ijk,ik->ij", sdfdx, x) - jnp.einsum("ijk,ik->ij", dfdu, u)
 
     # Stack up the results into the augmented state vector
     # fmt: off
@@ -74,6 +74,7 @@ def dVdt(
     dVdt = dVdt.at[:, i4:i5].set((jnp.matmul(sdfdx, V[:, i4:i5].reshape(-1, n_x)[..., None]).squeeze(-1) + z).reshape(-1, n_x))
     # fmt: on
     return dVdt.flatten()
+
 
 def calculate_discretization(
     x,
@@ -89,7 +90,7 @@ def calculate_discretization(
     solver: str,
     rtol,
     atol,
-    dis_type: str
+    dis_type: str,
 ):
 
     # Define indices for slicing the augmented state vector
@@ -101,14 +102,15 @@ def calculate_discretization(
     i5 = i4 + n_x
 
     # initial augmented state
-    V0 = jnp.zeros((N-1, i5))
+    V0 = jnp.zeros((N - 1, i5))
     V0 = V0.at[:, :n_x].set(x[:-1].astype(float))
-    V0 = V0.at[:, n_x:n_x+n_x*n_x].set(
-        jnp.eye(n_x).reshape(1,-1).repeat(N-1, axis=0)
+    V0 = V0.at[:, n_x : n_x + n_x * n_x].set(
+        jnp.eye(n_x).reshape(1, -1).repeat(N - 1, axis=0)
     )
 
     # choose integrator
     if custom_integrator:
+        # fmt: off
         sol = solve_ivp_rk45(
             lambda t,y,*a: dVdt(t, y, *a),
             1.0/N,
@@ -117,7 +119,9 @@ def calculate_discretization(
                   state_dot, A, B, n_x, n_u, N, dis_type),
             is_not_compiled=debug,
         )
+        # fmt: on
     else:
+        # fmt: off
         sol = solve_ivp_diffrax(
             lambda t,y,*a: dVdt(t, y, *a),
             1.0/N,
@@ -129,8 +133,9 @@ def calculate_discretization(
             atol=atol,
             extra_kwargs=None,
         )
+        # fmt: on
 
-    Vend   = sol[-1].T.reshape(-1, i5)
+    Vend = sol[-1].T.reshape(-1, i5)
     Vmulti = sol.T
 
     # fmt: off
@@ -144,5 +149,19 @@ def calculate_discretization(
 
 
 def get_discretization_solver(state_dot, A, B, params):
-    return lambda x, u: calculate_discretization(x, u, state_dot, A, B, params.sim.n_states, params.sim.n_controls, params.scp.n, params.dis.custom_integrator, params.dev.debug, params.dis.solver, params.dis.rtol, params.dis.atol, params.dis.dis_type)
-
+    return lambda x, u: calculate_discretization(
+        x=x,
+        u=u,
+        state_dot=state_dot,
+        A=A,
+        B=B,
+        n_x=params.sim.n_states,
+        n_u=params.sim.n_controls,
+        N=params.scp.n,
+        custom_integrator=params.dis.custom_integrator,
+        debug=params.dev.debug,
+        solver=params.dis.solver,
+        rtol=params.dis.rtol,
+        atol=params.dis.atol,
+        dis_type=params.dis.dis_type,
+    )
