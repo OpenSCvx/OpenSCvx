@@ -24,10 +24,8 @@ class Diffrax_Prop:
         self.params = params
         self.func = prop_aug_dy
         self.state_dot = state_dot
-    
-    def solve_ivp(self, V0, tau_grid, u_cur, u_next, tau_init, idx_s):
-        return solve_ivp_diffrax_prop(self.func, tau_grid[1], V0, args=(u_cur, u_next, tau_init, idx_s, self.state_dot, self.params.dis.dis_type, self.params.scp.n), tau_0=tau_grid[0])
-    
+
+        self.solve_ivp = get_propagation_solver(state_dot, params)
 
 def prop_aug_dy(
     tau: float,
