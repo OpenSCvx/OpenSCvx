@@ -1,7 +1,5 @@
 import jax.numpy as jnp
-from jax import jit, lax
 import numpy as np
-import diffrax  as dfx
 
 from openscvx.config import Config
 from openscvx.integrators import solve_ivp_rk45, solve_ivp_diffrax, solve_ivp_diffrax_prop
@@ -233,10 +231,12 @@ def calculate_discretization(
     Vend   = sol[-1].T.reshape(-1, i5)
     Vmulti = sol.T
 
+    # fmt: off
     A_bar = Vend[:, i1:i2].reshape(N-1, n_x, n_x).transpose(1,2,0).reshape(n_x*n_x, -1, order='F').T
     B_bar = Vend[:, i2:i3].reshape(N-1, n_x, n_u).transpose(1,2,0).reshape(n_x*n_u, -1, order='F').T
     C_bar = Vend[:, i3:i4].reshape(N-1, n_x, n_u).transpose(1,2,0).reshape(n_x*n_u, -1, order='F').T
     z_bar = Vend[:, i4:i5]
+    # fmt: on
 
     return A_bar, B_bar, C_bar, z_bar, Vmulti
 
