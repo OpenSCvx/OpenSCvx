@@ -162,23 +162,27 @@ class TrajOptProblem:
         self.params.scp.__post_init__()
         self.params.sim.__post_init__()
 
-        # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
-        # TODO: (norrisg) Consider writing the compiled versions into the same variables?
-        # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
+        # Compile dynamics and jacobians
         self.state_dot = jax.vmap(self.dynamics_augmented)
         self.A = jax.jit(jax.vmap(self.A_uncompiled, in_axes=(0, 0)))
         self.B = jax.jit(jax.vmap(self.B_uncompiled, in_axes=(0, 0)))
+        # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
+        # TODO: (norrisg) Consider writing the compiled versions into the same variables?
+        # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
 
+        # Generate solvers and optimal control problem
         self.discretization_solver = get_discretization_solver(self.state_dot, self.A, self.B, self.params)
         self.propagation_solver = get_propagation_solver(self.state_dot, self.params)
         self.optimal_control_problem = OptimalControlProblem(self.params)
 
+        # Initialize the PTR loop
         self.cpg_solve = PTR_init(
             self.optimal_control_problem,
             self.discretization_solver,
             self.params,
         )
 
+        # Compile the solvers
         if not self.params.dev.debug:
             self.discretization_solver = (
                 jax.jit(self.discretization_solver)
