@@ -16,7 +16,7 @@ from openscvx.config import (
 )
 from openscvx.dynamics import get_augmented_dynamics, get_jacobians
 from openscvx.constraints.ctcs import get_g_func
-from openscvx.discretization import ExactDis, Diffrax_Prop
+from openscvx.discretization import ExactDis, Diffrax_Prop, get_propagation_solver
 from openscvx.constraints.boundary import BoundaryConstraint
 from openscvx.ptr import PTR_init, PTR_main, PTR_post
 
@@ -192,7 +192,7 @@ class TrajOptProblem:
             ).compile()
 
         diff_prop = Diffrax_Prop(self.state_dot, self.A, self.B, self.params)
-        self.params.prp.integrator = jax.jit(diff_prop.solve_ivp).lower(
+        self.params.prp.integrator = jax.jit(get_propagation_solver(self.state_dot, self.params)).lower(
             np.ones((self.params.sim.n_states)),
             (0.0, 0.0),
             np.ones((1, self.params.sim.n_controls)), 
@@ -219,4 +219,4 @@ class TrajOptProblem:
         )
 
     def post_process(self, result):
-        return PTR_post(self.params, result, self.dynamics_discretized)
+        return PTR_post(self.params, result, self.params.prp.integrator)

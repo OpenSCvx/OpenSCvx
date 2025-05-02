@@ -7,7 +7,7 @@ import time
 import sys
 from termcolor import colored
 
-from openscvx.discretization import ExactDis, s_to_t, t_to_tau
+from openscvx.discretization import ExactDis, s_to_t, t_to_tau, simulate_nonlinear_time
 from openscvx.config import Config
 from openscvx.ocp import OCP
 
@@ -181,7 +181,7 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: ExactDis, cpg_solve) -> d
     )
     return result
 
-def PTR_post(params: Config, result: dict, aug_dy: ExactDis) -> dict:
+def PTR_post(params: Config, result: dict, propagation_solver: callable) -> dict:
     t_0_post = time.time()
     x = result["x"]
     u = result["u"]
@@ -192,7 +192,7 @@ def PTR_post(params: Config, result: dict, aug_dy: ExactDis) -> dict:
 
     tau_vals, u_full = t_to_tau(u, t_full, u, t, params)
 
-    x_full = aug_dy.simulate_nonlinear_time(x[0], u, tau_vals, t)
+    x_full = simulate_nonlinear_time(x[0], u, tau_vals, t, params, propagation_solver)
 
     print("Total CTCS Constraint Violation:", x_full[-1, params.sim.idx_y])
     i = 0

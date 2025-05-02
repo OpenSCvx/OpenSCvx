@@ -121,44 +121,43 @@ class ExactDis:
         self.calculate_discretization = get_discretization_solver(state_dot, A, B, params)
     
 
-    def simulate_nonlinear_time(self, x_0, u, tau_vals, t):
-        params = self.params
-        states = np.empty((x_0.shape[0], 0))  # Initialize states as a 2D array with shape (n, 0)
+def simulate_nonlinear_time(x_0, u, tau_vals, t, params, propagation_solver):
+    states = np.empty((x_0.shape[0], 0))  # Initialize states as a 2D array with shape (n, 0)
 
-        tau = np.linspace(0, 1, params.scp.n)
+    tau = np.linspace(0, 1, params.scp.n)
 
-        u_lam = lambda new_t: np.array([np.interp(new_t, t, u[:, i]) for i in range(u.shape[1])]).T
+    u_lam = lambda new_t: np.array([np.interp(new_t, t, u[:, i]) for i in range(u.shape[1])]).T
 
-        # Bin the tau_vals into with respect to the uniform tau grid, tau
-        tau_inds = np.digitize(tau_vals, tau) - 1
-        # Force the last indice to be in the same bin as the previous ones
-        tau_inds = np.where(tau_inds == params.scp.n - 1, params.scp.n - 2, tau_inds)
+    # Bin the tau_vals into with respect to the uniform tau grid, tau
+    tau_inds = np.digitize(tau_vals, tau) - 1
+    # Force the last indice to be in the same bin as the previous ones
+    tau_inds = np.where(tau_inds == params.scp.n - 1, params.scp.n - 2, tau_inds)
 
-        prev_count = 0
+    prev_count = 0
 
-        for k in range(params.scp.n - 1):
-            controls_current = np.squeeze(u_lam(t[k]))[None, :]
-            controls_next = np.squeeze(u_lam(t[k + 1]))[None, :]
+    for k in range(params.scp.n - 1):
+        controls_current = np.squeeze(u_lam(t[k]))[None, :]
+        controls_next = np.squeeze(u_lam(t[k + 1]))[None, :]
 
-            # Create a mask
-            mask = (tau_inds >= k) & (tau_inds < k + 1)
+        # Create a mask
+        mask = (tau_inds >= k) & (tau_inds < k + 1)
 
-            count = np.sum(mask)
+        count = np.sum(mask)
 
-            # Use count to grab the first count number of elements
-            tau_cur = tau_vals[prev_count:prev_count + count]
+        # Use count to grab the first count number of elements
+        tau_cur = tau_vals[prev_count:prev_count + count]
 
-            sol = self.params.prp.integrator(x_0, (tau[k], tau[k + 1]), controls_current, controls_next, np.array([[tau[k]]]), params.sim.idx_s.stop)
+        sol = propagation_solver(x_0, (tau[k], tau[k + 1]), controls_current, controls_next, np.array([[tau[k]]]), params.sim.idx_s.stop)
 
-            x = sol.ys
-            for tau_i in tau_cur:
-                new_state = sol.evaluate(tau_i).reshape(-1, 1)  # Ensure new_state is 2D
-                states = np.concatenate([states, new_state], axis=1)
+        x = sol.ys
+        for tau_i in tau_cur:
+            new_state = sol.evaluate(tau_i).reshape(-1, 1)  # Ensure new_state is 2D
+            states = np.concatenate([states, new_state], axis=1)
 
-            x_0 = x[-1]
-            prev_count += count
+        x_0 = x[-1]
+        prev_count += count
 
-        return states.T
+    return states.T
 
 
 def dVdt(
