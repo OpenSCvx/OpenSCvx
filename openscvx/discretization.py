@@ -22,10 +22,38 @@ class RK45_Custom:
 class Diffrax_Prop:
     def __init__(self, state_dot, A, B, params):
         self.params = params
-        self.func = ExactDis(state_dot, A, B, params).prop_aug_dy
+        self.func = prop_aug_dy
+        self.state_dot = state_dot
     
     def solve_ivp(self, V0, tau_grid, u_cur, u_next, tau_init, idx_s):
-        return solve_ivp_diffrax_prop(self.func, tau_grid[1], V0, args=(u_cur, u_next, tau_init, idx_s), tau_0=tau_grid[0])
+        return solve_ivp_diffrax_prop(self.func, tau_grid[1], V0, args=(u_cur, u_next, tau_init, idx_s, self.state_dot, self.params.dis.dis_type, self.params.scp.n), tau_0=tau_grid[0])
+    
+
+def prop_aug_dy(
+    tau: float,
+    x: np.ndarray,
+    u_current: np.ndarray,
+    u_next: np.ndarray,
+    tau_init: float,
+    idx_s: int,
+    state_dot: callable,
+    dis_type: str,
+    N: int,
+) -> np.ndarray:
+    x = x[None, :]
+    
+    if dis_type == "ZOH":
+        beta = 0.0
+    elif dis_type == "FOH":
+        beta = (tau - tau_init) * N
+    u = u_current + beta * (u_next - u_current)
+    
+    return  u[:, idx_s] * state_dot(x, u[:,:-1]).squeeze()
+
+def get_propagation_solver(state_dot, params):
+    def propagation_solver(V0, tau_grid, u_cur, u_next, tau_init, idx_s):
+        return solve_ivp_diffrax_prop(prop_aug_dy, tau_grid[1], V0, args=(u_cur, u_next, tau_init, idx_s, state_dot, params.dis.dis_type, params.scp.n), tau_0=tau_grid[0])
+    return propagation_solver
 
 class Diffrax:
     def __init__(self, params):
@@ -94,22 +122,6 @@ class ExactDis:
 
         self.calculate_discretization = get_discretization_solver(state_dot, A, B, params)
     
-    def prop_aug_dy(self,
-                    tau: float,
-                    x: np.ndarray,
-                    u_current: np.ndarray,
-                    u_next: np.ndarray,
-                    tau_init: float,
-                    idx_s: int) -> np.ndarray:
-        x = x[None, :]
-        
-        if self.params.dis.dis_type == "ZOH":
-            beta = 0.0
-        elif self.params.dis.dis_type == "FOH":
-            beta = (tau - tau_init) * self.params.scp.n
-        u = u_current + beta * (u_next - u_current)
-        
-        return  u[:, idx_s] * self.state_dot(x, u[:,:-1]).squeeze()
 
     def simulate_nonlinear_time(self, x_0, u, tau_vals, t):
         params = self.params
