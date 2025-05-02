@@ -16,7 +16,8 @@ from openscvx.config import (
 )
 from openscvx.dynamics import get_augmented_dynamics, get_jacobians
 from openscvx.constraints.ctcs import get_g_func
-from openscvx.discretization import get_discretization_solver, get_propagation_solver
+from openscvx.discretization import get_discretization_solver
+from openscvx.propagation import get_propagation_solver
 from openscvx.constraints.boundary import BoundaryConstraint
 from openscvx.ptr import PTR_init, PTR_main, PTR_post
 from openscvx.ocp import OptimalControlProblem
