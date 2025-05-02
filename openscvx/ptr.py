@@ -14,12 +14,10 @@ from openscvx.ocp import OCP
 import warnings
 warnings.filterwarnings("ignore")
 
-def PTR_init(state_dot, A, B, params: Config) -> tuple[cp.Problem, callable]:
+def PTR_init(ocp: cp.Problem, discretization_solver: callable, params: Config, ) -> tuple[cp.Problem, callable]:
     intro()
 
     t_0_while = time.time()
-
-    ocp = OCP(params) # Initialize the problem
 
     if params.cvx.cvxpygen:
         from solver.cpg_solver import cpg_solve
@@ -28,14 +26,12 @@ def PTR_init(state_dot, A, B, params: Config) -> tuple[cp.Problem, callable]:
     else:
         cpg_solve = None
 
-    dynamics_discretized = get_discretization_solver(state_dot, A, B, params)
-
     # Solve a dumb problem to intilize DPP and JAX jacobians
-    _ = PTR_subproblem(cpg_solve, params.sim.x_bar, params.sim.u_bar, dynamics_discretized, ocp, params)
+    _ = PTR_subproblem(cpg_solve, params.sim.x_bar, params.sim.u_bar, discretization_solver, ocp, params)
 
     t_f_while = time.time()
     print("Total Initialization Time: ", t_f_while - t_0_while)
-    return ocp, dynamics_discretized, cpg_solve
+    return cpg_solve
 
 def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> dict:
     J_vb = 1E2

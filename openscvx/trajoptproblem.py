@@ -16,9 +16,10 @@ from openscvx.config import (
 )
 from openscvx.dynamics import get_augmented_dynamics, get_jacobians
 from openscvx.constraints.ctcs import get_g_func
-from openscvx.discretization import get_propagation_solver
+from openscvx.discretization import get_discretization_solver, get_propagation_solver
 from openscvx.constraints.boundary import BoundaryConstraint
 from openscvx.ptr import PTR_init, PTR_main, PTR_post
+from openscvx.ocp import OCP
 
 
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
@@ -153,7 +154,7 @@ class TrajOptProblem:
         )
 
         self.ocp: cp.Problem = None
-        self.dynamics_discretized: callable = None
+        self.discretization_solver: callable = None
         self.cpg_solve = None
 
     def compile(self):
@@ -171,8 +172,14 @@ class TrajOptProblem:
 
         self.compile()
 
-        self.ocp, self.dynamics_discretized, self.cpg_solve = PTR_init(
-            self.state_dot, self.A, self.B, self.params
+        self.discretization_solver = get_discretization_solver(self.state_dot, self.A, self.B, self.params)
+        self.propagation_solver = get_propagation_solver(self.state_dot, self.params)
+        self.ocp = OCP(self.params)
+
+        self.cpg_solve = PTR_init(
+            self.ocp,
+            self.discretization_solver,
+            self.params,
         )
 
         # Extract the number of states and controls from the parameters
@@ -188,8 +195,8 @@ class TrajOptProblem:
         self.i5 = self.i4 + n_x
 
         if not self.params.dev.debug:
-            self.dynamics_discretized = (
-                jax.jit(self.dynamics_discretized)
+            self.discretization_solver = (
+                jax.jit(self.discretization_solver)
                 .lower(
                     np.ones((self.params.scp.n, self.params.sim.n_states)),
                     np.ones((self.params.scp.n, self.params.sim.n_controls)),
@@ -198,7 +205,7 @@ class TrajOptProblem:
             )
 
         self.params.prp.integrator = (
-            jax.jit(get_propagation_solver(self.state_dot, self.params))
+            jax.jit(self.propagation_solver)
             .lower(
                 np.ones((self.params.sim.n_states)),
                 (0.0, 0.0),
@@ -210,20 +217,18 @@ class TrajOptProblem:
             .compile()
         )
 
-        # _ = self.dynamics_discretized.simulate_nonlinear_time(np.ones((self.params.sim.n_states)), np.zeros((10, self.params.sim.n_controls)), np.linspace(0,1, 100), np.linspace(0,1, 10))
-
     def solve(self):
         # Ensure parameter sizes and normalization are correct
         self.params.scp.__post_init__()
         self.params.sim.__post_init__()
 
-        if self.ocp is None or self.dynamics_discretized is None:
+        if self.ocp is None or self.discretization_solver is None:
             raise ValueError(
                 "Problem has not been initialized. Call initialize() before solve()"
             )
 
         return PTR_main(
-            self.params, self.ocp, self.dynamics_discretized, self.cpg_solve
+            self.params, self.ocp, self.discretization_solver, self.cpg_solve
         )
 
     def post_process(self, result):
