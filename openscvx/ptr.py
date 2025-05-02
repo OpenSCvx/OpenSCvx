@@ -9,7 +9,7 @@ from termcolor import colored
 
 from openscvx.discretization import get_discretization_solver, s_to_t, t_to_tau, simulate_nonlinear_time
 from openscvx.config import Config
-from openscvx.ocp import OCP
+from openscvx.ocp import OptimalControlProblem
 
 import warnings
 warnings.filterwarnings("ignore")

@@ -8,7 +8,7 @@ from openscvx.config import Config
 from cvxpygen import cpg
 
 
-def OCP(params: Config):
+def OptimalControlProblem(params: Config):
     ########################
     # VARIABLES & PARAMETERS
     ########################

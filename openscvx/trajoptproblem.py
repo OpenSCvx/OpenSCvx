@@ -19,7 +19,7 @@ from openscvx.constraints.ctcs import get_g_func
 from openscvx.discretization import get_discretization_solver, get_propagation_solver
 from openscvx.constraints.boundary import BoundaryConstraint
 from openscvx.ptr import PTR_init, PTR_main, PTR_post
-from openscvx.ocp import OCP
+from openscvx.ocp import OptimalControlProblem
 
 
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
@@ -153,7 +153,7 @@ class TrajOptProblem:
             prp=prp,
         )
 
-        self.ocp: cp.Problem = None
+        self.optimal_control_problem: cp.Problem = None
         self.discretization_solver: callable = None
         self.cpg_solve = None
 
@@ -174,10 +174,10 @@ class TrajOptProblem:
 
         self.discretization_solver = get_discretization_solver(self.state_dot, self.A, self.B, self.params)
         self.propagation_solver = get_propagation_solver(self.state_dot, self.params)
-        self.ocp = OCP(self.params)
+        self.optimal_control_problem = OptimalControlProblem(self.params)
 
         self.cpg_solve = PTR_init(
-            self.ocp,
+            self.optimal_control_problem,
             self.discretization_solver,
             self.params,
         )
@@ -222,13 +222,13 @@ class TrajOptProblem:
         self.params.scp.__post_init__()
         self.params.sim.__post_init__()
 
-        if self.ocp is None or self.discretization_solver is None:
+        if self.optimal_control_problem is None or self.discretization_solver is None:
             raise ValueError(
                 "Problem has not been initialized. Call initialize() before solve()"
             )
 
         return PTR_main(
-            self.params, self.ocp, self.discretization_solver, self.cpg_solve
+            self.params, self.optimal_control_problem, self.discretization_solver, self.cpg_solve
         )
 
     def post_process(self, result):
