@@ -57,7 +57,9 @@ def solve_ivp_rk45(
             V_result = V_result.at[i].set(y_next)
             return (t + h, y_next, V_result)
 
-        _, _, solution = jax.lax.fori_loop(1, len(substeps), body_fun, (tau_0, y_0, solution))
+        _, _, solution = jax.lax.fori_loop(
+            1, len(substeps), body_fun, (tau_0, y_0, solution)
+        )
 
     return solution
 
@@ -67,7 +69,7 @@ def solve_ivp_diffrax(
     tau_final,
     y_0,
     args,
-    tau_0: float=0.0,
+    tau_0: float = 0.0,
     num_substeps: int = 50,
     solver_name="Dopri8",
     rtol: float = 1e-3,
@@ -97,3 +99,41 @@ def solve_ivp_diffrax(
     )
 
     return solution.ys
+
+
+# args = (u_cur, u_next, tau_init, idx_s)
+def solve_ivp_diffrax_prop(
+    f,
+    tau_final,
+    y_0,
+    args,
+    tau_0: float = 0.0,
+    num_substeps: int = 50,
+    solver_name="Dopri8",
+    rtol: float = 1e-3,
+    atol: float = 1e-6,
+    extra_kwargs=None,
+):
+    substeps = jnp.linspace(tau_0, tau_final, num_substeps)
+
+    solver_class = SOLVER_MAP.get(solver_name)
+    if solver_class is None:
+        raise ValueError(f"Unknown solver: {solver_name}")
+    solver = solver_class()
+
+    term = dfx.ODETerm(lambda t, y, args: f(t, y, *args))
+    stepsize_controller = dfx.PIDController(rtol=rtol, atol=atol)
+    solution = dfx.diffeqsolve(
+        term,
+        solver=solver,
+        t0=tau_0,
+        t1=tau_final,
+        dt0=(tau_final - tau_0) / (len(substeps) - 1),
+        y0=y_0,
+        args=args,
+        stepsize_controller=stepsize_controller,
+        saveat=dfx.SaveAt(dense=True, ts=substeps),
+        **(extra_kwargs or {}),
+    )
+
+    return solution

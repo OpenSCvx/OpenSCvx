@@ -4,7 +4,7 @@ import numpy as np
 import diffrax  as dfx
 
 from openscvx.config import Config
-from openscvx.integrators import solve_ivp_rk45, solve_ivp_diffrax, SOLVER_MAP
+from openscvx.integrators import solve_ivp_rk45, solve_ivp_diffrax, solve_ivp_diffrax_prop
 
 
 
@@ -25,31 +25,7 @@ class Diffrax_Prop:
         self.func = ExactDis(state_dot, A, B, params).prop_aug_dy
     
     def solve_ivp(self, V0, tau_grid, u_cur, u_next, tau_init, idx_s):
-        t_eval = jnp.linspace(tau_grid[0], tau_grid[1], 50)
-
-        solver_class = SOLVER_MAP.get(self.params.prp.solver)
-        if solver_class is None:
-            raise ValueError(f"Unknown solver: {self.params.prp.solver}")
-        solver = solver_class()
-
-        args = (u_cur, u_next, tau_init, idx_s)
-
-        term = dfx.ODETerm(lambda t, y, args: self.func(t, y, *args))
-        stepsize_controller = dfx.PIDController(rtol=self.params.prp.rtol, atol=self.params.prp.atol)
-        solution = dfx.diffeqsolve(
-            term,
-            solver = solver,
-            t0=tau_grid[0],
-            t1=tau_grid[1],
-            dt0=(tau_grid[1] - tau_grid[0]) / (len(t_eval) - 1),
-            y0=V0,
-            args=args,
-            stepsize_controller=stepsize_controller,
-            saveat=dfx.SaveAt(dense=True, ts=t_eval),
-            **self.params.prp.args
-        )
-
-        return solution
+        return solve_ivp_diffrax_prop(self.func, tau_grid[1], V0, args=(u_cur, u_next, tau_init, idx_s), tau_0=tau_grid[0])
 
 class Diffrax:
     def __init__(self, params):
