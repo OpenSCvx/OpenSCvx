@@ -157,20 +157,17 @@ class TrajOptProblem:
         self.discretization_solver: callable = None
         self.cpg_solve = None
 
-    def compile(self):
+    def initialize(self):
+        # Ensure parameter sizes and normalization are correct
+        self.params.scp.__post_init__()
+        self.params.sim.__post_init__()
+
         # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
         # TODO: (norrisg) Consider writing the compiled versions into the same variables?
         # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
         self.state_dot = jax.vmap(self.dynamics_augmented)
         self.A = jax.jit(jax.vmap(self.A_uncompiled, in_axes=(0, 0)))
         self.B = jax.jit(jax.vmap(self.B_uncompiled, in_axes=(0, 0)))
-
-    def initialize(self):
-        # Ensure parameter sizes and normalization are correct
-        self.params.scp.__post_init__()
-        self.params.sim.__post_init__()
-
-        self.compile()
 
         self.discretization_solver = get_discretization_solver(self.state_dot, self.A, self.B, self.params)
         self.propagation_solver = get_propagation_solver(self.state_dot, self.params)
