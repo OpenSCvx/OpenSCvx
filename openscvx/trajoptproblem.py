@@ -16,7 +16,7 @@ from openscvx.config import (
 )
 from openscvx.dynamics import get_augmented_dynamics, get_jacobians
 from openscvx.constraints.ctcs import get_g_func
-from openscvx.discretization import ExactDis, Diffrax_Prop, get_propagation_solver
+from openscvx.discretization import get_propagation_solver
 from openscvx.constraints.boundary import BoundaryConstraint
 from openscvx.ptr import PTR_init, PTR_main, PTR_post
 
@@ -59,7 +59,9 @@ class TrajOptProblem:
         idx_time_dilation = slice(idx_u_true.stop, idx_u_true.stop + 1)
 
         # check that idx_time is in the correct range
-        assert(idx_time >= 0 and idx_time < len(x_max)), "idx_time must be in the range of the state vector and non-negative"
+        assert idx_time >= 0 and idx_time < len(
+            x_max
+        ), "idx_time must be in the range of the state vector and non-negative"
         idx_time = slice(idx_time, idx_time + 1)
 
         x_min_augmented = np.hstack([x_min, ctcs_augmentation_min])
@@ -126,7 +128,9 @@ class TrajOptProblem:
         for constraint in constraints:
             if constraint.constraint_type == "ctcs":
                 sim.constraints_ctcs.append(
-                    lambda x, u, func=constraint: jnp.sum(func.penalty(func(x[idx_x_true], u[idx_u_true])))
+                    lambda x, u, func=constraint: jnp.sum(
+                        func.penalty(func(x[idx_x_true], u[idx_u_true]))
+                    )
                 )
             elif constraint.constraint_type == "nodal":
                 sim.constraints_nodal.append(constraint)
@@ -149,7 +153,7 @@ class TrajOptProblem:
         )
 
         self.ocp: cp.Problem = None
-        self.dynamics_discretized: ExactDis = None
+        self.dynamics_discretized: callable = None
         self.cpg_solve = None
 
     def compile(self):
@@ -184,26 +188,30 @@ class TrajOptProblem:
         self.i5 = self.i4 + n_x
 
         if not self.params.dev.debug:
-            self.dynamics_discretized.calculate_discretization = jax.jit(
-                self.dynamics_discretized.calculate_discretization
-            ).lower(
-                np.ones((self.params.scp.n, self.params.sim.n_states)),
-                np.ones((self.params.scp.n, self.params.sim.n_controls)),
-            ).compile()
+            self.dynamics_discretized = (
+                jax.jit(self.dynamics_discretized)
+                .lower(
+                    np.ones((self.params.scp.n, self.params.sim.n_states)),
+                    np.ones((self.params.scp.n, self.params.sim.n_controls)),
+                )
+                .compile()
+            )
 
-        diff_prop = Diffrax_Prop(self.state_dot, self.A, self.B, self.params)
-        self.params.prp.integrator = jax.jit(get_propagation_solver(self.state_dot, self.params)).lower(
-            np.ones((self.params.sim.n_states)),
-            (0.0, 0.0),
-            np.ones((1, self.params.sim.n_controls)), 
-            np.ones((1, self.params.sim.n_controls)), 
-            np.ones((1,1)), 
-            0
-        ).compile()
-
+        self.params.prp.integrator = (
+            jax.jit(get_propagation_solver(self.state_dot, self.params))
+            .lower(
+                np.ones((self.params.sim.n_states)),
+                (0.0, 0.0),
+                np.ones((1, self.params.sim.n_controls)),
+                np.ones((1, self.params.sim.n_controls)),
+                np.ones((1, 1)),
+                0,
+            )
+            .compile()
+        )
 
         # _ = self.dynamics_discretized.simulate_nonlinear_time(np.ones((self.params.sim.n_states)), np.zeros((10, self.params.sim.n_controls)), np.linspace(0,1, 100), np.linspace(0,1, 10))
-        
+
     def solve(self):
         # Ensure parameter sizes and normalization are correct
         self.params.scp.__post_init__()

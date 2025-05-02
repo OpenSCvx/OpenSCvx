@@ -7,26 +7,6 @@ from openscvx.config import Config
 from openscvx.integrators import solve_ivp_rk45, solve_ivp_diffrax, solve_ivp_diffrax_prop
 
 
-
-class RK45_Custom:
-    def __init__(self, params):
-        self.params = params
-
-    def solve_ivp(self, dVdt, tau_grid, V0, args, method='RK45', t_eval=None):
-        if method != 'RK45':
-            raise ValueError("Currently, only 'RK45' method is supported.")
-        
-        return solve_ivp_rk45(dVdt, tau_grid[1], V0, args, is_not_compiled=self.params.dev.debug)
-
-    
-class Diffrax_Prop:
-    def __init__(self, state_dot, A, B, params):
-        self.params = params
-        self.func = prop_aug_dy
-        self.state_dot = state_dot
-
-        self.solve_ivp = get_propagation_solver(state_dot, params)
-
 def prop_aug_dy(
     tau: float,
     x: np.ndarray,
@@ -52,13 +32,6 @@ def get_propagation_solver(state_dot, params):
     def propagation_solver(V0, tau_grid, u_cur, u_next, tau_init, idx_s):
         return solve_ivp_diffrax_prop(prop_aug_dy, tau_grid[1], V0, args=(u_cur, u_next, tau_init, idx_s, state_dot, params.dis.dis_type, params.scp.n), tau_0=tau_grid[0])
     return propagation_solver
-
-class Diffrax:
-    def __init__(self, params):
-        self.params = params
-    
-    def solve_ivp(self, dVdt, tau_grid, V0, args, t_eval=None):
-        return solve_ivp_diffrax(dVdt, tau_grid[1], V0, args, solver_name=self.params.dis.solver, rtol=self.params.dis.rtol, atol=self.params.dis.atol, extra_kwargs=self.params.dis.args)
 
 def s_to_t(u, params: Config):
     t = [0]
@@ -90,35 +63,6 @@ def t_to_tau(u, t, u_nodal, t_nodal, params: Config):
         else:
             tau[k] = tau_p + 2 * (t[k] - tp) / (s_k + s_kp)
     return tau, u
-
-class ExactDis:
-    def __init__(self, state_dot, A, B, params: Config) -> None:
-        self.state_dot = state_dot
-        self.A = A
-        self.B = B
-        self.params = params
-
-        # Extract the number of states and controls from the parameters
-        n_x = self.params.sim.n_states
-        n_u = self.params.sim.n_controls
-
-        # Define indices for slicing the augmented state vector
-        self.i0 = 0
-        self.i1 = n_x
-        self.i2 = self.i1 + n_x * n_x
-        self.i3 = self.i2 + n_x * n_u
-        self.i4 = self.i3 + n_x * n_u
-        self.i5 = self.i4 + n_x
-
-        
-        if self.params.dis.custom_integrator:
-            self.integrator = RK45_Custom(self.params)
-        else:
-            self.integrator = Diffrax(self.params)
-
-        self.tau_grid = jnp.linspace(0, 1, self.params.scp.n)
-
-        self.calculate_discretization = get_discretization_solver(state_dot, A, B, params)
     
 
 def simulate_nonlinear_time(x_0, u, tau_vals, t, params, propagation_solver):
