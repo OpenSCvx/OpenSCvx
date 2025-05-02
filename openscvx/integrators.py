@@ -101,7 +101,7 @@ def solve_ivp_diffrax(
     return solution.ys
 
 
-# args = (u_cur, u_next, tau_init, idx_s)
+# TODO: (norrisg) this function is basically identical to `solve_ivp_diffrax`, could combine, but requires returning solution and getting `.ys` wherever the `solve_ivp_diffrax` is called
 def solve_ivp_diffrax_prop(
     f,
     tau_final,
