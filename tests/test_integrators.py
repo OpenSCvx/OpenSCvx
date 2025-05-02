@@ -4,7 +4,7 @@ import numpy as np
 import jax.numpy as jnp
 import pytest
 
-from openscvx.integrators import solve_ivp_rk45, solve_ivp_diffrax
+from openscvx.integrators import solve_ivp_rk45, solve_ivp_diffrax, solve_ivp_diffrax_prop
 
 def decay(t, y):
     return -y
@@ -45,5 +45,32 @@ def test_solve_ivp_diffrax_decay(solver_name, num_steps):
     tol = 2e-2 if solver_name == "Euler" else 5e-3
     np.testing.assert_allclose(sol_np, expected, rtol=tol, atol=tol)
 
-if __name__ == "__main__":
-    pytest.main([__file__])
+@pytest.mark.parametrize("solver_name", ["Tsit5", "Dopri5", "Dopri8"])
+def test_solve_ivp_diffrax_prop_decay(solver_name):
+    # Integrate y' = -y, y(0)=1, from t=0 to t=1
+    tau0, tau1 = 0.0, 1.0
+    y0 = jnp.array([1.0])
+    args = ()  # our f ignores args
+
+    sol = solve_ivp_diffrax_prop(
+        f=decay,
+        tau_final=tau1,
+        y_0=y0,
+        args=args,
+        tau_0=tau0,
+        num_substeps=11,
+        solver_name=solver_name,
+        rtol=1e-6,
+        atol=1e-9,
+        extra_kwargs={}
+    )
+
+    # Check the discrete solution at the 11 grid points
+    ys = np.array(sol.ys[:, 0])
+    t_eval = np.linspace(tau0, tau1, 11)
+    expected = np.exp(-t_eval)
+    np.testing.assert_allclose(ys, expected, rtol=1e-3, atol=1e-6)
+
+    # Check the dense evaluator at t=0.5
+    y_half = float(sol.evaluate(0.5)[0])
+    assert np.isclose(y_half, np.exp(-0.5), rtol=1e-3, atol=1e-6)
