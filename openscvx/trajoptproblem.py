@@ -16,9 +16,11 @@ from openscvx.config import (
 )
 from openscvx.dynamics import get_augmented_dynamics, get_jacobians
 from openscvx.constraints.ctcs import get_g_func
-from openscvx.discretization import ExactDis, Diffrax_Prop
+from openscvx.discretization import get_discretization_solver
+from openscvx.propagation import get_propagation_solver
 from openscvx.constraints.boundary import BoundaryConstraint
 from openscvx.ptr import PTR_init, PTR_main, PTR_post
+from openscvx.ocp import OptimalControlProblem
 
 
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
@@ -59,7 +61,9 @@ class TrajOptProblem:
         idx_time_dilation = slice(idx_u_true.stop, idx_u_true.stop + 1)
 
         # check that idx_time is in the correct range
-        assert(idx_time >= 0 and idx_time < len(x_max)), "idx_time must be in the range of the state vector and non-negative"
+        assert idx_time >= 0 and idx_time < len(
+            x_max
+        ), "idx_time must be in the range of the state vector and non-negative"
         idx_time = slice(idx_time, idx_time + 1)
 
         x_min_augmented = np.hstack([x_min, ctcs_augmentation_min])
@@ -126,7 +130,9 @@ class TrajOptProblem:
         for constraint in constraints:
             if constraint.constraint_type == "ctcs":
                 sim.constraints_ctcs.append(
-                    lambda x, u, func=constraint: jnp.sum(func.penalty(func(x[idx_x_true], u[idx_u_true])))
+                    lambda x, u, func=constraint: jnp.sum(
+                        func.penalty(func(x[idx_x_true], u[idx_u_true]))
+                    )
                 )
             elif constraint.constraint_type == "nodal":
                 sim.constraints_nodal.append(constraint)
@@ -148,75 +154,72 @@ class TrajOptProblem:
             prp=prp,
         )
 
-        self.ocp: cp.Problem = None
-        self.dynamics_discretized: ExactDis = None
+        self.optimal_control_problem: cp.Problem = None
+        self.discretization_solver: callable = None
         self.cpg_solve = None
-
-    def compile(self):
-        # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
-        # TODO: (norrisg) Consider writing the compiled versions into the same variables?
-        # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
-        self.state_dot = jax.vmap(self.dynamics_augmented)
-        self.A = jax.jit(jax.vmap(self.A_uncompiled, in_axes=(0, 0)))
-        self.B = jax.jit(jax.vmap(self.B_uncompiled, in_axes=(0, 0)))
 
     def initialize(self):
         # Ensure parameter sizes and normalization are correct
         self.params.scp.__post_init__()
         self.params.sim.__post_init__()
 
-        self.compile()
+        # Compile dynamics and jacobians
+        self.state_dot = jax.vmap(self.dynamics_augmented)
+        self.A = jax.jit(jax.vmap(self.A_uncompiled, in_axes=(0, 0)))
+        self.B = jax.jit(jax.vmap(self.B_uncompiled, in_axes=(0, 0)))
+        # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
+        # TODO: (norrisg) Consider writing the compiled versions into the same variables?
+        # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
 
-        self.ocp, self.dynamics_discretized, self.cpg_solve = PTR_init(
-            self.state_dot, self.A, self.B, self.params
+        # Generate solvers and optimal control problem
+        self.discretization_solver = get_discretization_solver(self.state_dot, self.A, self.B, self.params)
+        self.propagation_solver = get_propagation_solver(self.state_dot, self.params)
+        self.optimal_control_problem = OptimalControlProblem(self.params)
+
+        # Initialize the PTR loop
+        self.cpg_solve = PTR_init(
+            self.optimal_control_problem,
+            self.discretization_solver,
+            self.params,
         )
 
-        # Extract the number of states and controls from the parameters
-        n_x = self.params.sim.n_states
-        n_u = self.params.sim.n_controls
-
-        # Define indices for slicing the augmented state vector
-        self.i0 = 0
-        self.i1 = n_x
-        self.i2 = self.i1 + n_x * n_x
-        self.i3 = self.i2 + n_x * n_u
-        self.i4 = self.i3 + n_x * n_u
-        self.i5 = self.i4 + n_x
-
+        # Compile the solvers
         if not self.params.dev.debug:
-            self.dynamics_discretized.calculate_discretization = jax.jit(
-                self.dynamics_discretized.calculate_discretization
-            ).lower(
-                np.ones((self.params.scp.n, self.params.sim.n_states)),
-                np.ones((self.params.scp.n, self.params.sim.n_controls)),
-            ).compile()
+            self.discretization_solver = (
+                jax.jit(self.discretization_solver)
+                .lower(
+                    np.ones((self.params.scp.n, self.params.sim.n_states)),
+                    np.ones((self.params.scp.n, self.params.sim.n_controls)),
+                )
+                .compile()
+            )
 
-        diff_prop = Diffrax_Prop(self.state_dot, self.A, self.B, self.params)
-        self.params.prp.integrator = jax.jit(diff_prop.solve_ivp).lower(
-            np.ones((self.params.sim.n_states)),
-            (0.0, 0.0),
-            np.ones((1, self.params.sim.n_controls)), 
-            np.ones((1, self.params.sim.n_controls)), 
-            np.ones((1,1)), 
-            0
-        ).compile()
+        self.propagation_solver = (
+            jax.jit(self.propagation_solver)
+            .lower(
+                np.ones((self.params.sim.n_states)),
+                (0.0, 0.0),
+                np.ones((1, self.params.sim.n_controls)),
+                np.ones((1, self.params.sim.n_controls)),
+                np.ones((1, 1)),
+                0,
+            )
+            .compile()
+        )
 
-
-        # _ = self.dynamics_discretized.simulate_nonlinear_time(np.ones((self.params.sim.n_states)), np.zeros((10, self.params.sim.n_controls)), np.linspace(0,1, 100), np.linspace(0,1, 10))
-        
     def solve(self):
         # Ensure parameter sizes and normalization are correct
         self.params.scp.__post_init__()
         self.params.sim.__post_init__()
 
-        if self.ocp is None or self.dynamics_discretized is None:
+        if self.optimal_control_problem is None or self.discretization_solver is None:
             raise ValueError(
                 "Problem has not been initialized. Call initialize() before solve()"
             )
 
         return PTR_main(
-            self.params, self.ocp, self.dynamics_discretized, self.cpg_solve
+            self.params, self.optimal_control_problem, self.discretization_solver, self.cpg_solve
         )
 
     def post_process(self, result):
-        return PTR_post(self.params, result, self.dynamics_discretized)
+        return PTR_post(self.params, result, self.propagation_solver)

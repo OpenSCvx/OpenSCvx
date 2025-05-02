@@ -7,19 +7,17 @@ import time
 import sys
 from termcolor import colored
 
-from openscvx.discretization import ExactDis
+from openscvx.propagation import s_to_t, t_to_tau, simulate_nonlinear_time
 from openscvx.config import Config
-from openscvx.ocp import OCP
+from openscvx.ocp import OptimalControlProblem
 
 import warnings
 warnings.filterwarnings("ignore")
 
-def PTR_init(state_dot, A, B, params: Config) -> tuple[cp.Problem, ExactDis]:
+def PTR_init(ocp: cp.Problem, discretization_solver: callable, params: Config, ) -> tuple[cp.Problem, callable]:
     intro()
 
     t_0_while = time.time()
-
-    ocp = OCP(params) # Initialize the problem
 
     if params.cvx.cvxpygen:
         from solver.cpg_solver import cpg_solve
@@ -28,16 +26,14 @@ def PTR_init(state_dot, A, B, params: Config) -> tuple[cp.Problem, ExactDis]:
     else:
         cpg_solve = None
 
-    dynamics_discretized = ExactDis(state_dot, A, B, params)
-
     # Solve a dumb problem to intilize DPP and JAX jacobians
-    _ = PTR_subproblem(cpg_solve, params.sim.x_bar, params.sim.u_bar, dynamics_discretized, ocp, params)
+    _ = PTR_subproblem(cpg_solve, params.sim.x_bar, params.sim.u_bar, discretization_solver, ocp, params)
 
     t_f_while = time.time()
     print("Total Initialization Time: ", t_f_while - t_0_while)
-    return ocp, dynamics_discretized, cpg_solve
+    return cpg_solve
 
-def PTR_main(params: Config, prob: cp.Problem, aug_dy: ExactDis, cpg_solve) -> dict:
+def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> dict:
     J_vb = 1E2
     J_vc = 1E2
     J_tr = 1E2
@@ -181,18 +177,18 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: ExactDis, cpg_solve) -> d
     )
     return result
 
-def PTR_post(params: Config, result: dict, aug_dy: ExactDis) -> dict:
+def PTR_post(params: Config, result: dict, propagation_solver: callable) -> dict:
     t_0_post = time.time()
     x = result["x"]
     u = result["u"]
 
-    t = np.array(aug_dy.s_to_t(u, params))
+    t = np.array(s_to_t(u, params))
 
     t_full = np.arange(0, t[-1], params.prp.dt)
 
-    tau_vals, u_full = aug_dy.t_to_tau(u, t_full, u, t, params)
+    tau_vals, u_full = t_to_tau(u, t_full, u, t, params)
 
-    x_full = aug_dy.simulate_nonlinear_time(x[0], u, tau_vals, t)
+    x_full = simulate_nonlinear_time(x[0], u, tau_vals, t, params, propagation_solver)
 
     print("Total CTCS Constraint Violation:", x_full[-1, params.sim.idx_y])
     i = 0
@@ -225,7 +221,7 @@ def PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params: Config):
     prob.param_dict['u_bar'].value = u_bar
     
     t0 = time.time()
-    A_bar, B_bar, C_bar, z_bar, V_multi_shoot = aug_dy.calculate_discretization(x_bar, u_bar.astype(float))
+    A_bar, B_bar, C_bar, z_bar, V_multi_shoot = aug_dy(x_bar, u_bar.astype(float))
     
 
     prob.param_dict['A_d'].value = A_bar.__array__()
