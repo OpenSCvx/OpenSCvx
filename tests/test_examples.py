@@ -3,10 +3,14 @@ import pytest
 import jax
 
 from examples.params.cinema_vp import problem as cinema_vp_problem
-from examples.params.cinema_vp import problem as cinema_vp_problem
+from examples.params.cinema_vp import plotting_dict as cinema_vp_plotting_dict
 from examples.params.dr_vp import problem as dr_vp_problem
+from examples.params.dr_vp import plotting_dict as dr_vp_plotting_dict
 from examples.params.obstacle_avoidance import problem as obstacle_avoidance_problem
+from examples.params.obstacle_avoidance import plotting_dict as obstacle_avoidance_plotting_dict
 from examples.params.dr_vp_nodal import problem as dr_vp_polytope_problem
+from examples.params.dr_vp_nodal import plotting_dict as dr_vp_polytope_plotting_dict
+from examples.plotting import plot_camera_animation, plot_animation, plot_scp_animation
 
 
 def test_obstacle_avoidance():
@@ -15,6 +19,11 @@ def test_obstacle_avoidance():
     problem.initialize()
     result = problem.solve()
     result = problem.post_process(result)
+
+    result.update(obstacle_avoidance_plotting_dict)
+
+    plot_animation(result, problem.params)
+    plot_scp_animation(result, problem.params)
     
     # Assuming PTR_main returns a dictionary
     output_dict = result
@@ -42,6 +51,12 @@ def test_dr_vp_nodal():
     problem.initialize()
     result = problem.solve()
     result = problem.post_process(result)
+
+    result.update(dr_vp_plotting_dict)
+
+    plot_animation(result, problem.params)
+    plot_camera_animation(result, problem.params)
+    plot_scp_animation(result, problem.params)
     
     # Assuming PTR_main returns a dictionary
     output_dict = result
@@ -66,6 +81,12 @@ def test_dr_vp():
     problem.initialize()
     result = problem.solve()
     result = problem.post_process(result)
+
+    result.update(dr_vp_plotting_dict)
+
+    plot_animation(result, problem.params)
+    plot_camera_animation(result, problem.params)
+    plot_scp_animation(result, problem.params)
     
     # Assuming PTR_main returns a dictionary
     output_dict = result
@@ -90,6 +111,12 @@ def test_cinema_vp():
     problem.initialize()
     result = problem.solve()
     result = problem.post_process(result)
+
+    result.update(cinema_vp_plotting_dict)
+
+    plot_animation(result, problem.params)
+    plot_camera_animation(result, problem.params)
+    plot_scp_animation(result, problem.params)
     
     # Assuming PTR_main returns a dictionary
     output_dict = result
