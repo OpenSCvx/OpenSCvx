@@ -3,6 +3,7 @@ import pytest
 import jax
 
 from examples.params.cinema_vp import problem as cinema_vp_problem
+from examples.params.cinema_vp import problem as cinema_vp_problem
 from examples.params.dr_vp import problem as dr_vp_problem
 from examples.params.obstacle_avoidance import problem as obstacle_avoidance_problem
 from examples.params.dr_vp_nodal import problem as dr_vp_polytope_problem
@@ -18,6 +19,17 @@ def test_obstacle_avoidance():
     # Assuming PTR_main returns a dictionary
     output_dict = result
     
+    scp_iters = len(result['discretization_history'])
+    prop_constr_vio = result['x_full'][:,-1][-1]
+    sol_constr_vio = result['x'][:,-1][-1]
+    prop_cost = result['x_full'][:,-2][-1]
+    sol_cost = result['x'][:,-2][-1]
+
+    assert sol_cost < 2.0, "Obstacle Avoidance Process failed with solution cost"
+    assert prop_cost < 2.0, "Obstacle Avoidance Process failed with propagated cost"
+    assert sol_constr_vio < 1e-3, "Obstacle Avoidance Process failed with solution constraint violation"
+    assert prop_constr_vio < 1e-3, "Obstacle Avoidance Process failed with propagated constraint violation"
+    assert scp_iters < 10, "Obstacle Avoidance Process took more then expected iterations"
     assert output_dict['converged'], "Obstacle Avoidance Process failed with output"
     
     # Clean up jax memory usage
@@ -33,7 +45,15 @@ def test_dr_vp_nodal():
     
     # Assuming PTR_main returns a dictionary
     output_dict = result
-    
+    prop_constr_vio = result['x_full'][:,-1][-1]
+    sol_constr_vio = result['x'][:,-1][-1]
+    prop_cost = result['x_full'][:,-2][-1]
+    sol_cost = result['x'][:,-2][-1]
+
+    assert sol_cost < 30.0, "Obstacle Avoidance Process failed with solution cost"
+    assert prop_cost < 30.0, "Obstacle Avoidance Process failed with propagated cost"
+    assert sol_constr_vio < 1e-3, "Obstacle Avoidance Process failed with solution constraint violation"
+    assert prop_constr_vio < 1e-3, "Obstacle Avoidance Process failed with propagated constraint violation"
     assert output_dict['converged'], "DR VP Nodal Process failed with output"
     
     # Clean up jax memory usage
@@ -49,7 +69,15 @@ def test_dr_vp():
     
     # Assuming PTR_main returns a dictionary
     output_dict = result
+    prop_constr_vio = result['x_full'][:,-1][-1]
+    sol_constr_vio = result['x'][:,-1][-1]
+    prop_cost = result['x_full'][:,-2][-1]
+    sol_cost = result['x'][:,-2][-1]
     
+    assert sol_cost < 45.0, "Obstacle Avoidance Process failed with solution cost"
+    assert prop_cost < 45.0, "Obstacle Avoidance Process failed with propagated cost"
+    assert sol_constr_vio < 1e0, "Obstacle Avoidance Process failed with solution constraint violation"
+    assert prop_constr_vio < 1e0, "Obstacle Avoidance Process failed with propagated constraint violation"
     assert output_dict['converged'], "DR VP Process failed with output"
     
     # Clean up jax memory usage
@@ -65,7 +93,15 @@ def test_cinema_vp():
     
     # Assuming PTR_main returns a dictionary
     output_dict = result
+    prop_constr_vio = result['x_full'][:,-1][-1]
+    sol_constr_vio = result['x'][:,-1][-1]
+    prop_cost = result['x_full'][:,-3][-1]
+    sol_cost = result['x'][:,-3][-1]
     
+    assert sol_cost < 400.0, "Obstacle Avoidance Process failed with solution cost"
+    assert prop_cost < 400.0, "Obstacle Avoidance Process failed with propagated cost"
+    assert sol_constr_vio < 1E0, "Obstacle Avoidance Process failed with solution constraint violation"
+    assert prop_constr_vio < 1e0, "Obstacle Avoidance Process failed with propagated constraint violation"
     assert output_dict['converged'], "Cinema VP Process failed with output"
     
     # Clean up jax memory usage
