@@ -1408,7 +1408,7 @@ def plot_scp_animation(result: dict,
     drone_forces = result["u_full"][:, :3]
     scp_interp_trajs = scp_traj_interp(result["x_history"], params)
     scp_ctcs_trajs = result["x_history"]
-    scp_multi_shoot = result["discretization"]
+    scp_multi_shoot = result["discretization_history"]
     # obstacles = result_ctcs["obstacles"]
     # gates = result_ctcs["gates"]
     if "moving_subject" in result or "init_poses" in result:
