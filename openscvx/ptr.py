@@ -10,12 +10,13 @@ from termcolor import colored
 from openscvx.propagation import s_to_t, t_to_tau, simulate_nonlinear_time
 from openscvx.config import Config
 from openscvx.ocp import OptimalControlProblem
+from openscvx import io
 
 import warnings
 warnings.filterwarnings("ignore")
 
 def PTR_init(ocp: cp.Problem, discretization_solver: callable, params: Config, ) -> tuple[cp.Problem, callable]:
-    intro()
+    io.intro()
 
     t_0_while = time.time()
 
@@ -50,9 +51,7 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> d
     col_pos = "green"
     col_neg = "red"
 
-    print("{:^4} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
-            "Iter", "Dis Time (ms)", "Solve Time (ms)", "J_total", "J_tr", "J_vb", "J_vc", "Cost", "Solver Status"))
-    print(colored("---------------------------------------------------------------------------------------------------------"))
+    io.header()
 
     k = 1
 
@@ -83,8 +82,6 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> d
         params.scp.w_tr = min(params.scp.w_tr * params.scp.w_tr_adapt, params.scp.w_tr_max)
         if k > params.scp.cost_drop:
             params.scp.lam_cost = params.scp.lam_cost * params.scp.cost_relax
-        
-
 
         log_data.append({
                 "iter": k,
@@ -154,14 +151,7 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> d
                 iter_colored, data["dis_time"], data["subprop_time"], J_tot_colored, J_tr_colored, J_vb_colored, J_vc_colored, cost_colored, prob_stat_colored))
 
 
-    print(colored("---------------------------------------------------------------------------------------------------------"))
-    # Define ANSI color codes
-    BOLD = "\033[1m"
-    RESET = "\033[0m"
-
-    # Print with bold text
-    print("------------------------------------------------ " + BOLD + "RESULTS" + RESET + " ------------------------------------------------")
-    print("Total Computation Time: ", t_f_while - t_0_while)
+    io.footer(t_f_while - t_0_while)
 
     result = dict(
         converged = k <= params.scp.k_max,
@@ -277,24 +267,3 @@ def PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params: Config):
             J_vb_vec += np.maximum(0, prob.var_dict['nu_vb_' + str(id_ncvx)].value)
             id_ncvx += 1
     return x, u, costs, prob.value, J_vb_vec, J_vc_vec, J_tr_vec, prob.status, V_multi_shoot, subprop_time, dis_time
-
-def intro():
-    # Silence syntax warnings
-    warnings.filterwarnings("ignore")
-    ascii_art = '''
-                             
-                            ____                    _____  _____           
-                           / __ \                  / ____|/ ____|          
-                          | |  | |_ __   ___ _ __ | (___ | |  __   ____  __
-                          | |  | | '_ \ / _ \ '_ \ \___ \| |  \ \ / /\ \/ /
-                          | |__| | |_) |  __/ | | |____) | |___\ V /  >  < 
-                           \____/| .__/ \___|_| |_|_____/ \_____\_/  /_/\_\ 
-                                 | |                                       
-                                 |_|                                       
----------------------------------------------------------------------------------------------------------
-                                Author: Chris Hayner and Griffin Norris
-                                    Autonomous Controls Laboratory
-                                       University of Washington
----------------------------------------------------------------------------------------------------------
-'''
-    print(ascii_art)
