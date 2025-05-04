@@ -113,7 +113,7 @@ def calculate_discretization(
         # fmt: off
         sol = solve_ivp_rk45(
             lambda t,y,*a: dVdt(t, y, *a),
-            1.0/N,
+            1.0/(N-1),
             V0.reshape(-1),
             args=(u[:-1].astype(float), u[1:].astype(float),
                   state_dot, A, B, n_x, n_u, N, dis_type),
@@ -124,7 +124,7 @@ def calculate_discretization(
         # fmt: off
         sol = solve_ivp_diffrax(
             lambda t,y,*a: dVdt(t, y, *a),
-            1.0/N,
+            1.0/(N-1),
             V0.reshape(-1),
             args=(u[:-1].astype(float), u[1:].astype(float),
                   state_dot, A, B, n_x, n_u, N, dis_type),
