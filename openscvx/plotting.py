@@ -10,7 +10,7 @@ from openscvx.config import Config
 def full_subject_traj_time(results, params):
     x_full = results["x_full"]
     x_nodes = results["x"]
-    t_nodes = x_nodes[:,params.sim.t_inds]
+    t_nodes = x_nodes[:,params.sim.idx_t]
     t_full = results['t_full']
     subs_traj = []
     subs_traj_node = []

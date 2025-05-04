@@ -29,7 +29,6 @@ initial_state.type[6:14] = "Free"
 final_state = bc(jnp.array([-10.0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 40]))
 final_state.type[0:13] = "Free"
 final_state.type[13] = "Minimize" # Minimize fuel usage
-final_state.type[14] = "Minimize" # Minimize time
 
 max_control = np.array(
     [0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562]
