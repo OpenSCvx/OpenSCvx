@@ -46,10 +46,6 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> d
     scp_controls = [u_bar]
     V_multi_shoot_traj = []
 
-    # Define colors for printing
-    col_main = "blue"
-    col_pos = "green"
-    col_neg = "red"
 
     io.header()
 
@@ -63,6 +59,7 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> d
         pr.enable()
 
     log_data = []
+    print_queue = []
 
     t_0_while = time.time()
     while k <= params.scp.k_max and ((J_tr >= params.scp.ep_tr) or (J_vb >= params.scp.ep_vb) or (J_vc >= params.scp.ep_vc)):
@@ -94,32 +91,10 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> d
                 "cost": t[-1],
                 "prob_stat": prob_stat
             })
+        print_queue.append(log_data[-1])
 
         if params.dev.debug_printing:
-            # remove bottom labels and line
-            if not k == 1:
-                sys.stdout.write('\x1b[1A\x1b[2K\x1b[1A\x1b[2K')
-            
-            if prob_stat[3] == 'f':
-                # Only show the first element of the string
-                prob_stat = prob_stat[0]
-
-            # Determine color for each value
-            iter_colored = colored("{:4d}".format(k))
-            J_tot_colored = colored("{:.1e}".format(J_total))
-            J_tr_colored = colored("{:.1e}".format(J_tr), col_pos if J_tr <= params.scp.ep_tr else col_neg)
-            J_vb_colored = colored("{:.1e}".format(J_vb), col_pos if J_vb <= params.scp.ep_vb else col_neg)
-            J_vc_colored = colored("{:.1e}".format(J_vc), col_pos if J_vc <= params.scp.ep_vc else col_neg)
-            cost_colored = colored("{:.1e}".format(t[-1]))
-            prob_stat_colored = colored(prob_stat, col_pos if prob_stat == 'optimal' else col_neg)
-
-            # Print with colors
-            print("{:^4} |     {:^6.2f}    |      {:^6.2F}     | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
-                iter_colored, dis_time*1000.0, subprop_time*1000.0, J_tot_colored, J_tr_colored, J_vb_colored, J_vc_colored, cost_colored, prob_stat_colored))
-
-            print(colored("---------------------------------------------------------------------------------------------------------"))
-            print("{:^4} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
-                "Iter", "Dis Time (ms)", "Solve Time (ms)", "J_total", "J_tr", "J_vb", "J_vc", "Cost", "Solver Status"))
+            io.intermediate(print_queue, params)
             
         k += 1
 
@@ -134,21 +109,11 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> d
 
     # Print logged data once
     if not params.dev.debug_printing:  
-        print(colored("---------------------------------------------------------------------------------------------------------"))
-        print("{:^4} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
-            "Iter", "Dis Time (ms)", "Solve Time (ms)", "J_total", "J_tr", "J_vb", "J_vc", "Cost", "Solver Status"))
+        # print(colored("---------------------------------------------------------------------------------------------------------"))
+        # print("{:^4} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
+        #     "Iter", "Dis Time (ms)", "Solve Time (ms)", "J_total", "J_tr", "J_vb", "J_vc", "Cost", "Solver Status"))
 
-        for data in log_data:
-            iter_colored = colored("{:4d}".format(data["iter"]))
-            J_tot_colored = colored("{:.1e}".format(data["J_total"]))
-            J_tr_colored = colored("{:.1e}".format(data["J_tr"]), col_pos if data["J_tr"] <= params.scp.ep_tr else col_neg)
-            J_vb_colored = colored("{:.1e}".format(data["J_vb"]), col_pos if data["J_vb"] <= params.scp.ep_vb else col_neg)
-            J_vc_colored = colored("{:.1e}".format(data["J_vc"]), col_pos if data["J_vc"] <= params.scp.ep_vc else col_neg)
-            cost_colored = colored("{:.1e}".format(data["cost"]))
-            prob_stat_colored = colored(data["prob_stat"], col_pos if data["prob_stat"] == 'optimal' else col_neg)
-
-            print("{:^4} |     {:^6.2f}    |      {:^6.2F}     | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
-                iter_colored, data["dis_time"], data["subprop_time"], J_tot_colored, J_tr_colored, J_vb_colored, J_vc_colored, cost_colored, prob_stat_colored))
+        io.intermediate(print_queue, params)
 
 
     io.footer(t_f_while - t_0_while)
