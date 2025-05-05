@@ -2,6 +2,7 @@ import jax.numpy as jnp
 from typing import List
 import queue
 import threading
+import time
 
 import cvxpy as cp
 import jax
@@ -167,6 +168,9 @@ class TrajOptProblem:
         self.print_thread.start()
 
     def initialize(self):
+        io.intro()
+
+        t_0_while = time.time()
         # Ensure parameter sizes and normalization are correct
         self.params.scp.__post_init__()
         self.params.sim.__post_init__()
@@ -190,6 +194,9 @@ class TrajOptProblem:
             self.discretization_solver,
             self.params,
         )
+
+        t_f_while = time.time()
+        print("Total Initialization Time: ", t_f_while - t_0_while)
 
         # Compile the solvers
         if not self.params.dev.debug:
@@ -232,10 +239,17 @@ class TrajOptProblem:
             pr = cProfile.Profile()
             pr.enable()
 
+        t_0_while = time.time()
+        # Print top header for solver results
+        io.header()
+
         result =  PTR_main(
             self.params, self.optimal_control_problem, self.discretization_solver, self.cpg_solve, self.emitter_function
         )
-    
+
+        t_f_while = time.time()
+        # Print bottom footer for solver results as well as total computation time
+        io.footer(t_f_while - t_0_while)
         # Disable the profiler
         if self.params.dev.profiling:
             pr.disable()
@@ -245,4 +259,8 @@ class TrajOptProblem:
         return result
 
     def post_process(self, result):
-        return PTR_post(self.params, result, self.propagation_solver)
+        t_0_post = time.time()
+        result = PTR_post(self.params, result, self.propagation_solver)
+        t_f_post = time.time()
+        print("Total Post Processing Time: ", t_f_post - t_0_post)
+        return result

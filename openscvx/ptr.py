@@ -15,11 +15,7 @@ from openscvx import io
 import warnings
 warnings.filterwarnings("ignore")
 
-def PTR_init(ocp: cp.Problem, discretization_solver: callable, params: Config, ) -> tuple[cp.Problem, callable]:
-    io.intro()
-
-    t_0_while = time.time()
-
+def PTR_init(ocp: cp.Problem, discretization_solver: callable, params: Config):
     if params.cvx.cvxpygen:
         from solver.cpg_solver import cpg_solve
         with open('solver/problem.pickle', 'rb') as f:
@@ -30,8 +26,6 @@ def PTR_init(ocp: cp.Problem, discretization_solver: callable, params: Config, )
     # Solve a dumb problem to intilize DPP and JAX jacobians
     _ = PTR_subproblem(cpg_solve, params.sim.x_bar, params.sim.u_bar, discretization_solver, ocp, params)
 
-    t_f_while = time.time()
-    print("Total Initialization Time: ", t_f_while - t_0_while)
     return cpg_solve
 
 def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emitter_function) -> dict:
@@ -46,13 +40,9 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emit
     scp_controls = [u_bar]
     V_multi_shoot_traj = []
 
-    io.header()
-
     k = 1
-
     log_data = []
 
-    t_0_while = time.time()
     while k <= params.scp.k_max and ((J_tr >= params.scp.ep_tr) or (J_vb >= params.scp.ep_vb) or (J_vc >= params.scp.ep_vc)):
         x, u, t, J_total, J_vb_vec, J_vc_vec, J_tr_vec, prob_stat, V_multi_shoot, subprop_time, dis_time = PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params)
         
@@ -86,12 +76,8 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emit
             
         k += 1
 
-    t_f_while = time.time()
-    
     # Allow emitter function to finish
     time.sleep(0.5)
-
-    io.footer(t_f_while - t_0_while)
 
     result = dict(
         converged = k <= params.scp.k_max,
@@ -108,7 +94,6 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emit
     return result
 
 def PTR_post(params: Config, result: dict, propagation_solver: callable) -> dict:
-    t_0_post = time.time()
     x = result["x"]
     u = result["u"]
 
@@ -140,8 +125,6 @@ def PTR_post(params: Config, result: dict, propagation_solver: callable) -> dict
         u_full = u_full
     )
 
-    t_f_post = time.time()
-    print("Total Post Processing Time: ", t_f_post - t_0_post)
     result.update(more_result)
     return result
 
@@ -152,7 +135,6 @@ def PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params: Config):
     
     t0 = time.time()
     A_bar, B_bar, C_bar, z_bar, V_multi_shoot = aug_dy(x_bar, u_bar.astype(float))
-    
 
     prob.param_dict['A_d'].value = A_bar.__array__()
     prob.param_dict['B_d'].value = B_bar.__array__()
