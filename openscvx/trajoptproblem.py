@@ -22,7 +22,8 @@ from openscvx.constraints.ctcs import get_g_func
 from openscvx.discretization import get_discretization_solver
 from openscvx.propagation import get_propagation_solver
 from openscvx.constraints.boundary import BoundaryConstraint
-from openscvx.ptr import PTR_init, PTR_main, PTR_post
+from openscvx.ptr import PTR_init, PTR_main
+from openscvx.post_processing import propagate_trajectory_results
 from openscvx.ocp import OptimalControlProblem
 from openscvx import io
 
@@ -300,7 +301,7 @@ class TrajOptProblem:
             pr.enable()
 
         t_0_post = time.time()
-        result = PTR_post(self.params, result, self.propagation_solver)
+        result = propagate_trajectory_results(self.params, result, self.propagation_solver)
         t_f_post = time.time()
 
         self.timing_post = t_f_post - t_0_post
