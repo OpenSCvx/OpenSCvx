@@ -163,12 +163,23 @@ class TrajOptProblem:
         self.cpg_solve = None
 
         self.print_queue = queue.Queue()
-        self.emitter_function = lambda intermediate_result: self.print_queue.put(intermediate_result)
-        self.print_thread = threading.Thread(target=io.intermediate, args=(self.print_queue, self.params), daemon=True)
+        self.emitter_function = lambda intermediate_result: self.print_queue.put(
+            intermediate_result
+        )
+        self.print_thread = threading.Thread(
+            target=io.intermediate, args=(self.print_queue, self.params), daemon=True
+        )
         self.print_thread.start()
 
     def initialize(self):
         io.intro()
+
+        # Enable the profiler
+        if self.params.dev.profiling:
+            import cProfile
+
+            pr = cProfile.Profile()
+            pr.enable()
 
         t_0_while = time.time()
         # Ensure parameter sizes and normalization are correct
@@ -184,7 +195,9 @@ class TrajOptProblem:
         # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
 
         # Generate solvers and optimal control problem
-        self.discretization_solver = get_discretization_solver(self.state_dot, self.A, self.B, self.params)
+        self.discretization_solver = get_discretization_solver(
+            self.state_dot, self.A, self.B, self.params
+        )
         self.propagation_solver = get_propagation_solver(self.state_dot, self.params)
         self.optimal_control_problem = OptimalControlProblem(self.params)
 
@@ -221,6 +234,10 @@ class TrajOptProblem:
             )
             .compile()
         )
+        if self.params.dev.profiling:
+            pr.disable()
+            # Save results so it can be viusualized with snakeviz
+            pr.dump_stats("profiling_initialize.prof")
 
     def solve(self):
         # Ensure parameter sizes and normalization are correct
@@ -232,10 +249,10 @@ class TrajOptProblem:
                 "Problem has not been initialized. Call initialize() before solve()"
             )
 
-
         # Enable the profiler
         if self.params.dev.profiling:
             import cProfile
+
             pr = cProfile.Profile()
             pr.enable()
 
@@ -243,8 +260,12 @@ class TrajOptProblem:
         # Print top header for solver results
         io.header()
 
-        result =  PTR_main(
-            self.params, self.optimal_control_problem, self.discretization_solver, self.cpg_solve, self.emitter_function
+        result = PTR_main(
+            self.params,
+            self.optimal_control_problem,
+            self.discretization_solver,
+            self.cpg_solve,
+            self.emitter_function,
         )
 
         t_f_while = time.time()
@@ -254,13 +275,27 @@ class TrajOptProblem:
         if self.params.dev.profiling:
             pr.disable()
             # Save results so it can be viusualized with snakeviz
-            pr.dump_stats('profiling_results.prof')
-        
+            pr.dump_stats("profiling_solve.prof")
+
         return result
 
     def post_process(self, result):
+        # Enable the profiler
+        if self.params.dev.profiling:
+            import cProfile
+
+            pr = cProfile.Profile()
+            pr.enable()
+
         t_0_post = time.time()
         result = PTR_post(self.params, result, self.propagation_solver)
         t_f_post = time.time()
+
+        # Disable the profiler
+        if self.params.dev.profiling:
+            pr.disable()
+            # Save results so it can be viusualized with snakeviz
+            pr.dump_stats("profiling_postprocess.prof")
+
         print("Total Post Processing Time: ", t_f_post - t_0_post)
         return result
