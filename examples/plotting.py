@@ -148,7 +148,7 @@ def plot_camera_view(result: dict, params: Config) -> None:
     # Save figure as svg
     fig.write_image("figures/camera_view.svg")
 
-    fig.show()
+    return fig
 
 def plot_camera_animation(result: dict, params:Config, path="") -> None:
     title = r'$\text{Camera Animation}$'
@@ -313,7 +313,7 @@ def plot_camera_animation(result: dict, params:Config, path="") -> None:
     # # Remove the paper background
     # fig.update_layout(paper_bgcolor='rgba(0,0,0,0)')
 
-    fig.show()  
+    return fig  
 
 def plot_camera_polytope_animation(result: dict, params: Config, path="") -> None:
     title = r'$\text{Camera Animation}$'
@@ -572,7 +572,7 @@ def plot_camera_polytope_animation(result: dict, params: Config, path="") -> Non
 
     # # Remove the paper background
     # fig.update_layout(paper_bgcolor='rgba(0,0,0,0)')
-    fig.show()  
+    return fig  
 
 def plot_conic_view_animation(result: dict, params: Config, path="") -> None:
     title = r'$\text{Conic Constraint}$'
@@ -766,7 +766,7 @@ def plot_conic_view_animation(result: dict, params: Config, path="") -> None:
     # # Remove the paper background
     # fig.update_layout(paper_bgcolor='rgba(0,0,0,0)')
 
-    fig.show()
+    return fig
 
 def plot_conic_view_polytope_animation(result: dict, params: Config, path="") -> None:
     title = r'$\text{Conic Constraint}$'
@@ -1061,7 +1061,7 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
     # with open(f'{path}results/conic_animation.html', 'w') as f:
     #     f.write(html_str)
 
-    fig.show()
+    return fig
 
 def plot_animation(result: dict,
                    params: Config,
@@ -1395,7 +1395,7 @@ def plot_animation(result: dict,
         dtick=1.0
     )
 
-    fig.show()
+    return fig
 
 
 def plot_scp_animation(result: dict,
@@ -1632,7 +1632,7 @@ def plot_scp_animation(result: dict,
     if not "moving_subject" in result:
         fig.update_layout(scene_camera=dict(up=dict(x=0, y=0, z=90), center=dict(x=1, y=0.3, z=1), eye=dict(x=-1, y=2, z=1)))
 
-    fig.show()
+    return fig
 
 def scp_traj_interp(scp_trajs, params: Config):
     scp_prop_trajs = []
