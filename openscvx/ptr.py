@@ -71,9 +71,6 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emit
             
         k += 1
 
-    # Allow emitter function to finish
-    time.sleep(0.5)
-
     result = dict(
         converged = k <= params.scp.k_max,
         t_final = x[:,params.sim.idx_t][-1],

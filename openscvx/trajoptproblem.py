@@ -269,6 +269,8 @@ class TrajOptProblem:
         )
 
         t_f_while = time.time()
+        while self.print_queue.qsize() > 0:
+            time.sleep(0.1)
         # Print bottom footer for solver results as well as total computation time
         io.footer(t_f_while - t_0_while)
         # Disable the profiler
