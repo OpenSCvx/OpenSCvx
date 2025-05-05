@@ -35,11 +35,10 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emit
     V_multi_shoot_traj = []
 
     k = 1
-    log_data = []
 
     while k <= params.scp.k_max and ((J_tr >= params.scp.ep_tr) or (J_vb >= params.scp.ep_vb) or (J_vc >= params.scp.ep_vc)):
         x, u, t, J_total, J_vb_vec, J_vc_vec, J_tr_vec, prob_stat, V_multi_shoot, subprop_time, dis_time = PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params)
-        
+
         V_multi_shoot_traj.append(V_multi_shoot)
 
         x_bar = x
@@ -55,7 +54,8 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emit
         if k > params.scp.cost_drop:
             params.scp.lam_cost = params.scp.lam_cost * params.scp.cost_relax
 
-        log_data.append({
+        emitter_function(
+            {
                 "iter": k,
                 "dis_time": dis_time * 1000.0,
                 "subprop_time": subprop_time * 1000.0,
@@ -64,10 +64,10 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emit
                 "J_vb": J_vb,
                 "J_vc": J_vc,
                 "cost": t[-1],
-                "prob_stat": prob_stat
-            })
-        emitter_function(log_data[-1])
-            
+                "prob_stat": prob_stat,
+            }
+        )
+
         k += 1
 
     result = dict(
