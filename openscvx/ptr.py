@@ -50,13 +50,6 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emit
 
     k = 1
 
-    if params.dev.profiling:
-        import cProfile
-        pr = cProfile.Profile()
-        
-        # Enable the profiler
-        pr.enable()
-
     log_data = []
 
     t_0_while = time.time()
@@ -94,12 +87,6 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emit
         k += 1
 
     t_f_while = time.time()
-    # Disable the profiler
-    if params.dev.profiling:
-        pr.disable()
-        
-        # Save results so it can be viusualized with snakeviz
-        pr.dump_stats('profiling_results.prof')
     
     # Allow emitter function to finish
     time.sleep(0.5)

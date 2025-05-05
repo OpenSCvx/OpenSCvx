@@ -225,9 +225,24 @@ class TrajOptProblem:
                 "Problem has not been initialized. Call initialize() before solve()"
             )
 
-        return PTR_main(
+
+        # Enable the profiler
+        if self.params.dev.profiling:
+            import cProfile
+            pr = cProfile.Profile()
+            pr.enable()
+
+        result =  PTR_main(
             self.params, self.optimal_control_problem, self.discretization_solver, self.cpg_solve, self.emitter_function
         )
+    
+        # Disable the profiler
+        if self.params.dev.profiling:
+            pr.disable()
+            # Save results so it can be viusualized with snakeviz
+            pr.dump_stats('profiling_results.prof')
+        
+        return result
 
     def post_process(self, result):
         return PTR_post(self.params, result, self.propagation_solver)
