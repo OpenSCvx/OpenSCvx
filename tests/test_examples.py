@@ -34,7 +34,7 @@ TEST_CASES = {
         "max_cost": 30.0,
         "max_vio": 1e-3,
         "timing": {"init": 20.0, "solve": 2.0, "post": 0.5},
-        "pre_init": lambda p: setattr(p.params.dis, "custom_integrator", False),
+        "pre_init": [lambda p: setattr(p.params.dis, "custom_integrator", False), lambda p: setattr(p.params.dev, "printing", False)],
     },
     "dr_vp": {
         "problem": dr_vp_problem,
@@ -45,7 +45,7 @@ TEST_CASES = {
         "max_cost": 45.0,
         "max_vio": 1.0,
         "timing": {"init": 25.0, "solve": 2.0, "post": 0.5},
-        "pre_init": lambda p: setattr(p.params.dis, "custom_integrator", False),
+        "pre_init": [lambda p: setattr(p.params.dis, "custom_integrator", False), lambda p: setattr(p.params.dev, "printing", False)],
     },
     "cinema_vp": {
         "problem": cinema_vp_problem,
@@ -56,16 +56,21 @@ TEST_CASES = {
         "max_cost": 400.0,
         "max_vio": 1.0,
         "timing": {"init": 8.0, "solve": 0.5, "post": 0.5},
-        "pre_init": lambda p: setattr(p.params.dis, "custom_integrator", False),
+        "pre_init": [lambda p: setattr(p.params.dis, "custom_integrator", False), lambda p: setattr(p.params.dev, "printing", False)],
     },
 }
 
 @pytest.mark.parametrize("name,conf", TEST_CASES.items(), ids=list(TEST_CASES))
 def test_example_problem(name, conf):
     problem = conf["problem"]
-    # apply any per‐problem tweaks
+    # apply any pre‐init hooks
     if "pre_init" in conf:
-        conf["pre_init"](problem)
+        hooks = conf["pre_init"]
+        # normalize to list
+        if callable(hooks):
+            hooks = [hooks]
+        for fn in hooks:
+            fn(problem)
 
     problem.initialize()
     result = problem.solve()
