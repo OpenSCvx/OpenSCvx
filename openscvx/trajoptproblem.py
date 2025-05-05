@@ -163,14 +163,20 @@ class TrajOptProblem:
         self.discretization_solver: callable = None
         self.cpg_solve = None
 
-        self.print_queue = queue.Queue()
-        self.emitter_function = lambda intermediate_result: self.print_queue.put(
-            intermediate_result
-        )
-        self.print_thread = threading.Thread(
-            target=io.intermediate, args=(self.print_queue, self.params), daemon=True
-        )
-        self.print_thread.start()
+        # set up emitter & thread only if printing is enabled
+        if self.params.dev.printing:
+            self.print_queue      = queue.Queue()
+            self.emitter_function = lambda data: self.print_queue.put(data)
+            self.print_thread     = threading.Thread(
+                target=io.intermediate,
+                args=(self.print_queue, self.params),
+                daemon=True,
+            )
+            self.print_thread.start()
+        else:
+            # no-op emitter; nothing ever gets queued or printed
+            self.emitter_function = lambda data: None
+
 
         self.timing_init = None
         self.timing_solve = None
