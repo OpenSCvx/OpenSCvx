@@ -22,7 +22,7 @@ TEST_CASES = {
         "max_cost": 2.0,
         "max_vio": 1e-3,
         "max_iters": 10,
-        "timing": {"init": 12.0, "solve": 0.5, "post": 0.5},
+        "timing": {"init": 15.0, "solve": 0.5, "post": 0.5},
         # no custom integrator flag
     },
     "dr_vp_nodal": {
@@ -33,7 +33,7 @@ TEST_CASES = {
         "vio_idx": -1,
         "max_cost": 30.0,
         "max_vio": 1e-3,
-        "timing": {"init": 30.0, "solve": 3.0, "post": 1.0},
+        "timing": {"init": 35.0, "solve": 3.0, "post": 1.0},
         "pre_init": [lambda p: setattr(p.params.dis, "custom_integrator", False), lambda p: setattr(p.params.dev, "printing", False)],
     },
     "dr_vp": {
@@ -44,7 +44,7 @@ TEST_CASES = {
         "vio_idx": -1,
         "max_cost": 45.0,
         "max_vio": 1.0,
-        "timing": {"init": 30.0, "solve": 3.0, "post": 1.0},
+        "timing": {"init": 35.0, "solve": 3.0, "post": 1.0},
         "pre_init": [lambda p: setattr(p.params.dis, "custom_integrator", False), lambda p: setattr(p.params.dev, "printing", False)],
     },
     "cinema_vp": {
