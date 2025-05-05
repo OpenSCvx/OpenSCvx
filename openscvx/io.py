@@ -57,9 +57,9 @@ def intermediate(print_queue: list, params):
         print("{:^4} |     {:^6.2f}    |      {:^6.2F}     | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
             iter_colored, data["dis_time"], data["subprop_time"], J_tot_colored, J_tr_colored, J_vb_colored, J_vc_colored, cost_colored, prob_stat_colored))
 
-    print(colored("---------------------------------------------------------------------------------------------------------"))
-    print("{:^4} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
-        "Iter", "Dis Time (ms)", "Solve Time (ms)", "J_total", "J_tr", "J_vb", "J_vc", "Cost", "Solver Status"))
+        print(colored("---------------------------------------------------------------------------------------------------------"))
+        print("{:^4} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
+            "Iter", "Dis Time (ms)", "Solve Time (ms)", "J_total", "J_tr", "J_vb", "J_vc", "Cost", "Solver Status"))
 
 def footer(computation_time):
     print(colored("---------------------------------------------------------------------------------------------------------"))
