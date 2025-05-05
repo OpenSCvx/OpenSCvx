@@ -34,12 +34,12 @@ def test_obstacle_avoidance():
     prop_cost = result['x_full'][:,-2][-1]
     sol_cost = result['x'][:,-2][-1]
 
-    assert sol_cost < 2.0, "Obstacle Avoidance Process failed with solution cost"
-    assert prop_cost < 2.0, "Obstacle Avoidance Process failed with propagated cost"
-    assert sol_constr_vio < 1e-3, "Obstacle Avoidance Process failed with solution constraint violation"
-    assert prop_constr_vio < 1e-3, "Obstacle Avoidance Process failed with propagated constraint violation"
-    assert scp_iters < 10, "Obstacle Avoidance Process took more then expected iterations"
-    assert output_dict['converged'], "Obstacle Avoidance Process failed with output"
+    assert sol_cost < 2.0, "Problem failed with solution cost"
+    assert prop_cost < 2.0, "Problem failed with propagated cost"
+    assert sol_constr_vio < 1e-3, "Problem failed with solution constraint violation"
+    assert prop_constr_vio < 1e-3, "Problem failed with propagated constraint violation"
+    assert scp_iters < 10, "Problem took more then expected iterations"
+    assert output_dict['converged'], "Problem failed with output"
 
     assert problem.timing_init < 6.0, "Problem took more then expected initialization time"
     assert problem.timing_solve < 0.2, "Problem took more then expected solve time"
@@ -69,10 +69,10 @@ def test_dr_vp_nodal():
     prop_cost = result['x_full'][:,-2][-1]
     sol_cost = result['x'][:,-2][-1]
 
-    assert sol_cost < 30.0, "Obstacle Avoidance Process failed with solution cost"
-    assert prop_cost < 30.0, "Obstacle Avoidance Process failed with propagated cost"
-    assert sol_constr_vio < 1e-3, "Obstacle Avoidance Process failed with solution constraint violation"
-    assert prop_constr_vio < 1e-3, "Obstacle Avoidance Process failed with propagated constraint violation"
+    assert sol_cost < 30.0, "Problem failed with solution cost"
+    assert prop_cost < 30.0, "Problem failed with propagated cost"
+    assert sol_constr_vio < 1e-3, "Problem failed with solution constraint violation"
+    assert prop_constr_vio < 1e-3, "Problem failed with propagated constraint violation"
     assert output_dict['converged'], "DR VP Nodal Process failed with output"
 
     assert problem.timing_init < 20.0, "Problem took more then expected initialization time"
@@ -103,10 +103,10 @@ def test_dr_vp():
     prop_cost = result['x_full'][:,-2][-1]
     sol_cost = result['x'][:,-2][-1]
     
-    assert sol_cost < 45.0, "Obstacle Avoidance Process failed with solution cost"
-    assert prop_cost < 45.0, "Obstacle Avoidance Process failed with propagated cost"
-    assert sol_constr_vio < 1e0, "Obstacle Avoidance Process failed with solution constraint violation"
-    assert prop_constr_vio < 1e0, "Obstacle Avoidance Process failed with propagated constraint violation"
+    assert sol_cost < 45.0, "Problem failed with solution cost"
+    assert prop_cost < 45.0, "Problem failed with propagated cost"
+    assert sol_constr_vio < 1e0, "Problem failed with solution constraint violation"
+    assert prop_constr_vio < 1e0, "Problem failed with propagated constraint violation"
     assert output_dict['converged'], "DR VP Process failed with output"
 
     assert problem.timing_init < 25.0, "Problem took more then expected initialization time"
@@ -137,10 +137,10 @@ def test_cinema_vp():
     prop_cost = result['x_full'][:,-3][-1]
     sol_cost = result['x'][:,-3][-1]
     
-    assert sol_cost < 400.0, "Obstacle Avoidance Process failed with solution cost"
-    assert prop_cost < 400.0, "Obstacle Avoidance Process failed with propagated cost"
-    assert sol_constr_vio < 1E0, "Obstacle Avoidance Process failed with solution constraint violation"
-    assert prop_constr_vio < 1e0, "Obstacle Avoidance Process failed with propagated constraint violation"
+    assert sol_cost < 400.0, "Problem failed with solution cost"
+    assert prop_cost < 400.0, "Problem failed with propagated cost"
+    assert sol_constr_vio < 1E0, "Problem failed with solution constraint violation"
+    assert prop_constr_vio < 1e0, "Problem failed with propagated constraint violation"
     assert output_dict['converged'], "Cinema VP Process failed with output"
 
     assert problem.timing_init < 8.0, "Problem took more then expected initialization time"
