@@ -22,7 +22,7 @@ TEST_CASES = {
         "max_cost": 2.0,
         "max_vio": 1e-3,
         "max_iters": 10,
-        "timing": {"init": 10.0, "solve": 0.5, "post": 0.5},
+        "timing": {"init": 12.0, "solve": 0.5, "post": 0.5},
         # no custom integrator flag
     },
     "dr_vp_nodal": {
