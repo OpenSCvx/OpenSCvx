@@ -171,6 +171,10 @@ class TrajOptProblem:
         )
         self.print_thread.start()
 
+        self.timing_init = None
+        self.timing_solve = None
+        self.timing_post = None
+
     def initialize(self):
         io.intro()
 
@@ -208,9 +212,6 @@ class TrajOptProblem:
             self.params,
         )
 
-        t_f_while = time.time()
-        print("Total Initialization Time: ", t_f_while - t_0_while)
-
         # Compile the solvers
         if not self.params.dev.debug:
             self.discretization_solver = (
@@ -234,6 +235,11 @@ class TrajOptProblem:
             )
             .compile()
         )
+
+        t_f_while = time.time()
+        self.timing_init = t_f_while - t_0_while
+        print("Total Initialization Time: ", self.timing_init)
+
         if self.params.dev.profiling:
             pr.disable()
             # Save results so it can be viusualized with snakeviz
@@ -269,10 +275,14 @@ class TrajOptProblem:
         )
 
         t_f_while = time.time()
+        self.timing_solve = t_f_while - t_0_while
+
         while self.print_queue.qsize() > 0:
             time.sleep(0.1)
+
         # Print bottom footer for solver results as well as total computation time
-        io.footer(t_f_while - t_0_while)
+        io.footer(self.timing_solve)
+
         # Disable the profiler
         if self.params.dev.profiling:
             pr.disable()
@@ -293,11 +303,12 @@ class TrajOptProblem:
         result = PTR_post(self.params, result, self.propagation_solver)
         t_f_post = time.time()
 
+        self.timing_post = t_f_post - t_0_post
+        print("Total Post Processing Time: ", self.timing_post)
+
         # Disable the profiler
         if self.params.dev.profiling:
             pr.disable()
             # Save results so it can be viusualized with snakeviz
             pr.dump_stats("profiling_postprocess.prof")
-
-        print("Total Post Processing Time: ", t_f_post - t_0_post)
         return result
