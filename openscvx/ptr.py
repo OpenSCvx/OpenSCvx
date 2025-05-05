@@ -3,8 +3,6 @@ import numpy.linalg as la
 import cvxpy as cp
 import pickle
 import time
-import threading
-import queue
 
 import sys
 from termcolor import colored
@@ -36,7 +34,7 @@ def PTR_init(ocp: cp.Problem, discretization_solver: callable, params: Config, )
     print("Total Initialization Time: ", t_f_while - t_0_while)
     return cpg_solve
 
-def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> dict:
+def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emitter_function) -> dict:
     J_vb = 1E2
     J_vc = 1E2
     J_tr = 1E2
@@ -48,8 +46,6 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> d
     scp_controls = [u_bar]
     V_multi_shoot_traj = []
 
-    print_queue = queue.Queue()
-    threading.Thread(target=io.intermediate, args=(print_queue, params), daemon=True).start()
     io.header()
 
     k = 1
@@ -62,7 +58,6 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> d
         pr.enable()
 
     log_data = []
-    # print_queue = []
 
     t_0_while = time.time()
     while k <= params.scp.k_max and ((J_tr >= params.scp.ep_tr) or (J_vb >= params.scp.ep_vb) or (J_vc >= params.scp.ep_vc)):
@@ -94,10 +89,7 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> d
                 "cost": t[-1],
                 "prob_stat": prob_stat
             })
-        print_queue.put(log_data[-1])
-
-        # if params.dev.debug_printing:
-        #     io.intermediate(print_queue, params)
+        emitter_function(log_data[-1])
             
         k += 1
 
@@ -109,15 +101,8 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> d
         # Save results so it can be viusualized with snakeviz
         pr.dump_stats('profiling_results.prof')
     
-
-    # Print logged data once
-    # if not params.dev.debug_printing:  
-    #     # print(colored("---------------------------------------------------------------------------------------------------------"))
-    #     # print("{:^4} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
-    #     #     "Iter", "Dis Time (ms)", "Solve Time (ms)", "J_total", "J_tr", "J_vb", "J_vc", "Cost", "Solver Status"))
-
-    #     io.intermediate(print_queue, params)
-    time.sleep(0.1)
+    # Allow emitter function to finish
+    time.sleep(0.5)
 
     io.footer(t_f_while - t_0_while)
 

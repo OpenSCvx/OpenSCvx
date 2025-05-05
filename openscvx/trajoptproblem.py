@@ -1,5 +1,7 @@
 import jax.numpy as jnp
 from typing import List
+import queue
+import threading
 
 import cvxpy as cp
 import jax
@@ -21,6 +23,7 @@ from openscvx.propagation import get_propagation_solver
 from openscvx.constraints.boundary import BoundaryConstraint
 from openscvx.ptr import PTR_init, PTR_main, PTR_post
 from openscvx.ocp import OptimalControlProblem
+from openscvx import io
 
 
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
@@ -158,6 +161,11 @@ class TrajOptProblem:
         self.discretization_solver: callable = None
         self.cpg_solve = None
 
+        self.print_queue = queue.Queue()
+        self.emitter_function = lambda intermediate_result: self.print_queue.put(intermediate_result)
+        self.print_thread = threading.Thread(target=io.intermediate, args=(self.print_queue, self.params), daemon=True)
+        self.print_thread.start()
+
     def initialize(self):
         # Ensure parameter sizes and normalization are correct
         self.params.scp.__post_init__()
@@ -218,7 +226,7 @@ class TrajOptProblem:
             )
 
         return PTR_main(
-            self.params, self.optimal_control_problem, self.discretization_solver, self.cpg_solve
+            self.params, self.optimal_control_problem, self.discretization_solver, self.cpg_solve, self.emitter_function
         )
 
     def post_process(self, result):
