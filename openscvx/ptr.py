@@ -4,13 +4,8 @@ import cvxpy as cp
 import pickle
 import time
 
-import sys
-from termcolor import colored
-
 from openscvx.propagation import s_to_t, t_to_tau, simulate_nonlinear_time
 from openscvx.config import Config
-from openscvx.ocp import OptimalControlProblem
-from openscvx import io
 
 import warnings
 warnings.filterwarnings("ignore")
