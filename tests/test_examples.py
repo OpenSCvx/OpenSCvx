@@ -40,6 +40,10 @@ def test_obstacle_avoidance():
     assert prop_constr_vio < 1e-3, "Obstacle Avoidance Process failed with propagated constraint violation"
     assert scp_iters < 10, "Obstacle Avoidance Process took more then expected iterations"
     assert output_dict['converged'], "Obstacle Avoidance Process failed with output"
+
+    assert problem.timing_init < 6.0, "Problem took more then expected initialization time"
+    assert problem.timing_solve < 0.2, "Problem took more then expected solve time"
+    assert problem.timing_post < 0.2, "Problem took more then expected post process time"
     
     # Clean up jax memory usage
     jax.clear_caches()
@@ -70,6 +74,10 @@ def test_dr_vp_nodal():
     assert sol_constr_vio < 1e-3, "Obstacle Avoidance Process failed with solution constraint violation"
     assert prop_constr_vio < 1e-3, "Obstacle Avoidance Process failed with propagated constraint violation"
     assert output_dict['converged'], "DR VP Nodal Process failed with output"
+
+    assert problem.timing_init < 20.0, "Problem took more then expected initialization time"
+    assert problem.timing_solve < 2.0, "Problem took more then expected solve time"
+    assert problem.timing_post < 0.5, "Problem took more then expected post process time"
     
     # Clean up jax memory usage
     jax.clear_caches()
@@ -100,6 +108,10 @@ def test_dr_vp():
     assert sol_constr_vio < 1e0, "Obstacle Avoidance Process failed with solution constraint violation"
     assert prop_constr_vio < 1e0, "Obstacle Avoidance Process failed with propagated constraint violation"
     assert output_dict['converged'], "DR VP Process failed with output"
+
+    assert problem.timing_init < 25.0, "Problem took more then expected initialization time"
+    assert problem.timing_solve < 2.0, "Problem took more then expected solve time"
+    assert problem.timing_post < 0.5, "Problem took more then expected post process time"
     
     # Clean up jax memory usage
     jax.clear_caches()
@@ -130,6 +142,10 @@ def test_cinema_vp():
     assert sol_constr_vio < 1E0, "Obstacle Avoidance Process failed with solution constraint violation"
     assert prop_constr_vio < 1e0, "Obstacle Avoidance Process failed with propagated constraint violation"
     assert output_dict['converged'], "Cinema VP Process failed with output"
+
+    assert problem.timing_init < 8.0, "Problem took more then expected initialization time"
+    assert problem.timing_solve < 0.5, "Problem took more then expected solve time"
+    assert problem.timing_post < 0.5, "Problem took more then expected post process time"
     
     # Clean up jax memory usage
     jax.clear_caches()
