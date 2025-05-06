@@ -51,8 +51,8 @@ class TrajOptProblem:
         sim: SimConfig = None,
         dev: DevConfig = None,
         cvx: ConvexSolverConfig = None,
-        ctcs_augmentation_min=0.0,
-        ctcs_augmentation_max=1e-4,
+        licq_min=0.0,
+        licq_max=1e-4,
         time_dilation_factor_min=0.3,
         time_dilation_factor_max=3.0,
     ):
@@ -107,13 +107,14 @@ class TrajOptProblem:
                 raise ValueError(
                     f"CTCS constraint nodes must be a tuple (start, end) or 'all'. Got {constraint[1].nodes}"
                 )
-    
+
+        num_augmented_states = len(constraints_dict)
 
         # Index tracking
         idx_x_true = slice(0, len(x_max))
         idx_u_true = slice(0, len(u_max))
         idx_constraint_violation = slice(
-            idx_x_true.stop, idx_x_true.stop + len(constraints_dict)
+            idx_x_true.stop, idx_x_true.stop + num_augmented_states
         )
 
         idx_time_dilation = slice(idx_u_true.stop, idx_u_true.stop + 1)
@@ -124,13 +125,13 @@ class TrajOptProblem:
         ), "idx_time must be in the range of the state vector and non-negative"
         idx_time = slice(idx_time, idx_time + 1)
 
-        x_min_augmented = np.hstack([x_min, np.repeat(ctcs_augmentation_min, len(constraints_dict))])
-        x_max_augmented = np.hstack([x_max, np.repeat(ctcs_augmentation_max, len(constraints_dict))])
+        x_min_augmented = np.hstack([x_min, np.repeat(licq_min, num_augmented_states)])
+        x_max_augmented = np.hstack([x_max, np.repeat(licq_max, num_augmented_states)])
 
         u_min_augmented = np.hstack([u_min, time_dilation_factor_min * time_init])
         u_max_augmented = np.hstack([u_max, time_dilation_factor_max * time_init])
 
-        x_bar_augmented = np.hstack([x_guess, np.full((x_guess.shape[0], len(constraints_dict)), 0)])
+        x_bar_augmented = np.hstack([x_guess, np.full((x_guess.shape[0], num_augmented_states), 0)])
         u_bar_augmented = np.hstack(
             [u_guess, np.full((u_guess.shape[0], 1), time_init)]
         )
@@ -187,16 +188,13 @@ class TrajOptProblem:
 
         sim.constraints_ctcs = constraints_ctcs
         sim.constraints_nodal = constraints_nodal
-        sim.num_augmented_states = len(constraints_dict)
+        sim.num_augmented_states = num_augmented_states
 
         # Make a list of the keys of the constraints_dict
         # This is used to create the augmented state nodes
         sim.y_nodes = []
         for key, _ in constraints_dict.items():
-            if key[0] == "all":
-                sim.y_nodes.append("all")
-            else:
-                sim.y_nodes.append(key[0])
+            sim.y_nodes.append(key[0])
 
         g_funcs = {}
         for key, constraints in constraints_dict.items():

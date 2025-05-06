@@ -136,7 +136,7 @@ problem = TrajOptProblem(
     x_min=min_state,
     u_max=max_control,  # Upper Bound on the controls
     u_min=min_control,  # Lower Bound on the controls
-    ctcs_augmentation_max=1e-8,
+    licq_max=1e-8,
 )
 
 problem.params.prp.dt = 0.1
