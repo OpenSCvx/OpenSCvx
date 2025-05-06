@@ -23,7 +23,7 @@ class DiscretizationConfig:
 class DevConfig:
     profiling: bool = False
     debug: bool = False
-    debug_printing: bool = True
+    printing: bool = True
 
 
 @dataclass

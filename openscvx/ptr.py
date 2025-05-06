@@ -4,21 +4,12 @@ import cvxpy as cp
 import pickle
 import time
 
-import sys
-from termcolor import colored
-
-from openscvx.propagation import s_to_t, t_to_tau, simulate_nonlinear_time
 from openscvx.config import Config
-from openscvx.ocp import OptimalControlProblem
 
 import warnings
 warnings.filterwarnings("ignore")
 
-def PTR_init(ocp: cp.Problem, discretization_solver: callable, params: Config, ) -> tuple[cp.Problem, callable]:
-    intro()
-
-    t_0_while = time.time()
-
+def PTR_init(ocp: cp.Problem, discretization_solver: callable, params: Config):
     if params.cvx.cvxpygen:
         from solver.cpg_solver import cpg_solve
         with open('solver/problem.pickle', 'rb') as f:
@@ -29,11 +20,9 @@ def PTR_init(ocp: cp.Problem, discretization_solver: callable, params: Config, )
     # Solve a dumb problem to intilize DPP and JAX jacobians
     _ = PTR_subproblem(cpg_solve, params.sim.x_bar, params.sim.u_bar, discretization_solver, ocp, params)
 
-    t_f_while = time.time()
-    print("Total Initialization Time: ", t_f_while - t_0_while)
     return cpg_solve
 
-def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> dict:
+def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emitter_function) -> dict:
     J_vb = 1E2
     J_vc = 1E2
     J_tr = 1E2
@@ -45,30 +34,11 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> d
     scp_controls = [u_bar]
     V_multi_shoot_traj = []
 
-    # Define colors for printing
-    col_main = "blue"
-    col_pos = "green"
-    col_neg = "red"
-
-    print("{:^4} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
-            "Iter", "Dis Time (ms)", "Solve Time (ms)", "J_total", "J_tr", "J_vb", "J_vc", "Cost", "Solver Status"))
-    print(colored("---------------------------------------------------------------------------------------------------------"))
-
     k = 1
 
-    if params.dev.profiling:
-        import cProfile
-        pr = cProfile.Profile()
-        
-        # Enable the profiler
-        pr.enable()
-
-    log_data = []
-
-    t_0_while = time.time()
     while k <= params.scp.k_max and ((J_tr >= params.scp.ep_tr) or (J_vb >= params.scp.ep_vb) or (J_vc >= params.scp.ep_vc)):
         x, u, t, J_total, J_vb_vec, J_vc_vec, J_tr_vec, prob_stat, V_multi_shoot, subprop_time, dis_time = PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params)
-        
+
         V_multi_shoot_traj.append(V_multi_shoot)
 
         x_bar = x
@@ -83,10 +53,9 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> d
         params.scp.w_tr = min(params.scp.w_tr * params.scp.w_tr_adapt, params.scp.w_tr_max)
         if k > params.scp.cost_drop:
             params.scp.lam_cost = params.scp.lam_cost * params.scp.cost_relax
-        
 
-
-        log_data.append({
+        emitter_function(
+            {
                 "iter": k,
                 "dis_time": dis_time * 1000.0,
                 "subprop_time": subprop_time * 1000.0,
@@ -95,73 +64,11 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> d
                 "J_vb": J_vb,
                 "J_vc": J_vc,
                 "cost": t[-1],
-                "prob_stat": prob_stat
-            })
+                "prob_stat": prob_stat,
+            }
+        )
 
-        if params.dev.debug_printing:
-            # remove bottom labels and line
-            if not k == 1:
-                sys.stdout.write('\x1b[1A\x1b[2K\x1b[1A\x1b[2K')
-            
-            if prob_stat[3] == 'f':
-                # Only show the first element of the string
-                prob_stat = prob_stat[0]
-
-            # Determine color for each value
-            iter_colored = colored("{:4d}".format(k))
-            J_tot_colored = colored("{:.1e}".format(J_total))
-            J_tr_colored = colored("{:.1e}".format(J_tr), col_pos if J_tr <= params.scp.ep_tr else col_neg)
-            J_vb_colored = colored("{:.1e}".format(J_vb), col_pos if J_vb <= params.scp.ep_vb else col_neg)
-            J_vc_colored = colored("{:.1e}".format(J_vc), col_pos if J_vc <= params.scp.ep_vc else col_neg)
-            cost_colored = colored("{:.1e}".format(t[-1]))
-            prob_stat_colored = colored(prob_stat, col_pos if prob_stat == 'optimal' else col_neg)
-
-            # Print with colors
-            print("{:^4} |     {:^6.2f}    |      {:^6.2F}     | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
-                iter_colored, dis_time*1000.0, subprop_time*1000.0, J_tot_colored, J_tr_colored, J_vb_colored, J_vc_colored, cost_colored, prob_stat_colored))
-
-            print(colored("---------------------------------------------------------------------------------------------------------"))
-            print("{:^4} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
-                "Iter", "Dis Time (ms)", "Solve Time (ms)", "J_total", "J_tr", "J_vb", "J_vc", "Cost", "Solver Status"))
-            
         k += 1
-
-    t_f_while = time.time()
-    # Disable the profiler
-    if params.dev.profiling:
-        pr.disable()
-        
-        # Save results so it can be viusualized with snakeviz
-        pr.dump_stats('profiling_results.prof')
-    
-
-    # Print logged data once
-    if not params.dev.debug_printing:  
-        print(colored("---------------------------------------------------------------------------------------------------------"))
-        print("{:^4} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
-            "Iter", "Dis Time (ms)", "Solve Time (ms)", "J_total", "J_tr", "J_vb", "J_vc", "Cost", "Solver Status"))
-
-        for data in log_data:
-            iter_colored = colored("{:4d}".format(data["iter"]))
-            J_tot_colored = colored("{:.1e}".format(data["J_total"]))
-            J_tr_colored = colored("{:.1e}".format(data["J_tr"]), col_pos if data["J_tr"] <= params.scp.ep_tr else col_neg)
-            J_vb_colored = colored("{:.1e}".format(data["J_vb"]), col_pos if data["J_vb"] <= params.scp.ep_vb else col_neg)
-            J_vc_colored = colored("{:.1e}".format(data["J_vc"]), col_pos if data["J_vc"] <= params.scp.ep_vc else col_neg)
-            cost_colored = colored("{:.1e}".format(data["cost"]))
-            prob_stat_colored = colored(data["prob_stat"], col_pos if data["prob_stat"] == 'optimal' else col_neg)
-
-            print("{:^4} |     {:^6.2f}    |      {:^6.2F}     | {:^7} | {:^7} | {:^7} | {:^7} |  {:^7} | {:^14}".format(
-                iter_colored, data["dis_time"], data["subprop_time"], J_tot_colored, J_tr_colored, J_vb_colored, J_vc_colored, cost_colored, prob_stat_colored))
-
-
-    print(colored("---------------------------------------------------------------------------------------------------------"))
-    # Define ANSI color codes
-    BOLD = "\033[1m"
-    RESET = "\033[0m"
-
-    # Print with bold text
-    print("------------------------------------------------ " + BOLD + "RESULTS" + RESET + " ------------------------------------------------")
-    print("Total Computation Time: ", t_f_while - t_0_while)
 
     result = dict(
         converged = k <= params.scp.k_max,
@@ -177,44 +84,6 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve) -> d
     )
     return result
 
-def PTR_post(params: Config, result: dict, propagation_solver: callable) -> dict:
-    t_0_post = time.time()
-    x = result["x"]
-    u = result["u"]
-
-    t = np.array(s_to_t(u, params))
-
-    t_full = np.arange(0, t[-1], params.prp.dt)
-
-    tau_vals, u_full = t_to_tau(u, t_full, u, t, params)
-
-    x_full = simulate_nonlinear_time(x[0], u, tau_vals, t, params, propagation_solver)
-
-    print("Total CTCS Constraint Violation:", x_full[-1, params.sim.idx_y])
-    i = 0
-    cost = np.zeros_like(x[-1, i])
-    for type in params.sim.initial_state.type:
-        if type == 'Minimize':
-            cost += x[0, i]
-        i +=1
-    i = 0
-    for type in params.sim.final_state.type:
-        if type == 'Minimize':
-            cost += x[-1, i]
-        i +=1
-    print("Cost: ", cost)
-
-    more_result = dict(
-        t_full = t_full,
-        x_full = x_full,
-        u_full = u_full
-    )
-
-    t_f_post = time.time()
-    print("Total Post Processing Time: ", t_f_post - t_0_post)
-    result.update(more_result)
-    return result
-
 
 def PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params: Config):
     prob.param_dict['x_bar'].value = x_bar
@@ -222,7 +91,6 @@ def PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params: Config):
     
     t0 = time.time()
     A_bar, B_bar, C_bar, z_bar, V_multi_shoot = aug_dy(x_bar, u_bar.astype(float))
-    
 
     prob.param_dict['A_d'].value = A_bar.__array__()
     prob.param_dict['B_d'].value = B_bar.__array__()
@@ -277,24 +145,3 @@ def PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params: Config):
             J_vb_vec += np.maximum(0, prob.var_dict['nu_vb_' + str(id_ncvx)].value)
             id_ncvx += 1
     return x, u, costs, prob.value, J_vb_vec, J_vc_vec, J_tr_vec, prob.status, V_multi_shoot, subprop_time, dis_time
-
-def intro():
-    # Silence syntax warnings
-    warnings.filterwarnings("ignore")
-    ascii_art = '''
-                             
-                            ____                    _____  _____           
-                           / __ \                  / ____|/ ____|          
-                          | |  | |_ __   ___ _ __ | (___ | |  __   ____  __
-                          | |  | | '_ \ / _ \ '_ \ \___ \| |  \ \ / /\ \/ /
-                          | |__| | |_) |  __/ | | |____) | |___\ V /  >  < 
-                           \____/| .__/ \___|_| |_|_____/ \_____\_/  /_/\_\ 
-                                 | |                                       
-                                 |_|                                       
----------------------------------------------------------------------------------------------------------
-                                Author: Chris Hayner and Griffin Norris
-                                    Autonomous Controls Laboratory
-                                       University of Washington
----------------------------------------------------------------------------------------------------------
-'''
-    print(ascii_art)

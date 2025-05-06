@@ -1,5 +1,8 @@
 import jax.numpy as jnp
 from typing import List
+import queue
+import threading
+import time
 
 import cvxpy as cp
 import jax
@@ -19,8 +22,10 @@ from openscvx.constraints.ctcs import get_g_func
 from openscvx.discretization import get_discretization_solver
 from openscvx.propagation import get_propagation_solver
 from openscvx.constraints.boundary import BoundaryConstraint
-from openscvx.ptr import PTR_init, PTR_main, PTR_post
+from openscvx.ptr import PTR_init, PTR_main
+from openscvx.post_processing import propagate_trajectory_results
 from openscvx.ocp import OptimalControlProblem
+from openscvx import io
 
 
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
@@ -215,7 +220,36 @@ class TrajOptProblem:
         self.discretization_solver: callable = None
         self.cpg_solve = None
 
+        # set up emitter & thread only if printing is enabled
+        if self.params.dev.printing:
+            self.print_queue      = queue.Queue()
+            self.emitter_function = lambda data: self.print_queue.put(data)
+            self.print_thread     = threading.Thread(
+                target=io.intermediate,
+                args=(self.print_queue, self.params),
+                daemon=True,
+            )
+            self.print_thread.start()
+        else:
+            # no-op emitter; nothing ever gets queued or printed
+            self.emitter_function = lambda data: None
+
+
+        self.timing_init = None
+        self.timing_solve = None
+        self.timing_post = None
+
     def initialize(self):
+        io.intro()
+
+        # Enable the profiler
+        if self.params.dev.profiling:
+            import cProfile
+
+            pr = cProfile.Profile()
+            pr.enable()
+
+        t_0_while = time.time()
         # Ensure parameter sizes and normalization are correct
         self.params.scp.__post_init__()
         self.params.sim.__post_init__()
@@ -229,7 +263,9 @@ class TrajOptProblem:
         # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
 
         # Generate solvers and optimal control problem
-        self.discretization_solver = get_discretization_solver(self.state_dot, self.A, self.B, self.params)
+        self.discretization_solver = get_discretization_solver(
+            self.state_dot, self.A, self.B, self.params
+        )
         self.propagation_solver = get_propagation_solver(self.state_dot, self.params)
         self.optimal_control_problem = OptimalControlProblem(self.params)
 
@@ -264,6 +300,15 @@ class TrajOptProblem:
             .compile()
         )
 
+        t_f_while = time.time()
+        self.timing_init = t_f_while - t_0_while
+        print("Total Initialization Time: ", self.timing_init)
+
+        if self.params.dev.profiling:
+            pr.disable()
+            # Save results so it can be viusualized with snakeviz
+            pr.dump_stats("profiling_initialize.prof")
+
     def solve(self):
         # Ensure parameter sizes and normalization are correct
         self.params.scp.__post_init__()
@@ -274,9 +319,60 @@ class TrajOptProblem:
                 "Problem has not been initialized. Call initialize() before solve()"
             )
 
-        return PTR_main(
-            self.params, self.optimal_control_problem, self.discretization_solver, self.cpg_solve
+        # Enable the profiler
+        if self.params.dev.profiling:
+            import cProfile
+
+            pr = cProfile.Profile()
+            pr.enable()
+
+        t_0_while = time.time()
+        # Print top header for solver results
+        io.header()
+
+        result = PTR_main(
+            self.params,
+            self.optimal_control_problem,
+            self.discretization_solver,
+            self.cpg_solve,
+            self.emitter_function,
         )
 
+        t_f_while = time.time()
+        self.timing_solve = t_f_while - t_0_while
+
+        while self.print_queue.qsize() > 0:
+            time.sleep(0.1)
+
+        # Print bottom footer for solver results as well as total computation time
+        io.footer(self.timing_solve)
+
+        # Disable the profiler
+        if self.params.dev.profiling:
+            pr.disable()
+            # Save results so it can be viusualized with snakeviz
+            pr.dump_stats("profiling_solve.prof")
+
+        return result
+
     def post_process(self, result):
-        return PTR_post(self.params, result, self.propagation_solver)
+        # Enable the profiler
+        if self.params.dev.profiling:
+            import cProfile
+
+            pr = cProfile.Profile()
+            pr.enable()
+
+        t_0_post = time.time()
+        result = propagate_trajectory_results(self.params, result, self.propagation_solver)
+        t_f_post = time.time()
+
+        self.timing_post = t_f_post - t_0_post
+        print("Total Post Processing Time: ", self.timing_post)
+
+        # Disable the profiler
+        if self.params.dev.profiling:
+            pr.disable()
+            # Save results so it can be viusualized with snakeviz
+            pr.dump_stats("profiling_postprocess.prof")
+        return result
