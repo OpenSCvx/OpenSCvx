@@ -10,7 +10,6 @@ from openscvx.constraints.decorators import ctcs
 n = 12  # Number of Nodes
 total_time = 40.0  # Total time for the simulation
 
-
 fuel_inds = 13  # Fuel Index in State
 t_inds = 14
 s_inds = 6  # Time dilation index in Control

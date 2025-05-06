@@ -2,9 +2,11 @@ from jax import jit, vmap, jacfwd
 import jax.numpy as jnp
 
 
-def ctcs(func: callable, penalty="squared_relu") -> callable:
+def ctcs(func: callable, penalty="squared_relu", nodes = "all", exclusive = False) -> callable:
     """Decorator to mark a function as a 'ctcs' constraint."""
     func.constraint_type = "ctcs"
+    func.nodes = nodes
+    func.exclusive = exclusive
     if penalty == "squared_relu":
         func.penalty = lambda x: jnp.maximum(0, x) ** 2
     elif penalty == "huber":

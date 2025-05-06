@@ -53,11 +53,64 @@ class TrajOptProblem:
     ):
 
         # TODO (norrisg) move this into some augmentation function, if we want to make this be executed after the init (i.e. within problem.initialize) need to rethink how problem is defined
+        constraints_ctcs = []
+        constraints_nodal = []
+        for constraint in constraints:
+            if constraint.constraint_type == "ctcs":
+                constraints_ctcs.append((
+                    lambda x, u, func=constraint: jnp.sum(func.penalty(func(x[idx_x_true], u[idx_u_true]))), constraint))
+            elif constraint.constraint_type == "nodal":
+                constraints_nodal.append(constraint)
+            else:
+                raise ValueError(
+                    f"Unknown constraint type: {constraint.constraint_type}, All constraints must be decorated with @ctcs or @nodal"
+                )
+        
+        # Constraints should be added to the list if there are multiple constraints for the same set of nodes
+        # unless they are specified as exclusive
+        constraints_dict = {}
+        shared_ids = {}  # Dictionary to store shared IDs for non-exclusive constraints
+
+        for constraint in constraints_ctcs:
+            if constraint[1].nodes == "all":
+                # Handle the special case where nodes is "all"
+                if constraint[1].exclusive:
+                    # Create a separate entry for exclusive constraints
+                    key = ("all", id(constraint))
+                else:
+                    # Use a shared ID for non-exclusive constraints
+                    if "all" not in shared_ids:
+                        shared_ids["all"] = id("all")  # Assign a shared ID
+                    key = ("all", shared_ids["all"])
+                if key not in constraints_dict:
+                    constraints_dict[key] = []
+                constraints_dict[key].append(constraint[0])
+            elif isinstance(constraint[1].nodes, tuple):
+                # Handle the case where nodes is a single tuple
+                if constraint[1].exclusive:
+                    # Create a separate entry for exclusive constraints
+                    key = (constraint[1].nodes, id(constraint))
+                else:
+                    # Use a shared ID for non-exclusive constraints
+                    if constraint[1].nodes not in shared_ids:
+                        shared_ids[constraint[1].nodes] = id(constraint[1].nodes)  # Assign a shared ID
+                    key = (constraint[1].nodes, shared_ids[constraint[1].nodes])
+                if key not in constraints_dict:
+                    constraints_dict[key] = []
+                constraints_dict[key].append(constraint[0])
+            else:
+                raise ValueError(
+                    f"CTCS constraint nodes must be a tuple (start, end) or 'all'. Got {constraint[1].nodes}"
+                )
+    
 
         # Index tracking
         idx_x_true = slice(0, len(x_max))
         idx_u_true = slice(0, len(u_max))
-        idx_constraint_violation = slice(idx_x_true.stop, idx_x_true.stop + 1)
+        idx_constraint_violation = slice(
+            idx_x_true.stop, idx_x_true.stop + len(constraints_dict)
+        )
+
         idx_time_dilation = slice(idx_u_true.stop, idx_u_true.stop + 1)
 
         # check that idx_time is in the correct range
@@ -66,13 +119,13 @@ class TrajOptProblem:
         ), "idx_time must be in the range of the state vector and non-negative"
         idx_time = slice(idx_time, idx_time + 1)
 
-        x_min_augmented = np.hstack([x_min, ctcs_augmentation_min])
-        x_max_augmented = np.hstack([x_max, ctcs_augmentation_max])
+        x_min_augmented = np.hstack([x_min, np.repeat(ctcs_augmentation_min, len(constraints_dict))])
+        x_max_augmented = np.hstack([x_max, np.repeat(ctcs_augmentation_max, len(constraints_dict))])
 
         u_min_augmented = np.hstack([u_min, time_dilation_factor_min * time_init])
         u_max_augmented = np.hstack([u_max, time_dilation_factor_max * time_init])
 
-        x_bar_augmented = np.hstack([x_guess, np.full((x_guess.shape[0], 1), 0)])
+        x_bar_augmented = np.hstack([x_guess, np.full((x_guess.shape[0], len(constraints_dict)), 0)])
         u_bar_augmented = np.hstack(
             [u_guess, np.full((u_guess.shape[0], 1), time_init)]
         )
@@ -127,22 +180,26 @@ class TrajOptProblem:
         if prp is None:
             prp = PropagationConfig()
 
-        for constraint in constraints:
-            if constraint.constraint_type == "ctcs":
-                sim.constraints_ctcs.append(
-                    lambda x, u, func=constraint: jnp.sum(
-                        func.penalty(func(x[idx_x_true], u[idx_u_true]))
-                    )
-                )
-            elif constraint.constraint_type == "nodal":
-                sim.constraints_nodal.append(constraint)
-            else:
-                raise ValueError(
-                    f"Unknown constraint type: {constraint.constraint_type}, All constraints must be decorated with @ctcs or @nodal"
-                )
+        sim.constraints_ctcs = constraints_ctcs
+        sim.constraints_nodal = constraints_nodal
+        sim.num_augmented_states = len(constraints_dict)
 
-        g_func = get_g_func(sim.constraints_ctcs)
-        self.dynamics_augmented = get_augmented_dynamics(dynamics, g_func)
+        # Make a list of the keys of the constraints_dict
+        # This is used to create the augmented state nodes
+        sim.y_nodes = []
+        for key, _ in constraints_dict.items():
+            if key[0] == "all":
+                sim.y_nodes.append("all")
+            else:
+                sim.y_nodes.append(key[0])
+
+        g_funcs = {}
+        for key, constraints in constraints_dict.items():
+            # Add the key to the g_func dict and create a new g_func for each set of constraints
+            g_funcs[key] = get_g_func(constraints)
+
+        # g_func = get_g_func(constraints_dict["all"])
+        self.dynamics_augmented = get_augmented_dynamics(dynamics, g_funcs)
         self.A_uncompiled, self.B_uncompiled = get_jacobians(self.dynamics_augmented)
 
         self.params = Config(

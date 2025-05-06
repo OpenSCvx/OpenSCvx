@@ -85,7 +85,7 @@ def OptimalControlProblem(params: Config):
                 constr += [((g[idx_ncvx][node] + grad_g_x[idx_ncvx][node] @ dx[node] + grad_g_u[idx_ncvx][node] @ du[node])) == nu_vb[idx_ncvx][node] for node in nodes]
                 idx_ncvx += 1
 
-    for i in range(params.sim.n_states-1):
+    for i in range(params.sim.n_states-params.sim.num_augmented_states):
         if params.sim.initial_state.type[i] == 'Fix':
             constr += [x_nonscaled[0][i] == params.sim.initial_state.value[i]]  # Initial Boundary Conditions
         if params.sim.final_state.type[i] == 'Fix':
@@ -129,8 +129,14 @@ def OptimalControlProblem(params: Config):
                 cost += params.scp.lam_vb * cp.sum(cp.pos(nu_vb[idx_ncvx]))
                 idx_ncvx += 1
 
-    constr += [cp.abs(x_nonscaled[i][params.sim.idx_y] - x_nonscaled[i-1][params.sim.idx_y]) <= params.sim.max_state[params.sim.idx_y] for i in range(1, params.scp.n)] # LICQ Constraint
-    constr += [x_nonscaled[0][params.sim.idx_y] == 0]
+    for idx, nodes in zip(np.arange(params.sim.idx_y.start, params.sim.idx_y.stop), params.sim.y_nodes):  
+        if nodes == 'all':
+            constr += [cp.abs(x_nonscaled[i][idx] - x_nonscaled[i-1][params.sim.idx_y]) <= params.sim.max_state[params.sim.idx_y] for i in range(1, params.scp.n)] # LICQ Constraint
+            constr += [x_nonscaled[0][idx] == 0]
+        else:
+            constr += [cp.abs(x_nonscaled[i][idx] - x_nonscaled[i-1][params.sim.idx_y]) <= params.sim.max_state[params.sim.idx_y] for i in range(nodes[0], nodes[1])]
+            constr += [x_nonscaled[0][idx] == 0]
+
     
     #########
     # PROBLEM
