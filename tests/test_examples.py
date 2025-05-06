@@ -12,124 +12,96 @@ from examples.params.dr_vp_nodal import problem as dr_vp_polytope_problem
 from examples.params.dr_vp_nodal import plotting_dict as dr_vp_polytope_plotting_dict
 from examples.plotting import plot_camera_animation, plot_animation, plot_scp_animation
 
+TEST_CASES = {
+    "obstacle_avoidance": {
+        "problem": obstacle_avoidance_problem,
+        "plotting_dict": obstacle_avoidance_plotting_dict,
+        "plot_funcs": [plot_animation, plot_scp_animation],
+        "cost_idx": -2,
+        "vio_idx": -1,
+        "max_cost": 2.0,
+        "max_vio": 1e-3,
+        "max_iters": 10,
+        "timing": {"init": 15.0, "solve": 0.5, "post": 0.5},
+        # no custom integrator flag
+    },
+    "dr_vp_nodal": {
+        "problem": dr_vp_polytope_problem,
+        "plotting_dict": dr_vp_polytope_plotting_dict,
+        "plot_funcs": [plot_animation, plot_camera_animation, plot_scp_animation],
+        "cost_idx": -2,
+        "vio_idx": -1,
+        "max_cost": 30.0,
+        "max_vio": 1e-3,
+        "timing": {"init": 35.0, "solve": 3.0, "post": 1.0},
+        "pre_init": [lambda p: setattr(p.params.dis, "custom_integrator", False), lambda p: setattr(p.params.dev, "printing", False)],
+    },
+    "dr_vp": {
+        "problem": dr_vp_problem,
+        "plotting_dict": dr_vp_plotting_dict,
+        "plot_funcs": [plot_animation, plot_camera_animation, plot_scp_animation],
+        "cost_idx": -2,
+        "vio_idx": -1,
+        "max_cost": 45.0,
+        "max_vio": 1.0,
+        "timing": {"init": 35.0, "solve": 3.0, "post": 1.0},
+        "pre_init": [lambda p: setattr(p.params.dis, "custom_integrator", False), lambda p: setattr(p.params.dev, "printing", False)],
+    },
+    "cinema_vp": {
+        "problem": cinema_vp_problem,
+        "plotting_dict": cinema_vp_plotting_dict,
+        "plot_funcs": [plot_animation, plot_camera_animation, plot_scp_animation],
+        "cost_idx": -3,
+        "vio_idx": -1,
+        "max_cost": 400.0,
+        "max_vio": 1.0,
+        "timing": {"init": 12.0, "solve": 1.0, "post": 1.0},
+        "pre_init": [lambda p: setattr(p.params.dis, "custom_integrator", False), lambda p: setattr(p.params.dev, "printing", False)],
+    },
+}
 
-def test_obstacle_avoidance():
-    # This test is specific to the obstacle avoidance problem
-    problem = obstacle_avoidance_problem
+@pytest.mark.parametrize("name,conf", TEST_CASES.items(), ids=list(TEST_CASES))
+def test_example_problem(name, conf):
+    problem = conf["problem"]
+    # apply any pre‐init hooks
+    if "pre_init" in conf:
+        hooks = conf["pre_init"]
+        # normalize to list
+        if callable(hooks):
+            hooks = [hooks]
+        for fn in hooks:
+            fn(problem)
+
     problem.initialize()
     result = problem.solve()
     result = problem.post_process(result)
 
-    result.update(obstacle_avoidance_plotting_dict)
+    # merge in plotting metadata and run plots
+    result.update(conf["plotting_dict"])
+    for fn in conf["plot_funcs"]:
+        fn(result, problem.params)
 
-    plot_animation(result, problem.params)
-    plot_scp_animation(result, problem.params)
-    
-    # Assuming PTR_main returns a dictionary
-    output_dict = result
-    
-    scp_iters = len(result['discretization_history'])
-    prop_constr_vio = result['x_full'][:,-1][-1]
-    sol_constr_vio = result['x'][:,-1][-1]
-    prop_cost = result['x_full'][:,-2][-1]
-    sol_cost = result['x'][:,-2][-1]
+    # extract metrics
+    scp_iters = len(result["discretization_history"])
+    sol_cost = result["x"][:, conf["cost_idx"]][-1]
+    prop_cost = result["x_full"][:, conf["cost_idx"]][-1]
+    sol_constr_vio  = result["x"][:, conf["vio_idx"]][-1]
+    prop_constr_vio = result["x_full"][:, conf["vio_idx"]][-1]
 
-    assert sol_cost < 2.0, "Obstacle Avoidance Process failed with solution cost"
-    assert prop_cost < 2.0, "Obstacle Avoidance Process failed with propagated cost"
-    assert sol_constr_vio < 1e-3, "Obstacle Avoidance Process failed with solution constraint violation"
-    assert prop_constr_vio < 1e-3, "Obstacle Avoidance Process failed with propagated constraint violation"
-    assert scp_iters < 10, "Obstacle Avoidance Process took more then expected iterations"
-    assert output_dict['converged'], "Obstacle Avoidance Process failed with output"
-    
-    # Clean up jax memory usage
-    jax.clear_caches()
+    # assertions
+    assert sol_cost < conf["max_cost"], "Problem failed with solution cost"
+    assert prop_cost < conf["max_cost"], "Problem failed with propagated cost"
+    assert sol_constr_vio  < conf["max_vio"], "Problem failed with solution constraint violation"
+    assert prop_constr_vio < conf["max_vio"], "Problem failed with propagated constraint violation"
+    if "max_iters" in conf:
+        assert scp_iters < conf["max_iters"], "Problem took more then expected iterations"
+    assert result["converged"], "Problem failed with output"
 
-def test_dr_vp_nodal():
-    # This test is specific to the dr_vp_nodal problem
-    problem = dr_vp_polytope_problem
-    problem.params.dis.custom_integrator = False
-    problem.initialize()
-    result = problem.solve()
-    result = problem.post_process(result)
+    # timing checks
+    t = conf["timing"]
+    assert problem.timing_init <  t["init"], "Problem took more then expected initialization time"
+    assert problem.timing_solve < t["solve"], "Problem took more then expected solve time"
+    assert problem.timing_post <  t["post"], "Problem took more then expected post process time"
 
-    result.update(dr_vp_plotting_dict)
-
-    plot_animation(result, problem.params)
-    plot_camera_animation(result, problem.params)
-    plot_scp_animation(result, problem.params)
-    
-    # Assuming PTR_main returns a dictionary
-    output_dict = result
-    prop_constr_vio = result['x_full'][:,-1][-1]
-    sol_constr_vio = result['x'][:,-1][-1]
-    prop_cost = result['x_full'][:,-2][-1]
-    sol_cost = result['x'][:,-2][-1]
-
-    assert sol_cost < 30.0, "Obstacle Avoidance Process failed with solution cost"
-    assert prop_cost < 30.0, "Obstacle Avoidance Process failed with propagated cost"
-    assert sol_constr_vio < 1e-3, "Obstacle Avoidance Process failed with solution constraint violation"
-    assert prop_constr_vio < 1e-3, "Obstacle Avoidance Process failed with propagated constraint violation"
-    assert output_dict['converged'], "DR VP Nodal Process failed with output"
-    
-    # Clean up jax memory usage
-    jax.clear_caches()
-
-def test_dr_vp():
-    # This test is specific to the dr_vp problem
-    problem = dr_vp_problem
-    problem.params.dis.custom_integrator = False
-    problem.initialize()
-    result = problem.solve()
-    result = problem.post_process(result)
-
-    result.update(dr_vp_plotting_dict)
-
-    plot_animation(result, problem.params)
-    plot_camera_animation(result, problem.params)
-    plot_scp_animation(result, problem.params)
-    
-    # Assuming PTR_main returns a dictionary
-    output_dict = result
-    prop_constr_vio = result['x_full'][:,-1][-1]
-    sol_constr_vio = result['x'][:,-1][-1]
-    prop_cost = result['x_full'][:,-2][-1]
-    sol_cost = result['x'][:,-2][-1]
-    
-    assert sol_cost < 45.0, "Obstacle Avoidance Process failed with solution cost"
-    assert prop_cost < 45.0, "Obstacle Avoidance Process failed with propagated cost"
-    assert sol_constr_vio < 1e0, "Obstacle Avoidance Process failed with solution constraint violation"
-    assert prop_constr_vio < 1e0, "Obstacle Avoidance Process failed with propagated constraint violation"
-    assert output_dict['converged'], "DR VP Process failed with output"
-    
-    # Clean up jax memory usage
-    jax.clear_caches()
-
-def test_cinema_vp():
-    # This test is specific to the cinema_vp problem
-    problem = cinema_vp_problem
-    problem.params.dis.custom_integrator = False
-    problem.initialize()
-    result = problem.solve()
-    result = problem.post_process(result)
-
-    result.update(cinema_vp_plotting_dict)
-
-    plot_animation(result, problem.params)
-    plot_camera_animation(result, problem.params)
-    plot_scp_animation(result, problem.params)
-    
-    # Assuming PTR_main returns a dictionary
-    output_dict = result
-    prop_constr_vio = result['x_full'][:,-1][-1]
-    sol_constr_vio = result['x'][:,-1][-1]
-    prop_cost = result['x_full'][:,-3][-1]
-    sol_cost = result['x'][:,-3][-1]
-    
-    assert sol_cost < 400.0, "Obstacle Avoidance Process failed with solution cost"
-    assert prop_cost < 400.0, "Obstacle Avoidance Process failed with propagated cost"
-    assert sol_constr_vio < 1E0, "Obstacle Avoidance Process failed with solution constraint violation"
-    assert prop_constr_vio < 1e0, "Obstacle Avoidance Process failed with propagated constraint violation"
-    assert output_dict['converged'], "Cinema VP Process failed with output"
-    
-    # Clean up jax memory usage
+    # clean up
     jax.clear_caches()
