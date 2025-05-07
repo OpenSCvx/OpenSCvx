@@ -32,7 +32,7 @@ TEST_CASES = {
         "cost_idx": -2,
         "vio_idx": -1,
         "max_cost": 30.0,
-        "max_vio": 1e-3,
+        "max_vio": -1,
         "timing": {"init": 35.0, "solve": 3.0, "post": 1.0},
         "pre_init": [lambda p: setattr(p.params.dis, "custom_integrator", False), lambda p: setattr(p.params.dev, "printing", False)],
     },
@@ -89,12 +89,13 @@ def test_example_problem(name, conf):
     prop_constr_vio = result["x_full"][:, conf["vio_idx"]][-1]
 
     # assertions
-    assert sol_cost < conf["max_cost"], "Problem failed with solution cost"
-    assert prop_cost < conf["max_cost"], "Problem failed with propagated cost"
-    if name != "dr_vp_nodal":
+    if conf["max_cost"] > 0.0:
+        assert sol_cost < conf["max_cost"], "Problem failed with solution cost"
+        assert prop_cost < conf["max_cost"], "Problem failed with propagated cost"
+    if conf["max_vio"] > 0.0:
         assert sol_constr_vio  < conf["max_vio"], "Problem failed with solution constraint violation"
         assert prop_constr_vio < conf["max_vio"], "Problem failed with propagated constraint violation"
-    if "max_iters" in conf:
+    if "max_iters" in conf and conf["max_iters"] > 0:
         assert scp_iters < conf["max_iters"], "Problem took more then expected iterations"
     assert result["converged"], "Problem failed with output"
 
