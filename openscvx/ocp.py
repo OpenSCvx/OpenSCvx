@@ -85,7 +85,7 @@ def OptimalControlProblem(params: Config):
                 constr += [((g[idx_ncvx][node] + grad_g_x[idx_ncvx][node] @ dx[node] + grad_g_u[idx_ncvx][node] @ du[node])) == nu_vb[idx_ncvx][node] for node in nodes]
                 idx_ncvx += 1
 
-    for i in range(params.sim.n_states-params.sim.num_augmented_states):
+    for i in range(params.sim.idx_y.start):
         if params.sim.initial_state.type[i] == 'Fix':
             constr += [x_nonscaled[0][i] == params.sim.initial_state.value[i]]  # Initial Boundary Conditions
         if params.sim.final_state.type[i] == 'Fix':

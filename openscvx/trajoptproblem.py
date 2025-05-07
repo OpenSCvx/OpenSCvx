@@ -188,7 +188,6 @@ class TrajOptProblem:
 
         sim.constraints_ctcs = constraints_ctcs
         sim.constraints_nodal = constraints_nodal
-        sim.num_augmented_states = num_augmented_states
 
         # Make a list of the keys of the constraints_dict
         # This is used to create the augmented state nodes
