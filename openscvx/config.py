@@ -59,6 +59,7 @@ class SimConfig:
     idx_t: slice
     idx_y: slice
     idx_s: slice
+    ctcs_node_intervals: list = None
     constraints_ctcs: List[callable] = field(
         default_factory=list
     )  # TODO (norrisg): clean this up, consider moving to dedicated `constraints` dataclass
