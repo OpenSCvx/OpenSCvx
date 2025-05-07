@@ -193,7 +193,7 @@ class TrajOptProblem:
         sim.constraints_nodal = constraints_nodal
 
         g_funcs = get_g_funcs(constraints_ctcs)
-        self.dynamics_augmented = get_augmented_dynamics(dynamics, g_funcs)
+        self.dynamics_augmented = get_augmented_dynamics(dynamics, g_funcs, idx_x_true, idx_u_true)
         self.A_uncompiled, self.B_uncompiled = get_jacobians(self.dynamics_augmented)
 
         self.params = Config(
