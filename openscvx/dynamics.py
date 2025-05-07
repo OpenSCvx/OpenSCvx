@@ -10,7 +10,8 @@ def get_augmented_dynamics(dynamics: callable, g_funcs: list[callable]):
         # Iterate through the g_func dictionary and stack the output each function
         # to x_dot
         for g in g_funcs:
-            x_dot = jnp.hstack([x_dot, g(x, u)])
+            # TODO: (norrisg) don't do hacky -1 indexing!!!
+            x_dot = jnp.hstack([x_dot, g(x[:-1], u[:-1])])
         
         return x_dot
 
