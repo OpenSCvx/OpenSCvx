@@ -10,8 +10,8 @@ import jax.numpy as jnp
 class CTCSConstraint:
     func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
     penalty: Callable[[jnp.ndarray], jnp.ndarray]
-    nodes: Sequence[Tuple[int, int]] | None
-    idx: int | None
+    nodes: Optional[Sequence[Tuple[int, int]]] = None
+    idx: Optional[int] = None
 
     def __call__(self, x, u):
         # slice x,u at the true-state indices upstream
@@ -19,23 +19,21 @@ class CTCSConstraint:
 
 
 def ctcs(
+    _func=None,
     *,
     penalty: str = "squared_relu",
-    nodes: Sequence[Tuple[int, int]] | None = None,
-    idx: int | None = None,
+    nodes: Optional[Sequence[Tuple[int, int]]] = None,
+    idx: Optional[int] = None,
 ):
     """Decorator to mark a function as a 'ctcs' constraint.
-    
+
     Use as:
     @ctcs(nodes=[(0,10)], idx=2, penalty='huber')
     def my_constraint(x,u): ...
     """
     # prepare penalty function once
     if penalty == "squared_relu":
-
-        def pen(x):
-            return jnp.maximum(0, x) ** 2
-
+        pen = lambda x: jnp.maximum(0, x) ** 2
     elif penalty == "huber":
         delta = 0.25
 
@@ -44,19 +42,19 @@ def ctcs(
             return jnp.where(r < delta, 0.5 * r**2, r - 0.5 * delta)
 
     else:
-        raise ValueError(penalty)
+        raise ValueError(f"Unknown penalty {penalty}")
 
-    def decorator(f: Callable):
-        # wrap and return a CTCSConstraint instance
-        # preserves f.__name__, __doc__ for introspection
-        return CTCSConstraint(
-            func=functools.wraps(f)(f),
-            penalty=pen,
-            nodes=nodes,
-            idx=idx,
-        )
+    def decorator(f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
+        # wrap so name, doc, signature stay on f
+        wrapped = functools.wraps(f)(f)
+        return CTCSConstraint(func=wrapped, penalty=pen, nodes=nodes, idx=idx)
 
-    return decorator
+    # if called as @ctcs or @ctcs(...), _func will be None and we return decorator
+    if _func is None:
+        return decorator
+    # if called as ctcs(func), we immediately decorate
+    else:
+        return decorator(_func)
 
 
 @dataclass
@@ -68,7 +66,7 @@ class NodalConstraint:
 
     def __post_init__(self):
         if not self.convex:
-        # TODO: (haynec) switch to AOT instead of JIT
+            # TODO: (haynec) switch to AOT instead of JIT
             self.g = vmap(jit(self.func), in_axes=(0, 0))
             self.grad_g_x = jit(vmap(jacfwd(self.func, argnums=0), in_axes=(0, 0)))
             self.grad_g_u = jit(vmap(jacfwd(self.func, argnums=1), in_axes=(0, 0)))
@@ -80,25 +78,21 @@ class NodalConstraint:
         # if convex=True and inter_nodal=False, assume an external solver (e.g. CVX) will handle it
 
     def __call__(self, x: jnp.ndarray, u: jnp.ndarray):
-        idxs = self.nodes if self.nodes is not None else list(range(x.shape[0]))
-        xs = x[idxs]
-        us = u[idxs]
-        return self.g(xs, us)
+        return self.func(x, u)
 
 
 def nodal(
+    _func=None,
     *,
     nodes: Optional[List[int]] = None,
     convex: bool = False,
     inter_nodal: bool = False,
 ):
-    """Decorator to mark a function as a 'nodal' constraint."""
     def decorator(f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
-        wrapped = functools.wraps(f)(f)
         return NodalConstraint(
-            func=wrapped,
+            func=f,              # no wraps, just keep the original
             nodes=nodes,
             convex=convex,
             inter_nodal=inter_nodal,
         )
-    return decorator
+    return decorator if _func is None else decorator(_func)
