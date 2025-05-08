@@ -55,7 +55,7 @@ norm_type = np.inf  # Norm Type
 R_sb = jnp.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]])
 
 
-def dynamics(x, u, node):
+def dynamics(x, u):
     m = 1.0  # Mass of the drone
     g_const = -9.18
     J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
@@ -97,11 +97,11 @@ def g_max(x):
 
 
 constraints = [
-    ctcs(lambda x, u, node: np.sqrt(2e1) * g_vp(x)),
-    ctcs(lambda x, u, node: x - max_state),
-    ctcs(lambda x, u, node: min_state - x),
-    ctcs(lambda x, u, node: g_min(x)),
-    ctcs(lambda x, u, node: g_max(x)),
+    ctcs(lambda x, u: np.sqrt(2e1) * g_vp(x)),
+    ctcs(lambda x, u: x - max_state),
+    ctcs(lambda x, u: min_state - x),
+    ctcs(lambda x, u: g_min(x)),
+    ctcs(lambda x, u: g_max(x)),
 ]
 
 

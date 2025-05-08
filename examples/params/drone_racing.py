@@ -68,8 +68,8 @@ for center in gate_centers:
 
 
 constraints = [
-    ctcs(lambda x, u, node: (x - max_state)),
-    ctcs(lambda x, u, node: (min_state - x)),
+    ctcs(lambda x, u: (x - max_state)),
+    ctcs(lambda x, u: (min_state - x)),
 ]
 for node, cen in zip(gate_nodes, A_gate_cen):
     constraints.append(
@@ -81,7 +81,7 @@ for node, cen in zip(gate_nodes, A_gate_cen):
     )  # use local variables inside the lambda function
 
 
-def dynamics(x, u, node):
+def dynamics(x, u):
     # Unpack the state and control vectors
     v = x[3:6]
     q = x[6:10]
