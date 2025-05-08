@@ -63,11 +63,11 @@ class TrajOptProblem:
         constraints_ctcs = []
         constraints_nodal = []
         for constraint in constraints:
-            if type(constraint).__name__() == CTCSConstraint.__name__:
+            if type(constraint).__name__ == CTCSConstraint.__name__:
                 constraints_ctcs.append(
                     constraint
                 )
-            elif type(constraint).__name__() == NodalConstraint.__name__:
+            elif type(constraint).__name__ == NodalConstraint.__name__:
                 constraints_nodal.append(
                     constraint
                 )
