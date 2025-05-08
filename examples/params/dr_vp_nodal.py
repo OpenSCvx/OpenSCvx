@@ -112,7 +112,7 @@ for node, cen in zip(gate_nodes, A_gate_cen):
     )  # use local variables inside the lambda function
 
 
-def dynamics(x, u):
+def dynamics(x, u, node):
     m = 1.0  # Mass of the drone
     g_const = -9.81
     J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone

@@ -63,11 +63,11 @@ class TrajOptProblem:
         constraints_ctcs = []
         constraints_nodal = []
         for constraint in constraints:
-            if isinstance(constraint, CTCSConstraint):
+            if type(constraint).__name__() == CTCSConstraint.__name__:
                 constraints_ctcs.append(
                     constraint
                 )
-            elif isinstance(constraint, NodalConstraint):
+            elif type(constraint).__name__() == NodalConstraint.__name__:
                 constraints_nodal.append(
                     constraint
                 )
@@ -211,8 +211,8 @@ class TrajOptProblem:
 
         # Compile dynamics and jacobians
         self.state_dot = jax.vmap(self.dynamics_augmented)
-        self.A = jax.jit(jax.vmap(self.A_uncompiled, in_axes=(0, 0)))
-        self.B = jax.jit(jax.vmap(self.B_uncompiled, in_axes=(0, 0)))
+        self.A = jax.jit(jax.vmap(self.A_uncompiled, in_axes=(0, 0, 0)))
+        self.B = jax.jit(jax.vmap(self.B_uncompiled, in_axes=(0, 0, 0)))
         # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
         # TODO: (norrisg) Consider writing the compiled versions into the same variables?
         # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
@@ -250,6 +250,7 @@ class TrajOptProblem:
                 np.ones((1, self.params.sim.n_controls)),
                 np.ones((1, self.params.sim.n_controls)),
                 np.ones((1, 1)),
+                np.ones((1, 1)).astype("int"),
                 0,
             )
             .compile()

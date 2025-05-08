@@ -24,7 +24,7 @@ final_state.type[13] = "Minimize"
 initial_control = np.array([0.0, 0, 50, 0, 0, 0])
 
 
-def dynamics(x, u):
+def dynamics(x, u, node):
     m = 1.0  # Mass of the drone
     g_const = -9.18
     J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
@@ -74,9 +74,9 @@ for _ in obstacle_centers:
 
 constraints = []
 for center, A in zip(obstacle_centers, A_obs):
-    constraints.append(ctcs(lambda x, u: g_obs(center, A, x)))
-constraints.append(ctcs(lambda x, u: x - max_state))
-constraints.append(ctcs(lambda x, u: min_state - x))
+    constraints.append(ctcs(lambda x, u, node: g_obs(center, A, x)))
+constraints.append(ctcs(lambda x, u, node: x - max_state))
+constraints.append(ctcs(lambda x, u, node: min_state - x))
 
 
 u_bar = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)

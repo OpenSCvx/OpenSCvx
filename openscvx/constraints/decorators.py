@@ -77,8 +77,8 @@ class NodalConstraint:
             self.grad_g_u = jit(jacfwd(self.func, argnums=1))
         # if convex=True and inter_nodal=False, assume an external solver (e.g. CVX) will handle it
 
-    def __call__(self, x: jnp.ndarray, u: jnp.ndarray):
-        return self.func(x, u)
+    def __call__(self, x: jnp.ndarray, u: jnp.ndarray, node: jnp.ndarray):
+        return self.func(x, u, node)
 
 
 def nodal(
