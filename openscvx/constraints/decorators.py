@@ -14,8 +14,10 @@ class CTCSConstraint:
     idx: Optional[int] = None
 
     def __call__(self, x, u, node):
-        # slice x,u at the true-state indices upstream
-        return jnp.sum(self.penalty(self.func(x, u, node)))
+        if jnp.all((self.nodes[0] <= node)) & jnp.all((node < self.nodes[1])):
+            # slice x,u at the true-state indices upstream
+            return jnp.sum(self.penalty(self.func(x, u)))
+        return 0.0
 
 
 def ctcs(

@@ -3,7 +3,7 @@ from collections import defaultdict
 import jax.numpy as jnp
 
 def get_g_func(constraints_ctcs: list[callable, callable]):
-    def g_func(x: jnp.array, u: jnp.array, node: jnp.ndarray) -> jnp.array:
+    def g_func(x: jnp.array, u: jnp.array, node: int) -> jnp.array:
         g_sum = 0
         for g in constraints_ctcs:
             g_sum += g(x,u, node)
