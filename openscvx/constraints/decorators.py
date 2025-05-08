@@ -13,9 +13,9 @@ class CTCSConstraint:
     nodes: Optional[Sequence[Tuple[int, int]]] = None
     idx: Optional[int] = None
 
-    def __call__(self, x, u):
+    def __call__(self, x, u, node):
         # slice x,u at the true-state indices upstream
-        return jnp.sum(self.penalty(self.func(x, u)))
+        return jnp.sum(self.penalty(self.func(x, u, node)))
 
 
 def ctcs(
@@ -77,8 +77,8 @@ class NodalConstraint:
             self.grad_g_u = jit(jacfwd(self.func, argnums=1))
         # if convex=True and inter_nodal=False, assume an external solver (e.g. CVX) will handle it
 
-    def __call__(self, x: jnp.ndarray, u: jnp.ndarray, node: jnp.ndarray):
-        return self.func(x, u, node)
+    def __call__(self, x: jnp.ndarray, u: jnp.ndarray):
+        return self.func(x, u)
 
 
 def nodal(
