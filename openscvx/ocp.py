@@ -129,17 +129,13 @@ def OptimalControlProblem(params: Config):
                 cost += params.scp.lam_vb * cp.sum(cp.pos(nu_vb[idx_ncvx]))
                 idx_ncvx += 1
 
-    for idx, nodes in zip(np.arange(params.sim.idx_y.start, params.sim.idx_y.stop), params.sim.y_nodes):  
-        if nodes == 'all':
-            constr += [cp.abs(x_nonscaled[i][idx] - x_nonscaled[i-1][idx]) <= params.sim.max_state[idx] for i in range(1, params.scp.n)] # LICQ Constraint
-            constr += [x_nonscaled[0][idx] == 0]
+    for idx, nodes in zip(np.arange(params.sim.idx_y.start, params.sim.idx_y.stop), params.sim.ctcs_node_intervals):  
+        if nodes[0] == 0:
+            start_idx = 1
         else:
-            if nodes[0] == 0:
-                start_indx = 1
-            else:
-                start_indx = nodes[0]
-            constr += [cp.abs(x_nonscaled[i][idx] - x_nonscaled[i-1][idx]) <= params.sim.max_state[idx] for i in range(start_indx, nodes[1])]
-            constr += [x_nonscaled[0][idx] == 0]
+            start_idx = nodes[0]
+        constr += [cp.abs(x_nonscaled[i][idx] - x_nonscaled[i-1][idx]) <= params.sim.max_state[idx] for i in range(start_idx, nodes[1])]
+        constr += [x_nonscaled[0][idx] == 0]
 
     
     #########

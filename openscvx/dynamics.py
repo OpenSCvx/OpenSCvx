@@ -2,16 +2,17 @@ import jax
 import jax.numpy as jnp
 
 
-def get_augmented_dynamics(dynamics: callable, g_func: dict[str, callable]):
+def get_augmented_dynamics(
+    dynamics: callable, g_funcs: list[callable], idx_x_true: slice, idx_u_true: slice
+) -> callable:
     def dynamics_augmented(x: jnp.array, u: jnp.array) -> jnp.array:
-        # TODO: (norrisg) only pass user-defined portion of x to dynamics in case user has `-1` or similar indexing in function
-        x_dot = dynamics(x, u)
+        x_dot = dynamics(x[idx_x_true], u[idx_u_true])
 
         # Iterate through the g_func dictionary and stack the output each function
         # to x_dot
-        for _, g in g_func.items():
-            x_dot = jnp.hstack([x_dot, g(x, u)])
-        
+        for g in g_funcs:
+            x_dot = jnp.hstack([x_dot, g(x[idx_x_true], u[idx_u_true])])
+
         return x_dot
 
     return dynamics_augmented

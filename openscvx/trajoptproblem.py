@@ -18,10 +18,12 @@ from openscvx.config import (
     Config,
 )
 from openscvx.dynamics import get_augmented_dynamics, get_jacobians
-from openscvx.constraints.ctcs import get_g_func
+from openscvx.constraints.violation import get_g_funcs
+from openscvx.augmentation import sort_ctcs_constraints
 from openscvx.discretization import get_discretization_solver
 from openscvx.propagation import get_propagation_solver
 from openscvx.constraints.boundary import BoundaryConstraint
+from openscvx.constraints.decorators import CTCSConstraint, NodalConstraint
 from openscvx.ptr import PTR_init, PTR_main
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.ocp import OptimalControlProblem
@@ -61,54 +63,20 @@ class TrajOptProblem:
         constraints_ctcs = []
         constraints_nodal = []
         for constraint in constraints:
-            if constraint.constraint_type == "ctcs":
-                constraints_ctcs.append((
-                    lambda x, u, func=constraint: jnp.sum(func.penalty(func(x[idx_x_true], u[idx_u_true]))), constraint))
-            elif constraint.constraint_type == "nodal":
-                constraints_nodal.append(constraint)
+            if isinstance(constraint, CTCSConstraint):
+                constraints_ctcs.append(
+                    constraint
+                )
+            elif isinstance(constraint, NodalConstraint):
+                constraints_nodal.append(
+                    constraint
+                )
             else:
                 raise ValueError(
-                    f"Unknown constraint type: {constraint.constraint_type}, All constraints must be decorated with @ctcs or @nodal"
-                )
-        
-        # Constraints should be added to the list if there are multiple constraints for the same set of nodes
-        # unless they are specified as exclusive
-        constraints_dict = {}
-        shared_ids = {}  # Dictionary to store shared IDs for non-exclusive constraints
-
-        for constraint in constraints_ctcs:
-            if constraint[1].nodes == "all":
-                # Handle the special case where nodes is "all"
-                if constraint[1].exclusive:
-                    # Create a separate entry for exclusive constraints
-                    key = ("all", id(constraint))
-                else:
-                    # Use a shared ID for non-exclusive constraints
-                    if "all" not in shared_ids:
-                        shared_ids["all"] = id("all")  # Assign a shared ID
-                    key = ("all", shared_ids["all"])
-                if key not in constraints_dict:
-                    constraints_dict[key] = []
-                constraints_dict[key].append(constraint[0])
-            elif isinstance(constraint[1].nodes, tuple):
-                # Handle the case where nodes is a single tuple
-                if constraint[1].exclusive:
-                    # Create a separate entry for exclusive constraints
-                    key = (constraint[1].nodes, id(constraint))
-                else:
-                    # Use a shared ID for non-exclusive constraints
-                    if constraint[1].nodes not in shared_ids:
-                        shared_ids[constraint[1].nodes] = id(constraint[1].nodes)  # Assign a shared ID
-                    key = (constraint[1].nodes, shared_ids[constraint[1].nodes])
-                if key not in constraints_dict:
-                    constraints_dict[key] = []
-                constraints_dict[key].append(constraint[0])
-            else:
-                raise ValueError(
-                    f"CTCS constraint nodes must be a tuple (start, end) or 'all'. Got {constraint[1].nodes}"
+                    f"Unknown constraint type: {type(constraint)}, All constraints must be decorated with @ctcs or @nodal"
                 )
 
-        num_augmented_states = len(constraints_dict)
+        constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(constraints_ctcs, N)
 
         # Index tracking
         idx_x_true = slice(0, len(x_max))
@@ -156,6 +124,7 @@ class TrajOptProblem:
                 idx_t=idx_time,
                 idx_y=idx_constraint_violation,
                 idx_s=idx_time_dilation,
+                ctcs_node_intervals=node_intervals,
             )
 
         if scp is None:
@@ -189,19 +158,8 @@ class TrajOptProblem:
         sim.constraints_ctcs = constraints_ctcs
         sim.constraints_nodal = constraints_nodal
 
-        # Make a list of the keys of the constraints_dict
-        # This is used to create the augmented state nodes
-        sim.y_nodes = []
-        for key, _ in constraints_dict.items():
-            sim.y_nodes.append(key[0])
-
-        g_funcs = {}
-        for key, constraints in constraints_dict.items():
-            # Add the key to the g_func dict and create a new g_func for each set of constraints
-            g_funcs[key] = get_g_func(constraints)
-
-        # g_func = get_g_func(constraints_dict["all"])
-        self.dynamics_augmented = get_augmented_dynamics(dynamics, g_funcs)
+        g_funcs = get_g_funcs(constraints_ctcs)
+        self.dynamics_augmented = get_augmented_dynamics(dynamics, g_funcs, idx_x_true, idx_u_true)
         self.A_uncompiled, self.B_uncompiled = get_jacobians(self.dynamics_augmented)
 
         self.params = Config(
