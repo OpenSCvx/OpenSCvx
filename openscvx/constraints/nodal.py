@@ -10,12 +10,12 @@ class NodalConstraint:
     func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
     nodes: Optional[List[int]] = None
     convex: bool = False
-    inter_nodal: bool = False
+    vectorized: bool = False
 
     def __post_init__(self):
         if not self.convex:
             # TODO: (haynec) switch to AOT instead of JIT
-            if self.inter_nodal:
+            if self.vectorized:
                 # single-node but still using JAX
                 self.g = jit(self.func)
                 self.grad_g_x = jit(jacfwd(self.func, argnums=0))
@@ -42,7 +42,7 @@ def nodal(
             func=f,  # no wraps, just keep the original
             nodes=nodes,
             convex=convex,
-            inter_nodal=inter_nodal,
+            vectorized=inter_nodal,
         )
 
     return decorator if _func is None else decorator(_func)
