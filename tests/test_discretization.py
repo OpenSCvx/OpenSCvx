@@ -25,16 +25,16 @@ def params():
     p.dev = Dummy(); p.dev.debug = False
     return p
 
-def state_dot(x, u):
+def state_dot(x, u, node):
     # simple linear: x' = A_true x + B_true u
     return x + u
 
-def A(x, u):
+def A(x, u, node):
     batch = x.shape[0]
     eye = jnp.eye(2)
     return jnp.broadcast_to(eye, (batch, 2, 2))
 
-def B(x, u):
+def B(x, u, node):
     batch = x.shape[0]
     ones = jnp.ones((2,1))
     return jnp.broadcast_to(ones, (batch, 2, 1))
