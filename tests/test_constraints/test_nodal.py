@@ -1,11 +1,13 @@
 import pytest
 import jax.numpy as jnp
 
-from openscvx.constraints.nodal import NodalConstraint, nodal  
+from openscvx.constraints.nodal import NodalConstraint, nodal
+
 
 def simple_dot(x, u):
     # f(x,u) = sum_i x_i * u_i
     return jnp.dot(x, u)
+
 
 def test___call___uses_original_func():
     # __call__ should bypass jax-transformed methods
@@ -14,6 +16,7 @@ def test___call___uses_original_func():
     u = jnp.array([0.1, 0.2, 0.3])
     # same as simple_dot(x,u)
     assert c(x, u) == pytest.approx(jnp.dot(x, u))
+
 
 def test_non_vectorized_batched_g_and_grads():
     # vectorized=False (default), convex=False
@@ -34,6 +37,7 @@ def test_non_vectorized_batched_g_and_grads():
     grad_u = c.grad_g_u(x, u)
     assert jnp.allclose(grad_u, x)
 
+
 def test_vectorized_single_node_jit_path():
     # vectorized=True, convex=False
     c = NodalConstraint(func=simple_dot, convex=False, vectorized=True)
@@ -42,12 +46,13 @@ def test_vectorized_single_node_jit_path():
     # g = jit(func)
     out = c.g(x, u)
     assert out.shape == ()  # scalar
-    assert out == pytest.approx(2*4 + 3*5)
+    assert out == pytest.approx(2 * 4 + 3 * 5)
     # grads
     grad_x = c.grad_g_x(x, u)
     grad_u = c.grad_g_u(x, u)
     assert jnp.allclose(grad_x, u)
     assert jnp.allclose(grad_u, x)
+
 
 def test_convex_skips_jax_transforms():
     # convex=True should not define g, grad_g_x, or grad_g_u
@@ -56,13 +61,14 @@ def test_convex_skips_jax_transforms():
         with pytest.raises(AttributeError):
             getattr(c, attr)
 
+
 def test_nodal_decorator_passes_parameters_through():
-    @nodal(nodes=[10,20,30], convex=True, vectorized=False)
+    @nodal(nodes=[10, 20, 30], convex=True, vectorized=False)
     def f2(x, u):
         return jnp.sum(x) + jnp.sum(u)
 
     # decorator returns a fully initialized NodalConstraint
     assert isinstance(f2, NodalConstraint)
-    assert f2.nodes == [10,20,30]
+    assert f2.nodes == [10, 20, 30]
     assert f2.convex is True
     assert f2.vectorized is False
