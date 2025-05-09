@@ -10,7 +10,6 @@ from openscvx.constraints.decorators import ctcs
 n = 12  # Number of Nodes
 total_time = 40.0  # Total time for the simulation
 
-
 fuel_inds = 13  # Fuel Index in State
 t_inds = 14
 s_inds = 6  # Time dilation index in Control
@@ -29,7 +28,6 @@ initial_state.type[6:14] = "Free"
 final_state = bc(jnp.array([-10.0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 40]))
 final_state.type[0:13] = "Free"
 final_state.type[13] = "Minimize" # Minimize fuel usage
-final_state.type[14] = "Minimize" # Minimize time
 
 max_control = np.array(
     [0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562]
@@ -138,7 +136,7 @@ problem = TrajOptProblem(
     x_min=min_state,
     u_max=max_control,  # Upper Bound on the controls
     u_min=min_control,  # Lower Bound on the controls
-    ctcs_augmentation_max=1e-8,
+    licq_max=1e-8,
 )
 
 problem.params.prp.dt = 0.1

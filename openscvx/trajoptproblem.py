@@ -1,5 +1,8 @@
 import jax.numpy as jnp
 from typing import List
+import queue
+import threading
+import time
 
 import cvxpy as cp
 import jax
@@ -15,10 +18,17 @@ from openscvx.config import (
     Config,
 )
 from openscvx.dynamics import get_augmented_dynamics, get_jacobians
-from openscvx.constraints.ctcs import get_g_func
-from openscvx.discretization import ExactDis, Diffrax_Prop
+from openscvx.constraints.violation import get_g_funcs
+from openscvx.augmentation import sort_ctcs_constraints
+from openscvx.discretization import get_discretization_solver
+from openscvx.propagation import get_propagation_solver
 from openscvx.constraints.boundary import BoundaryConstraint
-from openscvx.ptr import PTR_init, PTR_main, PTR_post
+from openscvx.constraints.decorators import CTCSConstraint, NodalConstraint
+from openscvx.ptr import PTR_init, PTR_main
+from openscvx.post_processing import propagate_trajectory_results
+from openscvx.ocp import OptimalControlProblem
+from openscvx import io
+
 
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
 class TrajOptProblem:
@@ -43,57 +53,54 @@ class TrajOptProblem:
         sim: SimConfig = None,
         dev: DevConfig = None,
         cvx: ConvexSolverConfig = None,
-        ctcs_augmentation_min=0.0,
-        ctcs_augmentation_max=1e-4,
+        licq_min=0.0,
+        licq_max=1e-4,
         time_dilation_factor_min=0.3,
         time_dilation_factor_max=3.0,
     ):
 
-        """Initializes the TrajOptProblem class.
+        # TODO (norrisg) move this into some augmentation function, if we want to make this be executed after the init (i.e. within problem.initialize) need to rethink how problem is defined
+        constraints_ctcs = []
+        constraints_nodal = []
+        # TODO: (norrisg) change back to using isinstance once on PyPi
+        for constraint in constraints:
+            if type(constraint).__name__ == CTCSConstraint.__name__:
+                constraints_ctcs.append(
+                    constraint
+                )
+            elif type(constraint).__name__ == NodalConstraint.__name__:
+                constraints_nodal.append(
+                    constraint
+                )
+            else:
+                raise ValueError(
+                    f"Unknown constraint type: {type(constraint)}, All constraints must be decorated with @ctcs or @nodal"
+                )
 
-        This constructor sets up a trajectory optimization problem by defining the system dynamics, 
-        constraints, and various configurations for solving the problem.
+        constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(constraints_ctcs, N)
 
-        Args:
-            dynamics (callable): The system dynamics function, which defines the evolution of the state.
-            constraints (List[callable]): A list of constraint functions to be satisfied during optimization.
-            N (int): The number of discretization points for the trajectory.
-            time_init (float): The initial time for the trajectory.
-            x_guess (jnp.ndarray): Initial guess for the state trajectory.
-            u_guess (jnp.ndarray): Initial guess for the control trajectory.
-            initial_state (BoundaryConstraint): Boundary constraint for the initial state of the system.
-            final_state (BoundaryConstraint): Boundary constraint for the final state of the system.
-            x_max (jnp.ndarray): Maximum bounds for the state variables.
-            x_min (jnp.ndarray): Minimum bounds for the state variables.
-            u_max (jnp.ndarray): Maximum bounds for the control variables.
-            u_min (jnp.ndarray): Minimum bounds for the control variables.
-            scp (ScpConfig, optional): Configuration for the sequential convex programming solver.
-            dis (DiscretizationConfig, optional): Configuration for the discretization method.
-            prp (PropagationConfig, optional): Configuration for the propagation method.
-            sim (SimConfig, optional): Configuration for the simulation settings.
-            dev (DevConfig, optional): Configuration for device-specific settings.
-            cvx (ConvexSolverConfig, optional): Configuration for the convex solver.
-
-        Raises:
-            ValueError: If any of the input parameters are invalid or inconsistent.
-        """
         # Index tracking
         idx_x_true = slice(0, len(x_max))
         idx_u_true = slice(0, len(u_max))
-        idx_constraint_violation = slice(idx_x_true.stop, idx_x_true.stop + 1)
+        idx_constraint_violation = slice(
+            idx_x_true.stop, idx_x_true.stop + num_augmented_states
+        )
+
         idx_time_dilation = slice(idx_u_true.stop, idx_u_true.stop + 1)
 
         # check that idx_time is in the correct range
-        assert(idx_time >= 0 and idx_time < len(x_max)), "idx_time must be in the range of the state vector and non-negative"
+        assert idx_time >= 0 and idx_time < len(
+            x_max
+        ), "idx_time must be in the range of the state vector and non-negative"
         idx_time = slice(idx_time, idx_time + 1)
 
-        x_min_augmented = np.hstack([x_min, ctcs_augmentation_min])
-        x_max_augmented = np.hstack([x_max, ctcs_augmentation_max])
+        x_min_augmented = np.hstack([x_min, np.repeat(licq_min, num_augmented_states)])
+        x_max_augmented = np.hstack([x_max, np.repeat(licq_max, num_augmented_states)])
 
         u_min_augmented = np.hstack([u_min, time_dilation_factor_min * time_init])
         u_max_augmented = np.hstack([u_max, time_dilation_factor_max * time_init])
 
-        x_bar_augmented = np.hstack([x_guess, np.full((x_guess.shape[0], 1), 0)])
+        x_bar_augmented = np.hstack([x_guess, np.full((x_guess.shape[0], num_augmented_states), 0)])
         u_bar_augmented = np.hstack(
             [u_guess, np.full((u_guess.shape[0], 1), time_init)]
         )
@@ -118,6 +125,7 @@ class TrajOptProblem:
                 idx_t=idx_time,
                 idx_y=idx_constraint_violation,
                 idx_s=idx_time_dilation,
+                ctcs_node_intervals=node_intervals,
             )
 
         if scp is None:
@@ -148,20 +156,11 @@ class TrajOptProblem:
         if prp is None:
             prp = PropagationConfig()
 
-        for constraint in constraints:
-            if constraint.constraint_type == "ctcs":
-                sim.constraints_ctcs.append(
-                    lambda x, u, func=constraint: jnp.sum(func.penalty(func(x[idx_x_true], u[idx_u_true])))
-                )
-            elif constraint.constraint_type == "nodal":
-                sim.constraints_nodal.append(constraint)
-            else:
-                raise ValueError(
-                    f"Unknown constraint type: {constraint.constraint_type}, All constraints must be decorated with @ctcs or @nodal"
-                )
+        sim.constraints_ctcs = constraints_ctcs
+        sim.constraints_nodal = constraints_nodal
 
-        g_func = get_g_func(sim.constraints_ctcs)
-        self.dynamics_augmented = get_augmented_dynamics(dynamics, g_func)
+        g_funcs = get_g_funcs(constraints_ctcs)
+        self.dynamics_augmented = get_augmented_dynamics(dynamics, g_funcs, idx_x_true, idx_u_true)
         self.A_uncompiled, self.B_uncompiled = get_jacobians(self.dynamics_augmented)
 
         self.params = Config(
@@ -173,75 +172,164 @@ class TrajOptProblem:
             prp=prp,
         )
 
-        self.ocp: cp.Problem = None
-        self.dynamics_discretized: ExactDis = None
+        self.optimal_control_problem: cp.Problem = None
+        self.discretization_solver: callable = None
         self.cpg_solve = None
 
-    def compile(self):
-        # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
-        # TODO: (norrisg) Consider writing the compiled versions into the same variables?
-        # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
-        self.state_dot = jax.vmap(self.dynamics_augmented)
-        self.A = jax.jit(jax.vmap(self.A_uncompiled, in_axes=(0, 0)))
-        self.B = jax.jit(jax.vmap(self.B_uncompiled, in_axes=(0, 0)))
+        # set up emitter & thread only if printing is enabled
+        if self.params.dev.printing:
+            self.print_queue      = queue.Queue()
+            self.emitter_function = lambda data: self.print_queue.put(data)
+            self.print_thread     = threading.Thread(
+                target=io.intermediate,
+                args=(self.print_queue, self.params),
+                daemon=True,
+            )
+            self.print_thread.start()
+        else:
+            # no-op emitter; nothing ever gets queued or printed
+            self.emitter_function = lambda data: None
+
+
+        self.timing_init = None
+        self.timing_solve = None
+        self.timing_post = None
 
     def initialize(self):
+        io.intro()
+
+        # Enable the profiler
+        if self.params.dev.profiling:
+            import cProfile
+
+            pr = cProfile.Profile()
+            pr.enable()
+
+        t_0_while = time.time()
         # Ensure parameter sizes and normalization are correct
         self.params.scp.__post_init__()
         self.params.sim.__post_init__()
 
-        self.compile()
+        # Compile dynamics and jacobians
+        self.state_dot = jax.vmap(self.dynamics_augmented)
+        self.A = jax.jit(jax.vmap(self.A_uncompiled, in_axes=(0, 0, 0)))
+        self.B = jax.jit(jax.vmap(self.B_uncompiled, in_axes=(0, 0, 0)))
+        # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
+        # TODO: (norrisg) Consider writing the compiled versions into the same variables?
+        # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
 
-        self.ocp, self.dynamics_discretized, self.cpg_solve = PTR_init(
+        # Generate solvers and optimal control problem
+        self.discretization_solver = get_discretization_solver(
             self.state_dot, self.A, self.B, self.params
         )
+        self.propagation_solver = get_propagation_solver(self.state_dot, self.params)
+        self.optimal_control_problem = OptimalControlProblem(self.params)
 
-        # Extract the number of states and controls from the parameters
-        n_x = self.params.sim.n_states
-        n_u = self.params.sim.n_controls
+        # Initialize the PTR loop
+        self.cpg_solve = PTR_init(
+            self.optimal_control_problem,
+            self.discretization_solver,
+            self.params,
+        )
 
-        # Define indices for slicing the augmented state vector
-        self.i0 = 0
-        self.i1 = n_x
-        self.i2 = self.i1 + n_x * n_x
-        self.i3 = self.i2 + n_x * n_u
-        self.i4 = self.i3 + n_x * n_u
-        self.i5 = self.i4 + n_x
-
+        # Compile the solvers
         if not self.params.dev.debug:
-            self.dynamics_discretized.calculate_discretization = jax.jit(
-                self.dynamics_discretized.calculate_discretization
-            ).lower(
-                np.ones((self.params.scp.n, self.params.sim.n_states)),
-                np.ones((self.params.scp.n, self.params.sim.n_controls)),
-            ).compile()
+            self.discretization_solver = (
+                jax.jit(self.discretization_solver)
+                .lower(
+                    np.ones((self.params.scp.n, self.params.sim.n_states)),
+                    np.ones((self.params.scp.n, self.params.sim.n_controls)),
+                )
+                .compile()
+            )
 
-        diff_prop = Diffrax_Prop(self.state_dot, self.A, self.B, self.params)
-        self.params.prp.integrator = jax.jit(diff_prop.solve_ivp).lower(
-            np.ones((self.params.sim.n_states)),
-            (0.0, 0.0),
-            np.ones((1, self.params.sim.n_controls)), 
-            np.ones((1, self.params.sim.n_controls)), 
-            np.ones((1,1)), 
-            0
-        ).compile()
+        self.propagation_solver = (
+            jax.jit(self.propagation_solver)
+            .lower(
+                np.ones((self.params.sim.n_states)),
+                (0.0, 0.0),
+                np.ones((1, self.params.sim.n_controls)),
+                np.ones((1, self.params.sim.n_controls)),
+                np.ones((1, 1)),
+                np.ones((1, 1)).astype("int"),
+                0,
+            )
+            .compile()
+        )
 
+        t_f_while = time.time()
+        self.timing_init = t_f_while - t_0_while
+        print("Total Initialization Time: ", self.timing_init)
 
-        # _ = self.dynamics_discretized.simulate_nonlinear_time(np.ones((self.params.sim.n_states)), np.zeros((10, self.params.sim.n_controls)), np.linspace(0,1, 100), np.linspace(0,1, 10))
-        
+        if self.params.dev.profiling:
+            pr.disable()
+            # Save results so it can be viusualized with snakeviz
+            pr.dump_stats("profiling_initialize.prof")
+
     def solve(self):
         # Ensure parameter sizes and normalization are correct
         self.params.scp.__post_init__()
         self.params.sim.__post_init__()
 
-        if self.ocp is None or self.dynamics_discretized is None:
+        if self.optimal_control_problem is None or self.discretization_solver is None:
             raise ValueError(
                 "Problem has not been initialized. Call initialize() before solve()"
             )
 
-        return PTR_main(
-            self.params, self.ocp, self.dynamics_discretized, self.cpg_solve
+        # Enable the profiler
+        if self.params.dev.profiling:
+            import cProfile
+
+            pr = cProfile.Profile()
+            pr.enable()
+
+        t_0_while = time.time()
+        # Print top header for solver results
+        io.header()
+
+        result = PTR_main(
+            self.params,
+            self.optimal_control_problem,
+            self.discretization_solver,
+            self.cpg_solve,
+            self.emitter_function,
         )
 
+        t_f_while = time.time()
+        self.timing_solve = t_f_while - t_0_while
+
+        while self.print_queue.qsize() > 0:
+            time.sleep(0.1)
+
+        # Print bottom footer for solver results as well as total computation time
+        io.footer(self.timing_solve)
+
+        # Disable the profiler
+        if self.params.dev.profiling:
+            pr.disable()
+            # Save results so it can be viusualized with snakeviz
+            pr.dump_stats("profiling_solve.prof")
+
+        return result
+
     def post_process(self, result):
-        return PTR_post(self.params, result, self.dynamics_discretized)
+        # Enable the profiler
+        if self.params.dev.profiling:
+            import cProfile
+
+            pr = cProfile.Profile()
+            pr.enable()
+
+        t_0_post = time.time()
+        result = propagate_trajectory_results(self.params, result, self.propagation_solver)
+        t_f_post = time.time()
+
+        self.timing_post = t_f_post - t_0_post
+        print("Total Post Processing Time: ", self.timing_post)
+
+        # Disable the profiler
+        if self.params.dev.profiling:
+            pr.disable()
+            # Save results so it can be viusualized with snakeviz
+            pr.dump_stats("profiling_postprocess.prof")
+        return result

@@ -48,3 +48,7 @@ class BoundaryConstraint:
     def type(self):
         # Expose the helper class so that slice assignments work naturally.
         return self._types
+    
+    # Make an append method to add new types
+    def append_type(self, new_type):
+        self._types.values.append(new_type)
