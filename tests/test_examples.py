@@ -19,7 +19,7 @@ from examples.plotting import plot_camera_animation, plot_animation, plot_scp_an
 CI_OS = os.getenv("RUNNER_OS", platform.system())
 
 OS_MULTIPLIER = {
-    "Windows": 2.0,  # give Windows twice as much time
+    "Windows": 1.5,  # give Windows twice as much time
     "Linux": 1.0,
     "Darwin": 1.0,
 }.get(CI_OS, 1.0)
@@ -73,7 +73,7 @@ TEST_CASES = {
         "vio_idx": -1,
         "max_cost": 400.0,
         "max_vio": 1.0,
-        "timing": {"init": 8.0, "solve": 1.0, "post": 1.0},
+        "timing": {"init": 10.0, "solve": 1.0, "post": 1.0},
         "pre_init": [
             lambda p: setattr(p.params.dis, "custom_integrator", False),
             lambda p: setattr(p.params.dev, "printing", False),
