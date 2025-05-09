@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 
-ALLOWED_TYPES = {"Fix", "Free", "Minimize"}
+ALLOWED_TYPES = {"Fix", "Free", "Minimize", "Maximize"}
 
 class TypeList:
     def __init__(self, values):
