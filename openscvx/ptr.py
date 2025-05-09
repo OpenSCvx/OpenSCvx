@@ -125,7 +125,9 @@ def PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params: Config):
     costs = [0]
     for type in params.sim.final_state.type:
         if type == 'Minimize':
-            costs = x[:,i]
+            costs += x[:,i]
+        if type == 'Maximize':
+            costs -= x[:,i]
         i += 1
 
     # Create the block diagonal matrix using jax.numpy.block
