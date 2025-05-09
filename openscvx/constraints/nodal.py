@@ -15,14 +15,15 @@ class NodalConstraint:
     def __post_init__(self):
         if not self.convex:
             # TODO: (haynec) switch to AOT instead of JIT
-            self.g = vmap(jit(self.func), in_axes=(0, 0))
-            self.grad_g_x = jit(vmap(jacfwd(self.func, argnums=0), in_axes=(0, 0)))
-            self.grad_g_u = jit(vmap(jacfwd(self.func, argnums=1), in_axes=(0, 0)))
-        elif self.inter_nodal:
-            # single-node but still using JAX
-            self.g = jit(self.func)
-            self.grad_g_x = jit(jacfwd(self.func, argnums=0))
-            self.grad_g_u = jit(jacfwd(self.func, argnums=1))
+            if self.inter_nodal:
+                # single-node but still using JAX
+                self.g = jit(self.func)
+                self.grad_g_x = jit(jacfwd(self.func, argnums=0))
+                self.grad_g_u = jit(jacfwd(self.func, argnums=1))
+            else:
+                self.g = vmap(jit(self.func), in_axes=(0, 0))
+                self.grad_g_x = jit(vmap(jacfwd(self.func, argnums=0), in_axes=(0, 0)))
+                self.grad_g_u = jit(vmap(jacfwd(self.func, argnums=1), in_axes=(0, 0)))
         # if convex=True and inter_nodal=False, assume an external solver (e.g. CVX) will handle it
 
     def __call__(self, x: jnp.ndarray, u: jnp.ndarray):
