@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Union, Sequence
 import jax.numpy as jnp
 
-ALLOWED_TYPES = {"Fix", "Free", "Minimize"}
+ALLOWED_TYPES = {"Fix", "Free", "Minimize", "Maximize"}
 
 @dataclass
 class BoundaryConstraint:
