@@ -7,7 +7,8 @@ def sort_ctcs_constraints(constraints_ctcs: List[CTCSConstraint], N: int):
     next_idx = 0
     for c in constraints_ctcs:
         # normalize None to full horizon
-        key = c.nodes if c.nodes is not None else (0, N)
+        c.nodes = c.nodes or (0, N)
+        key = c.nodes
 
         if c.idx is not None:
             # user supplied an identifier: ensure it always points to the same interval

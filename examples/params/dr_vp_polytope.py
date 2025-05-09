@@ -118,10 +118,10 @@ def g_vp(p_s_I, x):
 
 
 constraints = []
-constraints.append(ctcs(lambda x, u, node: x - max_state))
-constraints.append(ctcs(lambda x, u, node: min_state - x))
+constraints.append(ctcs(lambda x, u: x - max_state))
+constraints.append(ctcs(lambda x, u: min_state - x))
 for pose in init_poses:
-    constraints.append(ctcs(lambda x, u, node, p=pose: g_vp(p, x)))
+    constraints.append(ctcs(lambda x, u, p=pose: g_vp(p, x)))
 for node, cen in zip(gate_nodes, A_gate_cen):
     constraints.append(
         nodal(
@@ -132,7 +132,7 @@ for node, cen in zip(gate_nodes, A_gate_cen):
     )  # use local variables inside the lambda function
 
 
-def dynamics(x, u, node):
+def dynamics(x, u):
     m = 1.0  # Mass of the drone
     g_const = -9.18
     J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone

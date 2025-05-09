@@ -3,6 +3,7 @@ from typing import Callable, Sequence, Tuple, Optional, List
 import functools
 
 from jax import jit, vmap, jacfwd
+from jax.lax import cond
 import jax.numpy as jnp
 
 
@@ -14,8 +15,12 @@ class CTCSConstraint:
     idx: Optional[int] = None
 
     def __call__(self, x, u, node):
-        # slice x,u at the true-state indices upstream
-        return jnp.sum(self.penalty(self.func(x, u, node)))
+        return cond(
+            jnp.all((self.nodes[0] <= node) & (node < self.nodes[1])),
+            lambda _: jnp.sum(self.penalty(self.func(x, u))),
+            lambda _: 0.0,
+            operand=None,
+        )
 
 
 def ctcs(

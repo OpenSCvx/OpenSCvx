@@ -5,8 +5,8 @@ import jax.numpy as jnp
 def get_augmented_dynamics(
     dynamics: callable, g_funcs: list[callable], idx_x_true: slice, idx_u_true: slice
 ) -> callable:
-    def dynamics_augmented(x: jnp.array, u: jnp.array, node: jnp.ndarray) -> jnp.array:
-        x_dot = dynamics(x[idx_x_true], u[idx_u_true], node)
+    def dynamics_augmented(x: jnp.array, u: jnp.array, node: int) -> jnp.array:
+        x_dot = dynamics(x[idx_x_true], u[idx_u_true])
 
         # Iterate through the g_func dictionary and stack the output each function
         # to x_dot
