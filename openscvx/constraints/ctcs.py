@@ -1,8 +1,7 @@
 from dataclasses import dataclass
-from typing import Callable, Sequence, Tuple, Optional, List
+from typing import Callable, Sequence, Tuple, Optional
 import functools
 
-from jax import jit, vmap, jacfwd
 from jax.lax import cond
 import jax.numpy as jnp
 
@@ -60,44 +59,3 @@ def ctcs(
     # if called as ctcs(func), we immediately decorate
     else:
         return decorator(_func)
-
-
-@dataclass
-class NodalConstraint:
-    func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
-    nodes: Optional[List[int]] = None
-    convex: bool = False
-    inter_nodal: bool = False
-
-    def __post_init__(self):
-        if not self.convex:
-            # TODO: (haynec) switch to AOT instead of JIT
-            self.g = vmap(jit(self.func), in_axes=(0, 0))
-            self.grad_g_x = jit(vmap(jacfwd(self.func, argnums=0), in_axes=(0, 0)))
-            self.grad_g_u = jit(vmap(jacfwd(self.func, argnums=1), in_axes=(0, 0)))
-        elif self.inter_nodal:
-            # single-node but still using JAX
-            self.g = jit(self.func)
-            self.grad_g_x = jit(jacfwd(self.func, argnums=0))
-            self.grad_g_u = jit(jacfwd(self.func, argnums=1))
-        # if convex=True and inter_nodal=False, assume an external solver (e.g. CVX) will handle it
-
-    def __call__(self, x: jnp.ndarray, u: jnp.ndarray):
-        return self.func(x, u)
-
-
-def nodal(
-    _func=None,
-    *,
-    nodes: Optional[List[int]] = None,
-    convex: bool = False,
-    inter_nodal: bool = False,
-):
-    def decorator(f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
-        return NodalConstraint(
-            func=f,              # no wraps, just keep the original
-            nodes=nodes,
-            convex=convex,
-            inter_nodal=inter_nodal,
-        )
-    return decorator if _func is None else decorator(_func)
