@@ -35,14 +35,14 @@ def nodal(
     *,
     nodes: Optional[List[int]] = None,
     convex: bool = False,
-    inter_nodal: bool = False,
+    vectorized: bool = False,
 ):
     def decorator(f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
         return NodalConstraint(
             func=f,  # no wraps, just keep the original
             nodes=nodes,
             convex=convex,
-            vectorized=inter_nodal,
+            vectorized=vectorized,
         )
 
     return decorator if _func is None else decorator(_func)
