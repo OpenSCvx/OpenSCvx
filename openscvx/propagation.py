@@ -10,6 +10,7 @@ def prop_aug_dy(
     u_current: np.ndarray,
     u_next: np.ndarray,
     tau_init: float,
+    node: int,
     idx_s: int,
     state_dot: callable,
     dis_type: str,
@@ -23,11 +24,11 @@ def prop_aug_dy(
         beta = (tau - tau_init) * N
     u = u_current + beta * (u_next - u_current)
 
-    return u[:, idx_s] * state_dot(x, u[:, :-1]).squeeze()
+    return u[:, idx_s] * state_dot(x, u[:, :-1], node).squeeze()
 
 
 def get_propagation_solver(state_dot, params):
-    def propagation_solver(V0, tau_grid, u_cur, u_next, tau_init, idx_s):
+    def propagation_solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s):
         return solve_ivp_diffrax_prop(
             f=prop_aug_dy,
             tau_final=tau_grid[1],
@@ -36,6 +37,7 @@ def get_propagation_solver(state_dot, params):
                 u_cur,
                 u_next,
                 tau_init,
+                node,
                 idx_s,
                 state_dot,
                 params.dis.dis_type,
@@ -118,6 +120,7 @@ def simulate_nonlinear_time(x_0, u, tau_vals, t, params, propagation_solver):
             controls_current,
             controls_next,
             np.array([[tau[k]]]),
+            np.array([[k]]),
             params.sim.idx_s.stop,
         )
 

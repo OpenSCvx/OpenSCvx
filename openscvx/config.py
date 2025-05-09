@@ -59,6 +59,7 @@ class SimConfig:
     idx_t: slice
     idx_y: slice
     idx_s: slice
+    ctcs_node_intervals: list = None
     constraints_ctcs: List[callable] = field(
         default_factory=list
     )  # TODO (norrisg): clean this up, consider moving to dedicated `constraints` dataclass
@@ -77,11 +78,11 @@ class SimConfig:
         self.n_controls = len(self.max_control)
 
         assert (
-            len(self.initial_state.value) == self.n_states - 1
-        ), f"Initial state must have {self.n_states - 1} elements"
+            len(self.initial_state.value) == self.n_states - (self.idx_y.stop - self.idx_y.start)
+        ), f"Initial state must have {self.n_states - (self.idx_y.stop - self.idx_y.start)} elements"
         assert (
-            len(self.final_state.value) == self.n_states - 1
-        ), f"Final state must have {self.n_states - 1} elements"
+            len(self.final_state.value) == self.n_states - (self.idx_y.stop - self.idx_y.start)
+        ), f"Final state must have {self.n_states - (self.idx_y.stop - self.idx_y.start)} elements"
         assert (
             self.max_state.shape[0] == self.n_states
         ), f"Max state must have {self.n_states} elements"

@@ -9,8 +9,8 @@ from openscvx.propagation import prop_aug_dy, s_to_t, t_to_tau, get_propagation_
 
 
 # simple scalar decay: x' = -x
-def decay(t, y):
-    return -t
+def decay(x, u, node):
+    return -x
 
 
 class Dummy:
@@ -33,6 +33,8 @@ def test_prop_aug_dy_linear(dis_type, beta_expected):
     u_cur = np.array([[0.5, 3.0]])
     u_next = np.array([[1.5, 5.0]])
 
+    node = 0  # dummy node index
+
     # compute beta
     if dis_type == "ZOH":
         beta = 0.0
@@ -51,8 +53,9 @@ def test_prop_aug_dy_linear(dis_type, beta_expected):
         u_cur,
         u_next,
         tau_init,
+        node,
         idx_s,
-        lambda x_batch, u_control: x_batch + u_control,  # state_dot
+        lambda x_batch, u_control, node: x_batch + u_control,  # state_dot
         dis_type,
         N,
     )
@@ -143,7 +146,9 @@ def test_propagation_solver_decay(dis_type):
     tau_init = float(tau_grid[0])
     idx_s = 1  # slack lives in column 1
 
-    sol = solver(V0, tau_grid, u_cur, u_next, tau_init, idx_s)
+    node = 0  # dummy node index
+
+    sol = solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s)
 
     # check discrete output
     ys = np.array(sol.ys[:, 0])
@@ -182,12 +187,14 @@ def test_jit_propagation_solver_compiles(dis_type):
     tau_init = tau_grid[0]
     idx_s = 1
 
+    node = 0  # dummy node index
+
     # JIT only the ys output (the array of solution states)
     jitted = jax.jit(
-        lambda V0, tau_grid, u_cur, u_next, tau_init, idx_s: solver(
-            V0, tau_grid, u_cur, u_next, tau_init, idx_s
+        lambda V0, tau_grid, u_cur, u_next, tau_init, node, idx_s: solver(
+            V0, tau_grid, u_cur, u_next, tau_init, node, idx_s
         ).ys
     )
     # Lower & compile
-    lowered = jitted.lower(V0, tau_grid, u_cur, u_next, tau_init, idx_s)
+    lowered = jitted.lower(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s)
     lowered.compile()

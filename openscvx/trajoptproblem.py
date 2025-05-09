@@ -18,10 +18,12 @@ from openscvx.config import (
     Config,
 )
 from openscvx.dynamics import get_augmented_dynamics, get_jacobians
-from openscvx.constraints.ctcs import get_g_func
+from openscvx.constraints.violation import get_g_funcs
+from openscvx.augmentation import sort_ctcs_constraints
 from openscvx.discretization import get_discretization_solver
 from openscvx.propagation import get_propagation_solver
 from openscvx.constraints.boundary import BoundaryConstraint
+from openscvx.constraints.decorators import CTCSConstraint, NodalConstraint
 from openscvx.ptr import PTR_init, PTR_main
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.ocp import OptimalControlProblem
@@ -51,18 +53,39 @@ class TrajOptProblem:
         sim: SimConfig = None,
         dev: DevConfig = None,
         cvx: ConvexSolverConfig = None,
-        ctcs_augmentation_min=0.0,
-        ctcs_augmentation_max=1e-4,
+        licq_min=0.0,
+        licq_max=1e-4,
         time_dilation_factor_min=0.3,
         time_dilation_factor_max=3.0,
     ):
 
         # TODO (norrisg) move this into some augmentation function, if we want to make this be executed after the init (i.e. within problem.initialize) need to rethink how problem is defined
+        constraints_ctcs = []
+        constraints_nodal = []
+        # TODO: (norrisg) change back to using isinstance once on PyPi
+        for constraint in constraints:
+            if type(constraint).__name__ == CTCSConstraint.__name__:
+                constraints_ctcs.append(
+                    constraint
+                )
+            elif type(constraint).__name__ == NodalConstraint.__name__:
+                constraints_nodal.append(
+                    constraint
+                )
+            else:
+                raise ValueError(
+                    f"Unknown constraint type: {type(constraint)}, All constraints must be decorated with @ctcs or @nodal"
+                )
+
+        constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(constraints_ctcs, N)
 
         # Index tracking
         idx_x_true = slice(0, len(x_max))
         idx_u_true = slice(0, len(u_max))
-        idx_constraint_violation = slice(idx_x_true.stop, idx_x_true.stop + 1)
+        idx_constraint_violation = slice(
+            idx_x_true.stop, idx_x_true.stop + num_augmented_states
+        )
+
         idx_time_dilation = slice(idx_u_true.stop, idx_u_true.stop + 1)
 
         # check that idx_time is in the correct range
@@ -71,13 +94,13 @@ class TrajOptProblem:
         ), "idx_time must be in the range of the state vector and non-negative"
         idx_time = slice(idx_time, idx_time + 1)
 
-        x_min_augmented = np.hstack([x_min, ctcs_augmentation_min])
-        x_max_augmented = np.hstack([x_max, ctcs_augmentation_max])
+        x_min_augmented = np.hstack([x_min, np.repeat(licq_min, num_augmented_states)])
+        x_max_augmented = np.hstack([x_max, np.repeat(licq_max, num_augmented_states)])
 
         u_min_augmented = np.hstack([u_min, time_dilation_factor_min * time_init])
         u_max_augmented = np.hstack([u_max, time_dilation_factor_max * time_init])
 
-        x_bar_augmented = np.hstack([x_guess, np.full((x_guess.shape[0], 1), 0)])
+        x_bar_augmented = np.hstack([x_guess, np.full((x_guess.shape[0], num_augmented_states), 0)])
         u_bar_augmented = np.hstack(
             [u_guess, np.full((u_guess.shape[0], 1), time_init)]
         )
@@ -102,6 +125,7 @@ class TrajOptProblem:
                 idx_t=idx_time,
                 idx_y=idx_constraint_violation,
                 idx_s=idx_time_dilation,
+                ctcs_node_intervals=node_intervals,
             )
 
         if scp is None:
@@ -132,22 +156,11 @@ class TrajOptProblem:
         if prp is None:
             prp = PropagationConfig()
 
-        for constraint in constraints:
-            if constraint.constraint_type == "ctcs":
-                sim.constraints_ctcs.append(
-                    lambda x, u, func=constraint: jnp.sum(
-                        func.penalty(func(x[idx_x_true], u[idx_u_true]))
-                    )
-                )
-            elif constraint.constraint_type == "nodal":
-                sim.constraints_nodal.append(constraint)
-            else:
-                raise ValueError(
-                    f"Unknown constraint type: {constraint.constraint_type}, All constraints must be decorated with @ctcs or @nodal"
-                )
+        sim.constraints_ctcs = constraints_ctcs
+        sim.constraints_nodal = constraints_nodal
 
-        g_func = get_g_func(sim.constraints_ctcs)
-        self.dynamics_augmented = get_augmented_dynamics(dynamics, g_func)
+        g_funcs = get_g_funcs(constraints_ctcs)
+        self.dynamics_augmented = get_augmented_dynamics(dynamics, g_funcs, idx_x_true, idx_u_true)
         self.A_uncompiled, self.B_uncompiled = get_jacobians(self.dynamics_augmented)
 
         self.params = Config(
@@ -199,8 +212,8 @@ class TrajOptProblem:
 
         # Compile dynamics and jacobians
         self.state_dot = jax.vmap(self.dynamics_augmented)
-        self.A = jax.jit(jax.vmap(self.A_uncompiled, in_axes=(0, 0)))
-        self.B = jax.jit(jax.vmap(self.B_uncompiled, in_axes=(0, 0)))
+        self.A = jax.jit(jax.vmap(self.A_uncompiled, in_axes=(0, 0, 0)))
+        self.B = jax.jit(jax.vmap(self.B_uncompiled, in_axes=(0, 0, 0)))
         # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
         # TODO: (norrisg) Consider writing the compiled versions into the same variables?
         # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
@@ -238,6 +251,7 @@ class TrajOptProblem:
                 np.ones((1, self.params.sim.n_controls)),
                 np.ones((1, self.params.sim.n_controls)),
                 np.ones((1, 1)),
+                np.ones((1, 1)).astype("int"),
                 0,
             )
             .compile()

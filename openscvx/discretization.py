@@ -17,6 +17,8 @@ def dVdt(
     N: int,
     dis_type: str,
 ) -> jnp.ndarray:
+    # Define the nodes
+    nodes = jnp.arange(0, N-1)
 
     # Define indices for slicing the augmented state vector
     i0 = 0
@@ -49,15 +51,15 @@ def dVdt(
     u = u[: x.shape[0]]
 
     # Compute the nonlinear propagation term
-    f = state_dot(x, u[:, :-1])
+    f = state_dot(x, u[:, :-1], nodes)
     F = s[:, None] * f
 
     # Evaluate the State Jacobian
-    dfdx = A(x, u[:, :-1])
+    dfdx = A(x, u[:, :-1], nodes)
     sdfdx = s[:, None, None] * dfdx
 
     # Evaluate the Control Jacobian
-    dfdu_veh = B(x, u[:, :-1])
+    dfdu_veh = B(x, u[:, :-1], nodes)
     dfdu = dfdu.at[:, :, :-1].set(s[:, None, None] * dfdu_veh)
     dfdu = dfdu.at[:, :, -1].set(f)
 
