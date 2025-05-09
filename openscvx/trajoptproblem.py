@@ -62,6 +62,7 @@ class TrajOptProblem:
         # TODO (norrisg) move this into some augmentation function, if we want to make this be executed after the init (i.e. within problem.initialize) need to rethink how problem is defined
         constraints_ctcs = []
         constraints_nodal = []
+        # TODO: (norrisg) change back to using isinstance once on PyPi
         for constraint in constraints:
             if type(constraint).__name__ == CTCSConstraint.__name__:
                 constraints_ctcs.append(
