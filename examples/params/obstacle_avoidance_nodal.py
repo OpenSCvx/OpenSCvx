@@ -2,8 +2,7 @@ import numpy as np
 import jax.numpy as jnp
 
 from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.constraints.boundary import boundary
-from openscvx.constraints.decorators import ctcs, nodal
+from openscvx.constraints import boundary, ctcs, nodal
 from openscvx.utils import qdcm, SSMP, SSM, generate_orthogonal_unit_vectors
 
 n = 6

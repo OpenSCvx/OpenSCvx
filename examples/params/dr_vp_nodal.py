@@ -5,8 +5,7 @@ import jax.numpy as jnp
 
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.utils import qdcm, SSMP, SSM, rot, gen_vertices
-from openscvx.constraints.boundary import boundary
-from openscvx.constraints.decorators import ctcs, nodal
+from openscvx.constraints import boundary, nodal
 
 n = 33  # Number of Nodes
 total_time = 30.0  # Total time for the simulation

@@ -3,8 +3,7 @@ import jax.numpy as jnp
 import cvxpy as cp
 
 from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.constraints.boundary import boundary
-from openscvx.constraints.decorators import ctcs, nodal
+from openscvx.constraints import boundary, ctcs, nodal
 from openscvx.utils import qdcm, SSMP, SSM, rot, gen_vertices
 
 n = 22  # Number of Nodes
