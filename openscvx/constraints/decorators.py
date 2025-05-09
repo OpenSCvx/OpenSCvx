@@ -17,7 +17,7 @@ class CTCSConstraint:
     def __call__(self, x, u, node):
         return cond(
             jnp.all((self.nodes[0] <= node) & (node < self.nodes[1])),
-            lambda _: jnp.sum(self.penalty(self.func(x, u, node))),
+            lambda _: jnp.sum(self.penalty(self.func(x, u))),
             lambda _: 0.0,
             operand=None,
         )
