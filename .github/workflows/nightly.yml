@@ -39,7 +39,7 @@ jobs:
             --skip-existing \
             dist/*
       - name: Create or Update “Nightly” Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: nightly
           release_name: Nightly Build
@@ -47,11 +47,6 @@ jobs:
             Nightly build for commit `${{ github.sha }}`
           draft: true
           prerelease: true
+          files: dist/*.whl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload Release Assets
-        uses: softprops/action-gh-release@upload-release-asset@v1
-        with:
-          tag_name: nightly
-          asset_path: dist/*.whl
-          asset_name: nightly-${{ github.run_number }}.whl
