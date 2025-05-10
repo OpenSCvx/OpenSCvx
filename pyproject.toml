@@ -1,0 +1,8 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to      = "openscvx/_version.py"
+version_scheme = "guess-next-dev"   # e.g. 1.2.4.dev3
+local_scheme   = "no-local-version" # drops the "+node-and-date"
