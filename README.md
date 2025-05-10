@@ -13,20 +13,31 @@
 <!-- GETTING STARTED -->
 ## Getting Started
 
-
 ### Installation
+
+To grab the latest release simply run
+
+```sh
+pip install openscvx
+```
+
+to install OpenSCVx in your python environment.
+
+
+#### Dependencies
+
 The main packages are:
-- ```cvxpy``` - is used to formulate and solve the convex subproblems
-- ```jax``` - is used for determining the Jacobians using automatic differentiation, vectorization, and ahead-of-time (AOT) compilation of the dynamics and their Jacobians 
-- ```numpy``` - is used for numerical operations
-- ```diffrax``` - is used for the numerical integration of the dynamics
-- ```termcolor``` - is used for pretty command line output
-- ```plotly``` - is used for all visualizations
 
+- `cvxpy` - is used to formulate and solve the convex subproblems
+- `jax` - is used for determining the Jacobians using automatic differentiation, vectorization, and ahead-of-time (AOT) compilation of the dynamics and their Jacobians 
+- `numpy` - is used for numerical operations
+- `diffrax` - is used for the numerical integration of the dynamics
+- `termcolor` - is used for pretty command line output
+- `plotly` - is used for all visualizations
 
-These can be installed via conda or pip.
+These will be installed automatically, but can be installed via conda or pip if you are building from source.
 <details>
-<summary>Via Conda (Recommended) </summary>
+<summary>Via Conda</summary>
 
 1. Clone the repo
    ```sh
@@ -63,11 +74,11 @@ These can be installed via conda or pip.
 See `examples/` folder for several example trajectory optimization problems.
 To run a problem simply run `examples/main.py` with:
 
-```bash
-python3 -m examples.main
+```sh
+python3 examples/main.py
 ```
 
-To change which example is run by `main` simply replace the `params` import line:
+To change which example is run by `main` simply replace the `problem` import line:
 
 ```python
 # other imports
@@ -75,10 +86,11 @@ from examples.params.dr_vp import problem
 # rest of code
 ```
 
+and adjust the plotting as needed.
 Check out the problem definitions inside `examples/params` to see how to define your own problems.
 
-
 ## ToDos
+
 - [X] Standardized Vehicle and Constraint classes
 - [X] Implement QOCOGen with CVPYGEN
 - [X] Non-Dilated Time Propagation 
@@ -86,8 +98,11 @@ Check out the problem definitions inside `examples/params` to see how to define 
 - [ ] Compiled at the subproblem level with JAX
 - [ ] Save and reload the compiled JAX code
 - [ ] Single Shot propagation
+
 ## What is implemented
+
 This repo has the following features:
+
 1. Free Final Time
 2. Fully adaptive time dilation (```s``` is appended to the control vector)
 3. Continuous-Time Constraint Satisfaction
@@ -98,11 +113,14 @@ This repo has the following features:
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Acknowledgements
+
 This work was supported by a NASA Space Technology Graduate Research Opportunity and the Office of Naval Research under grant N00014-17-1-2433. The authors would like to acknowledge Natalia Pavlasek, Samuel Buckner, Abhi Kamath, Govind Chari, and Purnanand Elango as well as the other Autonomous Controls Laboratory members, for their many helpful discussions and support throughout this work.
 
 ## Citation
+
 Please cite the following works if you use the repository,
-```
+
+```tex
 @ARTICLE{hayner2025los,
         author={Hayner, Christopher R. and Carson III, John M. and Açıkmeşe, Behçet and Leung, Karen},
         journal={IEEE Robotics and Automation Letters}, 
@@ -115,7 +133,7 @@ Please cite the following works if you use the repository,
         doi={10.1109/LRA.2025.3545299}}
 ```
 
-```
+```tex
 @misc{elango2024ctscvx,
       title={Successive Convexification for Trajectory Optimization with Continuous-Time Constraint Satisfaction}, 
       author={Purnanand Elango and Dayou Luo and Abhinav G. Kamath and Samet Uzun and Taewan Kim and Behçet Açıkmeşe},
