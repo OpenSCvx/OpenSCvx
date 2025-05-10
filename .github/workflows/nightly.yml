@@ -60,6 +60,12 @@ jobs:
       - name: Find last semver
         run: echo "LAST_SEMVER=$(git describe --tags --match 'v*.*.*' --abbrev=0)" >> $GITHUB_ENV
 
+      - name: Delete existing nightly release
+        run: |
+          if gh release view nightly >/dev/null 2>&1; then
+            gh release delete nightly --yes
+          fi
+
       - name: Create Release
         run: |
           gh release create nightly \
