@@ -1,5 +1,7 @@
-# .github/workflows/nightly.yml
 name: Nightly build → TestPyPI
+
+permissions:
+  contents: write
 
 on:
   push:
