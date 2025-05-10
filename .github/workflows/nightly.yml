@@ -30,4 +30,5 @@ jobs:
             --repository testpypi \
             --non-interactive \
             --verbose \
+            --skip-existing \
             dist/*
