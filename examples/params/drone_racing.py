@@ -3,8 +3,7 @@ import jax.numpy as jnp
 import cvxpy as cp
 
 from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.constraints.boundary import BoundaryConstraint as bc
-from openscvx.constraints.decorators import ctcs, nodal
+from openscvx.constraints import boundary, ctcs, nodal
 from openscvx.utils import qdcm, SSMP, SSM, rot, gen_vertices
 
 n = 22  # Number of Nodes
@@ -17,10 +16,10 @@ min_state = np.array(
     [-200.0, -100, 15, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0]
 )  # Lower Bound on the states
 
-initial_state = bc(jnp.array([10.0, 0, 20, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]))
+initial_state = boundary(jnp.array([10.0, 0, 20, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]))
 initial_state.type[6:13] = "Free"
 
-final_state = bc(jnp.array([10.0, 0, 20, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, total_time]))
+final_state = boundary(jnp.array([10.0, 0, 20, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, total_time]))
 final_state.type[3:13] = "Free"
 final_state.type[13] = "Minimize"
 

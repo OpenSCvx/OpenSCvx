@@ -1,54 +1,49 @@
+from dataclasses import dataclass, field
+from typing import Union, Sequence
 import jax.numpy as jnp
 
 ALLOWED_TYPES = {"Fix", "Free", "Minimize", "Maximize"}
 
-class TypeList:
-    def __init__(self, values):
-        self.values = list(values)
-    
-    def __getitem__(self, key):
-        return self.values[key]
-    
-    def __setitem__(self, key, value):
-        # Handle slice assignment
-        if isinstance(key, slice):
-            indices = range(*key.indices(len(self.values)))
-            # If a single string is given, replicate it for the slice.
-            if isinstance(value, str):
-                value = [value] * len(indices)
-            # Validate every element in the assigned slice.
-            for idx, v in zip(indices, value):
-                self._validate(v)
-                self.values[idx] = v
-        else:
-            self._validate(value)
-            self.values[key] = value
-
-    def _validate(self, v):
-        if v not in ALLOWED_TYPES:
-            raise ValueError(f"Type must be one of {ALLOWED_TYPES}, got {v}")
-
-    def __len__(self):
-        return len(self.values)
-    
-    def __repr__(self):
-        return repr(self.values)
-
+@dataclass
 class BoundaryConstraint:
-    def __init__(self, value: jnp.ndarray, types=None):
-        self.value = value
-        if types is None:
-            types = ["Fix"] * len(value)
-        elif len(types) != len(value):
-            raise ValueError("Length of types must match length of value")
-        # Internally store types using our helper class.
-        self._types = TypeList(types)
-    
+    value: jnp.ndarray
+    types: list[str] = field(init=False)
+
+    def __post_init__(self):
+        self.types = ["Fix"] * len(self.value)
+
+    def __getitem__(self, key):
+        return self.value[key]
+
+    def __setitem__(self, key, val):
+        self.value = self.value.at[key].set(val)
+
     @property
     def type(self):
-        # Expose the helper class so that slice assignments work naturally.
-        return self._types
-    
-    # Make an append method to add new types
-    def append_type(self, new_type):
-        self._types.values.append(new_type)
+        constraint = self
+        class TypeProxy:
+            def __getitem__(self, key):
+                return constraint.types[key]
+
+            def __setitem__(self, key, val: Union[str, Sequence[str]]):
+                indices = range(*key.indices(len(constraint.types))) if isinstance(key, slice) else [key]
+                values = [val] * len(indices) if isinstance(val, str) else val
+
+                if len(values) != len(indices):
+                    raise ValueError("Mismatch between indices and values length")
+
+                for idx, v in zip(indices, values):
+                    if v not in ALLOWED_TYPES:
+                        raise ValueError(f"Invalid type: {v}, must be one of {ALLOWED_TYPES}")
+                    constraint.types[idx] = v
+
+            def __len__(self):
+                return len(constraint.types)
+
+            def __repr__(self):
+                return repr(constraint.types)
+
+        return TypeProxy()
+
+def boundary(arr: jnp.ndarray):
+    return BoundaryConstraint(arr)

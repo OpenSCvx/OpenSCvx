@@ -23,7 +23,8 @@ from openscvx.augmentation import sort_ctcs_constraints
 from openscvx.discretization import get_discretization_solver
 from openscvx.propagation import get_propagation_solver
 from openscvx.constraints.boundary import BoundaryConstraint
-from openscvx.constraints.decorators import CTCSConstraint, NodalConstraint
+from openscvx.constraints.ctcs import CTCSConstraint
+from openscvx.constraints.nodal import NodalConstraint
 from openscvx.ptr import PTR_init, PTR_main
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.ocp import OptimalControlProblem
