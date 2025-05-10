@@ -29,4 +29,5 @@ jobs:
           twine upload \
             --repository testpypi \
             --non-interactive \
+            --verbose \
             dist/*
