@@ -44,19 +44,6 @@ jobs:
             --skip-existing \
             dist/*
 
-      - name: Package source archive
-        run: |
-          git archive \
-            --format zip \
-            --prefix openscvx-nightly/ \
-            --output dist/openscvx-nightly.zip \
-            HEAD
-          git archive \
-            --format tar.gz \
-            --prefix openscvx-nightly/ \
-            --output dist/openscvx-nightly.tar.gz \
-            HEAD
-
       - name: Find last semver
         run: echo "LAST_SEMVER=$(git describe --tags --match 'v*.*.*' --abbrev=0)" >> $GITHUB_ENV
 
