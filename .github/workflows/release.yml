@@ -17,11 +17,14 @@ jobs:
 
       - name: Install build tools
         run: pip install --upgrade pip build twine setuptools-scm
+      - name: Build artifacts
+        run: |
+          rm -rf dist
+          python -m build
 
-      - name: Build & publish
+      - name: Publish to PyPI
         env:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          python -m build
           twine upload --non-interactive dist/*
