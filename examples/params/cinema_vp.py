@@ -4,8 +4,7 @@ import jax.numpy as jnp
 
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.utils import qdcm, SSMP, SSM, get_kp_pose
-from openscvx.constraints.boundary import BoundaryConstraint as bc
-from openscvx.constraints.decorators import ctcs
+from openscvx.constraints import boundary, ctcs
 
 n = 12  # Number of Nodes
 total_time = 40.0  # Total time for the simulation
@@ -22,10 +21,10 @@ min_state = np.array(
     [-100.0, -100, -10, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0, 0]
 )  # Lower Bound on the states
 
-initial_state = bc(jnp.array([8.0, -0.2, 2.2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]))
+initial_state = boundary(jnp.array([8.0, -0.2, 2.2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]))
 initial_state.type[6:14] = "Free"
 
-final_state = bc(jnp.array([-10.0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 40]))
+final_state = boundary(jnp.array([-10.0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 40]))
 final_state.type[0:13] = "Free"
 final_state.type[13] = "Minimize" # Minimize fuel usage
 

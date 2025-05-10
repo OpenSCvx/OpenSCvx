@@ -1,6 +1,6 @@
 from typing import List
 
-from openscvx.constraints.decorators import CTCSConstraint
+from openscvx.constraints.ctcs import CTCSConstraint
 
 def sort_ctcs_constraints(constraints_ctcs: List[CTCSConstraint], N: int):        
     idx_to_nodes: dict[int, tuple] = {}
