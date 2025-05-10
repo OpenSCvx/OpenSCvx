@@ -3,24 +3,29 @@ name: Nightly build → TestPyPI
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+  # Keep nightly schedule as a fallback
+  schedule:
+    - cron: '0 0 * * *'
+
+concurrency:
+  group: nightly-build
+  cancel-in-progress: true
 
 jobs:
-  build-and-publish:
+  nightly:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
-        with: 
-          python-version: '3.13'
-
+        with: python-version: '3.x'
       - name: Install build tools
         run: pip install --upgrade pip build twine setuptools-scm
-
       - name: Build artifacts
-        run: python -m build
-
+        run: |
+          rm -rf dist
+          python -m build
       - name: Publish to TestPyPI
         env:
           TWINE_USERNAME: ${{ secrets.TEST_PYPI_USERNAME }}
@@ -32,3 +37,20 @@ jobs:
             --verbose \
             --skip-existing \
             dist/*
+      - name: Create or Update “Nightly” Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: nightly
+          release_name: Nightly Build
+          body: |
+            Nightly build for commit `${{ github.sha }}`
+          draft: true
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@upload-release-asset@v1
+        with:
+          tag_name: nightly
+          asset_path: dist/*.whl
+          asset_name: nightly-${{ github.run_number }}.whl
