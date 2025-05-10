@@ -1,9 +1,9 @@
 ---
 template: home.html
-title: Material for MkDocs
+title: OpenSCvx
 social:
   cards_layout_options:
     title: Fast and Easy Nonconvex Trajectory Optimization
 ---
 
-Welcome to Material for MkDocs.
+Welcome to OpenSCvx.

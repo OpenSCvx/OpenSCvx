@@ -138,6 +138,7 @@ markdown_extensions:
   - def_list
   - footnotes
   - md_in_html
+  - pymdownx.blocks.caption
   - toc:
       permalink: true
   - pymdownx.arithmatex:
@@ -187,7 +188,7 @@ nav:
     - Foundations:
       - 'Overview/scvx.md'
       - 'Overview/ocp.md'
-      - 'Overview/discretization.md'
       - 'Overview/constraint_reformulation.md'
       - 'Overview/control_parameterization.md'
       - 'Overview/time_dilation.md'
+      - 'Overview/discretization.md'

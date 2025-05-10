@@ -1,7 +1,9 @@
 # What is Succesive Convexification?
 *Successive Convexification* is an approach to solve infinite dimensional nonconvex trajectory optimization problems. It works by *successively* convexifying or linearizing a problem and solving the convex subproblem. The solution to the convex subproblem is then used to update the original problem, and the process is repeated until convergence.
 
-![CT-SCvx](../../docs/assets/images/ct-scvx_dark.png){ align=left }
+![CT-SCvx_dark]{ align=left }
+![CT-SCvx_light]{ align=left }
+
 
 ## Problem Formulation
 In this repository, the user will likely find it most useful specify there problem in the Mayer Form order to take full advantage of the features of this repo, but not worry this is quite easy.
@@ -37,3 +39,7 @@ where $r\in\mathbb{R}^2$ and $v\in\mathbb{R}^2$ are the position and velocity of
 We want a minimum fuel cost which will look something like the following,
 
 $$\int^{t_f}_{t_i} \|u(t)\|_2\, dt$$
+
+
+[CT-SCvx_dark]: ../assets/images/ct-scvx_dark.png#only-dark
+[CT-SCvx_light]: ../assets/images/ct-scvx_light.png#only-light
