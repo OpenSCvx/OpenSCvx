@@ -20,6 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v4
         with: 
           python-version: '3.x'
@@ -29,6 +31,19 @@ jobs:
         run: |
           rm -rf dist
           python -m build
+      - name: Package source archive
+        run: |
+          git archive \
+            --format zip \
+            --prefix openscvx-nightly/ \
+            --output dist/openscvx-nightly.zip \
+            HEAD
+          git archive \
+            --format tar.gz \
+            --prefix openscvx-nightly/ \
+            --output dist/openscvx-nightly.tar.gz \
+            HEAD
+
       - name: Publish to TestPyPI
         env:
           TWINE_USERNAME: ${{ secrets.TEST_PYPI_USERNAME }}
@@ -40,15 +55,31 @@ jobs:
             --verbose \
             --skip-existing \
             dist/*
+      - name: Determine last release tag # this finds the most recent tag matching v*.*.*
+        id: find_last
+        run: |
+          echo "LAST_VERSION=$(git describe --tags --match 'v*.*.*' --abbrev=0)" >> $GITHUB_ENV
+      - name: Generate changelog
+        run: |
+          echo "## Changes since $LAST_VERSION" > changelog.md
+          git log $LAST_VERSION..HEAD \
+            --pretty=format:'- %s ([%h](https://github.com/${{ github.repository }}/commit/%H))' \
+          >> changelog.md
       - name: Create or Update “Nightly” Release
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: nightly
           name: Nightly Build
-          body: Nightly build for commit `${{ github.sha }}`
+          body_path: changelog.md
           draft: true
           prerelease: true
-          files: dist/*.whl
+          files: |
+            dist/*.whl
+            dist/source.zip
+            dist/source.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Cleanup changelog
+        if: always()            # run regardless of previous step status
+        run: rm -f changelog.md
