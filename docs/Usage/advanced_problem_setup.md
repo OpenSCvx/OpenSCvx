@@ -98,3 +98,10 @@ Similar to the `ctcs` decorator, you can specify a range of nodes over which the
 @nodal(lambda x, u: x[r_idx] == r_wp, convex=True, nodes=[4])
 ```
 
+#### Internodal Constraints
+
+By default the nonconvex nodal constraints will be `vmap`'ed which is nice for performance, but if you want to enforce the constraint between two nodes, you can set `internodal = True`. When true, the dimensions of the input state `x` and `u` will be a $(n,n_x)$ and $(n,n_u)$ respectively where $n$ is the number of nodes and $n_x$ and $n_U$ are the number of states and controls respectively. This will allow you to enforce the constraint between two nodes. For example, if I want to enforce that the time between two nodes is less than a certain value, $t_{\max}$, I can do so as follows,
+
+```python
+@nodal(lambda x, u: (x[1, t_idx] - x[0, t_idx]) - t_max, convex=False, internodal=True)
+```
