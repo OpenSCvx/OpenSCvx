@@ -3,7 +3,7 @@
 OpenSCvx :rocket: is an [JAX](https://github.com/jax-ml/jax)-based library for nonconvex trajectory planning in Python.
 
 !!! warning
-    This repository is still in alpha, here there be dragons :dragon:.
+    This repository is still in beta, here there be dragons :dragon:.
 
 !!! tip
 
