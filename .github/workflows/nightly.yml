@@ -1,4 +1,4 @@
-name: Nightly build → TestPyPI
+name: Nightly
 
 permissions:
   contents: write
