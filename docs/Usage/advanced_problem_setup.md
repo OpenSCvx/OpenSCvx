@@ -15,8 +15,22 @@ For a inequality constraint using the definition ($g(\cdot) \leq 0$) that you wi
 ```
 In order to enforce this constraint a penalty function is used. THis can be set using the `penalty` flag, which will defualt to `"squared_relu"`, $\max(0, g(x))^2$. However this may not be the best choice depending on the nature of your constraints. We provide a few different options, 
 
-- `penalty_type` - The type of penalty function to use. Options are:
-  - `squared_relu` - $\max(0, g(x))^2$
-  - `huber` - $\frac{1}{2} \left( \sqrt{g(x)^2 + \delta^2} - \delta \right)$
-  - `smooth relu` - $\|\max(0, g(x))+c\|-c$
+The type of penalty function to use. Options are:
+  - `squared_relu` - $\max(0, g)^2$
+  - `huber` - $\frac{1}{2} \left( \sqrt{g^2 + \delta^2} - \delta \right)$
+  - `smooth relu` - $\|\max(0, g)+c\|-c$
 
+These can be set using the `penalty` flag. For example, if I want to use the huber penalty function, I can do the following:
+
+```python
+
+@ctcs(lambda x, u: jnp.linalg.norm(x-r_c) - r_min, penalty="huber")
+
+```
+
+If you want to set your own penalty function, then you can provide a lamda function as follows 
+
+```python
+
+@ctcs(lambda x, u: jnp.linalg.norm(x-r_c) - r_min, penalty=lambda x:  jnp.maximum(0, x)**2)
+```
