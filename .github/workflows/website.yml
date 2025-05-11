@@ -35,20 +35,9 @@ jobs:
       - run: pip install git+https://${GH_TOKEN}@github.com/squidfunk/mkdocs-material-insiders.git
       - run: pip install mkdocstrings-python
       - run: mkdocs build
-      - name: Verify site directory
-        run: |
-          if [ ! -d "site" ] || [ -z "$(ls -A site)" ]; then
-            echo "Error: The site directory is missing or empty. Check the mkdocs build step."
-            exit 1
-          fi
-      - name: Debug site directory
-        run: |
-          echo "Listing contents of site directory:"
-          ls -la site
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-pages-artifact@v1
         with:
-          name: site-artifact
           path: site
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v1
