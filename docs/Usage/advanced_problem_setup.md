@@ -60,3 +60,14 @@ Constraints that are enforced over difference ranges will be associated with dif
 @ctcs(lambda x, u: x - max_state, idx = 1)
 ```
 In this case, two augmented states will be used to enforce each constraint. 
+
+
+## Nodal Constraints
+
+By default this constraint will be applied at all nodes. To change this, you can add ```nodes = ["Insert a list of the desired nodes here"]``` to the decorator.
+
+If the constraint is nonconvex, either set ```convex = False``` or leave it out as it defualts to ```False```. This will linearize the constraint and apply it at the nodes specified in the decorator. For example, 
+
+```python
+constraints.append(nodal(lambda x, u, c=center, A=A_obs_s: g_obs(x, u, c, A), convex=False))
+```

@@ -18,11 +18,11 @@ min_state = np.array(["Insert your min state here"])
 For the initial and terminal values, this is done as follows,
 
 ```python
-from openscvx.constraints.boundary import BoundaryConstraint as bc
-initial_state = bc(jnp.array(["Insert your initial state here"]))
-terminal_state = bc(jnp.array(["Insert your terminal state here"]))
+from openscvx.constraints import boundary
+initial_state = boundary(jnp.array(["Insert your initial state here"]))
+terminal_state = boundary(jnp.array(["Insert your terminal state here"]))
 ```
-By default, all elements in the initial and terminal state are assumed to be fixed. To change this, you can modify the ```initial_state.type[] = "Type"``` and ```final_state.type``` attributes. The options are: ```"Fix", "Free", "Minimize"```.
+By default, all elements in the initial and terminal state are assumed to be fixed. To change this, you can modify the ```initial_state.type[] = "Type"``` and ```final_state.type``` attributes. The options are: ```"Fix", "Free", "Minimize", "Maximize"```.
 
 ## Control Specification
 To specify the control, it is sufficient to specify the maximum and minimum values of each element of the control. This is done as follows,
@@ -41,7 +41,13 @@ def dynamics(x, u):
     return jnp.hstack(["Stack up your dynamics here"]) 
 ```
 
-Here ```x``` is the state and ```u``` is the control. The function must return a vector of the same size as the state. Augmented states can be created here to capture costs that are not already defined within the states. For example, if you have a minimum fuel problem, you can do so by adding a new state, $\mathrm{fuel} = \int^{t_f}_{t_i}\|u\|_2\, dt$, in which case the dynamics will simply be $\dot{\mathrm{fuel}} = \|u\|_2$. 
+Here ```x``` is the state and ```u``` is the control. The function must return a vector of the same size as the state.
+
+!!! Note
+    Under the hood the dynamics and constraint functions will be compiled using JAX so it is neccesary to only use `jax` functions and `jax.ndarrays` within the dynamics and constraint functions.
+
+## Costs
+We can choose a state to either maximize or minimize. Additional augmented states can be created here to capture costs that are not already defined within the states. For example, if you have a minimum fuel problem, you can do so by adding a new state, $\mathrm{fuel} = \int^{t_f}_{t_i}\|u\|_2\, dt$, in which case the dynamics will simply be $\dot{\mathrm{fuel}} = \|u\|_2$. 
 
 ```python
 def dynamics(x, u):
@@ -71,13 +77,6 @@ constraints.append(nodal(lambda x, u, args: g(x, u, **args)))
 If this constraint is convex, please set ```convex = True``` and use [```cvxpy``` atoms](https://www.cvxpy.org/tutorial/functions/index.html) to define the constraint as a boolean expression. For example,  
 ```python
 constraints.append(nodal(lambda x, u, A=A_gate, c=cen: cp.norm(A @ x[:3] - c, "inf") <= 1,convex=True))
-```
-By default this constraint will be applied at all nodes. To change this, you can add ```nodes = ["Insert a list of the desired nodes here"]``` to the decorator.
-
-If the constraint is nonconvex, either set ```convex = False``` or leave it out as it defualts to ```False```. This will linearize the constraint and apply it at the nodes specified in the decorator. For example, 
-
-```python
-constraints.append(nodal(lambda x, u, c=center, A=A_obs_s: g_obs(x, u, c, A), convex=False))
 ```
 
 ## Initial Guess
