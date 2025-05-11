@@ -32,14 +32,14 @@ jobs:
           restore-keys: |
             mkdocs-material-
       - run: sudo apt-get update && sudo apt-get install -y pngquant
-      - run: pip install git+https://${GH_TOKEN}@github.com/squidfunk/mkdocs-material-insiders.git
+      - run: pip install git+https://${{ secrets.GH_TOKEN }}@github.com/squidfunk/mkdocs-material-insiders.git
       - run: pip install mkdocstrings-python
       - run: mkdocs build
       
       - name: Upload to GitHub Pages
-          uses: actions/upload-pages-artifact@v3
-          with:
-            path: site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
     
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
