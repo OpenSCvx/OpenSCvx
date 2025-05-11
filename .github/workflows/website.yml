@@ -35,7 +35,20 @@ jobs:
       - run: pip install git+https://${GH_TOKEN}@github.com/squidfunk/mkdocs-material-insiders.git
       - run: pip install mkdocstrings-python
       - run: mkdocs build
-      - run: mkdocs gh-deploy --force
+      
+      - name: Upload to GitHub Pages
+          uses: actions/upload-pages-artifact@v3
+          with:
+            path: site
+    
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+  
+      - name: Save build cache
+        uses: actions/cache/save@v4
+        with:
+          key: mkdocs-material-${{ hashfiles('.cache/**') }}
+          path: .cache
 
 env:
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
