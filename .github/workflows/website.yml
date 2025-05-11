@@ -1,14 +1,20 @@
 name: ci-website
+
 on:
   push:
     branches:
       - feature/documentation
+
 permissions:
   contents: write
+  pages: write
+  id-token: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     if: github.event.repository.fork == false
+
     steps:
       - uses: actions/checkout@v4
       - name: Configure Git Credentials
@@ -28,6 +34,15 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y pngquant
       - run: pip install git+https://${GH_TOKEN}@github.com/squidfunk/mkdocs-material-insiders.git
       - run: pip install mkdocstrings-python
-      - run: mkdocs gh-deploy --force
+      - run: mkdocs build
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: site
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
 env:
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
