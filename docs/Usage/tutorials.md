@@ -31,8 +31,8 @@ import numpy as np
 import jax.numpy as jnp
 
 from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.constraints.boundary import BoundaryConstraint as bc
-from openscvx.constraints.decorators import ctcs
+from openscvx.constraints import boundary, ctcs
+from openscvx.utils import qdcm, SSMP, SSM, generate_orthogonal_unit_vectors
 ```
 
 ### Problem Definition
@@ -48,8 +48,10 @@ It is neccesary to define minimum and maximum elementwise bounds for the state, 
 
 ```python
 #                       rx,   ry, rz,   vx,   vy,   vz, qw, qx, qy, qz,  wx,  wy,  wz,   t
-max_state = np.array([ 200,   10, 20,  100,  100,  100,  1,  1,  1,  1,  10,  10,  10, 100])
-min_state = np.array([-200, -100,  0, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10,   0])
+max_state = np.array([200., 10, 20, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100])
+min_state = np.array(
+    [-200., -100, 0, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0]
+)
 
 ```
 
@@ -57,10 +59,10 @@ It is also neccesary for the user to characterize the boundary conditions. By de
 
 ```python
 
-initial_state = bc(jnp.array([10.0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]))
+initial_state = boundary(jnp.array([10.0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]))
 initial_state.type[6:13] = "Free"
 
-final_state = bc(jnp.array([-10.0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, total_time]))
+final_state = boundary(jnp.array([-10.0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, total_time]))
 final_state.type[3:13] = "Free"
 final_state.type[13] = "Minimize"
 ```
@@ -144,10 +146,10 @@ Finally, now that we have all the pieces we need, we can express the dynamics of
 
 
 def dynamics(x, u):
-    m = 1.0                           # Mass of the drone
-    g_const = -9.18                   # Gravitational constant
+    m = 1.0  # Mass of the drone
+    g_const = -9.18
     J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
-    
+    # Unpack the state and control vectors
     v = x[3:6]
     q = x[6:10]
     w = x[10:13]
@@ -155,7 +157,7 @@ def dynamics(x, u):
     f = u[:3]
     tau = u[3:]
 
-    q_norm = jnp.linalg.norm(q)       # Ensure quaternion is normalized
+    q_norm = jnp.linalg.norm(q)
     q = q / q_norm
 
     # Compute the time derivatives of the state variables
@@ -163,7 +165,8 @@ def dynamics(x, u):
     v_dot = (1 / m) * qdcm(q) @ f + jnp.array([0, 0, g_const])
     q_dot = 0.5 * SSMP(w) @ q
     w_dot = jnp.diag(1 / J_b) @ (tau - SSM(w) @ jnp.diag(J_b) @ w)
-    return jnp.hstack([r_dot, v_dot, q_dot, w_dot])
+    t_dot = 1
+    return jnp.hstack([r_dot, v_dot, q_dot, w_dot, t_dot])
 
 ```
 
@@ -174,7 +177,8 @@ function which very clsoely follows the mathematical definition in the above pro
 ```python
 
 def g_obs(center, A, x):
-    return 1 - (x[:3] - center).T @ A @ (x[:3] - center)
+    value = 1 - (x[:3] - center).T @ A @ (x[:3] - center)
+    return value
 ```
 
 Lets go ahead and define what our obstacles will look like. To get a more fundamental understanding of how I am parameterizing ellipsoids, I would direct the interested reader to what I consider to be the [bible of ellipsoide](https://tcg.mae.cornell.edu/pubs/Pope_FDA_08.pdf). 
