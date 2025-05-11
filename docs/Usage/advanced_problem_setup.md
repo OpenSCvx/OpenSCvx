@@ -83,7 +83,7 @@ When specifying constraints if the constraint is convex, please set `convex = Tr
 ```
 
 !!! Tip
-    The default solver `QOCO` can handle up to second-order conic constraints. If you wish to express exponential, power cones, or semi-definite programs, a good choice of solver would be `CLARABEL`. For mixed-interger programs, `Gurobi` is a good choice.
+    The default solver `QOCO` can handle up to second-order conic constraints. If you wish to express exponential, power cones, or semi-definite programs, a good choice of solver would be `CLARABEL`. For mixed-interger programs, `Gurobi` is a good choice. A full list of what solvers are supported and the types of problems they can handle can be found [here](https://www.cvxpy.org/tutorial/solvers/index.html).
 
 If the constraint is nonconvex, either set ```convex = False``` or leave it out as it defualts to ```False```. This will linearize the constraint and apply it at the nodes specified in the decorator. Nonconvex nodal constraints should be expressed as inequalities of the form $g(x,u) <= 0$ For example if I wish the agent to avoid a spherical obstacle of radius $r_{\min}$ at a point $r_c$ at all nodes,
 

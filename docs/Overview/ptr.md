@@ -1,1 +1,0 @@
-# Penalized Trust Region

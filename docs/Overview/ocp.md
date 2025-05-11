@@ -1,7 +1,39 @@
 # Optimal Control Problem
+The underlying convex subproblem is posed in the following general form. 
+
+## Variable and Parameter Definition
+The state, constrol and additional parameters are defined as follows:
 
 ```python
-def OCP(params: Config):
+
+w_tr = cp.Parameter(nonneg = True, name='w_tr')       # Weight on the Trust Region
+lam_cost = cp.Parameter(nonneg=True, name='lam_cost') # Weight on the Nonlinear Cost
+
+x = cp.Variable((params.scp.n, params.sim.n_states), name='x')   # State
+dx = cp.Variable((params.scp.n, params.sim.n_states), name='dx') # State Trust Region
+x_bar = cp.Parameter((params.scp.n, params.sim.n_states), name='x_bar') # Previous SCP State
+
+
+u = cp.Variable((params.scp.n, params.sim.n_controls), name='u')   # Control
+du = cp.Variable((params.scp.n, params.sim.n_controls), name='du') # Control Trust Region
+u_bar = cp.Parameter((params.scp.n, params.sim.n_controls), name='u_bar') # Previous SCP Control
+
+```
+
+## Scalaing Definitions
+The state and control are scaled using the following affine transformations:
+
+
+```python
+# Affine Scaling for State
+S_x = params.sim.S_x
+inv_S_x = params.sim.inv_S_x
+c_x = params.sim.c_x
+```
+
+
+```python
+def OptimalControlProblem(params: Config):
     ########################
     # VARIABLES & PARAMETERS
     ########################
@@ -11,8 +43,8 @@ def OCP(params: Config):
     lam_cost = cp.Parameter(nonneg=True, name='lam_cost')
 
     # State
-    x = cp.Variable((params.scp.n, params.sim.n_states), name='x') # Current State
-    dx = cp.Variable((params.scp.n, params.sim.n_states), name='dx') # State Error
+    x = cp.Variable((params.scp.n, params.sim.n_states), name='x') 
+    dx = cp.Variable((params.scp.n, params.sim.n_states), name='dx') # State Trust Region
     x_bar = cp.Parameter((params.scp.n, params.sim.n_states), name='x_bar') # Previous SCP State
 
     # Affine Scaling for State
@@ -21,8 +53,8 @@ def OCP(params: Config):
     c_x = params.sim.c_x
 
     # Control
-    u = cp.Variable((params.scp.n, params.sim.n_controls), name='u') # Current Control
-    du = cp.Variable((params.scp.n, params.sim.n_controls), name='du') # Control Error
+    u = cp.Variable((params.scp.n, params.sim.n_controls), name='u') 
+    du = cp.Variable((params.scp.n, params.sim.n_controls), name='du') # Control Trust Region
     u_bar = cp.Parameter((params.scp.n, params.sim.n_controls), name='u_bar') # Previous SCP Control
 
     # Affine Scaling for Control
@@ -38,12 +70,12 @@ def OCP(params: Config):
     nu  = cp.Variable((params.scp.n - 1, params.sim.n_states), name='nu') # Virtual Control
 
     # Linearized Nonconvex Nodal Constraints
-    if params.dyn.constraints_nodal:
+    if params.sim.constraints_nodal:
         g = []
         grad_g_x = []
         grad_g_u = []
         nu_vb = []
-        for idx_ncvx, constraint in enumerate(params.dyn.constraints_nodal):
+        for idx_ncvx, constraint in enumerate(params.sim.constraints_nodal):
             if not constraint.convex:
                 g.append(cp.Parameter(params.scp.n, name = 'g_' + str(idx_ncvx)))
                 grad_g_x.append(cp.Parameter((params.scp.n, params.sim.n_states), name='grad_g_x_' + str(idx_ncvx)))
@@ -64,8 +96,8 @@ def OCP(params: Config):
     # CONSTRAINTS
     #############
     idx_ncvx = 0
-    if params.dyn.constraints_nodal:
-        for constraint in params.dyn.constraints_nodal:
+    if params.sim.constraints_nodal:
+        for constraint in params.sim.constraints_nodal:
             if constraint.nodes is None:
                 nodes = range(params.scp.n)
             else:
@@ -78,7 +110,7 @@ def OCP(params: Config):
                 constr += [((g[idx_ncvx][node] + grad_g_x[idx_ncvx][node] @ dx[node] + grad_g_u[idx_ncvx][node] @ du[node])) == nu_vb[idx_ncvx][node] for node in nodes]
                 idx_ncvx += 1
 
-    for i in range(params.sim.n_states-1):
+    for i in range(params.sim.idx_x_true.start, params.sim.idx_x_true.stop):
         if params.sim.initial_state.type[i] == 'Fix':
             constr += [x_nonscaled[0][i] == params.sim.initial_state.value[i]]  # Initial Boundary Conditions
         if params.sim.final_state.type[i] == 'Fix':
@@ -87,9 +119,13 @@ def OCP(params: Config):
             cost += lam_cost * x_nonscaled[0][i]
         if params.sim.final_state.type[i] == 'Minimize':
             cost += lam_cost * x_nonscaled[-1][i]
+        if params.sim.initial_state.type[i] == 'Maximize':
+            cost += lam_cost * x_nonscaled[0][i]
+        if params.sim.final_state.type[i] == 'Maximize':
+            cost += lam_cost * x_nonscaled[-1][i]
 
     if params.scp.uniform_time_grid:
-        constr += [x_nonscaled[i][params.dyn.t_inds] - x_nonscaled[i-1][params.dyn.t_inds] == x_nonscaled[i-1][params.dyn.t_inds] - x_nonscaled[i-2][params.dyn.t_inds] for i in range(2, params.scp.n)] # Uniform Time Step
+        constr += [x_nonscaled[i][params.sim.idx_t] - x_nonscaled[i-1][params.sim.idx_t] == x_nonscaled[i-1][params.sim.idx_t] - x_nonscaled[i-2][params.sim.idx_t] for i in range(2, params.scp.n)] # Uniform Time Step
 
     constr += [0 == la.inv(S_x) @ (x_nonscaled[i] - x_bar[i] - dx[i]) for i in range(params.scp.n)] # State Error
     constr += [0 == la.inv(S_u) @ (u_nonscaled[i] - u_bar[i] - du[i]) for i in range(params.scp.n)] # Control Error
@@ -104,8 +140,8 @@ def OCP(params: Config):
     constr += [u_nonscaled[i] <= params.sim.max_control for i in range(params.scp.n)]
     constr += [u_nonscaled[i] >= params.sim.min_control for i in range(params.scp.n)] # Control Constraints
 
-    constr += [x_nonscaled[i][:-1] <= params.sim.max_state[:-1] for i in range(params.scp.n)]
-    constr += [x_nonscaled[i][:-1] >= params.sim.min_state[:-1] for i in range(params.scp.n)] # State Constraints (Also implemented in CTCS but included for numerical stability)
+    constr += [x_nonscaled[i][params.sim.idx_x_true] <= params.sim.max_state[params.sim.idx_x_true] for i in range(params.scp.n)]
+    constr += [x_nonscaled[i][params.sim.idx_x_true] >= params.sim.min_state[params.sim.idx_x_true] for i in range(params.scp.n)] # State Constraints (Also implemented in CTCS but included for numerical stability)
 
     ########
     # COSTS
@@ -116,14 +152,20 @@ def OCP(params: Config):
     cost += sum(params.scp.lam_vc * cp.sum(cp.abs(nu[i-1])) for i in range(1, params.scp.n)) # Virtual Control Slack
     
     idx_ncvx = 0
-    if params.dyn.constraints_nodal:
-        for constraint in params.dyn.constraints_nodal:
+    if params.sim.constraints_nodal:
+        for constraint in params.sim.constraints_nodal:
             if not constraint.convex:
                 cost += params.scp.lam_vb * cp.sum(cp.pos(nu_vb[idx_ncvx]))
                 idx_ncvx += 1
 
-    constr += [cp.abs(x_nonscaled[i][-1] - x_nonscaled[i-1][-1]) <= params.sim.max_state[-1] for i in range(1, params.scp.n)] # LICQ Constraint
-    constr += [x_nonscaled[0][-1] == 0]
+    for idx, nodes in zip(np.arange(params.sim.idx_y.start, params.sim.idx_y.stop), params.sim.ctcs_node_intervals):  
+        if nodes[0] == 0:
+            start_idx = 1
+        else:
+            start_idx = nodes[0]
+        constr += [cp.abs(x_nonscaled[i][idx] - x_nonscaled[i-1][idx]) <= params.sim.max_state[idx] for i in range(start_idx, nodes[1])]
+        constr += [x_nonscaled[0][idx] == 0]
+
     
     #########
     # PROBLEM

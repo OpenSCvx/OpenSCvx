@@ -67,17 +67,7 @@ To specify continuous constraints, you can use the ```ctcs``` decorator. This de
 constraints.append(ctcs(lambda x, u, args = args: g(x, u, **args)))
 ```
 
-### Nodal Constraints
-To specify discrete or nodal constraints you can use the ```nodal``` decorator.
-
-```python
-constraints.append(nodal(lambda x, u, args: g(x, u, **args)))
-```
-
-If this constraint is convex, please set ```convex = True``` and use [```cvxpy``` atoms](https://www.cvxpy.org/tutorial/functions/index.html) to define the constraint as a boolean expression. For example,  
-```python
-constraints.append(nodal(lambda x, u, A=A_gate, c=cen: cp.norm(A @ x[:3] - c, "inf") <= 1,convex=True))
-```
+The input state `x` will be an array of shape `(n_x)` and the control `u` will be an array of shape `(n_u)`. The function must return a scalar value.
 
 ## Initial Guess
 This is a very important part of the problem setup. While it is not strictly neccesary for the inital guess to be dynamically feasiable or satisfy constraints, it is best practice to use an initial guess that is as close to the solution as possible. This will help the solver converge faster and avoid local minima. Generally a decent first place to start is to linearly interpolate between the initial and terminal states. This can be done as follows,
