@@ -1,6 +1,11 @@
 # Optimal Control Problem
 The underlying convex subproblem is posed in the following general form. 
 
+```python
+def OptimalControlProblem(params: Config):
+```
+The problem is defined as a function that takes in a `Config` object, which contains all the necessary parameters for the problem. The function returns a `cvxpy.Problem` object that can be solved using various solvers.
+
 ## Variable and Parameter Definition
 The state, constrol and additional parameters are defined as follows:
 
@@ -20,9 +25,26 @@ u_bar = cp.Parameter((params.scp.n, params.sim.n_controls), name='u_bar') # Prev
 
 ```
 
-## Scalaing Definitions
+## Scaling Definitions
 The state and control are scaled using the following affine transformations:
 
+$$
+\begin{align*}
+\tilde{x} &= S_x x + c_x, \\
+\tilde{u} &= S_u u + c_u,
+\end{align*}
+$$
+
+where $\tilde{x}$ and $\tilde{u}$ are the unscaled state and control. The diagonal scalaing matrices, $S_x$ and $S_u$, are given by:
+
+$$
+\begin{align*}
+S_\Box &= \mathrm{diag}\left(\mathrm{max}\left(1, \frac{\mathrm{abs}(\Box_\min - \Box_\max)}{2}\right)\right) \\
+c_\Box &= \frac{\Box_\max + \Box_\min}{2}
+\end{align*}
+$$
+
+These are instantiated in the optimal control problem as follows:
 
 ```python
 # Affine Scaling for State
@@ -30,6 +52,39 @@ S_x = params.sim.S_x
 inv_S_x = params.sim.inv_S_x
 c_x = params.sim.c_x
 ```
+
+## Discretized Dynamic Parameters
+The discretized dynamics matrices are defined as follows:
+
+```python
+
+# Discretized Augmented Dynamics Constraints
+A_d = cp.Parameter((params.scp.n - 1, (params.sim.n_states)*(params.sim.n_states)), name='A_d')
+B_d = cp.Parameter((params.scp.n - 1, params.sim.n_states*params.sim.n_controls), name='B_d')
+C_d = cp.Parameter((params.scp.n - 1, params.sim.n_states*params.sim.n_controls), name='C_d')
+z_d = cp.Parameter((params.scp.n - 1, params.sim.n_states), name='z_d') # Nonlinear Propagation Defect
+nu  = cp.Variable((params.scp.n - 1, params.sim.n_states), name='nu')  # Virtual Control Slack Variable
+
+```
+
+## Nodal Constraints
+The nonconvex nodal parameters and variables are instantiated using the following code:
+
+```python
+# Linearized Nonconvex Nodal Constraints
+    if params.sim.constraints_nodal:
+        g = []
+        grad_g_x = []
+        grad_g_u = []
+        nu_vb = []
+        for idx_ncvx, constraint in enumerate(params.sim.constraints_nodal):
+            if not constraint.convex:
+                g.append(cp.Parameter(params.scp.n, name = 'g_' + str(idx_ncvx)))
+                grad_g_x.append(cp.Parameter((params.scp.n, params.sim.n_states), name='grad_g_x_' + str(idx_ncvx)))
+                grad_g_u.append(cp.Parameter((params.scp.n, params.sim.n_controls), name='grad_g_u_' + str(idx_ncvx)))
+                nu_vb.append(cp.Variable(params.scp.n, name='nu_vb_' + str(idx_ncvx))) # Virtual Control for VB
+```
+
 
 
 ```python
