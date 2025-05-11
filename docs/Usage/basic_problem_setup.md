@@ -102,7 +102,7 @@ problem = TrajOptProblem(
     time_init=total_time,
     x_guess=x_bar,
     u_guess=u_bar,
-    initial_state=initial_state,  # Initial State
+    initial_state=initial_state,
     final_state=final_state,
     x_max=max_state,
     x_min=min_state,
@@ -115,9 +115,9 @@ problem = TrajOptProblem(
 The weights are used to scale the cost, trust region, and dynamic feasibility. A good place to start is to set ```lam_cost = 0, lam_vc = 1E1``` and ```w_tr = 1E0```. Then you can slowly increase the cost weight and decrease the trust region weight until you find a good balance.
 
 ```python
-problem.params.scp.w_tr = 1E0  # Weight on the Trust Reigon
+problem.params.scp.w_tr = 1E0      # Weight on the Trust Reigon
 problem.params.scp.lam_cost = 0E0  # Weight on the Cost
-problem.params.scp.lam_vc = 1E1  # Weight on the Virtual Control Objective
+problem.params.scp.lam_vc = 1E1    # Weight on the Virtual Control Objective
 ```
 and if you have nonconvex nodal constraints
 
