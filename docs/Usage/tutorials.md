@@ -373,8 +373,7 @@ import jax.numpy as jnp
 
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.utils import qdcm, SSMP, SSM, rot, gen_vertices
-from openscvx.constraints.boundary import BoundaryConstraint as bc
-from openscvx.constraints.decorators import ctcs, nodal
+from openscvx.constraints import boundary, ctcs, nodal
 ```
 
 ### Problem Definition
@@ -398,11 +397,13 @@ min_state = np.array([-200, -100, 15, -100, -100, -100, -1, -1, -1, -1, -10, -10
 It is neccesary for the user to characterize the boundary conditions. By default all boundary conditions are assumed to be fixed, meaning ```initial_state.type = "Fixed"``` and ```final_state.type = "Fixed"```. Here since we only care that the drone finishes in minimum time, we will set the other states to be free, ```final_state.type[3:13] = "Free"```. Lastly, since we said this is a minimum time problem, we will set the time at the final state to be a minimization variable, ```final_state.type[13] = "Minimize"```.
 
 ```python
+max_state = np.array([200.0, 100, 50, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100])
+min_state = np.array([-200.0, -100, 15, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0])
 
-initial_state = bc(jnp.array([10.0, 0, 20, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]))
+initial_state = boundary(jnp.array([10.0, 0, 20, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]))
 initial_state.type[6:13] = "Free"
 
-final_state = bc(jnp.array([10.0, 0, 20, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, total_time]))
+final_state = boundary(jnp.array([10.0, 0, 20, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, total_time]))
 final_state.type[3:13] = "Free"
 final_state.type[13] = "Minimize"
 ```
@@ -581,6 +582,7 @@ Finally now that we have all the pieces we need, we can go ahead and instantiate
 problem = TrajOptProblem(
     dynamics=dynamics,
     constraints=constraints,
+    idx_time=len(max_state)-1,
     N=n,
     time_init=total_time,
     x_guess=x_bar,
