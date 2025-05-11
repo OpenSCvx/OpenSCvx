@@ -160,6 +160,8 @@ extra_javascript:
 # Page tree
 nav:
     - Home: index.md
+    - Getting Started:
+      -  'getting-started.md'
     - Usage:
       - 'Usage/basic_problem_setup.md'
       - 'Usage/advanced_problem_setup.md'
