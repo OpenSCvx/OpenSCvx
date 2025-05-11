@@ -44,7 +44,9 @@ def ctcs(
         def pen(x):
             r = jnp.maximum(0, x)
             return jnp.where(r < delta, 0.5 * r**2, r - 0.5 * delta)
-
+    elif penalty == "smooth_relu":
+        c = 1e-8
+        pen = lambda x: (jnp.maximum(0, x) ** 2 + c**2) ** 0.5 - c
     else:
         raise ValueError(f"Unknown penalty {penalty}")
 
