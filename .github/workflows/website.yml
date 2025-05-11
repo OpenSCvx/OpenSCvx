@@ -35,14 +35,7 @@ jobs:
       - run: pip install git+https://${GH_TOKEN}@github.com/squidfunk/mkdocs-material-insiders.git
       - run: pip install mkdocstrings-python
       - run: mkdocs build
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
-        with:
-          path: site
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - run: mkdocs gh-deploy --force
 
 env:
   GH_TOKEN: ${{ secrets.GH_TOKEN }}
