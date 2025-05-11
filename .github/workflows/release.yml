@@ -1,4 +1,4 @@
-name: Release → PyPI
+name: Release
 
 permissions:
   contents: write                     # needed to create GitHub Release
