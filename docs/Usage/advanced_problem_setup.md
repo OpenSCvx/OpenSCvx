@@ -18,5 +18,5 @@ In order to enforce this constraint a penalty function is used. THis can be set 
 - `penalty_type` - The type of penalty function to use. Options are:
   - `squared_relu` - $\max(0, g(x))^2$
   - `huber` - $\frac{1}{2} \left( \sqrt{g(x)^2 + \delta^2} - \delta \right)$
-  - `abs` - $|g(x)|$
+  - `smooth relu` - $\|\max(0, g(x))+c\|-c$
 
