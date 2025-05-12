@@ -43,4 +43,4 @@ template: |
   $CHANGES
 
 footer: |
-  \n**Full Changelog:** [$PREVIOUS_TAG...$NEXT_PATCH_VERSION](https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...$NEXT_PATCH_VERSION)
+  \n**Full Changelog:** [`$PREVIOUS_TAG...$NEXT_PATCH_VERSION`](https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...$NEXT_PATCH_VERSION)
