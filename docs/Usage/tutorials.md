@@ -239,7 +239,7 @@ constraints.append(ctcs(lambda x, u: min_state - x[:-1]))          # Min State C
 We will use a very simply linear guess for the state and a constant guess for the control.
 
 !!! tip
-    The Penalized Trust Region method is very nice in that the initi initial guess is not required to be dynamically feasible nor satisfy constraints. However, it is a good idea to have a guess that is close to the solution to reduce the number of iterations as well as keep things numerically stable. A good place to start is a linear interpolation between the initial and final state and a constant guess for control.
+    The Penalized Trust Region method is very nice in that the initial guess is not required to be dynamically feasible nor satisfy constraints. However, it is a good idea to have a guess that is close to the solution to reduce the number of iterations as well as keep things numerically stable. A good place to start is a linear interpolation between the initial and final state and a constant guess for control.
 
 
 ```python
