@@ -24,57 +24,70 @@ We provide a simple interface to define the dynamics and constraints of your pro
 - JAX Automatic Differentiation for Jacobians
 
 ## Installation
-The main packages are:
+=== "Stable"
+    
+    0. If you haven't already please make a virtual environment for your project.
+    ```sh
+    conda env create -n openscvx python=3.13
+    ```
+    
+    1. Install the stable version of OpenSCvx.
+    ``` sh
+    pip install openscvx
+    ```
 
-- ```cvxpy``` - is used to formulate and solve the convex subproblems
-- ```jax``` - is used for determining the Jacobians using automatic differentiation, vectorization, and ahead-of-time (AOT) compilation of the dynamics and their Jacobians 
-- ```numpy``` - is used for numerical operations
-- ```diffrax``` - is used for the numerical integration of the dynamics
-- ```termcolor``` - is used for pretty command line output
-- ```plotly``` - is used for all visualizations
+=== "Nightly"
+    
+    0. If you haven't already please make a virtual environment for your project.
+    ```sh
+    conda env create -n openscvx python=3.13
+    ```
 
+    1. Install the nightly version of OpenSCvx to get the lates features.
+    ``` sh
+    pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx
+    ```
+=== "Source"
 
-These can be installed via conda or pip.
+    <details>
+    <summary>Via Conda (Recommended) </summary>
 
-<details>
-<summary>Via Conda (Recommended) </summary>
+    1. Clone the repo 
+    ```sh
+    git clone https://github.com/haynec/OpenSCvx.git
+    ```
 
-1. Clone the repo 
-```sh
-git clone https://github.com/haynec/OpenSCvx.git
-```
+    2. Install environment packages (this will take about a minute or two):
+    ```sh
+    conda env create -f environment.yml
+    ```
 
-2. Install environment packages (this will take about a minute or two):
-```sh
-conda env create -f environment.yml
-```
+    3. Activate the environment:
+    ```sh
+    conda activate openscvx
+    ```
 
-3. Activate the environment:
-```sh
-conda activate openscvx
-```
+    </details>
 
-</details>
+    <details>
 
-<details>
+    <summary>Via Pip</summary>
 
-<summary>Via Pip</summary>
+    0. Prerequisites 
+    ```
+    Python >= 3.9
+    ```
 
-0. Prerequisites 
-```
-Python >= 3.9
-```
+    1. Clone the repo
+    ```sh 
+    git clone https://github.com/haynec/OpenSCvx.git
+    ```
 
-1. Clone the repo
-```sh 
-git clone https://github.com/haynec/OpenSCvx.git
-```
-
-2. Install environment packages:
-```sh
-pip install -r requirements.txt
-```
-</details>
+    2. Install environment packages:
+    ```sh
+    pip install -r requirements.txt
+    ```
+    </details>
 
 
 ## Examples
