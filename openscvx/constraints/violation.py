@@ -1,8 +1,11 @@
 from collections import defaultdict
+from typing import List
 
 import jax.numpy as jnp
 
-def get_g_func(constraints_ctcs: list[callable, callable]):
+from openscvx.constraints.ctcs import CTCSConstraint
+
+def get_g_func(constraints_ctcs: List[CTCSConstraint]):
     def g_func(x: jnp.array, u: jnp.array, node: int) -> jnp.array:
         g_sum = 0
         for g in constraints_ctcs:
@@ -11,7 +14,7 @@ def get_g_func(constraints_ctcs: list[callable, callable]):
     return g_func
 
 
-def get_g_funcs(constraints_ctcs: list[callable]) -> list[callable]:
+def get_g_funcs(constraints_ctcs: List[CTCSConstraint]) -> list[callable]:
     # Bucket by idx
     groups: dict[int, list[callable]] = defaultdict(list)
     for c in constraints_ctcs:
