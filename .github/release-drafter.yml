@@ -28,19 +28,22 @@ version-resolver:
       - 'patch'
   default: patch
 autolabeler:
-  - label: 'feature'
+  - label: 'enhancement'
     branch:
-      - '/^feature\\/.*$/'
-  - label: 'fix'
+      - '/feature\/.+/'
+  - label: 'bug'
     branch:
-      - '/^fix\\/.*$/'
+      - '/fix\/.+/'
+  - label: 'chore'
+    branch:
+      - '/chore\/.+/'
   - label: 'refactor'
     branch:
-      - '/^refactor\\/.*$/'
+      - '/refactor\/.+/'
 template: |
   ## What's Changed
 
   $CHANGES
 
 footer: |
-  **Full Changelog:** [$PREVIOUS_TAG...$NEXT_PATCH_VERSION](https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...$NEXT_PATCH_VERSION)
+  \n**Full Changelog:** [`$PREVIOUS_TAG...$NEXT_PATCH_VERSION`](https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...$NEXT_PATCH_VERSION)
