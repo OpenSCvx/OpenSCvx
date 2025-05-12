@@ -181,7 +181,7 @@ def g_obs(center, A, x):
     return value
 ```
 
-Lets go ahead and define what our obstacles will look like. To get a more fundamental understanding of how I am parameterizing ellipsoids, I would direct the interested reader to what I consider to be the [bible of ellipsoide](https://tcg.mae.cornell.edu/pubs/Pope_FDA_08.pdf). 
+Lets go ahead and define what our obstacles will look like. To get a more fundamental understanding of how I am parameterizing ellipsoids, I would direct the interested reader [here](https://tcg.mae.cornell.edu/pubs/Pope_FDA_08.pdf). 
 
 ```python
 A_obs = []

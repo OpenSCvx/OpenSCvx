@@ -3,7 +3,7 @@ site_name: OpenSCvx
 site_url: https://haynec.github.io/OpenSCvx/
 site_author: Chris Hayner
 site_description: >-
-  Documentation for OpenSCvx, a JAX-based Python library for solving nonconvex trajectory optimization problems.
+  Documentation for OpenSCvx, a JAX-based Python library for solving nonconvex trajectory optimization problems
 # Repository
 repo_name: haynec/OpenSCvx
 repo_url: https://github.com/haynec/OpenSCvx

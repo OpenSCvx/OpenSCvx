@@ -19,7 +19,7 @@ $$
 \end{align}
 $$
 
-Lets break down whats happening here. The first line, $L_{f}(x(t_f))$, is specifying a terminal cost as a function of state. The second is describing the nonlinear dynamics of the system, $\dot{x}(t) = f(t, x(t),u(t))$ where $x$ and $u$ are the system state and control respectively. The third and fourth lines are describing the inequality, $g(t,x(t),u(t)) \leq 0_{n_g} $,  and equality, $h(t,x(t),u(t)) = 0_{n_h}$, constraints on the system respectively. Finally, the initial and terminal inequality and equality constraints are specified by $P(t_i, x(t_i), t_f, x(t_f)) = 0_{n_P}$ and $Q(t_i, x(t_i), t_f, x(t_f)) = 0_{n_Q}$ respectively.
+Lets break down whats happening here. The first line, $L_{f}(x(t_f))$, is specifying a terminal cost as a function of state. The second is describing the nonlinear dynamics of the system, $\dot{x}(t) = f(t, x(t),u(t))$ where $x$ and $u$ are the system state and control respectively. The third and fourth lines are describing the inequality, $g(t,x(t),u(t)) \leq 0_{n_g}$,  and equality, $h(t,x(t),u(t)) = 0_{n_h}$, constraints on the system respectively. Finally, the initial and terminal inequality and equality constraints are specified by $P(t_i, x(t_i), t_f, x(t_f)) = 0_{n_P}$ and $Q(t_i, x(t_i), t_f, x(t_f)) = 0_{n_Q}$ respectively.
 
 <!-- 
 ## Simple Example
