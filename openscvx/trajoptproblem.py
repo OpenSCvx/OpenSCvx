@@ -219,6 +219,13 @@ class TrajOptProblem:
         # TODO: (norrisg) Consider writing the compiled versions into the same variables?
         # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
 
+        for constraint in self.params.sim.constraints_nodal:
+            if not constraint.convex:
+                # TODO: (haynec) switch to AOT instead of JIT
+                constraint.g = jax.jit(constraint.g)
+                constraint.grad_g_x = jax.jit(constraint.grad_g_x)
+                constraint.grad_g_u = jax.jit(constraint.grad_g_u)
+
         # Generate solvers and optimal control problem
         self.discretization_solver = get_discretization_solver(
             self.state_dot, self.A, self.B, self.params
