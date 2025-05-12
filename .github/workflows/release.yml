@@ -1,18 +1,15 @@
-name: Release
-
-permissions:
-  contents: write                     # needed to create GitHub Release
+name: 🚀 Release
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  release:
+    types: [published]
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-python@v4
         with:
           python-version: '3.x'
@@ -20,7 +17,7 @@ jobs:
       - name: Install build tools
         run: pip install --upgrade pip build twine setuptools-scm
 
-      - name: Build artifacts
+      - name: Build distributions
         run: |
           rm -rf dist
           python -m build
@@ -30,19 +27,15 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          twine upload --non-interactive dist/*
+          twine upload \
+            --non-interactive \
+            --verbose \
+            --skip-existing \
+            dist/*
 
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-          files: |
-            dist/*.whl
+      - name: Upload Release Assets
+        if: ${{ always() }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

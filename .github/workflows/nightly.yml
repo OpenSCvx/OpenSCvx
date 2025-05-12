@@ -1,4 +1,4 @@
-name: Nightly
+name: 🌙 Nightly
 
 permissions:
   contents: write
@@ -7,12 +7,11 @@ on:
   push:
     branches:
       - main
-  # Keep nightly schedule as a fallback
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 0 * * *'   # daily at midnight UTC
 
 concurrency:
-  group: nightly-build
+  group: nightly
   cancel-in-progress: true
 
 jobs:
@@ -20,14 +19,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+        with: { fetch-depth: 0 }
+
       - uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
+        with: { python-version: '3.x' }
+
       - name: Install build tools
         run: pip install --upgrade pip build twine setuptools-scm
-      - name: Build artifacts
+
+      - name: Build distributions
         run: |
           rm -rf dist
           python -m build
@@ -43,23 +43,3 @@ jobs:
             --verbose \
             --skip-existing \
             dist/*
-
-      - name: Find last semver
-        run: echo "LAST_SEMVER=$(git describe --tags --match 'v*.*.*' --abbrev=0)" >> $GITHUB_ENV
-
-      - name: Delete existing nightly release
-        run: |
-          if gh release view nightly >/dev/null 2>&1; then
-            gh release delete nightly --yes
-          fi
-
-      - name: Create Release
-        run: |
-          gh release create nightly \
-            --draft \
-            --prerelease \
-            --generate-notes \
-            --notes-start-tag "$LAST_SEMVER"
-          gh release upload nightly dist/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
