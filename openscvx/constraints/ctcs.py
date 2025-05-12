@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Callable, Sequence, Tuple, Optional
 import functools
+import types
 
 from jax.lax import cond
 import jax.numpy as jnp
@@ -47,6 +48,8 @@ def ctcs(
     elif penalty == "smooth_relu":
         c = 1e-8
         pen = lambda x: (jnp.maximum(0, x) ** 2 + c**2) ** 0.5 - c
+    elif isinstance(penalty, types.LambdaType):
+        pen = penalty
     else:
         raise ValueError(f"Unknown penalty {penalty}")
 
