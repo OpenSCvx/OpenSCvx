@@ -3,11 +3,13 @@
 <img src="figures/openscvx_logo.svg" width="1200"/>
 <p align="center">
     <a href="https://github.com//haynec/OpenSCvx/actions/workflows/website.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/website.yml/badge.svg"/></a>
+    <a href="https://arxiv.org/abs/2410.22596"><img src="http://img.shields.io/badge/arXiv-2410.22596-B31B1B.svg"/></a>
+    <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"/></a>
+</p>
+<p align="center">
     <a href="https://github.com//haynec/OpenSCvx/actions/workflows/ci.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/ci.yml/badge.svg"/></a>
     <a href="https://github.com//haynec/OpenSCvx/actions/workflows/nightly.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/nightly.yml/badge.svg"/></a>
     <a href="https://github.com//haynec/OpenSCvx/actions/workflows/release.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/release.yml/badge.svg"/></a>
-    <a href="https://arxiv.org/abs/2410.22596"><img src="http://img.shields.io/badge/arXiv-2410.22596-B31B1B.svg"/></a>
-    <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"/></a>
 </p>
 
 <!-- PROJECT LOGO -->
@@ -18,13 +20,38 @@
 
 ### Installation
 
-To grab the latest release simply run
+To grab the latest stable release simply run
 
 ```sh
 pip install openscvx
 ```
 
 to install OpenSCVx in your python environment.
+
+<details>
+<summary>Nightly Build</summary>
+If you want the latest pre-release version, you can install the `nightly` build:
+
+```sh
+python3 -m pip install \
+  --index-url https://test.pypi.org/simple/ \
+  --extra-index-url https://pypi.org/simple/ \
+  --pre \
+  --upgrade \
+  openscvx
+```
+
+Or if you want a specific pre-release version this can be installed with
+
+```sh
+python3 -m pip install \
+  --index-url https://test.pypi.org/simple/ \
+  --extra-index-url https://pypi.org/simple/ \
+  openscvx==1.2.3.dev45
+```
+
+where `1.2.3.dev45 => <major>.<minor>.<patch>.dev<XY>` corresponds to your exact version
+</details>
 
 
 #### Dependencies
