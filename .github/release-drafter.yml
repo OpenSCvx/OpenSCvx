@@ -30,16 +30,16 @@ version-resolver:
 autolabeler:
   - label: 'enhancement'
     branch:
-      - '/feature\/.+/'
+      - '/^[Ff]eature\/.+/'
   - label: 'bug'
     branch:
-      - '/fix\/.+/'
+      - '/^[Ff]ix\/.+/'
   - label: 'chore'
     branch:
-      - '/chore\/.+/'
+      - '/^[Cc]hore\/.+/'
   - label: 'refactor'
     branch:
-      - '/refactor\/.+/'
+      - '/^[Rr]efactor\/.+/'
 template: |
   ## What's Changed
 
