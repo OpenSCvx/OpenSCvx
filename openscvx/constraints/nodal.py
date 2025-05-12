@@ -14,16 +14,15 @@ class NodalConstraint:
 
     def __post_init__(self):
         if not self.convex:
-            if self.vectorized:
-                # single-node but still using JAX
-                self.g = self.func
-                self.grad_g_x = jacfwd(self.func, argnums=0)
-                self.grad_g_u = jacfwd(self.func, argnums=1)
-            else:
-                self.g = vmap(self.func, in_axes=(0, 0))
-                self.grad_g_x = vmap(jacfwd(self.func, argnums=0), in_axes=(0, 0))
-                self.grad_g_u = vmap(jacfwd(self.func, argnums=1), in_axes=(0, 0))
-        # if convex=True and inter_nodal=False, assume an external solver (e.g. CVX) will handle it
+            # single-node but still using JAX
+            self.g = self.func
+            self.grad_g_x = jacfwd(self.func, argnums=0)
+            self.grad_g_u = jacfwd(self.func, argnums=1)
+            if not self.vectorized:
+                self.g = vmap(self.g, in_axes=(0, 0))
+                self.grad_g_x = vmap(self.grad_g_x, in_axes=(0, 0))
+                self.grad_g_u = vmap(self.grad_g_u, in_axes=(0, 0))
+        # if convex=True assume an external solver (e.g. CVX) will handle it
 
     def __call__(self, x: jnp.ndarray, u: jnp.ndarray):
         return self.func(x, u)
