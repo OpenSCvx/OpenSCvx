@@ -1,4 +1,7 @@
 # What is Succesive Convexification?
+!!! Warning
+    This page is still under development :construction:.
+
 *Successive Convexification* is an approach to solve infinite dimensional nonconvex trajectory optimization problems. It works by *successively* convexifying or linearizing a problem and solving the convex subproblem. The solution to the convex subproblem is then used to update the original problem, and the process is repeated until convergence.
 
 ![CT-SCvx_dark]{ align=left }
