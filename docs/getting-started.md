@@ -43,7 +43,7 @@ We provide a simple interface to define the dynamics and constraints of your pro
     conda env create -n openscvx python=3.13
     ```
 
-    1. Install the nightly version of OpenSCvx to get the lates features.
+    1. Install the nightly version of OpenSCvx to get the latest features.
     ``` sh
     pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx
     ```
