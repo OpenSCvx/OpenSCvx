@@ -1,5 +1,5 @@
 import jax.numpy as jnp
-from typing import List
+from typing import List, Union
 import queue
 import threading
 import time
@@ -36,7 +36,7 @@ class TrajOptProblem:
     def __init__(
         self,
         dynamics: Dynamics,
-        constraints: List[callable],
+        constraints: List[Union[CTCSConstraint, NodalConstraint]],
         idx_time: int,
         N: int,
         time_init: float,
