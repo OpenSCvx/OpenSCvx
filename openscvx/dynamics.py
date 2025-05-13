@@ -35,7 +35,7 @@ def dynamics(
             B=B,
         )
 
-    # if called as @ctdynamicscs or @dynamics(...), _func will be None and we return decorator
+    # if called as @dynamics or @dynamics(...), _func will be None and we return decorator
     if _func is None:
         return decorator
     # if called as dynamics(func), we immediately decorate
