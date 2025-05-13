@@ -18,8 +18,8 @@ from openscvx.config import (
     Config,
 )
 from openscvx.dynamics import Dynamics, build_augmented_dynamics
-from openscvx.constraints.violation import get_g_funcs, CTCSViolation
-from openscvx.augmentation import sort_ctcs_constraints
+from openscvx.augmentation.ctcs_violation import get_g_funcs, CTCSViolation
+from openscvx.augmentation.ctcs import sort_ctcs_constraints
 from openscvx.discretization import get_discretization_solver
 from openscvx.propagation import get_propagation_solver
 from openscvx.constraints.boundary import BoundaryConstraint

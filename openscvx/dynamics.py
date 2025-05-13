@@ -5,7 +5,7 @@ import functools
 import jax
 import jax.numpy as jnp
 
-from openscvx.constraints.violation import CTCSViolation
+from openscvx.augmentation.ctcs_violation import CTCSViolation
 
 
 @dataclass
