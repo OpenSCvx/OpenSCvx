@@ -41,6 +41,10 @@ autolabeler:
   - label: 'refactor'
     branch:
       - '/^[Rr]efactor\/.+/'
+  - label: 'documentation'
+    branch:
+      - '/^[Dd]ocumentation\/.+/'
+      - '/^[Dd]oc\/.+/'
 template: |
   ## What's Changed
 
