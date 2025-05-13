@@ -25,7 +25,7 @@ def build_augmented_dynamics(
             dynamics_non_augmented.f, violations, idx_x_true, idx_u_true
         ),
     )
-    A, B = get_jacobians(dynamics_augmented, dynamics_non_augmented, violations)
+    A, B = get_jacobians(dynamics_augmented.f, dynamics_non_augmented, violations, idx_x_true, idx_u_true)
     dynamics_augmented.A = A
     dynamics_augmented.B = B
     return dynamics_augmented
