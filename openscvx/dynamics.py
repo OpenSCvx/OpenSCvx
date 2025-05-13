@@ -12,9 +12,12 @@ class Dynamics:
     f: Callable
     A: Optional[Callable] = None
     B: Optional[Callable] = None
-
-    def __call__(self, x, u):
-        return self.f(x, u)
+    
+@dataclass
+class CTCSViolation:
+    g: Callable
+    g_grad_x: Optional[Callable] = None
+    g_grad_u: Optional[Callable] = None
 
 
 def get_augmented_dynamics(
@@ -40,14 +43,12 @@ def get_jacobians(
     dyn_augmented: Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray],
     A_non_aug: Optional[Callable] = None,
     B_non_aug: Optional[Callable] = None,
-    g_funcs: Optional[List[Callable]] = None,
-    g_grads_x: Optional[List[Optional[Callable]]] = None,
-    g_grads_u: Optional[List[Optional[Callable]]] = None,
+    violations: Optional[List[CTCSViolation]] = None,
 ) -> Tuple[
     Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray],
     Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray],
 ]:
-    # Dynamics block
+    # Dynamics block — either user-supplied or autodiff
     if A_non_aug:
         A_dyn_fn = A_non_aug
     else:
@@ -62,36 +63,39 @@ def get_jacobians(
             lambda xx, uu: dyn_augmented(xx, uu, node), argnums=1
         )(x, u)
 
-    # Per-constraint rows
-    n_g = len(g_funcs or [])
+    # Handle violations
+    violations = violations or []
+    n_v = len(violations)
 
-    def make_gx(i):
-        if g_grads_x and g_grads_x[i] is not None:
-            return g_grads_x[i]
+    def make_violation_grad_x(i: int) -> Callable:
+        viol = violations[i]
+        if viol.g_grad_x is not None:
+            return viol.g_grad_x
         else:
             return lambda x, u, node: jax.jacfwd(
-                lambda xx, uu: g_funcs[i](xx, uu, node), argnums=0
+                lambda xx, uu: viol.g(xx, uu, node), argnums=0
             )(x, u, node)
 
-    def make_gu(i):
-        if g_grads_u and g_grads_u[i] is not None:
-            return g_grads_u[i]
+    def make_violation_grad_u(i: int) -> Callable:
+        viol = violations[i]
+        if viol.g_grad_u is not None:
+            return viol.g_grad_u
         else:
             return lambda x, u, node: jax.jacfwd(
-                lambda xx, uu: g_funcs[i](xx, uu, node), argnums=1
+                lambda xx, uu: viol.g(xx, uu, node), argnums=1
             )(x, u, node)
 
     # Assemble full A, B
     def A(x, u, node):
         rows = [A_dyn_fn(x, u, node)]
-        for i in range(n_g):
-            rows.append(make_gx(i)(x, u, node))
+        for i in range(n_v):
+            rows.append(make_violation_grad_x(i)(x, u, node))
         return jnp.vstack(rows)
 
     def B(x, u, node):
         rows = [B_dyn_fn(x, u, node)]
-        for i in range(n_g):
-            rows.append(make_gu(i)(x, u, node))
+        for i in range(n_v):
+            rows.append(make_violation_grad_u(i)(x, u, node))
         return jnp.vstack(rows)
 
     return A, B
