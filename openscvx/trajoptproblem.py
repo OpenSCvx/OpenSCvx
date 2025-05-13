@@ -35,7 +35,7 @@ from openscvx import io
 class TrajOptProblem:
     def __init__(
         self,
-        dynamics: callable,
+        dynamics: Dynamics,
         constraints: List[callable],
         idx_time: int,
         N: int,
@@ -161,7 +161,7 @@ class TrajOptProblem:
         sim.constraints_nodal = constraints_nodal
 
         ctcs_violation_funcs = get_g_funcs(constraints_ctcs)
-        self.dynamics_augmented = build_augmented_dynamics(Dynamics(dynamics), ctcs_violation_funcs, idx_x_true, idx_u_true)
+        self.dynamics_augmented = build_augmented_dynamics(dynamics, ctcs_violation_funcs, idx_x_true, idx_u_true)
 
         self.params = Config(
             sim=sim,
