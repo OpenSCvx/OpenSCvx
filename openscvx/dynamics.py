@@ -79,21 +79,13 @@ def get_jacobians(
 
     def make_violation_grad_x(i: int) -> Callable:
         viol = violations[i]
-        if viol.g_grad_x is not None:
-            return viol.g_grad_x
-        else:
-            return lambda x, u, node: jax.jacfwd(
-                lambda xx, uu: viol.g(xx, uu, node), argnums=0
-            )(x, u, node)
+        # use user‐provided if present, otherwise autodiff viol.g in argnum=0
+        return viol.g_grad_x or jax.jacfwd(viol.g, argnums=0)
 
     def make_violation_grad_u(i: int) -> Callable:
         viol = violations[i]
-        if viol.g_grad_u is not None:
-            return viol.g_grad_u
-        else:
-            return lambda x, u, node: jax.jacfwd(
-                lambda xx, uu: viol.g(xx, uu, node), argnums=1
-            )(x, u, node)
+        # use user‐provided if present, otherwise autodiff viol.g in argnum=1
+        return viol.g_grad_u or jax.jacfwd(viol.g, argnums=1)
 
     # Assemble full A, B
     def A(x, u, node):
