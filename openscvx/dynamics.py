@@ -41,23 +41,22 @@ def get_augmented_dynamics(
 
 def get_jacobians(
     dyn_augmented: Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray],
-    A_non_aug: Optional[Callable] = None,
-    B_non_aug: Optional[Callable] = None,
+    dynamics_non_augmented: Dynamics,
     violations: Optional[List[CTCSViolation]] = None,
 ) -> Tuple[
     Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray],
     Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray],
 ]:
     # Dynamics block — either user-supplied or autodiff
-    if A_non_aug:
-        A_dyn_fn = A_non_aug
+    if dynamics_non_augmented.A:
+        A_dyn_fn = dynamics_non_augmented.A
     else:
         A_dyn_fn = lambda x, u, node: jax.jacfwd(
             lambda xx, uu: dyn_augmented(xx, uu, node), argnums=0
         )(x, u)
 
-    if B_non_aug:
-        B_dyn_fn = B_non_aug
+    if dynamics_non_augmented.B:
+        B_dyn_fn = dynamics_non_augmented.B
     else:
         B_dyn_fn = lambda x, u, node: jax.jacfwd(
             lambda xx, uu: dyn_augmented(xx, uu, node), argnums=1
