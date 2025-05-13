@@ -17,8 +17,8 @@ from openscvx.config import (
     DevConfig,
     Config,
 )
-from openscvx.dynamics import get_augmented_dynamics, get_jacobians
-from openscvx.constraints.violation import get_g_funcs
+from openscvx.dynamics import Dynamics, build_augmented_dynamics
+from openscvx.constraints.violation import get_g_funcs, CTCSViolation
 from openscvx.augmentation import sort_ctcs_constraints
 from openscvx.discretization import get_discretization_solver
 from openscvx.propagation import get_propagation_solver
@@ -160,9 +160,8 @@ class TrajOptProblem:
         sim.constraints_ctcs = constraints_ctcs
         sim.constraints_nodal = constraints_nodal
 
-        g_funcs, g_grads_x, g_grads_u = get_g_funcs(constraints_ctcs)
-        self.dynamics_augmented = get_augmented_dynamics(dynamics, g_funcs, idx_x_true, idx_u_true)
-        self.A_uncompiled, self.B_uncompiled = get_jacobians(self.dynamics_augmented, g_grads_x=g_grads_x, g_grads_u=g_grads_u)
+        ctcs_violation_funcs = get_g_funcs(constraints_ctcs)
+        self.dynamics_augmented = build_augmented_dynamics(Dynamics(dynamics), ctcs_violation_funcs, idx_x_true, idx_u_true)
 
         self.params = Config(
             sim=sim,
@@ -212,12 +211,9 @@ class TrajOptProblem:
         self.params.sim.__post_init__()
 
         # Compile dynamics and jacobians
-        self.state_dot = jax.vmap(self.dynamics_augmented)
-        self.A = jax.jit(jax.vmap(self.A_uncompiled, in_axes=(0, 0, 0)))
-        self.B = jax.jit(jax.vmap(self.B_uncompiled, in_axes=(0, 0, 0)))
-        # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
-        # TODO: (norrisg) Consider writing the compiled versions into the same variables?
-        # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
+        self.dynamics_augmented.f = jax.vmap(self.dynamics_augmented.f)
+        self.dynamics_augmented.A = jax.jit(jax.vmap(self.dynamics_augmented.A, in_axes=(0, 0, 0)))
+        self.dynamics_augmented.B = jax.jit(jax.vmap(self.dynamics_augmented.B, in_axes=(0, 0, 0)))
 
         for constraint in self.params.sim.constraints_nodal:
             if not constraint.convex:
@@ -228,9 +224,9 @@ class TrajOptProblem:
 
         # Generate solvers and optimal control problem
         self.discretization_solver = get_discretization_solver(
-            self.state_dot, self.A, self.B, self.params
+            self.dynamics_augmented.f, self.dynamics_augmented.A, self.dynamics_augmented.B, self.params
         )
-        self.propagation_solver = get_propagation_solver(self.state_dot, self.params)
+        self.propagation_solver = get_propagation_solver(self.dynamics_augmented.f, self.params)
         self.optimal_control_problem = OptimalControlProblem(self.params)
 
         # Initialize the PTR loop
