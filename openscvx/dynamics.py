@@ -18,7 +18,7 @@ class Dynamics:
 
 
 def get_augmented_dynamics(
-    dynamics: Dynamics,
+    dynamics: callable,
     g_funcs: list[CTCSConstraint],
     idx_x_true: slice,
     idx_u_true: slice,
