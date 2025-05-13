@@ -1,4 +1,5 @@
 import pytest
+import types
 import jax.numpy as jnp
 from openscvx.constraints.ctcs import CTCSConstraint, ctcs
 
@@ -65,3 +66,62 @@ def test_ctcs_called_directly_without_parentheses():
     # calling without nodes ought to complain about comparing None to int
     with pytest.raises(TypeError):
         _ = c(jnp.zeros(1), jnp.zeros(1), node=0)
+
+
+def test_custom_penalty_callable():
+    """Allow passing a custom callable as `penalty`."""
+    custom_pen = lambda x: x * 2.0
+    values = jnp.array([1.0, 2.0, 3.0])
+
+    @ctcs(nodes=(0, 5), penalty=custom_pen)
+    def f(x, u):
+        return values
+
+    result = f(jnp.zeros(1), jnp.zeros(1), node=3)
+    expected = float(jnp.sum(custom_pen(values)))
+    assert float(result) == pytest.approx(expected)
+
+
+def test_default_grad_attrs_none():
+    """By default, grad_f_x and grad_f_u should be None."""
+    @ctcs(nodes=(0, 5))
+    def f(x, u):
+        return jnp.array([0.0])
+
+    assert f.grad_f_x is None
+    assert f.grad_f_u is None
+
+
+def test_grad_functions_wrapped_and_callable():
+    """Passing grad_f_x and grad_f_u should wrap them to accept (x, u, node)."""
+    def base_func(x, u):
+        return x + u
+
+    def grad_x(x, u):
+        return jnp.array([42.0])
+
+    def grad_u(x, u):
+        return jnp.array([24.0])
+
+    @ctcs(nodes=(0, 5), grad_f_x=grad_x, grad_f_u=grad_u)
+    def f(x, u):
+        return base_func(x, u)
+
+    # Ensure we got lambda wrappers
+    assert isinstance(f, CTCSConstraint)
+    assert isinstance(f.grad_f_x, types.LambdaType)
+    assert isinstance(f.grad_f_u, types.LambdaType)
+
+    x = jnp.array([3.0])
+    u = jnp.array([1.0])
+    node = 2
+
+    # Call them; unwrap with .item() to get a Python scalar
+    wrapped_fx = f.grad_f_x(x, u, node)
+    wrapped_fu = f.grad_f_u(x, u, node)
+
+    assert wrapped_fx.shape == (1,)
+    assert wrapped_fu.shape == (1,)
+
+    assert wrapped_fx.item() == pytest.approx(grad_x(x, u).item())
+    assert wrapped_fu.item() == pytest.approx(grad_u(x, u).item())
