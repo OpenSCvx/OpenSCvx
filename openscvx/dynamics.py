@@ -4,7 +4,7 @@ from typing import Callable, Optional, List, Tuple
 import jax
 import jax.numpy as jnp
 
-from openscvx.constraints.ctcs import CTCSConstraint
+from openscvx.constraints.violation import CTCSViolation
 
 
 @dataclass
@@ -12,21 +12,24 @@ class Dynamics:
     f: Callable
     A: Optional[Callable] = None
     B: Optional[Callable] = None
-    
-@dataclass
-class CTCSViolation:
-    g: Callable
-    g_grad_x: Optional[Callable] = None
-    g_grad_u: Optional[Callable] = None
 
-def build_augmented_dynamics(dynamics_non_augmented: Dynamics, violations: List[CTCSViolation], idx_x_true: slice, idx_u_true: slice) -> Dynamics:
+
+def build_augmented_dynamics(
+    dynamics_non_augmented: Dynamics,
+    violations: List[CTCSViolation],
+    idx_x_true: slice,
+    idx_u_true: slice,
+) -> Dynamics:
     dynamics_augmented = Dynamics(
-        f=get_augmented_dynamics(dynamics_non_augmented.f, violations, idx_x_true, idx_u_true),
+        f=get_augmented_dynamics(
+            dynamics_non_augmented.f, violations, idx_x_true, idx_u_true
+        ),
     )
     A, B = get_jacobians(dynamics_augmented, dynamics_non_augmented, violations)
     dynamics_augmented.A = A
     dynamics_augmented.B = B
     return dynamics_augmented
+
 
 def get_augmented_dynamics(
     dynamics: callable,
