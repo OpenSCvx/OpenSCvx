@@ -54,6 +54,8 @@ def get_jacobians(
     dyn_augmented: Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray],
     dynamics_non_augmented: Dynamics,
     violations: Optional[List[CTCSViolation]] = None,
+    idx_x_true: Optional[slice] = None,
+    idx_u_true: Optional[slice] = None,
 ) -> Tuple[
     Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray],
     Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray],
@@ -91,13 +93,13 @@ def get_jacobians(
     def A(x, u, node):
         rows = [A_dyn_fn(x, u, node)]
         for i in range(n_v):
-            rows.append(make_violation_grad_x(i)(x, u, node))
+            rows.append(make_violation_grad_x(i)(x[idx_x_true], u[idx_u_true], node))
         return jnp.vstack(rows)
 
     def B(x, u, node):
         rows = [B_dyn_fn(x, u, node)]
         for i in range(n_v):
-            rows.append(make_violation_grad_u(i)(x, u, node))
+            rows.append(make_violation_grad_u(i)(x[idx_x_true], u[idx_u_true], node))
         return jnp.vstack(rows)
 
     return A, B
