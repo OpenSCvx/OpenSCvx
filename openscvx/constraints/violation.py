@@ -8,8 +8,8 @@ from openscvx.constraints.ctcs import CTCSConstraint
 def get_g_func(constraints_ctcs: List[CTCSConstraint]):
     def g_func(x: jnp.array, u: jnp.array, node: int) -> jnp.array:
         g_sum = 0
-        for g in constraints_ctcs:
-            g_sum += g(x,u, node)
+        for constraint in constraints_ctcs:
+            g_sum += constraint(x,u, node)
         return g_sum
     return g_func
 
