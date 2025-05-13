@@ -162,7 +162,7 @@ class TrajOptProblem:
 
         g_funcs, g_grads_x, g_grads_u = get_g_funcs(constraints_ctcs)
         self.dynamics_augmented = get_augmented_dynamics(dynamics, g_funcs, idx_x_true, idx_u_true)
-        self.A_uncompiled, self.B_uncompiled = get_jacobians(self.dynamics_augmented)
+        self.A_uncompiled, self.B_uncompiled = get_jacobians(self.dynamics_augmented, g_grads_x=g_grads_x, g_grads_u=g_grads_u)
 
         self.params = Config(
             sim=sim,
