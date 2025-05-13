@@ -22,7 +22,7 @@ def dynamics(
     """Decorator to mark a function as defining the system dynamics.
 
     Use as:
-    @dynamics(grad_f_x=my_grad_f_x, grad_f_u=my_grad_f_u)')
+    @dynamics(A=my_grad_f_x, B=my_grad_f_u)')
     def my_dynamics(x,u): ...
     """
 
