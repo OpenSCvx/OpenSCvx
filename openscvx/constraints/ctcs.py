@@ -11,7 +11,7 @@ import jax.numpy as jnp
 class CTCSConstraint:
     func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
     penalty: Callable[[jnp.ndarray], jnp.ndarray]
-    nodes: Optional[Sequence[Tuple[int, int]]] = None
+    nodes: Optional[Tuple[int, int]] = None
     idx: Optional[int] = None
     grad_f_x: Optional[Callable] = None
     grad_f_u: Optional[Callable] = None
