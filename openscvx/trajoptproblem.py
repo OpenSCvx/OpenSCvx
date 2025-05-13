@@ -223,9 +223,7 @@ class TrajOptProblem:
                 constraint.grad_g_u = jax.jit(constraint.grad_g_u)
 
         # Generate solvers and optimal control problem
-        self.discretization_solver = get_discretization_solver(
-            self.dynamics_augmented.f, self.dynamics_augmented.A, self.dynamics_augmented.B, self.params
-        )
+        self.discretization_solver = get_discretization_solver(self.dynamics_augmented, self.params)
         self.propagation_solver = get_propagation_solver(self.dynamics_augmented.f, self.params)
         self.optimal_control_problem = OptimalControlProblem(self.params)
 

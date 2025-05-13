@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 import numpy as np
 
+from openscvx.dynamics import Dynamics
 from openscvx.integrators import solve_ivp_rk45, solve_ivp_diffrax
 
 
@@ -150,13 +151,13 @@ def calculate_discretization(
     return A_bar, B_bar, C_bar, z_bar, Vmulti
 
 
-def get_discretization_solver(state_dot, A, B, params):
+def get_discretization_solver(dyn: Dynamics, params):
     return lambda x, u: calculate_discretization(
         x=x,
         u=u,
-        state_dot=state_dot,
-        A=A,
-        B=B,
+        state_dot=dyn.f,
+        A=dyn.A,
+        B=dyn.B,
         n_x=params.sim.n_states,
         n_u=params.sim.n_controls,
         N=params.scp.n,
