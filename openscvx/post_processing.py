@@ -14,9 +14,9 @@ def propagate_trajectory_results(params: Config, result: dict, propagation_solve
 
     tau_vals, u_full = t_to_tau(u, t_full, u, t, params)
 
-    x_full = simulate_nonlinear_time(x[0], u, tau_vals, t, params, propagation_solver)
+    x_full = simulate_nonlinear_time(params.sim.initial_state_prop, u, tau_vals, t, params, propagation_solver)
 
-    print("Total CTCS Constraint Violation:", x_full[-1, params.sim.idx_y])
+    print("Total CTCS Constraint Violation:", x_full[-1, params.sim.idx_y_prop])
     i = 0
     cost = np.zeros_like(x[-1, i])
     for type in params.sim.initial_state.type:
@@ -27,6 +27,16 @@ def propagate_trajectory_results(params: Config, result: dict, propagation_solve
     for type in params.sim.final_state.type:
         if type == "Minimize":
             cost += x[-1, i]
+        i += 1
+    i=0
+    for type in params.sim.initial_state.type:
+        if type == "Maximize":
+            cost -= x[0, i]
+        i += 1
+    i = 0
+    for type in params.sim.final_state.type:
+        if type == "Maximize":
+            cost -= x[-1, i]
         i += 1
     print("Cost: ", cost)
 
