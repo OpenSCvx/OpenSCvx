@@ -1,11 +1,8 @@
 from dataclasses import dataclass
-from typing import Callable, Optional, List, Tuple
+from typing import Callable, Optional
 import functools
 
-import jax
 import jax.numpy as jnp
-
-from openscvx.constraints.violation import CTCSViolation
 
 
 @dataclass
