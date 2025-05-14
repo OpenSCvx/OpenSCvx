@@ -1,5 +1,8 @@
 name: 🚀 Release
 
+permissions:
+  contents: write
+
 on:
   release:
     types: [published]
@@ -31,7 +34,7 @@ jobs:
             --non-interactive \
             --verbose \
             --skip-existing \
-            dist/*
+            dist/*.whl
 
       - name: Upload Release Assets
         if: ${{ always() }}
