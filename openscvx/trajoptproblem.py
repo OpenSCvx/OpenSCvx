@@ -1,5 +1,5 @@
 import jax.numpy as jnp
-from typing import List, Union
+from typing import List, Union, Optional
 import queue
 import threading
 import time
@@ -51,12 +51,12 @@ class TrajOptProblem:
         u_min: jnp.ndarray,
         dynamics_prop: callable = None,
         initial_state_prop: BoundaryConstraint = None,
-        scp: ScpConfig = None,
-        dis: DiscretizationConfig = None,
-        prp: PropagationConfig = None,
-        sim: SimConfig = None,
-        dev: DevConfig = None,
-        cvx: ConvexSolverConfig = None,
+        scp: Optional[ScpConfig] = None,
+        dis: Optional[DiscretizationConfig] = None,
+        prp: Optional[PropagationConfig] = None,
+        sim: Optional[SimConfig] = None,
+        dev: Optional[DevConfig] = None,
+        cvx: Optional[ConvexSolverConfig] = None,
         licq_min=0.0,
         licq_max=1e-4,
         time_dilation_factor_min=0.3,
