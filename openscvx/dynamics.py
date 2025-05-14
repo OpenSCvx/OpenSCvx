@@ -7,9 +7,9 @@ import jax.numpy as jnp
 
 @dataclass
 class Dynamics:
-    f: Callable
-    A: Optional[Callable] = None
-    B: Optional[Callable] = None
+    f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
+    A: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
+    B: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
 
 def dynamics(
     _func=None,

@@ -26,11 +26,11 @@ def build_augmented_dynamics(
 
 
 def get_augmented_dynamics(
-    dynamics: callable,
+    dynamics: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray],
     violations: List[CTCSViolation],
     idx_x_true: slice,
     idx_u_true: slice,
-) -> callable:
+) -> Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray]:
     def dynamics_augmented(x: jnp.array, u: jnp.array, node: int) -> jnp.array:
         x_dot = dynamics(x[idx_x_true], u[idx_u_true])
 

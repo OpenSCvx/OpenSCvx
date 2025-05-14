@@ -9,12 +9,12 @@ from openscvx.constraints.ctcs import CTCSConstraint
 
 @dataclass
 class CTCSViolation:
-    g: Callable
-    g_grad_x: Optional[Callable] = None
-    g_grad_u: Optional[Callable] = None
+    g: Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray]
+    g_grad_x: Optional[Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray]] = None
+    g_grad_u: Optional[Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray]] = None
 
 
-def get_g_grad_x(constraints_ctcs: List[CTCSConstraint]):
+def get_g_grad_x(constraints_ctcs: List[CTCSConstraint]) -> Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray]:
     def g_grad_x(x: jnp.ndarray, u: jnp.ndarray, node: int) -> jnp.ndarray:
         grads = [
             c.grad_f_x(x, u, node) for c in constraints_ctcs if c.grad_f_x is not None
@@ -24,7 +24,7 @@ def get_g_grad_x(constraints_ctcs: List[CTCSConstraint]):
     return g_grad_x
 
 
-def get_g_grad_u(constraints_ctcs: List[CTCSConstraint]):
+def get_g_grad_u(constraints_ctcs: List[CTCSConstraint]) -> Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray]:
     def g_grad_u(x: jnp.ndarray, u: jnp.ndarray, node: int) -> jnp.ndarray:
         grads = [
             c.grad_f_u(x, u, node) for c in constraints_ctcs if c.grad_f_u is not None
@@ -34,7 +34,7 @@ def get_g_grad_u(constraints_ctcs: List[CTCSConstraint]):
     return g_grad_u
 
 
-def get_g_func(constraints_ctcs: List[CTCSConstraint]):
+def get_g_func(constraints_ctcs: List[CTCSConstraint]) -> Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray]:
     def g_func(x: jnp.array, u: jnp.array, node: int) -> jnp.array:
         return sum(c(x, u, node) for c in constraints_ctcs)
 
