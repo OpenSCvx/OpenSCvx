@@ -2,6 +2,8 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import Dict, List
 
+from openscvx.constraints.boundary import BoundaryConstraint
+
 
 def get_affine_scaling_matrices(n, minimum, maximum):
     S = np.diag(np.maximum(np.ones(n), abs(minimum - maximum) / 2))
@@ -120,8 +122,8 @@ class PropagationConfig:
 class SimConfig:
     x_bar: np.ndarray
     u_bar: np.ndarray
-    initial_state: np.ndarray
-    initial_state_prop: np.ndarray
+    initial_state: BoundaryConstraint
+    initial_state_prop: BoundaryConstraint
     final_state: np.ndarray
     max_state: np.ndarray
     min_state: np.ndarray
