@@ -3,7 +3,7 @@ import pytest
 import jax.numpy as jnp
 
 from openscvx.constraints.violation import CTCSViolation
-from openscvx.augmentation.state_augmentation import build_augmented_dynamics, get_augmented_dynamics, get_jacobians
+from openscvx.augmentation.dynamics_augmentation import build_augmented_dynamics, get_augmented_dynamics, get_jacobians
 from openscvx.dynamics import dynamics, Dynamics
 
 # base dynamics: ẋ = [ 2*x0, 3*x1 ] + [ 1*u0, 0*u1 ]
