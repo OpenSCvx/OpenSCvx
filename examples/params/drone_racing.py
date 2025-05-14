@@ -3,6 +3,7 @@ import jax.numpy as jnp
 import cvxpy as cp
 
 from openscvx.trajoptproblem import TrajOptProblem
+from openscvx.dynamics import dynamics
 from openscvx.constraints import boundary, ctcs, nodal
 from openscvx.utils import qdcm, SSMP, SSM, rot, gen_vertices
 
@@ -80,6 +81,7 @@ for node, cen in zip(gate_nodes, A_gate_cen):
     )  # use local variables inside the lambda function
 
 
+@dynamics
 def dynamics(x, u):
     # Unpack the state and control vectors
     v = x[3:6]

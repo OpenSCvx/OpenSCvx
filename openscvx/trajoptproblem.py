@@ -1,5 +1,5 @@
 import jax.numpy as jnp
-from typing import List
+from typing import List, Union
 import queue
 import threading
 import time
@@ -17,9 +17,10 @@ from openscvx.config import (
     DevConfig,
     Config,
 )
-from openscvx.dynamics import get_augmented_dynamics, get_jacobians
-from openscvx.constraints.violation import get_g_funcs
-from openscvx.augmentation import sort_ctcs_constraints
+from openscvx.dynamics import Dynamics
+from openscvx.augmentation.dynamics_augmentation import build_augmented_dynamics
+from openscvx.augmentation.ctcs import sort_ctcs_constraints
+from openscvx.constraints.violation import get_g_funcs, CTCSViolation
 from openscvx.discretization import get_discretization_solver
 from openscvx.propagation import get_propagation_solver
 from openscvx.constraints.boundary import BoundaryConstraint
@@ -35,8 +36,8 @@ from openscvx import io
 class TrajOptProblem:
     def __init__(
         self,
-        dynamics: callable,
-        constraints: List[callable],
+        dynamics: Dynamics,
+        constraints: List[Union[CTCSConstraint, NodalConstraint]],
         idx_time: int,
         N: int,
         time_init: float,
@@ -63,13 +64,12 @@ class TrajOptProblem:
         # TODO (norrisg) move this into some augmentation function, if we want to make this be executed after the init (i.e. within problem.initialize) need to rethink how problem is defined
         constraints_ctcs = []
         constraints_nodal = []
-        # TODO: (norrisg) change back to using isinstance once on PyPi
         for constraint in constraints:
-            if type(constraint).__name__ == CTCSConstraint.__name__:
+            if isinstance(constraint, CTCSConstraint):
                 constraints_ctcs.append(
                     constraint
                 )
-            elif type(constraint).__name__ == NodalConstraint.__name__:
+            elif isinstance(constraint, NodalConstraint):
                 constraints_nodal.append(
                     constraint
                 )
@@ -160,9 +160,8 @@ class TrajOptProblem:
         sim.constraints_ctcs = constraints_ctcs
         sim.constraints_nodal = constraints_nodal
 
-        g_funcs = get_g_funcs(constraints_ctcs)
-        self.dynamics_augmented = get_augmented_dynamics(dynamics, g_funcs, idx_x_true, idx_u_true)
-        self.A_uncompiled, self.B_uncompiled = get_jacobians(self.dynamics_augmented)
+        ctcs_violation_funcs = get_g_funcs(constraints_ctcs)
+        self.dynamics_augmented = build_augmented_dynamics(dynamics, ctcs_violation_funcs, idx_x_true, idx_u_true)
 
         self.params = Config(
             sim=sim,
@@ -212,12 +211,9 @@ class TrajOptProblem:
         self.params.sim.__post_init__()
 
         # Compile dynamics and jacobians
-        self.state_dot = jax.vmap(self.dynamics_augmented)
-        self.A = jax.jit(jax.vmap(self.A_uncompiled, in_axes=(0, 0, 0)))
-        self.B = jax.jit(jax.vmap(self.B_uncompiled, in_axes=(0, 0, 0)))
-        # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
-        # TODO: (norrisg) Consider writing the compiled versions into the same variables?
-        # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
+        self.dynamics_augmented.f = jax.vmap(self.dynamics_augmented.f)
+        self.dynamics_augmented.A = jax.jit(jax.vmap(self.dynamics_augmented.A, in_axes=(0, 0, 0)))
+        self.dynamics_augmented.B = jax.jit(jax.vmap(self.dynamics_augmented.B, in_axes=(0, 0, 0)))
 
         for constraint in self.params.sim.constraints_nodal:
             if not constraint.convex:
@@ -227,10 +223,8 @@ class TrajOptProblem:
                 constraint.grad_g_u = jax.jit(constraint.grad_g_u)
 
         # Generate solvers and optimal control problem
-        self.discretization_solver = get_discretization_solver(
-            self.state_dot, self.A, self.B, self.params
-        )
-        self.propagation_solver = get_propagation_solver(self.state_dot, self.params)
+        self.discretization_solver = get_discretization_solver(self.dynamics_augmented, self.params)
+        self.propagation_solver = get_propagation_solver(self.dynamics_augmented.f, self.params)
         self.optimal_control_problem = OptimalControlProblem(self.params)
 
         # Initialize the PTR loop

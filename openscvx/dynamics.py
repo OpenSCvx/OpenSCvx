@@ -1,24 +1,41 @@
-import jax
+from dataclasses import dataclass
+from typing import Callable, Optional
+import functools
+
 import jax.numpy as jnp
 
 
-def get_augmented_dynamics(
-    dynamics: callable, g_funcs: list[callable], idx_x_true: slice, idx_u_true: slice
-) -> callable:
-    def dynamics_augmented(x: jnp.array, u: jnp.array, node: int) -> jnp.array:
-        x_dot = dynamics(x[idx_x_true], u[idx_u_true])
+@dataclass
+class Dynamics:
+    f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
+    A: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
+    B: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
 
-        # Iterate through the g_func dictionary and stack the output each function
-        # to x_dot
-        for g in g_funcs:
-            x_dot = jnp.hstack([x_dot, g(x[idx_x_true], u[idx_u_true], node)])
+def dynamics(
+    _func=None,
+    *,
+    A: Optional[Callable] = None,
+    B: Optional[Callable] = None,):
+    """Decorator to mark a function as defining the system dynamics.
 
-        return x_dot
+    Use as:
+    @dynamics(A=my_grad_f_x, B=my_grad_f_u)')
+    def my_dynamics(x,u): ...
+    """
 
-    return dynamics_augmented
+    def decorator(f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
+        # wrap so name, doc, signature stay on f
+        wrapped = functools.wraps(f)(f)
+        return Dynamics(
+            f=wrapped,
+            A=A,
+            B=B,
+        )
 
+    # if called as @dynamics or @dynamics(...), _func will be None and we return decorator
+    if _func is None:
+        return decorator
+    # if called as dynamics(func), we immediately decorate
+    else:
+        return decorator(_func)
 
-def get_jacobians(dyn: callable):
-    A = jax.jacfwd(dyn, argnums=0)
-    B = jax.jacfwd(dyn, argnums=1)
-    return A, B

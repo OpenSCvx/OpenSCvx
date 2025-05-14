@@ -11,8 +11,18 @@ import jax.numpy as jnp
 class CTCSConstraint:
     func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
     penalty: Callable[[jnp.ndarray], jnp.ndarray]
-    nodes: Optional[Sequence[Tuple[int, int]]] = None
+    nodes: Optional[Tuple[int, int]] = None
     idx: Optional[int] = None
+    grad_f_x: Optional[Callable] = None
+    grad_f_u: Optional[Callable] = None
+
+    def __post_init__(self):
+        if self.grad_f_x is not None:
+            _grad_f_x = self.grad_f_x
+            self.grad_f_x = lambda x, u, nodes: _grad_f_x(x, u)
+        if self.grad_f_u is not None:
+            _grad_f_u = self.grad_f_u
+            self.grad_f_u = lambda x, u, nodes: _grad_f_u(x, u)
 
     def __call__(self, x, u, node):
         return cond(
@@ -29,6 +39,8 @@ def ctcs(
     penalty: str = "squared_relu",
     nodes: Optional[Sequence[Tuple[int, int]]] = None,
     idx: Optional[int] = None,
+    grad_f_x: Optional[Callable] = None,
+    grad_f_u: Optional[Callable] = None,
 ):
     """Decorator to mark a function as a 'ctcs' constraint.
 
@@ -56,7 +68,14 @@ def ctcs(
     def decorator(f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
         # wrap so name, doc, signature stay on f
         wrapped = functools.wraps(f)(f)
-        return CTCSConstraint(func=wrapped, penalty=pen, nodes=nodes, idx=idx)
+        return CTCSConstraint(
+            func=wrapped,
+            penalty=pen,
+            nodes=nodes,
+            idx=idx,
+            grad_f_x=grad_f_x,
+            grad_f_u=grad_f_u,
+        )
 
     # if called as @ctcs or @ctcs(...), _func will be None and we return decorator
     if _func is None:
