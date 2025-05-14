@@ -1,4 +1,5 @@
 import numpy as np
+import jax.numpy as jnp
 
 from openscvx.propagation import s_to_t, t_to_tau, simulate_nonlinear_time
 from openscvx.config import Config
@@ -14,7 +15,11 @@ def propagate_trajectory_results(params: Config, result: dict, propagation_solve
 
     tau_vals, u_full = t_to_tau(u, t_full, u, t, params)
 
-    x_full = simulate_nonlinear_time(params.sim.initial_state_prop, u, tau_vals, t, params, propagation_solver)
+    # Match free values from initial state to the initial value from the result
+    mask = jnp.array([t == "Free" for t in params.sim.initial_state_prop.types], dtype=bool)
+    params.sim.initial_state_prop.value = jnp.where(mask, x[0], params.sim.initial_state_prop.value)
+
+    x_full = simulate_nonlinear_time(params.sim.initial_state_prop.value, u, tau_vals, t, params, propagation_solver)
 
     print("Total CTCS Constraint Violation:", x_full[-1, params.sim.idx_y_prop])
     i = 0

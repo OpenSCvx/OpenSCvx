@@ -23,7 +23,7 @@ from openscvx.augmentation.ctcs import sort_ctcs_constraints
 from openscvx.constraints.violation import get_g_funcs, CTCSViolation
 from openscvx.discretization import get_discretization_solver
 from openscvx.propagation import get_propagation_solver
-from openscvx.constraints.boundary import BoundaryConstraint
+from openscvx.constraints.boundary import BoundaryConstraint, boundary
 from openscvx.constraints.ctcs import CTCSConstraint
 from openscvx.constraints.nodal import NodalConstraint
 from openscvx.ptr import PTR_init, PTR_main
@@ -117,7 +117,10 @@ class TrajOptProblem:
             [u_guess, np.full((u_guess.shape[0], 1), time_init)]
         )
 
-        initial_state_prop = np.hstack([initial_state_prop.value, np.repeat(licq_min, num_augmented_states)])
+        initial_state_prop_values = np.hstack([initial_state_prop.value, np.repeat(licq_min, num_augmented_states)])
+        initial_state_prop_types = np.hstack([initial_state_prop.type, ["Fix"] * num_augmented_states])
+        initial_state_prop = boundary(initial_state_prop_values)
+        initial_state_prop.types = initial_state_prop_types
 
         if dis is None:
             dis = DiscretizationConfig()
@@ -135,7 +138,7 @@ class TrajOptProblem:
                 min_control=u_min_augmented,
                 total_time=time_init,
                 n_states=len(initial_state.value),
-                n_states_prop=len(initial_state_prop),
+                n_states_prop=len(initial_state_prop.value),
                 idx_x_true=idx_x_true,
                 idx_x_true_prop=idx_x_true_prop,
                 idx_u_true=idx_u_true,
