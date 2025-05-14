@@ -117,7 +117,7 @@ class TrajOptProblem:
             [u_guess, np.full((u_guess.shape[0], 1), time_init)]
         )
 
-        initial_state_prop = np.hstack([initial_state_prop.value, np.repeat(0, num_augmented_states)])
+        initial_state_prop = np.hstack([initial_state_prop.value, np.repeat(licq_min, num_augmented_states)])
 
         if dis is None:
             dis = DiscretizationConfig()
@@ -249,7 +249,7 @@ class TrajOptProblem:
         self.discretization_solver = get_discretization_solver(
             self.state_dot, self.A, self.B, self.params
         )
-        self.propagation_solver = get_propagation_solver(self.state_dot, self.params)
+        self.propagation_solver = get_propagation_solver(self.state_dot_prop, self.params)
         self.optimal_control_problem = OptimalControlProblem(self.params)
 
         # Initialize the PTR loop
