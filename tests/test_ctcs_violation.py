@@ -2,7 +2,7 @@ import pytest
 import jax.numpy as jnp
 
 from openscvx.constraints.ctcs import CTCSConstraint
-from openscvx.augmentation.ctcs_violation import (
+from openscvx.constraints.violation import (
     CTCSViolation,
     get_g_grad_x,
     get_g_grad_u,

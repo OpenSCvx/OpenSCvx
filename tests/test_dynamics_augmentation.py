@@ -2,7 +2,7 @@ import pytest
 
 import jax.numpy as jnp
 
-from openscvx.augmentation.ctcs_violation import CTCSViolation
+from openscvx.constraints.violation import CTCSViolation
 from openscvx.augmentation.state_augmentation import build_augmented_dynamics, get_augmented_dynamics
 from openscvx.dynamics import dynamics
 

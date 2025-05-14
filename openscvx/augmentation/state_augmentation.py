@@ -3,7 +3,7 @@ from typing import Callable, List, Tuple
 import jax
 import jax.numpy as jnp
 
-from openscvx.augmentation.ctcs_violation import CTCSViolation
+from openscvx.constraints.violation import CTCSViolation
 from openscvx.dynamics import Dynamics
 
 def build_augmented_dynamics(
