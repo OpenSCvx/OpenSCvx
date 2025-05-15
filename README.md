@@ -9,7 +9,8 @@
 <p align="center">
     <a href="https://github.com//haynec/OpenSCvx/actions/workflows/ci.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/ci.yml/badge.svg"/></a>
     <a href="https://github.com//haynec/OpenSCvx/actions/workflows/nightly.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/nightly.yml/badge.svg"/></a>
-    <a href="https://github.com//haynec/OpenSCvx/actions/workflows/release.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/release.yml/badge.svg"/></a>
+    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml?event=release"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml/badge.svg?event=release"/>
+  </a>
 </p>
 
 <!-- PROJECT LOGO -->
