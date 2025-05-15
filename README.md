@@ -63,30 +63,45 @@ The main packages are:
 
 These will be installed automatically, but can be installed via conda or pip if you are building from source.
 
+### Local Development
+
+This git repository can be installed using https
+
+```sh
+git clone https://github.com/haynec/OpenSCvx.git
+```
+
+or ssh
+
+```sh
+git clone git@github.com:haynec/OpenSCvx.git
+```
+
+Dependencies can then be installed using Conda or Pip
+
 #### Via Conda
 
-1. Clone the repo
-   ```sh
-   git clone https://github.com/haynec/OpenSCvx.git
-   ```
+1. Clone the repo using https or ssh
 2. Install environment packages (this will take about a minute or two):
    ```sh
    conda env create -f environment.yml
    ```
 3. Activate the environment:
    ```sh
-   conda activate los_guidance
+   conda activate openscvx
    ```
 
 #### Via Pip
 
 1. Prerequisites
    Python >= 3.9
-2. Clone the repo
+2. Clone the repo using https or ssh
+3. Create virtual environment (called `venv` here) and source it
    ```sh
-   git clone https://github.com/haynec/OpenSCvx.git
+   python3 -m venv venv
+   source venv/bin/activate
    ```
-3. Install environment packages:
+4. Install environment packages:
    ```sh
    pip install -r requirements.txt
    ```
