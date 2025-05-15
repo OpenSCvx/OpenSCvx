@@ -21,6 +21,8 @@
 
 ### Installation
 
+#### Stable
+
 To grab the latest stable release simply run
 
 ```sh
@@ -29,8 +31,9 @@ pip install openscvx
 
 to install OpenSCVx in your python environment.
 
-<details>
-<summary>Install Development / Nightly Version</summary>
+#### Nightly
+
+Install Development / Nightly Version</summary>
 
 If you want the pre-release version, you can install the latest `nightly` build with:
 
@@ -46,10 +49,8 @@ python3 -m pip install --index-url https://test.pypi.org/simple/ --extra-index-u
 ```
 
 where `1.2.3.dev45 => <major>.<minor>.<patch>.dev<XY>` corresponds to your exact version
-</details>
 
-
-#### Dependencies
+### Dependencies
 
 The main packages are:
 
@@ -61,8 +62,8 @@ The main packages are:
 - `plotly` - is used for all visualizations
 
 These will be installed automatically, but can be installed via conda or pip if you are building from source.
-<details>
-<summary>Via Conda</summary>
+
+#### Via Conda
 
 1. Clone the repo
    ```sh
@@ -77,22 +78,18 @@ These will be installed automatically, but can be installed via conda or pip if 
    conda activate los_guidance
    ```
 
-</details>
+#### Via Pip
 
-<details>
-<summary>Via Pip</summary>
-
-0. Prerequisites
+1. Prerequisites
    Python >= 3.9
-1. Clone the repo
+2. Clone the repo
    ```sh
    git clone https://github.com/haynec/OpenSCvx.git
    ```
-2. Install environment packages:
+3. Install environment packages:
    ```sh
    pip install -r requirements.txt
    ```
-</details>
 
 ### Running Trajectory Optimization
 
