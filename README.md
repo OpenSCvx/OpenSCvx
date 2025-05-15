@@ -21,7 +21,8 @@
 
 ### Installation
 
-#### Stable
+<details>
+<summary>Stable</summary>
 
 To grab the latest stable release simply run
 
@@ -30,8 +31,10 @@ pip install openscvx
 ```
 
 to install OpenSCVx in your python environment.
+</details>
 
-#### Nightly
+<details>
+<summary>Nightly</summary>
 
 Install Development / Nightly Version</summary>
 
@@ -50,6 +53,8 @@ python3 -m pip install --index-url https://test.pypi.org/simple/ --extra-index-u
 ```
 
 where `1.2.3.dev45 => <major>.<minor>.<patch>.dev<XY>` corresponds to your exact version
+
+</details>
 
 ### Dependencies
 
@@ -80,7 +85,8 @@ git clone git@github.com:haynec/OpenSCvx.git
 
 Dependencies can then be installed using Conda or Pip
 
-#### Via Conda
+<details>
+<summary>Via Conda</summary>
 
 1. Clone the repo using https or ssh
 2. Install environment packages (this will take about a minute or two):
@@ -91,8 +97,10 @@ Dependencies can then be installed using Conda or Pip
    ```sh
    conda activate openscvx
    ```
+</details>
 
-#### Via Pip
+<details>
+<summary>Via pip</summary>
 
 1. Prerequisites
    Python >= 3.9
@@ -106,6 +114,7 @@ Dependencies can then be installed using Conda or Pip
    ```sh
    pip install -r requirements.txt
    ```
+</details>
 
 ### Running Trajectory Optimization
 
