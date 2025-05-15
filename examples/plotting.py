@@ -7,6 +7,36 @@ import pickle
 from openscvx.utils import qdcm, get_kp_pose
 from openscvx.config import Config
 
+
+def plot_dubins_car(results, params):
+    # Plot the trajectory of the Dubins car in 3d as an animaiton
+    fig = go.Figure()
+
+    x = results["x_full"][:,0]
+    y = results["x_full"][:,1]
+
+    theta = results["x_full"][2]
+    t_full = results["t_full"]
+
+    obs_center = results["obs_center"]
+    obs_radius = results["obs_radius"]
+
+    # Create a 2D scatter plot
+    fig.add_trace(go.Scatter(x=x, y=y, mode='lines', line=dict(color='blue', width=2), name='Trajectory'))
+
+    # Plot the circular obstacle
+    fig.add_trace(go.Scatter(x=obs_center[0] + obs_radius * np.cos(np.linspace(0, 2 * np.pi, 100)),
+                             y=obs_center[1] + obs_radius * np.sin(np.linspace(0, 2 * np.pi, 100)),
+                             mode='lines', line=dict(color='red', width=2), name='Obstacle'))
+    
+    fig.update_layout(title='Dubins Car Trajectory', title_x=0.5, template='plotly_dark')
+
+    # Set axis to be equal
+    fig.update_xaxes(scaleanchor="y", scaleratio=1)
+    return fig
+
+    
+
 def full_subject_traj_time(results, params):
     x_full = results["x_full"]
     x_nodes = results["x"]
