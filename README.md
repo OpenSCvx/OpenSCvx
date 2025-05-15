@@ -41,7 +41,8 @@ If you want the pre-release version, you can install the latest `nightly` build 
 python3 -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --pre --upgrade openscvx
 ```
 
-This command will also upgrade an existing `nightly` install to the latest version
+This command will also upgrade an existing `nightly` install to the latest version.
+
 Or if you want a specific pre-release version this can be installed with
 
 ```sh
