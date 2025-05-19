@@ -16,21 +16,21 @@ class NodalConstraint:
     and integrate with convex solvers when `convex=True`.
 
     Args:
-        func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
+        func (Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
             User-supplied constraint function g(x, u).
-        nodes: Optional[List[int]]
+        nodes (Optional[List[int]]):
             Specific node indices where this constraint applies. If None, applies at all nodes.
-        convex: bool
+        convex (bool):
             If True, indicates the constraint should be handled by an external
             convex solver (e.g., CVX).
             Note that the constraint must be defined using cvxpy if this flag is set
-        vectorized: bool
+        vectorized (bool):
             If False, automatically vectorizes `func` and its jacobians over
             the node dimension using `jax.vmap`.
-        grad_g_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
+        grad_g_x (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
             User-supplied gradient of `func` wrt `x`. If None, computed via
             `jax.jacfwd(func, argnums=0)`.
-        grad_g_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
+        grad_g_u (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]): 
             User-supplied gradient of `func` wrt `u`. If None, computed via
             `jax.jacfwd(func, argnums=1)`.
     """
@@ -92,19 +92,19 @@ def nodal(
     ```
 
     Args:
-        _func: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
+        _func (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
             The function to wrap; populated automatically when using bare @nodal.
-        nodes: Optional[List[int]]
+        nodes (Optional[List[int]]):
             Node indices where the constraint applies; default None applies to all.
-        convex: bool
+        convex (bool):
             If True, skip automatic jacobian/vectorization and assume external solver.
             Note that the constraint must be defined using cvxpy if this flag is set
-        vectorized: bool
+        vectorized (bool):
             If False, auto-vectorize over nodes using `jax.vmap`.
-        grad_g_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
+        grad_g_x (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
             User-supplied gradient of `func` wrt `x`. If None, computed via
             `jax.jacfwd(func, argnums=0)`.
-        grad_g_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
+        grad_g_u (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
             User-supplied gradient of `func` wrt `u`. If None, computed via
             `jax.jacfwd(func, argnums=1)`.
 

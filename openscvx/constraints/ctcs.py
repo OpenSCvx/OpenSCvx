@@ -20,21 +20,21 @@ class CTCSConstraint:
     Note: the user is intended to instantiate `CTCSConstraint`s using the `@ctcs` decorator
 
     Args:
-        func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
+        func (Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]): 
             Function computing constraint residuals g(x, u).
-        penalty: Callable[[jnp.ndarray], jnp.ndarray]
+        penalty (Callable[[jnp.ndarray], jnp.ndarray]): 
             Penalty function applied elementwise to g's output. Used to calculate and penalize
             constraint violation during state augmentation
-        nodes: Optional[Tuple[int, int]]
+        nodes (Optional[Tuple[int, int]]):
             Half-open interval (start, end) of node indices where this constraint is active.
             If None, the penalty applies at every node.
-        idx: Optional[int]
+        idx (Optional[int]): 
             Optional index used to group CTCS constraints. Used during automatic state augmentation.
             All CTCS constraints with the same index must be active over the same `nodes` interval
-        grad_f_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
+        grad_f_x (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
             User-supplied gradient of `func` w.r.t. state `x`, signature (x, u) -> jacobian.
             If None, computed via `jax.jacfwd(func, argnums=0)` during state augmentation.
-        grad_f_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
+        grad_f_u (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
             User-supplied gradient of `func` w.r.t. input `u`, signature (x, u) -> jacobian.
             If None, computed via `jax.jacfwd(func, argnums=1)` during state augmentation.
     """
@@ -67,12 +67,9 @@ class CTCSConstraint:
         The penalty is summed only if `node` lies within the active interval.
 
         Args:
-            x: jnp.ndarray
-                State vector at this node.
-            u: jnp.ndarray
-                Input vector at this node.
-            node: int
-                Trajectory time-step index.
+            x (jnp.ndarray): State vector at this node.
+            u (jnp.ndarray): Input vector at this node.
+            node (int): Trajectory time-step index.
 
         Returns:
             jnp.ndarray or float:
@@ -122,21 +119,21 @@ def ctcs(
     ```
 
     Args:
-        _func: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
+        _func (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
             The function to wrap; provided automatically when using bare @ctcs.
-        penalty: Union[str, Callable[[jnp.ndarray], jnp.ndarray]]
+        penalty (Union[str, Callable[[jnp.ndarray], jnp.ndarray]]):
             Name of a built-in penalty ('squared_relu', 'huber', 'smooth_relu')
             or a custom elementwise penalty function.
-        nodes: Optional[Tuple[int, int]]
+        nodes (Optional[Tuple[int, int]]):
             Half-open interval (start, end) of node indices where this constraint is active.
             If None, the penalty applies at every node.
-        idx: Optional[int]
+        idx (Optional[int]):
             Optional index used to group CTCS constraints. Used during automatic state augmentation.
             All CTCS constraints with the same index must be active over the same `nodes` interval
-        grad_f_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
+        grad_f_x (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
             User-supplied gradient of `func` w.r.t state `x`.
             If None, computed via `jax.jacfwd(func, argnums=0)` during state augmentation.
-        grad_f_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
+        grad_f_u (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
             User-supplied gradient of `func` w.r.t input `u`.
             If None, computed via `jax.jacfwd(func, argnums=1)` during state augmentation.
 
