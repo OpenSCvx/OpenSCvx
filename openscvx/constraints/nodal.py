@@ -22,7 +22,7 @@ class NodalConstraint:
             Specific node indices where this constraint applies. If None, applies at all nodes.
         convex: bool
             If True, indicates the constraint should be handled by an external
-            convex solver (e.g., CVX). 
+            convex solver (e.g., CVX).
             Note that the constraint must be defined using cvxpy if this flag is set
         vectorized: bool
             If False, automatically vectorizes `func` and its jacobians over
@@ -61,7 +61,7 @@ class NodalConstraint:
 
 
 def nodal(
-    _func=None,
+    _func: Optional[Callable]=None,
     *,
     nodes: Optional[List[int]] = None,
     convex: bool = False,
@@ -72,21 +72,22 @@ def nodal(
     """
     Decorator to build a `NodalConstraint` from a constraint function.
 
-    Can be used with or without additional arguments:
+    Usage examples:
 
-    ```
+    ```python
     @nodal
     def g(x, u):
         ...
     ```
-    or
-    ```
+    ```python
     @nodal(nodes=[0, -1], convex=True, vectorized=False)
     def g(x, u):
         ...
     ```
-    or, if a  more lambda-function style is desired, the function can be directly wrapped
-    ```
+
+    Or can directly wrap a function if a more lambda-function interface is desired:
+
+    ```python
     constraint = nodal(lambda x, u: ...)
     ```
 
