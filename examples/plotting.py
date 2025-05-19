@@ -1674,3 +1674,289 @@ def scp_traj_interp(scp_trajs, params: Config):
                 states.append(traj_temp[:,i])
         scp_prop_trajs.append(np.array(states))
     return scp_prop_trajs
+
+def plot_animation_double_integrator(result: dict,
+                   params: Config,
+                   path="",
+                   ) -> None:
+    tof = result["t_final"]
+    # Make title say quadrotor simulation and insert the variable tof into the title
+    # title = 'Quadrotor Simulation: Time of Flight = ' + str(tof) + 's'
+    drone_positions = result["x_full"][:, :3]
+    drone_velocities = result["x_full"][:, 3:6]
+    if "moving_subject" in result or "init_poses" in result:
+        subs_positions, _, _, _ = full_subject_traj_time(result, params)
+
+    step = 2
+    indices = np.array(list(range(drone_positions.shape[0]-1)[::step]) + [drone_positions.shape[0]-1])
+
+    fig = go.Figure(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='gray', width = 2)))
+    for i in range(100):
+        fig.add_trace(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='red', width = 2)))
+    
+    frames = []
+    i = 0
+    # Generate a color for each keypoint
+    if "init_poses" in result or "moving_subject" in result:
+        color_kp = []
+        if "init_poses" in result:
+            for j in range(len(result["init_poses"])):
+                color_kp.append(f'rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})')
+        else:
+            for j in range(1):
+                color_kp.append(f'rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})')
+
+    # Draw drone attitudes as axes
+    for i in range(0, len(indices)-1, step):
+        frame = go.Frame(name=str(i))
+
+        subs_pose = []
+
+        if "moving_subject" in result or "init_poses" in result:
+            for sub_positions in subs_positions:
+                subs_pose.append(sub_positions[indices[i]])
+
+
+        # Extract axes from rotation matrix
+        axes = 20 * np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+
+        # Meshgrid
+        if "moving_subject" in result:    
+            x = np.linspace(-5, 5, 20)
+            y = np.linspace(-5, 5, 20)
+            z = np.linspace(-5, 5, 20)
+        elif "covariance" in result:
+            x = np.linspace(-2000, 2000, 20)
+            y = np.linspace(-2000, 2000, 20)
+            z = np.linspace(-2000, 2000, 20)
+        else:
+            x = np.linspace(-30, 30, 20)
+            y = np.linspace(-30, 30, 20)
+            z = np.linspace(-30, 30, 20)
+        
+        
+        X, Y = np.meshgrid(x, y)
+
+        data = []
+
+        colors = ['#FF0000', '#00FF00', '#0000FF']
+        labels = ['X', 'Y', 'Z']
+
+        for k in range(3):
+            color = colors[k]
+            label = labels[k]
+
+            data.append(go.Scatter3d(
+                    x=[drone_positions[indices[i], 0], drone_positions[indices[i], 0]],
+                    y=[drone_positions[indices[i], 1], drone_positions[indices[i], 1]],
+                    z=[drone_positions[indices[i], 2], drone_positions[indices[i], 2]],
+                    mode='lines+text',
+                    line=dict(color=color, width=4),
+                    showlegend=False
+                ))
+        # Add subject position to data
+        j = 0
+        for sub_pose in subs_pose:
+            # Use color iter to change the color of the subject in rgb
+            data.append(go.Scatter3d(x=[sub_pose[0]], y=[sub_pose[1]], z=[sub_pose[2]], mode='markers', marker=dict(size=10, color=color_kp[j]), showlegend=False, name='Subject'))
+            # if params.vp.n_subs != 1:
+            j += 1
+    
+        data.append(go.Scatter3d(
+            x=drone_positions[:indices[i]+1,0], 
+            y=drone_positions[:indices[i]+1,1], 
+            z=drone_positions[:indices[i]+1,2], 
+            mode='markers',
+            marker=dict(
+                size=5,
+                color=np.linalg.norm(drone_velocities[:indices[i]+1], axis = 1), # set color to an array/list of desired values
+                colorscale='Viridis', # choose a colorscale
+                colorbar=dict(title='Velocity Norm (m/s)', x=0.02, y=0.55, len=0.75) # add colorbar
+            ),
+            name='Nonlinear Propagation'
+        ))
+        
+
+        # Make the subject draw a line as it moves
+        if "moving_subject" in result:
+            if result["moving_subject"]:
+                for sub_positions in subs_positions:
+                    data.append(go.Scatter3d(x=sub_positions[:indices[i]+1,0], y=sub_positions[:indices[i]+1,1], z=sub_positions[:indices[i]+1,2], mode='lines', line=dict(color='red', width = 10), name='Subject Position'))
+                    
+                    sub_position = sub_positions[indices[i]]
+
+                    # Plot two spheres as a surface at the location of the subject to represent the minimum and maximum allowed range from the subject
+                    n = 20
+                    # Generate points on the unit sphere
+                    u = np.linspace(0, 2 * np.pi, n)
+                    v = np.linspace(0, np.pi, n)
+
+                    x = np.outer(np.cos(u), np.sin(v))
+                    y = np.outer(np.sin(u), np.sin(v))
+                    z = np.outer(np.ones(np.size(u)), np.cos(v))
+
+                    if "min_range" in result and "max_range" in result:
+                        # Scale points by minimum range
+                        x_min = result["min_range"] * x
+                        y_min = result["min_range"] * y
+                        z_min = result["min_range"] * z
+
+                        # Scale points by maximum range
+                        x_max = result["max_range"] * x
+                        y_max = result["max_range"] * y
+                        z_max = result["max_range"] * z
+                    else:
+                        raise ValueError("`min_range` and `max_range` not found in result dictionary.")
+
+                    # Rotate and translate points
+                    points_min = np.array([x_min.flatten(), y_min.flatten(), z_min.flatten()])
+                    points_max = np.array([x_max.flatten(), y_max.flatten(), z_max.flatten()])
+                    
+                    points_min = points_min.T + sub_position
+                    points_max = points_max.T + sub_position
+
+                    data.append(go.Surface(x=points_min[:, 0].reshape(n,n), y=points_min[:, 1].reshape(n,n), z=points_min[:, 2].reshape(n,n), opacity = 0.2, colorscale='reds', name='Minimum Range', showlegend=True, showscale=False))
+                    data.append(go.Surface(x=points_max[:, 0].reshape(n,n), y=points_max[:, 1].reshape(n,n), z=points_max[:, 2].reshape(n,n), opacity = 0.2, colorscale='blues', name='Maximum Range', showlegend=True, showscale=False))
+
+
+        frame.data = data
+        frames.append(frame)
+
+    fig.frames = frames
+
+    if "obstacles_centers" in result:
+        for center, axes, radius in zip(result['obstacles_centers'], result['obstacles_axes'], result['obstacles_radii']):
+                n = 20
+                # Generate points on the unit sphere
+                u = np.linspace(0, 2 * np.pi, n)
+                v = np.linspace(0, np.pi, n)
+
+                x = np.outer(np.cos(u), np.sin(v))
+                y = np.outer(np.sin(u), np.sin(v))
+                z = np.outer(np.ones(np.size(u)), np.cos(v))
+
+                # Scale points by radii
+                x = 1/radius[0] * x
+                y = 1/radius[1] * y
+                z = 1/radius[2] * z
+
+                # Rotate and translate points
+                points = np.array([x.flatten(), y.flatten(), z.flatten()])
+                points = axes @ points
+                points = points.T + center
+
+                fig.add_trace(go.Surface(x=points[:, 0].reshape(n,n), y=points[:, 1].reshape(n,n), z=points[:, 2].reshape(n,n), opacity = 0.5, showscale=False))
+
+    if "vertices" in result:
+        for vertices in result["vertices"]:
+            # Plot a line through the vertices of the gate
+            fig.add_trace(go.Scatter3d(x=[vertices[0][0], vertices[1][0], vertices[2][0], vertices[3][0], vertices[0][0]], y=[vertices[0][1], vertices[1][1], vertices[2][1], vertices[3][1], vertices[0][1]], z=[vertices[0][2], vertices[1][2], vertices[2][2], vertices[3][2], vertices[0][2]], mode='lines', showlegend=False, line=dict(color='blue', width=10)))
+
+    # Add ground plane
+    fig.add_trace(go.Surface(x=[-200, 200, 200, -200], y=[-200, -200, 200, 200], z=[[0, 0], [0, 0], [0, 0], [0, 0]], opacity=0.3, showscale=False, colorscale='Greys', showlegend = True, name='Ground Plane'))
+
+    sliders = [
+        {
+            "pad": {"b": 10, "t": 60},
+            "len": 0.8,
+            "x": 0.15,
+            "y": 0.32,
+            "steps": [
+                {
+                    "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
+                    "label": f.name,
+                    "method": "animate",
+                } for f in fig.frames
+            ]
+        }
+    ]
+
+    fig.update_layout(updatemenus = [{"buttons":[
+                                        {
+                                            "args": [None, frame_args(50)],
+                                            "label": "Play",
+                                            "method": "animate",
+                                        },
+                                        {
+                                            "args": [[None], frame_args(0)],
+                                            "label": "Pause",
+                                            "method": "animate",
+                                    }],
+
+                                    "direction": "left",
+                                    "pad": {"r": 10, "t": 70},
+                                    "type": "buttons",
+                                    "x": 0.1,
+                                    "y": 0,
+                                }
+                            ],
+                            sliders=sliders
+                        )
+
+    fig.update_layout(sliders=sliders)
+
+    fig.update_layout(template='plotly_dark') #, title=title)
+    
+    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
+    
+    # Check if covariance exists
+    if "covariance" in result:
+        fig.update_layout(scene=dict(xaxis=dict(range=[0, 4000]), yaxis=dict(range=[0, 4000]), zaxis=dict(range=[-1000, 3000])))
+    else:
+        fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
+
+    # Overlay the title onto the plot
+    fig.update_layout(title_y=0.95, title_x=0.5)
+
+    
+
+
+
+    # Overlay the sliders and buttons onto the plot
+    fig.update_layout(updatemenus = [{"buttons":[
+                                        {
+                                            "args": [None, frame_args(50)],
+                                            "label": "Play",
+                                            "method": "animate",
+                                        },
+                                        {
+                                            "args": [[None], frame_args(0)],
+                                            "label": "Pause",
+                                            "method": "animate",
+                                    }],
+
+                                    "direction": "left",
+                                    "pad": {"r": 10, "t": 70},
+                                    "type": "buttons",
+                                    "x": 0.22,
+                                    "y": 0.37,
+                                }
+                            ],
+                            sliders=sliders
+                        )
+    
+    
+
+    # Show the legend overlayed on the plot
+    fig.update_layout(legend=dict(yanchor="top", y=0.9, xanchor="left", x=0.75))
+
+    # fig.update_layout(height=450, width = 800)
+
+    # Remove the black border around the fig
+    fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
+
+    # Rmeove the background from the legend
+    fig.update_layout(legend=dict(bgcolor='rgba(0,0,0,0)'))
+
+    fig.update_xaxes(
+        dtick=1.0,
+        showline=False
+    )
+    fig.update_yaxes(
+        scaleanchor="x",
+        scaleratio=1,
+        showline=False,
+        dtick=1.0
+    )
+
+    return fig
