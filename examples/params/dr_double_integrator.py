@@ -1,0 +1,148 @@
+import numpy as np
+import jax.numpy as jnp
+import cvxpy as cp
+
+from openscvx.trajoptproblem import TrajOptProblem
+from openscvx.dynamics import dynamics
+from openscvx.constraints import boundary, ctcs, nodal
+from openscvx.utils import qdcm, SSMP, SSM, rot, gen_vertices
+
+n = 22  # Number of Nodes
+total_time = 24.0  # Total time for the simulation
+
+max_state = np.array(
+    [200.0, 100, 50, 100, 100, 100, 100]
+)  # Upper Bound on the states
+min_state = np.array(
+    [-200.0, -100, 15, -100, -100, -100, 0]
+)  # Lower Bound on the states
+
+initial_state = boundary(jnp.array([10.0, 0, 20, 0, 0, 0, 0]))
+initial_state.type[6] = "Free"
+
+final_state = boundary(jnp.array([10.0, 0, 20, 0, 0, 0, total_time]))
+final_state.type[3:6] = "Free"
+final_state.type[6] = "Minimize"
+
+initial_control = np.array([0.0, 0, 10,])
+f_max = 4.179446268 * 9.81
+max_control = np.array(
+    [f_max, f_max, f_max]
+)
+min_control = np.array(
+    [-f_max, -f_max, -f_max]
+)
+
+m = 1.0  # Mass of the drone
+g_const = -9.18
+J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
+
+
+### Gate Parameters ###
+n_gates = 10
+gate_centers = [
+    np.array([59.436, 0.000, 20.0000]),
+    np.array([92.964, -23.750, 25.5240]),
+    np.array([92.964, -29.274, 20.0000]),
+    np.array([92.964, -23.750, 20.0000]),
+    np.array([130.150, -23.750, 20.0000]),
+    np.array([152.400, -73.152, 20.0000]),
+    np.array([92.964, -75.080, 20.0000]),
+    np.array([92.964, -68.556, 20.0000]),
+    np.array([59.436, -81.358, 20.0000]),
+    np.array([22.250, -42.672, 20.0000]),
+]
+
+radii = np.array([2.5, 1e-4, 2.5])
+A_gate = rot @ np.diag(1 / radii) @ rot.T
+A_gate_cen = []
+for center in gate_centers:
+    center[0] = center[0] + 2.5
+    center[2] = center[2] + 2.5
+    A_gate_cen.append(A_gate @ center)
+nodes_per_gate = 2
+gate_nodes = np.arange(nodes_per_gate, n, nodes_per_gate)
+vertices = []
+for center in gate_centers:
+    vertices.append(gen_vertices(center, radii))
+### End Gate Parameters ###
+
+
+constraints = [
+    ctcs(lambda x, u: (x - max_state)),
+    ctcs(lambda x, u: (min_state - x)),
+]
+for node, cen in zip(gate_nodes, A_gate_cen):
+    constraints.append(
+        nodal(
+            lambda x, u, A=A_gate, c=cen: cp.norm(A @ x[:3] - c, "inf") <= 1,
+            nodes=[node],
+            convex=True,
+        )
+    )  # use local variables inside the lambda function
+
+
+@dynamics
+def dynamics(x, u):
+    # Unpack the state and control vectors
+    v = x[3:6]
+
+    f = u[:3]
+
+    # Compute the time derivatives of the state variables
+    r_dot = v
+    v_dot = (1 / m) * f + jnp.array([0, 0, g_const])
+    t_dot = 1
+    return jnp.hstack([r_dot, v_dot, t_dot])
+
+
+u_bar = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
+x_bar = np.linspace(initial_state.value, final_state.value, n)
+
+i = 0
+origins = [initial_state.value[:3]]
+ends = []
+for center in gate_centers:
+    origins.append(center)
+    ends.append(center)
+ends.append(final_state.value[:3])
+gate_idx = 0
+for _ in range(n_gates + 1):
+    for k in range(n // (n_gates + 1)):
+        x_bar[i, :3] = origins[gate_idx] + (k / (n // (n_gates + 1))) * (
+            ends[gate_idx] - origins[gate_idx]
+        )
+        i += 1
+    gate_idx += 1
+
+problem = TrajOptProblem(
+    dynamics=dynamics,
+    constraints=constraints,
+    idx_time=len(max_state)-1,
+    N=n,
+    time_init=total_time,
+    x_guess=x_bar,
+    u_guess=u_bar,
+    initial_state=initial_state,  # Initial State
+    final_state=final_state,
+    x_max=max_state,
+    x_min=min_state,
+    u_max=max_control,  # Upper Bound on the controls
+    u_min=min_control,  # Lower Bound on the controls
+)
+
+problem.params.prp.dt = 0.01
+problem.params.dis.custom_integrator = True
+
+problem.params.scp.w_tr = 2e0  # Weight on the Trust Reigon
+problem.params.scp.lam_cost = 1e-1  # 0e-1,  # Weight on the Minimal Time Objective
+problem.params.scp.lam_vc = 1e1  # 1e1,  # Weight on the Virtual Control Objective (not including CTCS Augmentation)
+problem.params.scp.ep_tr = 1e-3  # Trust Region Tolerance
+problem.params.scp.ep_vb = 1e-4  # Virtual Control Tolerance
+problem.params.scp.ep_vc = 1e-8  # Virtual Control Tolerance for CTCS
+problem.params.scp.cost_drop = 10  # SCP iteration to relax minimal final time objective
+problem.params.scp.cost_relax = 0.8  # Minimal Time Relaxation Factor
+problem.params.scp.w_tr_adapt = 1.4  # Trust Region Adaptation Factor
+problem.params.scp.w_tr_max_scaling_factor = 1e2  # Maximum Trust Region Weight
+
+plotting_dict = dict(vertices=vertices)
