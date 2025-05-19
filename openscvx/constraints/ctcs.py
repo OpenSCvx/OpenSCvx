@@ -6,6 +6,7 @@ import types
 from jax.lax import cond
 import jax.numpy as jnp
 
+# TODO: (norrisg) Unclear if should specify behavior for `idx`, `jacfwd` behavior for Jacobians, etc. since that logic is handled elsewhere and could change
 
 @dataclass
 class CTCSConstraint:
