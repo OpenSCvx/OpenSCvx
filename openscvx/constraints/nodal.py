@@ -27,10 +27,10 @@ class NodalConstraint:
         vectorized: bool
             If False, automatically vectorizes `func` and its jacobians over
             the node dimension using `jax.vmap`.
-        grad_g_x: Optional[Callable]
+        grad_g_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
             User-supplied gradient of `func` wrt `x`. If None, computed via
             `jax.jacfwd(func, argnums=0)`.
-        grad_g_u: Optional[Callable]
+        grad_g_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
             User-supplied gradient of `func` wrt `u`. If None, computed via
             `jax.jacfwd(func, argnums=1)`.
     """
@@ -39,8 +39,8 @@ class NodalConstraint:
     nodes: Optional[List[int]] = None
     convex: bool = False
     vectorized: bool = False
-    grad_g_x: Optional[Callable] = None
-    grad_g_u: Optional[Callable] = None
+    grad_g_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
+    grad_g_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
 
     def __post_init__(self):
         if not self.convex:
@@ -61,14 +61,14 @@ class NodalConstraint:
 
 
 def nodal(
-    _func: Optional[Callable]=None,
+    _func: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
     *,
     nodes: Optional[List[int]] = None,
     convex: bool = False,
     vectorized: bool = False,
-    grad_g_x: Optional[Callable] = None,
-    grad_g_u: Optional[Callable] = None,
-):
+    grad_g_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
+    grad_g_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
+) -> NodalConstraint:
     """
     Decorator to build a `NodalConstraint` from a constraint function.
 
@@ -92,7 +92,7 @@ def nodal(
     ```
 
     Args:
-        _func: Optional[callable]
+        _func: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
             The function to wrap; populated automatically when using bare @nodal.
         nodes: Optional[List[int]]
             Node indices where the constraint applies; default None applies to all.
@@ -101,10 +101,10 @@ def nodal(
             Note that the constraint must be defined using cvxpy if this flag is set
         vectorized: bool
             If False, auto-vectorize over nodes using `jax.vmap`.
-        grad_g_x: Optional[Callable]
+        grad_g_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
             User-supplied gradient of `func` wrt `x`. If None, computed via
             `jax.jacfwd(func, argnums=0)`.
-        grad_g_u: Optional[Callable]
+        grad_g_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
             User-supplied gradient of `func` wrt `u`. If None, computed via
             `jax.jacfwd(func, argnums=1)`.
 

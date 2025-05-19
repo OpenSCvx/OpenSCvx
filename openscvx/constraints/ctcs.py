@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, Sequence, Tuple, Optional
+from typing import Callable, Tuple, Optional, Union
 import functools
 import types
 
@@ -30,10 +30,10 @@ class CTCSConstraint:
         idx: Optional[int]
             Optional index used to group CTCS constraints. Used during automatic state augmentation.
             All CTCS constraints with the same index must be active over the same `nodes` interval
-        grad_f_x: Optional[Callable]
+        grad_f_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
             User-supplied gradient of `func` w.r.t. state `x`, signature (x, u) -> jacobian.
             If None, computed via `jax.jacfwd(func, argnums=0)` during state augmentation.
-        grad_f_u: Optional[Callable]
+        grad_f_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
             User-supplied gradient of `func` w.r.t. input `u`, signature (x, u) -> jacobian.
             If None, computed via `jax.jacfwd(func, argnums=1)` during state augmentation.
     """
@@ -42,8 +42,8 @@ class CTCSConstraint:
     penalty: Callable[[jnp.ndarray], jnp.ndarray]
     nodes: Optional[Tuple[int, int]] = None
     idx: Optional[int] = None
-    grad_f_x: Optional[Callable] = None
-    grad_f_u: Optional[Callable] = None
+    grad_f_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
+    grad_f_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
 
     def __post_init__(self):
         """
@@ -88,14 +88,14 @@ class CTCSConstraint:
 
 
 def ctcs(
-    _func: Optional[Callable] = None,
+    _func: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
     *,
-    penalty: str = "squared_relu",
+    penalty: Union[str, Callable[[jnp.ndarray], jnp.ndarray]] = "squared_relu",
     nodes: Optional[Tuple[int, int]] = None,
     idx: Optional[int] = None,
-    grad_f_x: Optional[Callable] = None,
-    grad_f_u: Optional[Callable] = None,
-):
+    grad_f_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
+    grad_f_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
+) -> CTCSConstraint:
     """
     Decorator to build a CTCSConstraint from a raw constraint function.
 
@@ -121,7 +121,7 @@ def ctcs(
     ```
 
     Args:
-        _func: Optional[callable]
+        _func: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
             The function to wrap; provided automatically when using bare @ctcs.
         penalty: Union[str, Callable[[jnp.ndarray], jnp.ndarray]]
             Name of a built-in penalty ('squared_relu', 'huber', 'smooth_relu')
@@ -132,10 +132,10 @@ def ctcs(
         idx: Optional[int]
             Optional index used to group CTCS constraints. Used during automatic state augmentation.
             All CTCS constraints with the same index must be active over the same `nodes` interval
-        grad_f_x: Optional[Callable]
+        grad_f_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
             User-supplied gradient of `func` w.r.t state `x`.
             If None, computed via `jax.jacfwd(func, argnums=0)` during state augmentation.
-        grad_f_u: Optional[Callable]
+        grad_f_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]
             User-supplied gradient of `func` w.r.t input `u`.
             If None, computed via `jax.jacfwd(func, argnums=1)` during state augmentation.
 
