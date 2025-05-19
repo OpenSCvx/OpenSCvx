@@ -31,6 +31,7 @@ def dynamics(
 ) -> Dynamics:
     """
     Decorator that wraps a function as a Dynamics object.
+    Note: the dynamics as well as the optional gradients should be composed of `jax` primitives to enable efficient computation.
 
     This decorator may be used with or without arguments:
 
