@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Union, Sequence
+from typing import Union, Sequence, List
 import jax.numpy as jnp
 
 ALLOWED_TYPES = {"Fix", "Free", "Minimize", "Maximize"}
@@ -28,7 +28,7 @@ class BoundaryConstraint:
     """
 
     value: jnp.ndarray
-    types: list[str] = field(init=False)
+    types: List[str] = field(init=False)
 
     def __post_init__(self):
         """
