@@ -8,7 +8,7 @@ ALLOWED_TYPES = {"Fix", "Free", "Minimize", "Maximize"}
 @dataclass
 class BoundaryConstraint:
     """
-    Holds boundary constraints for a trajectory optimization problem 
+    Holds boundary constraints for a trajectory optimization problem
     _i.e._ _initial_ and _terminal_ state constraints.
 
     Each element of the `value` array corresponds to a state variable at either
@@ -48,13 +48,16 @@ class BoundaryConstraint:
         Proxy for getting and setting constraint types.
 
         Use indexing or slicing to read/write the `types` list in lockstep
-        with `value`.  Examples:
+        with `value`.
 
-            >>> bc = BoundaryConstraint(jnp.array([0.0, 1.0]))
-            >>> bc.type[0]
-            'Fix'
-            >>> bc.type[1] = 'Free'
-            >>> bc.type[:] = ['Minimize', 'Maximize']
+        Examples:
+
+        ```python
+        bc = BoundaryConstraint(jnp.array([0.0, 1.0]))
+        bc.type[0] # Returns 'Fix'
+        bc.type[1] = 'Free'
+        bc.type[:] = ['Minimize', 'Maximize']
+        ```
 
         Raises:
             ValueError: If you try to assign a type not in ALLOWED_TYPES.
@@ -108,7 +111,7 @@ def boundary(arr: jnp.ndarray):
       - "Free": allow the optimizer to choose freely.
       - "Minimize": include the state in the cost to be minimized.
       - "Maximize": include the state in the cost to be maximized.
-    
+
     Note that the `type` is initialzed as `Fix` for each value and can be updated after instantiating
     the `BoundaryConstraint`
 
@@ -119,8 +122,11 @@ def boundary(arr: jnp.ndarray):
         BoundaryConstraint: With `value == arr` and all `types == "Fix"`.
 
     Examples:
-        >>> initial_state = boundary(jnp.array(10.0, 0.0, 2.0, 6.0))
-        ... initial_state.type[0:3] = "Free
-        ... initial_state.type[3] = "Minimize"
+
+    ```python
+    initial_state = boundary(jnp.array(10.0, 0.0, 2.0, 6.0))
+    initial_state.type[0:3] = "Free
+    initial_state.type[3] = "Minimize"
+    ```
     """
     return BoundaryConstraint(arr)
