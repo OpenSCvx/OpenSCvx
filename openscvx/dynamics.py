@@ -30,7 +30,8 @@ def dynamics(
     B: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
 ) -> Dynamics:
     """
-    Decorator that wraps a function as a Dynamics object.
+    Decorator that wraps a function defining the system dynamics as a `Dynamics` object.
+    You may optionally specify the system gradients w.r.t. `x`, `u` if desired, if not specified they will be calculated using `jax.jacfwd`.
     Note: the dynamics as well as the optional gradients should be composed of `jax` primitives to enable efficient computation.
 
     This decorator may be used with or without arguments:
