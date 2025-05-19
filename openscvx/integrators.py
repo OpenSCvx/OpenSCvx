@@ -1,3 +1,5 @@
+from typing import Callable, Any
+
 import jax
 import jax.numpy as jnp
 import diffrax as dfx
@@ -19,7 +21,30 @@ SOLVER_MAP = {
 }
 
 # fmt: off
-def rk45_step(f, t, y, h, *args):
+def rk45_step(
+    f: Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray],
+    t: jnp.ndarray,
+    y: jnp.ndarray,
+    h: float,
+    *args
+) -> jnp.ndarray:
+    """
+    Perform a single RK45 (Runge-Kutta-Fehlberg) integration step.
+
+    This implements the classic Dorman-Prince coefficients for an
+    explicit 4(5) method, returning the fourth-order estimate.
+
+    Args:
+        f (Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray]):
+            ODE right-hand side; signature f(t, y, *args) -> dy/dt.
+        t (jnp.ndarray): Current time.
+        y (jnp.ndarray): Current state vector.
+        h (float): Step size.
+        *args: Additional arguments passed to `f`.
+
+    Returns:
+        jnp.ndarray: Next state estimate at t + h.
+    """
     k1 = f(t, y, *args)
     k2 = f(t + h/4, y + h*k1/4, *args)
     k3 = f(t + 3*h/8, y + 3*h*k1/32 + 9*h*k2/32, *args)
@@ -31,14 +56,31 @@ def rk45_step(f, t, y, h, *args):
 
 
 def solve_ivp_rk45(
-    f,
+    f: Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray],
     tau_final: float,
-    y_0,
+    y_0: jnp.ndarray,
     args,
     tau_0: float = 0.0,
     num_substeps: int = 50,
     is_not_compiled: bool = False,
 ):
+    """
+    Solve an initial-value ODE problem using fixed-step RK45 integration.
+
+    Args:
+        f (Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray]):
+            ODE right-hand side; signature f(t, y, *args) -> dy/dt.
+        tau_final (float): Final integration time.
+        y_0 (jnp.ndarray): Initial state at tau_0.
+        args (tuple): Extra arguments to pass to `f`.
+        tau_0 (float, optional): Initial time. Defaults to 0.0.
+        num_substeps (int, optional): Number of output time points. Defaults to 50.
+        is_not_compiled (bool, optional): If True, use Python loop instead of
+            JAX `lax.fori_loop`. Defaults to False.
+
+    Returns:
+        jnp.ndarray: Array of shape (num_substeps, state_dim) with solution at each time.
+    """
     substeps = jnp.linspace(tau_0, tau_final, num_substeps)
 
     h = (tau_final - tau_0) / (len(substeps) - 1)
@@ -65,17 +107,40 @@ def solve_ivp_rk45(
 
 
 def solve_ivp_diffrax(
-    f,
-    tau_final,
-    y_0,
+    f: Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray],
+    tau_final: float,
+    y_0: jnp.ndarray,
     args,
     tau_0: float = 0.0,
     num_substeps: int = 50,
-    solver_name="Dopri8",
+    solver_name: str = "Dopri8",
     rtol: float = 1e-3,
     atol: float = 1e-6,
     extra_kwargs=None,
 ):
+    """
+    Solve an initial-value ODE problem using a Diffrax adaptive solver.
+
+    Args:
+        f (Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray]): ODE right-hand side; signature f(t, y, *args) -> dy/dt.
+        tau_final (float): Final integration time.
+        y_0 (jnp.ndarray): Initial state at tau_0.
+        args (tuple): Extra arguments to pass to `f` in the solver term.
+        tau_0 (float, optional): Initial time. Defaults to 0.0.
+        num_substeps (int, optional): Number of save points between tau_0 and tau_final.
+            Defaults to 50.
+        solver_name (str, optional): Key into SOLVER_MAP for the Diffrax solver class.
+            Defaults to "Dopri8".
+        rtol (float, optional): Relative tolerance for adaptive stepping. Defaults to 1e-3.
+        atol (float, optional): Absolute tolerance for adaptive stepping. Defaults to 1e-6.
+        extra_kwargs (dict, optional): Additional keyword arguments forwarded to `diffeqsolve`.
+
+    Returns:
+        jnp.ndarray: Solution states at the requested save points, shape (num_substeps, state_dim).
+
+    Raises:
+        ValueError: If `solver_name` is not in SOLVER_MAP.
+    """
     substeps = jnp.linspace(tau_0, tau_final, num_substeps)
 
     solver_class = SOLVER_MAP.get(solver_name)
@@ -103,17 +168,41 @@ def solve_ivp_diffrax(
 
 # TODO: (norrisg) this function is basically identical to `solve_ivp_diffrax`, could combine, but requires returning solution and getting `.ys` wherever the `solve_ivp_diffrax` is called
 def solve_ivp_diffrax_prop(
-    f,
-    tau_final,
-    y_0,
+    f: Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray],
+    tau_final: float,
+    y_0: jnp.ndarray,
     args,
     tau_0: float = 0.0,
     num_substeps: int = 50,
-    solver_name="Dopri8",
+    solver_name: str = "Dopri8",
     rtol: float = 1e-3,
     atol: float = 1e-6,
     extra_kwargs=None,
 ):
+    """
+    Propagator variant of `solve_ivp_diffrax` returning the full Diffrax result.
+
+    This is identical to `solve_ivp_diffrax` except that it returns the
+    `diffeqsolve` output struct, which includes dense output and auxiliary data.
+
+    Args:
+        f (Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray]): ODE right-hand side; signature f(t, y, *args) -> dy/dt.
+        tau_final (float): Final integration time.
+        y_0 (jnp.ndarray): Initial state at tau_0.
+        args (tuple): Extra arguments to pass to `f` in the solver term.
+        tau_0 (float, optional): Initial time. Defaults to 0.0.
+        num_substeps (int, optional): Number of save points. Defaults to 50.
+        solver_name (str, optional): Key into SOLVER_MAP. Defaults to "Dopri8".
+        rtol (float, optional): Relative tolerance. Defaults to 1e-3.
+        atol (float, optional): Absolute tolerance. Defaults to 1e-6.
+        extra_kwargs (dict, optional): Additional kwargs for `diffeqsolve`.
+
+    Returns:
+        diffrax.Solution: Full solver output, including `ys` and interpolation functions.
+
+    Raises:
+        ValueError: If `solver_name` is not recognized.
+    """
     substeps = jnp.linspace(tau_0, tau_final, num_substeps)
 
     solver_class = SOLVER_MAP.get(solver_name)
