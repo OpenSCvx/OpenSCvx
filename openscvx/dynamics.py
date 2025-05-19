@@ -24,10 +24,10 @@ class Dynamics:
 
 
 def dynamics(
-    _func=None,
+    _func: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
     *,
-    A: Optional[Callable] = None,
-    B: Optional[Callable] = None,
+    A: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
+    B: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
 ) -> Dynamics:
     """
     Decorator that wraps a function as a Dynamics object.
