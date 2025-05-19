@@ -98,7 +98,19 @@ class BoundaryConstraint:
 
 def boundary(arr: jnp.ndarray):
     """
-    Convenience factory to build a `BoundaryConstraint`.
+    Convenience factory to build a `BoundaryConstraint`, _i.e._ initial or terminal state constraint,
+    from an array of values.
+    Each element of the input array corresponds to a state variable at either
+    the initial or terminal time.  The parallel `types` list specifies how each
+    state should be treated by the optimizer:
+
+      - "Fix": enforce the state exactly.
+      - "Free": allow the optimizer to choose freely.
+      - "Minimize": include the state in the cost to be minimized.
+      - "Maximize": include the state in the cost to be maximized.
+    
+    Note that the `type` is initialzed as `Fix` for each value and can be updated after instantiating
+    the `BoundaryConstraint`
 
     Args:
         arr (jnp.ndarray): Array of boundary values.
