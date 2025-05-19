@@ -70,7 +70,7 @@ def nodal(
     grad_g_u: Optional[Callable] = None,
 ):
     """
-    Decorator to build a NodalConstraint from a constraint function.
+    Decorator to build a `NodalConstraint` from a constraint function.
 
     Can be used with or without additional arguments:
 
