@@ -95,7 +95,7 @@ def ctcs(
     idx: Optional[int] = None,
     grad_f_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
     grad_f_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
-) -> CTCSConstraint:
+) -> Union[Callable, CTCSConstraint]:
     """
     Decorator to build a CTCSConstraint from a raw constraint function.
 

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, Optional, List
+from typing import Callable, Optional, List, Union
 
 import jax.numpy as jnp
 from jax import vmap, jacfwd
@@ -68,7 +68,7 @@ def nodal(
     vectorized: bool = False,
     grad_g_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
     grad_g_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
-) -> NodalConstraint:
+) -> Union[Callable, NodalConstraint]:
     """
     Decorator to build a `NodalConstraint` from a constraint function.
 
@@ -109,7 +109,9 @@ def nodal(
             `jax.jacfwd(func, argnums=1)`.
 
     Returns:
-        `NodalConstraint`: A dataclass bundling nodal constraint function and Jacobians
+        Union[Callable, NodalConstraint]
+            A decorator if called without a function, or a `NodalConstraint` dataclass
+            instance bundling nodal constraint function and Jacobians when applied to a function
     """
 
     def decorator(f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):

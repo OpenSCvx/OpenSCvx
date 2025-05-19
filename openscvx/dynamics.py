@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 import functools
 
 import jax.numpy as jnp
@@ -28,7 +28,7 @@ def dynamics(
     *,
     A: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
     B: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
-) -> Dynamics:
+) -> Union[Callable, Dynamics]:
     """
     Decorator that wraps a function defining the system dynamics as a `Dynamics` object.
     You may optionally specify the system gradients w.r.t. `x`, `u` if desired, if not specified they will be calculated using `jax.jacfwd`.
@@ -64,7 +64,9 @@ def dynamics(
             via jax.jacfwd if not provided.
 
     Returns:
-        Dynamics: A dataclass bundling your function and Jacobians.
+        Union[Callable, Dynamics]
+            A decorator if called without a function, or a `Dynamics` dataclass bundling system dynamics function
+            and Jacobians when applied to a function.
 
     Examples:
         >>> @dynamics
