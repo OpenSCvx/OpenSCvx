@@ -20,6 +20,9 @@ class BoundaryConstraint:
       - "Minimize": include the state in the cost to be minimized.
       - "Maximize": include the state in the cost to be maximized.
 
+    Note: for convenience and consistency with other constraint types,
+    the user should use the `boundary` factory to instantiate a `BoundaryConstraint` object.
+
     Args:
         value (jnp.ndarray): Array of boundary values.  Length N.
     """
