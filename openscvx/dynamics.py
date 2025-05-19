@@ -7,6 +7,16 @@ import jax.numpy as jnp
 
 @dataclass
 class Dynamics:
+    """
+    Dataclass to hold dynamics function and (optionally) it's gradients.
+    This class is intended to be instantiated using the `dynamics` decorator wrapped around a function defining the system dynamics.
+    Note: the dynamics as well as the optional gradients should be composed of `jax` primitives to enable efficient computation.
+
+    Args:
+        f (Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]): function defining the continuous time nonlinear system dynamics as x_dot = f(x, u)
+        A (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]): Jacobian of `f` w.r.t. `x`. If not specified will be calculated using `jax.jacfwd`
+        B (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]): Jacobian of `f` w.r.t. `u`. If not specified will be calculated using `jax.jacfwd`
+    """
     f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
     A: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
     B: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
