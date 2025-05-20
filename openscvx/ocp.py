@@ -21,6 +21,8 @@ def OptimalControlProblem(params: Config):
     x = cp.Variable((params.scp.n, params.sim.n_states), name='x') # Current State
     dx = cp.Variable((params.scp.n, params.sim.n_states), name='dx') # State Error
     x_bar = cp.Parameter((params.scp.n, params.sim.n_states), name='x_bar') # Previous SCP State
+    x_init = cp.Parameter(params.sim.n_states, name='x_init') # Initial State
+    x_term = cp.Parameter(params.sim.n_states, name='x_term') # Final State
 
     # Affine Scaling for State
     S_x = params.sim.S_x
@@ -87,9 +89,9 @@ def OptimalControlProblem(params: Config):
 
     for i in range(params.sim.idx_x_true.start, params.sim.idx_x_true.stop):
         if params.sim.initial_state.type[i] == 'Fix':
-            constr += [x_nonscaled[0][i] == params.sim.initial_state.value[i]]  # Initial Boundary Conditions
+            constr += [x_nonscaled[0][i] == x_init[i]]  # Initial Boundary Conditions
         if params.sim.final_state.type[i] == 'Fix':
-            constr += [x_nonscaled[-1][i] == params.sim.final_state.value[i]]   # Final Boundary Conditions
+            constr += [x_nonscaled[-1][i] == x_term[i]]   # Final Boundary Conditions
         if params.sim.initial_state.type[i] == 'Minimize':
             cost += lam_cost * x_nonscaled[0][i]
         if params.sim.final_state.type[i] == 'Minimize':

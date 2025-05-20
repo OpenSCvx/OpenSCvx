@@ -17,6 +17,24 @@ def PTR_init(ocp: cp.Problem, discretization_solver: callable, params: Config):
     else:
         cpg_solve = None
 
+    if 'x_init' in ocp.param_dict:
+        x_init_param = ocp.param_dict['x_init']
+        x_init_value = np.zeros(x_init_param.shape)
+
+        x_init_value[params.sim.idx_x_true] = params.sim.initial_state.value.__array__()
+        x_init_value[params.sim.idx_x_true.stop:-1] = 0
+
+        x_init_param.value = x_init_value
+    
+    if 'x_term' in ocp.param_dict:
+        x_term_param = ocp.param_dict['x_term']
+        x_term_value = np.zeros(x_term_param.shape)
+
+        x_term_value[params.sim.idx_x_true] = params.sim.final_state.value.__array__()
+        x_term_value[params.sim.idx_x_true.stop:-1] = 0
+
+        x_term_param.value = x_term_value
+
     # Solve a dumb problem to intilize DPP and JAX jacobians
     _ = PTR_subproblem(cpg_solve, params.sim.x_bar, params.sim.u_bar, discretization_solver, ocp, params)
 
@@ -29,6 +47,24 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emit
 
     x_bar = params.sim.x_bar
     u_bar = params.sim.u_bar
+
+    if 'x_init' in prob.param_dict:
+        x_init_param = prob.param_dict['x_init']
+        x_init_value = np.zeros(x_init_param.shape)
+
+        x_init_value[params.sim.idx_x_true] = params.sim.initial_state.value.__array__()
+        x_init_value[params.sim.idx_x_true.stop:-1] = 0
+
+        x_init_param.value = x_init_value
+    
+    if 'x_term' in prob.param_dict:
+        x_term_param = prob.param_dict['x_term']
+        x_term_value = np.zeros(x_term_param.shape)
+
+        x_term_value[params.sim.idx_x_true] = params.sim.final_state.value.__array__()
+        x_term_value[params.sim.idx_x_true.stop:-1] = 0
+
+        x_term_param.value = x_term_value
 
     scp_trajs = [x_bar]
     scp_controls = [u_bar]
