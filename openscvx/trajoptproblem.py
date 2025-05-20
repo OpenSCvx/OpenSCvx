@@ -1,5 +1,5 @@
 import jax.numpy as jnp
-from typing import List
+from typing import List, Union, Optional
 import queue
 import threading
 import time
@@ -17,12 +17,13 @@ from openscvx.config import (
     DevConfig,
     Config,
 )
-from openscvx.dynamics import get_augmented_dynamics, get_jacobians
-from openscvx.constraints.violation import get_g_funcs
-from openscvx.augmentation import sort_ctcs_constraints
+from openscvx.dynamics import Dynamics
+from openscvx.augmentation.dynamics_augmentation import build_augmented_dynamics
+from openscvx.augmentation.ctcs import sort_ctcs_constraints
+from openscvx.constraints.violation import get_g_funcs, CTCSViolation
 from openscvx.discretization import get_discretization_solver
 from openscvx.propagation import get_propagation_solver
-from openscvx.constraints.boundary import BoundaryConstraint
+from openscvx.constraints.boundary import BoundaryConstraint, boundary
 from openscvx.constraints.ctcs import CTCSConstraint
 from openscvx.constraints.nodal import NodalConstraint
 from openscvx.ptr import PTR_init, PTR_main
@@ -35,8 +36,8 @@ from openscvx import io
 class TrajOptProblem:
     def __init__(
         self,
-        dynamics: callable,
-        constraints: List[callable],
+        dynamics: Dynamics,
+        constraints: List[Union[CTCSConstraint, NodalConstraint]],
         idx_time: int,
         N: int,
         time_init: float,
@@ -48,28 +49,34 @@ class TrajOptProblem:
         x_min: jnp.ndarray,
         u_max: jnp.ndarray,
         u_min: jnp.ndarray,
-        scp: ScpConfig = None,
-        dis: DiscretizationConfig = None,
-        prp: PropagationConfig = None,
-        sim: SimConfig = None,
-        dev: DevConfig = None,
-        cvx: ConvexSolverConfig = None,
+        dynamics_prop: callable = None,
+        initial_state_prop: BoundaryConstraint = None,
+        scp: Optional[ScpConfig] = None,
+        dis: Optional[DiscretizationConfig] = None,
+        prp: Optional[PropagationConfig] = None,
+        sim: Optional[SimConfig] = None,
+        dev: Optional[DevConfig] = None,
+        cvx: Optional[ConvexSolverConfig] = None,
         licq_min=0.0,
         licq_max=1e-4,
         time_dilation_factor_min=0.3,
         time_dilation_factor_max=3.0,
     ):
+        if dynamics_prop is None:
+            dynamics_prop = dynamics
+        
+        if initial_state_prop is None:
+            initial_state_prop = initial_state
 
         # TODO (norrisg) move this into some augmentation function, if we want to make this be executed after the init (i.e. within problem.initialize) need to rethink how problem is defined
         constraints_ctcs = []
         constraints_nodal = []
-        # TODO: (norrisg) change back to using isinstance once on PyPi
         for constraint in constraints:
-            if type(constraint).__name__ == CTCSConstraint.__name__:
+            if isinstance(constraint, CTCSConstraint):
                 constraints_ctcs.append(
                     constraint
                 )
-            elif type(constraint).__name__ == NodalConstraint.__name__:
+            elif isinstance(constraint, NodalConstraint):
                 constraints_nodal.append(
                     constraint
                 )
@@ -81,10 +88,14 @@ class TrajOptProblem:
         constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(constraints_ctcs, N)
 
         # Index tracking
-        idx_x_true = slice(0, len(x_max))
+        idx_x_true = slice(0, len(initial_state.value))
+        idx_x_true_prop = slice(0, len(initial_state_prop.value))
         idx_u_true = slice(0, len(u_max))
         idx_constraint_violation = slice(
             idx_x_true.stop, idx_x_true.stop + num_augmented_states
+        )
+        idx_constraint_violation_prop = slice(
+            idx_x_true_prop.stop, idx_x_true_prop.stop + num_augmented_states
         )
 
         idx_time_dilation = slice(idx_u_true.stop, idx_u_true.stop + 1)
@@ -106,6 +117,11 @@ class TrajOptProblem:
             [u_guess, np.full((u_guess.shape[0], 1), time_init)]
         )
 
+        initial_state_prop_values = np.hstack([initial_state_prop.value, np.repeat(licq_min, num_augmented_states)])
+        initial_state_prop_types = np.hstack([initial_state_prop.type, ["Fix"] * num_augmented_states])
+        initial_state_prop = boundary(initial_state_prop_values)
+        initial_state_prop.types = initial_state_prop_types
+
         if dis is None:
             dis = DiscretizationConfig()
 
@@ -114,17 +130,21 @@ class TrajOptProblem:
                 x_bar=x_bar_augmented,
                 u_bar=u_bar_augmented,
                 initial_state=initial_state,
+                initial_state_prop=initial_state_prop,
                 final_state=final_state,
                 max_state=x_max_augmented,
                 min_state=x_min_augmented,
                 max_control=u_max_augmented,
                 min_control=u_min_augmented,
                 total_time=time_init,
-                n_states=len(x_max),
+                n_states=len(initial_state.value),
+                n_states_prop=len(initial_state_prop.value),
                 idx_x_true=idx_x_true,
+                idx_x_true_prop=idx_x_true_prop,
                 idx_u_true=idx_u_true,
                 idx_t=idx_time,
                 idx_y=idx_constraint_violation,
+                idx_y_prop=idx_constraint_violation_prop,
                 idx_s=idx_time_dilation,
                 ctcs_node_intervals=node_intervals,
             )
@@ -160,9 +180,9 @@ class TrajOptProblem:
         sim.constraints_ctcs = constraints_ctcs
         sim.constraints_nodal = constraints_nodal
 
-        g_funcs = get_g_funcs(constraints_ctcs)
-        self.dynamics_augmented = get_augmented_dynamics(dynamics, g_funcs, idx_x_true, idx_u_true)
-        self.A_uncompiled, self.B_uncompiled = get_jacobians(self.dynamics_augmented)
+        ctcs_violation_funcs = get_g_funcs(constraints_ctcs)
+        self.dynamics_augmented = build_augmented_dynamics(dynamics, ctcs_violation_funcs, idx_x_true, idx_u_true)
+        self.dynamics_augmented_prop = build_augmented_dynamics(dynamics_prop, ctcs_violation_funcs, idx_x_true_prop, idx_u_true)
 
         self.params = Config(
             sim=sim,
@@ -212,18 +232,23 @@ class TrajOptProblem:
         self.params.sim.__post_init__()
 
         # Compile dynamics and jacobians
-        self.state_dot = jax.vmap(self.dynamics_augmented)
-        self.A = jax.jit(jax.vmap(self.A_uncompiled, in_axes=(0, 0, 0)))
-        self.B = jax.jit(jax.vmap(self.B_uncompiled, in_axes=(0, 0, 0)))
-        # TODO: (norrisg) Could consider using dataclass just to hold dynamics and jacobians
-        # TODO: (norrisg) Consider writing the compiled versions into the same variables?
-        # Otherwise if have a dataclass could have 2 instances, one for compied and one for uncompiled
+        self.dynamics_augmented.f = jax.vmap(self.dynamics_augmented.f)
+        self.dynamics_augmented.A = jax.vmap(self.dynamics_augmented.A, in_axes=(0, 0, 0))
+        self.dynamics_augmented.B = jax.vmap(self.dynamics_augmented.B, in_axes=(0, 0, 0))
+
+
+        self.dynamics_augmented_prop.f = jax.vmap(self.dynamics_augmented_prop.f)
+
+        for constraint in self.params.sim.constraints_nodal:
+            if not constraint.convex:
+                # TODO: (haynec) switch to AOT instead of JIT
+                constraint.g = jax.jit(constraint.g)
+                constraint.grad_g_x = jax.jit(constraint.grad_g_x)
+                constraint.grad_g_u = jax.jit(constraint.grad_g_u)
 
         # Generate solvers and optimal control problem
-        self.discretization_solver = get_discretization_solver(
-            self.state_dot, self.A, self.B, self.params
-        )
-        self.propagation_solver = get_propagation_solver(self.state_dot, self.params)
+        self.discretization_solver = get_discretization_solver(self.dynamics_augmented, self.params)
+        self.propagation_solver = get_propagation_solver(self.dynamics_augmented_prop.f, self.params)
         self.optimal_control_problem = OptimalControlProblem(self.params)
 
         # Initialize the PTR loop
@@ -247,7 +272,7 @@ class TrajOptProblem:
         self.propagation_solver = (
             jax.jit(self.propagation_solver)
             .lower(
-                np.ones((self.params.sim.n_states)),
+                np.ones((self.params.sim.n_states_prop)),
                 (0.0, 0.0),
                 np.ones((1, self.params.sim.n_controls)),
                 np.ones((1, self.params.sim.n_controls)),

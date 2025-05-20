@@ -4,6 +4,7 @@ import cvxpy as cp
 import jax.numpy as jnp
 
 from openscvx.trajoptproblem import TrajOptProblem
+from openscvx.dynamics import dynamics
 from openscvx.utils import qdcm, SSMP, SSM, rot, gen_vertices
 from openscvx.constraints import boundary, nodal
 
@@ -111,6 +112,7 @@ for node, cen in zip(gate_nodes, A_gate_cen):
     )  # use local variables inside the lambda function
 
 
+@dynamics
 def dynamics(x, u):
     m = 1.0  # Mass of the drone
     g_const = -9.81

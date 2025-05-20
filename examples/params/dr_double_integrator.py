@@ -11,26 +11,27 @@ n = 22  # Number of Nodes
 total_time = 24.0  # Total time for the simulation
 
 max_state = np.array(
-    [200.0, 100, 50, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100]
+    [200.0, 100, 50, 100, 100, 100, 100]
 )  # Upper Bound on the states
 min_state = np.array(
-    [-200.0, -100, 15, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0]
+    [-200.0, -100, 15, -100, -100, -100, 0]
 )  # Lower Bound on the states
 
-initial_state = boundary(jnp.array([10.0, 0, 20, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]))
-initial_state.type[6:13] = "Free"
+initial_state = boundary(jnp.array([10.0, 0, 20, 0, 0, 0, 0]))
+initial_state.type[6] = "Free"
 
-final_state = boundary(jnp.array([10.0, 0, 20, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, total_time]))
-final_state.type[3:13] = "Free"
-final_state.type[13] = "Minimize"
+final_state = boundary(jnp.array([10.0, 0, 20, 0, 0, 0, total_time]))
+final_state.type[3:6] = "Free"
+final_state.type[6] = "Minimize"
 
-initial_control = np.array([0.0, 0, 10, 0, 0, 0])
+initial_control = np.array([0.0, 0, 10,])
+f_max = 4.179446268 * 9.81
 max_control = np.array(
-    [0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562]
-)  # Upper Bound on the controls
+    [f_max, f_max, f_max]
+)
 min_control = np.array(
-    [0, 0, 0, -18.665, -18.665, -0.55562]
-)  # Lower Bound on the controls
+    [-f_max, -f_max, -f_max]
+)
 
 m = 1.0  # Mass of the drone
 g_const = -9.18
@@ -85,22 +86,14 @@ for node, cen in zip(gate_nodes, A_gate_cen):
 def dynamics(x, u):
     # Unpack the state and control vectors
     v = x[3:6]
-    q = x[6:10]
-    w = x[10:13]
 
     f = u[:3]
-    tau = u[3:]
-
-    q_norm = jnp.linalg.norm(q)
-    q = q / q_norm
 
     # Compute the time derivatives of the state variables
     r_dot = v
-    v_dot = (1 / m) * qdcm(q) @ f + jnp.array([0, 0, g_const])
-    q_dot = 0.5 * SSMP(w) @ q
-    w_dot = jnp.diag(1 / J_b) @ (tau - SSM(w) @ jnp.diag(J_b) @ w)
+    v_dot = (1 / m) * f + jnp.array([0, 0, g_const])
     t_dot = 1
-    return jnp.hstack([r_dot, v_dot, q_dot, w_dot, t_dot])
+    return jnp.hstack([r_dot, v_dot, t_dot])
 
 
 u_bar = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)

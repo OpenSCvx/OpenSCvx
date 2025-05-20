@@ -1,6 +1,6 @@
 import pytest
 
-from openscvx.augmentation import sort_ctcs_constraints
+from openscvx.augmentation.ctcs import sort_ctcs_constraints
 
 class DummyCTCS:
     def __init__(self, nodes=None, idx=None):

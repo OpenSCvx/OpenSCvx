@@ -2,6 +2,7 @@ import numpy as np
 import jax.numpy as jnp
 
 from openscvx.trajoptproblem import TrajOptProblem
+from openscvx.dynamics import dynamics
 from openscvx.constraints import boundary, ctcs
 from openscvx.utils import qdcm, SSMP, SSM, generate_orthogonal_unit_vectors
 
@@ -26,6 +27,7 @@ max_control = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])
 min_control = np.array([0, 0, 0, -18.665, -18.665, -0.55562])
 
 
+@dynamics
 def dynamics(x, u):
     m = 1.0  # Mass of the drone
     g_const = -9.18

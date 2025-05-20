@@ -3,6 +3,7 @@ import numpy.linalg as la
 import jax.numpy as jnp
 
 from openscvx.trajoptproblem import TrajOptProblem
+from openscvx.dynamics import dynamics
 from openscvx.utils import qdcm, SSMP, SSM, get_kp_pose
 from openscvx.constraints import boundary, ctcs
 
@@ -54,6 +55,7 @@ norm_type = np.inf  # Norm Type
 R_sb = jnp.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]])
 
 
+@dynamics
 def dynamics(x, u):
     m = 1.0  # Mass of the drone
     g_const = -9.18

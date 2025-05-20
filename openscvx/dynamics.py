@@ -1,24 +1,93 @@
-import jax
+from dataclasses import dataclass
+from typing import Callable, Optional, Union
+import functools
+
 import jax.numpy as jnp
 
 
-def get_augmented_dynamics(
-    dynamics: callable, g_funcs: list[callable], idx_x_true: slice, idx_u_true: slice
-) -> callable:
-    def dynamics_augmented(x: jnp.array, u: jnp.array, node: int) -> jnp.array:
-        x_dot = dynamics(x[idx_x_true], u[idx_u_true])
+@dataclass
+class Dynamics:
+    """
+    Dataclass to hold dynamics function and (optionally) it's gradients.
+    This class is intended to be instantiated using the `dynamics` decorator wrapped around a function defining the system dynamics.
+    Note: the dynamics as well as the optional gradients should be composed of `jax` primitives to enable efficient computation.
 
-        # Iterate through the g_func dictionary and stack the output each function
-        # to x_dot
-        for g in g_funcs:
-            x_dot = jnp.hstack([x_dot, g(x[idx_x_true], u[idx_u_true], node)])
+    Args:
+        f (Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]): function defining the continuous time nonlinear system dynamics as x_dot = f(x, u)
+        A (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]): Jacobian of `f` w.r.t. `x`. If not specified will be calculated using `jax.jacfwd`
+        B (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]): Jacobian of `f` w.r.t. `u`. If not specified will be calculated using `jax.jacfwd`
+    """
 
-        return x_dot
+    f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
+    A: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
+    B: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
 
-    return dynamics_augmented
 
+def dynamics(
+    _func: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
+    *,
+    A: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
+    B: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
+) -> Union[Callable, Dynamics]:
+    """
+    Decorator that wraps a function defining the system dynamics as a `Dynamics` object.
+    You may optionally specify the system gradients w.r.t. `x`, `u` if desired, if not specified they will be calculated using `jax.jacfwd`.
+    Note: the dynamics as well as the optional gradients should be composed of `jax` primitives to enable efficient computation.
 
-def get_jacobians(dyn: callable):
-    A = jax.jacfwd(dyn, argnums=0)
-    B = jax.jacfwd(dyn, argnums=1)
-    return A, B
+    This decorator may be used with or without arguments:
+
+    ```
+    @dynamics
+    def f(x, u): ...
+    ```
+
+    or
+
+    ```
+    @dynamics(A=grad_f_x, B=grad_f_u)
+    def f(x, u): ...
+    ```
+
+    or, if a more lambda-function-style is desired, the function can be direclty wrapped
+
+    ```
+    dyn = dynamics(f(x,u))
+    dyn_lambda = dynamics(lambda x, u: ...)
+    ```
+
+    Args:
+        _func (callable, optional): The function to wrap. Populated
+            when using @dynamics with no extra args.
+        A (callable, optional): Jacobian of f wrt state x. Computed
+            via jax.jacfwd if not provided.
+        B (callable, optional): Jacobian of f wrt input u. Computed
+            via jax.jacfwd if not provided.
+
+    Returns:
+        Union[Callable, Dynamics]
+            A decorator if called without a function, or a `Dynamics` dataclass bundling system dynamics function
+            and Jacobians when applied to a function.
+
+    Examples:
+        >>> @dynamics
+        ... def f(x, u):
+        ...     return x + u
+        >>> isinstance(f, Dynamics)
+        True
+    """
+
+    def decorator(f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
+        # wrap so name, doc, signature stay on f
+        wrapped = functools.wraps(f)(f)
+        return Dynamics(
+            f=wrapped,
+            A=A,
+            B=B,
+        )
+
+    # if called as @dynamics or @dynamics(...), _func will be None and we return decorator
+    if _func is None:
+        return decorator
+    # if called as dynamics(func), we immediately decorate
+    else:
+        return decorator(_func)

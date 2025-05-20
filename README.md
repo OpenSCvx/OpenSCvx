@@ -2,12 +2,15 @@
 
 <img src="figures/openscvx_logo.svg" width="1200"/>
 <p align="center">
-    <a href="https://github.com//haynec/OpenSCvx/actions/workflows/release.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/release.yml/badge.svg"/></a>
-    <a href="https://github.com//haynec/OpenSCvx/actions/workflows/nightly.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/nightly.yml/badge.svg"/></a>
     <a href="https://github.com//haynec/OpenSCvx/actions/workflows/website.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/website.yml/badge.svg"/></a>
-    <a href="https://github.com//haynec/OpenSCvx/actions/workflows/main.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/main.yml/badge.svg"/></a>
     <a href="https://arxiv.org/abs/2410.22596"><img src="http://img.shields.io/badge/arXiv-2410.22596-B31B1B.svg"/></a>
     <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"/></a>
+</p>
+<p align="center">
+    <a href="https://github.com//haynec/OpenSCvx/actions/workflows/ci.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/ci.yml/badge.svg"/></a>
+    <a href="https://github.com//haynec/OpenSCvx/actions/workflows/nightly.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/nightly.yml/badge.svg"/></a>
+    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml?event=release"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml/badge.svg?event=release"/>
+  </a>
 </p>
 
 <!-- PROJECT LOGO -->
@@ -18,16 +21,42 @@
 
 ### Installation
 
-To grab the latest release simply run
+<details>
+<summary>Stable</summary>
+
+To grab the latest stable release simply run
 
 ```sh
 pip install openscvx
 ```
 
 to install OpenSCVx in your python environment.
+</details>
 
+<details>
+<summary>Nightly</summary>
 
-#### Dependencies
+Install Development / Nightly Version</summary>
+
+If you want the pre-release version, you can install the latest `nightly` build with:
+
+```sh
+python3 -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --pre --upgrade openscvx
+```
+
+This command will also upgrade an existing `nightly` install to the latest version.
+
+Or if you want a specific pre-release version this can be installed with
+
+```sh
+python3 -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx==1.2.3.dev45
+```
+
+where `1.2.3.dev45 => <major>.<minor>.<patch>.dev<XY>` corresponds to your exact version
+
+</details>
+
+### Dependencies
 
 The main packages are:
 
@@ -39,34 +68,49 @@ The main packages are:
 - `plotly` - is used for all visualizations
 
 These will be installed automatically, but can be installed via conda or pip if you are building from source.
+
+### Local Development
+
+This git repository can be installed using https
+
+```sh
+git clone https://github.com/haynec/OpenSCvx.git
+```
+
+or ssh
+
+```sh
+git clone git@github.com:haynec/OpenSCvx.git
+```
+
+Dependencies can then be installed using Conda or Pip
+
 <details>
 <summary>Via Conda</summary>
 
-1. Clone the repo
-   ```sh
-   git clone https://github.com/haynec/OpenSCvx.git
-   ```
+1. Clone the repo using https or ssh
 2. Install environment packages (this will take about a minute or two):
    ```sh
    conda env create -f environment.yml
    ```
 3. Activate the environment:
    ```sh
-   conda activate los_guidance
+   conda activate openscvx
    ```
-
 </details>
 
 <details>
-<summary>Via Pip</summary>
+<summary>Via pip</summary>
 
-0. Prerequisites
+1. Prerequisites
    Python >= 3.9
-1. Clone the repo
+2. Clone the repo using https or ssh
+3. Create virtual environment (called `venv` here) and source it
    ```sh
-   git clone https://github.com/haynec/OpenSCvx.git
+   python3 -m venv venv
+   source venv/bin/activate
    ```
-2. Install environment packages:
+4. Install environment packages:
    ```sh
    pip install -r requirements.txt
    ```

@@ -39,11 +39,21 @@ def B(x, u, node):
     ones = jnp.ones((2,1))
     return jnp.broadcast_to(ones, (batch, 2, 1))
 
+class Dynamics: pass
+
+@pytest.fixture
+def dynamics():
+    d = Dummy()
+    d.f = state_dot
+    d.A = A
+    d.B = B
+    return d
+
 # --- tests ---------------------------------------------------------
 
-def test_discretization_shapes(params):
+def test_discretization_shapes(params, dynamics):
     # build solver
-    solver = get_discretization_solver(state_dot, A, B, params)
+    solver = get_discretization_solver(dynamics, params)
 
     # dummy x,u
     x = jnp.ones((params.scp.n, params.sim.n_states))
@@ -82,7 +92,7 @@ def test_jit_dVdt_compiles(params):
     lowered.compile()
 
 @pytest.mark.parametrize("integrator", ["custom_integrator", "diffrax"])
-def test_jit_discretization_solver_compiles(params, integrator):
+def test_jit_discretization_solver_compiles(params, dynamics, integrator):
     # flip between the two modes
     if integrator == "custom_integrator":
         params.dis.custom_integrator = True
@@ -90,7 +100,7 @@ def test_jit_discretization_solver_compiles(params, integrator):
         params.dis.custom_integrator = False
 
     # build the solver (captures only hashable primitives)
-    solver = get_discretization_solver(state_dot, A, B, params)
+    solver = get_discretization_solver(dynamics, params)
 
     # dummy x,u (including slack column)
     x = jnp.ones((params.scp.n, params.sim.n_states))
