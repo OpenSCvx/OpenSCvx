@@ -14,7 +14,7 @@ OpenSCvx :rocket: is an [JAX](https://github.com/jax-ml/jax)-based library for n
     - The "Basic Problem Setup" goes in depth into each neccesary element to setup your problem in detail.
     - The "Advanced Problem Setup" goes into more advanced features parameters and options to fine tune the performance of your problem. 
 
-We provide a simple interface to define the dynamics and constraints of your problem, all in continuous time no need for you to descritize your dynamics and constraints, while keeping the repo light enough that if the aspiring user wishes to delve a bit deeper and implement there own components they can do so with relative ease. 
+We provide a simple interface to define the dynamics and constraints of your problem, all in continuous time no need for you to discritize your dynamics and constraints, while keeping the repo light enough that if the aspiring user wishes to delve a bit deeper and implement there own components they can do so with relative ease. 
 
 ## Features
 - Free Final Time
