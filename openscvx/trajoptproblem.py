@@ -288,8 +288,6 @@ class TrajOptProblem:
                 with open(dis_solver_file, "wb") as f:
                     f.write(self.discretization_solver.serialize())
 
-        save_times_dim = (export.symbolic_shape("n"))
-
         # Check if the compiled file already exists 
         try:
             with open(prop_solver_file, "rb") as f:
@@ -306,7 +304,7 @@ class TrajOptProblem:
                 np.ones((1, 1)),
                 np.ones((1, 1)).astype("int"),
                 0,
-                ShapeDtypeStruct(save_times_dim, jnp.float32),
+                0.0,
             )
             # Serialize and Save the compiled code in a temp directory
             self.propagation_solver = propagation_solver
