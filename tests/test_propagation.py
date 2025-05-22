@@ -73,6 +73,10 @@ def test_s_to_t_basic(dis_type):
     p.scp.n = 4
     p.dis = Dummy()
     p.dis.dis_type = dis_type
+    p.sim = Dummy()
+    p.sim.initial_state = Dummy()
+    p.sim.initial_state.value = np.array([0])
+    p.sim.idx_t = slice(0, 1)
 
     # build u with slack values [1,2,3,4]
     u = np.stack([[0.0, float(s)] for s in [1, 2, 3, 4]])
@@ -105,6 +109,10 @@ def test_t_to_tau_constant_slack(dis_type):
     p.scp.n = 4
     p.dis = Dummy()
     p.dis.dis_type = dis_type
+    p.sim = Dummy()
+    p.sim.initial_state = Dummy()
+    p.sim.initial_state.value = np.array([0])
+    p.sim.idx_t = slice(0, 1)
 
     # constant slack = 2.0, control doesn't matter
     N = p.scp.n
