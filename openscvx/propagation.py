@@ -28,7 +28,7 @@ def prop_aug_dy(
 
 
 def get_propagation_solver(state_dot, params):
-    def propagation_solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s):
+    def propagation_solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_times):
         return solve_ivp_diffrax_prop(
             f=prop_aug_dy,
             tau_final=tau_grid[1],
@@ -44,6 +44,7 @@ def get_propagation_solver(state_dot, params):
                 params.scp.n,
             ),
             tau_0=tau_grid[0],
+            save_times=save_times,
         )
 
     return propagation_solver
@@ -85,19 +86,15 @@ def t_to_tau(u, t, u_nodal, t_nodal, params: Config):
 
 
 def simulate_nonlinear_time(x_0, u, tau_vals, t, params, propagation_solver):
-    states = np.empty(
-        (x_0.shape[0], 0)
-    )  # Initialize states as a 2D array with shape (n, 0)
-
+    states = np.empty((x_0.shape[0], 0))  # shape: (n_states, 0)
     tau = np.linspace(0, 1, params.scp.n)
 
     u_lam = lambda new_t: np.array(
         [np.interp(new_t, t, u[:, i]) for i in range(u.shape[1])]
     ).T
 
-    # Bin the tau_vals into with respect to the uniform tau grid, tau
+    # Bin tau_vals into segments of tau
     tau_inds = np.digitize(tau_vals, tau) - 1
-    # Force the last indice to be in the same bin as the previous ones
     tau_inds = np.where(tau_inds == params.scp.n - 1, params.scp.n - 2, tau_inds)
 
     prev_count = 0
@@ -106,30 +103,31 @@ def simulate_nonlinear_time(x_0, u, tau_vals, t, params, propagation_solver):
         controls_current = np.squeeze(u_lam(t[k]))[None, :]
         controls_next = np.squeeze(u_lam(t[k + 1]))[None, :]
 
-        # Create a mask
+        # Mask for tau_vals in current segment
         mask = (tau_inds >= k) & (tau_inds < k + 1)
-
         count = np.sum(mask)
 
-        # Use count to grab the first count number of elements
         tau_cur = tau_vals[prev_count : prev_count + count]
+        # Add tau[k+1] to the end to ensure we grab the end of the integration
+        tau_cur = np.concatenate([tau_cur, np.array([tau[k + 1]])])
 
-        sol = propagation_solver(
-            x_0,
-            (tau[k], tau[k + 1]),
-            controls_current,
-            controls_next,
-            np.array([[tau[k]]]),
-            np.array([[k]]),
-            params.sim.idx_s.stop,
-        )
+        if count > 0:
+            # ⚠️ Directly evaluate at specific times using `saveat=SaveAt(ts=...)`
+            sol = propagation_solver.call(
+                x_0,
+                (tau[k], tau[k + 1]),
+                controls_current,
+                controls_next,
+                np.array([[tau[k]]]),
+                np.array([[k]]),
+                params.sim.idx_s.stop,
+                tau_cur,  # <- pass these to `saveat=SaveAt(ts=...)` internally
+            )
+            x = sol  # Already evaluated at tau_cur
+            states = np.concatenate([states, x[:-1].T], axis=1)
 
-        x = sol.ys
-        for tau_i in tau_cur:
-            new_state = sol.evaluate(tau_i).reshape(-1, 1)  # Ensure new_state is 2D
-            states = np.concatenate([states, new_state], axis=1)
+            x_0 = x[-1]  # Final state becomes initial for next segment
 
-        x_0 = x[-1]
         prev_count += count
 
     return states.T

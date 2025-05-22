@@ -15,3 +15,5 @@ dependencies:
       - qoco
       - qocogen
       - diffrax
+      - absl-py
+      - flatbuffers

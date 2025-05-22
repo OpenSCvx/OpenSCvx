@@ -2,6 +2,7 @@
 
 import numpy as np
 import jax
+from jax import export
 import jax.numpy as jnp
 import pytest
 
@@ -137,6 +138,7 @@ def test_propagation_solver_decay(dis_type):
     # initial state, time grid
     V0 = jnp.array([1.0])
     tau_grid = jnp.array([0.0, 1.0])
+    tau_eval = jnp.array([0.0, 0.5, 1.0])
 
     # we'll hold control constant and slack=1 so f(x)=−x
     # u arrays must be shape (1, n_u+1)= (1,2): [control, slack]
@@ -148,21 +150,18 @@ def test_propagation_solver_decay(dis_type):
 
     node = 0  # dummy node index
 
-    sol = solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s)
+    sol = solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, tau_eval)
 
     # check discrete output
-    ys = np.array(sol.ys[:, 0])
+    ys = np.array(sol[:, 0])
     times = np.linspace(0.0, 1.0, ys.shape[0])
     expected = np.exp(-times)
     # about 1% relative tolerance
     np.testing.assert_allclose(ys, expected, rtol=1e-2, atol=1e-3)
 
     # check dense evaluator at t=0.5
-    y_half = float(sol.evaluate(0.5)[0])
+    y_half = float(sol[1][0])
     assert np.isclose(y_half, np.exp(-0.5), rtol=1e-2, atol=1e-3)
-
-    # confirm shape: default num_substeps=50
-    assert sol.ys.shape == (50, 1)
 
 
 @pytest.mark.parametrize("dis_type", ["ZOH", "FOH"])
@@ -189,12 +188,15 @@ def test_jit_propagation_solver_compiles(dis_type):
 
     node = 0  # dummy node index
 
+    save_times_dim = (export.symbolic_shape("n"))
+
     # JIT only the ys output (the array of solution states)
     jitted = jax.jit(
-        lambda V0, tau_grid, u_cur, u_next, tau_init, node, idx_s: solver(
-            V0, tau_grid, u_cur, u_next, tau_init, node, idx_s
-        ).ys
+        lambda V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_times: solver(
+            V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_times
+        )
     )
-    # Lower & compile
-    lowered = jitted.lower(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s)
-    lowered.compile()
+
+    # Export the function
+    exported = export.export(jitted)(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, jax.ShapeDtypeStruct(save_times_dim, jnp.float32))
+    serial = exported.serialize()
