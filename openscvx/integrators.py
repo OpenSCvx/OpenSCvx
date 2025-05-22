@@ -225,12 +225,27 @@ def solve_ivp_diffrax_prop(
     save_times: Optional[jnp.ndarray] = None,
 ):
     """
-    Export-compatible variant of `solve_ivp_diffrax` returning the full Diffrax result,
-    with optional direct evaluation at specific time points (no dense interpolation).
+    Export-compatible integrator returning the Diffrax result evaluated at `save_time`,
+    with optional direct evaluation at specific time points (dense interpolation is handeled internally
+    as it is not export-compatible).
 
     Args:
-        ...
+        f (Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray]): ODE right-hand side; signature f(t, y, *args) -> dy/dt.
+        tau_final (float): Final integration time.
+        y_0 (jnp.ndarray): Initial state at tau_0.
+        args (tuple): Extra arguments to pass to `f` in the solver term.
+        tau_0 (float, optional): Initial time. Defaults to 0.0.
+        num_substeps (int, optional): Number of save points. Defaults to 50.
+        solver_name (str, optional): Key into SOLVER_MAP. Defaults to "Dopri8".
+        rtol (float, optional): Relative tolerance. Defaults to 1e-3.
+        atol (float, optional): Absolute tolerance. Defaults to 1e-6.
+        extra_kwargs (dict, optional): Additional kwargs for `diffeqsolve`.
         save_times (jnp.ndarray, optional): Time points to evaluate solution at.
+    
+    Returns:
+        sol.ys: Solution evaluated at save_times
+    Raises:
+        ValueError: If `solver_name` is not recognized.
     """
     if save_times is None:
         save_times = jnp.linspace(tau_0, tau_final, num_substeps)
