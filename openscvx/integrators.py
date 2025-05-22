@@ -1,8 +1,51 @@
+import os
+os.environ["EQX_ON_ERROR"] = "nan"
+
+
+from typing import Callable, Any, Optional
+
+
+import jax
+import jax.numpy as jnp
+import diffrax as dfx
 from typing import Callable, Any
 
 import jax
 import jax.numpy as jnp
 import diffrax as dfx
+
+from diffrax._global_interpolation import DenseInterpolation
+from jax import tree_util
+
+# Safely check if DenseInterpolation is already registered
+try:
+    # Attempt to flatten a dummy DenseInterpolation instance
+    # Provide dummy arguments to create a valid instance
+    dummy_instance = DenseInterpolation(
+        ts=jnp.array([]),
+        ts_size=0,
+        infos=None,
+        interpolation_cls=None,
+        direction=None,
+        t0_if_trivial=0.0,
+        y0_if_trivial=jnp.array([]),
+    )
+    tree_util.tree_flatten(dummy_instance)
+except ValueError:
+    # Register DenseInterpolation as a PyTree node if not already registered
+    def dense_interpolation_flatten(obj):
+        # Flatten the internal data of DenseInterpolation
+        return (obj._data,), None
+
+    def dense_interpolation_unflatten(aux_data, children):
+        # Reconstruct DenseInterpolation from its flattened data
+        return DenseInterpolation(*children)
+
+    tree_util.register_pytree_node(
+        DenseInterpolation,
+        dense_interpolation_flatten,
+        dense_interpolation_unflatten,
+    )
 
 SOLVER_MAP = {
     "Tsit5": dfx.Tsit5,
@@ -160,6 +203,7 @@ def solve_ivp_diffrax(
         args=args,
         stepsize_controller=stepsize_controller,
         saveat=dfx.SaveAt(ts=substeps),
+        progress_meter=dfx.NoProgressMeter(),
         **(extra_kwargs or {}),
     )
 
@@ -178,32 +222,18 @@ def solve_ivp_diffrax_prop(
     rtol: float = 1e-3,
     atol: float = 1e-6,
     extra_kwargs=None,
+    save_times: Optional[jnp.ndarray] = None,
 ):
     """
-    Propagator variant of `solve_ivp_diffrax` returning the full Diffrax result.
-
-    This is identical to `solve_ivp_diffrax` except that it returns the
-    `diffeqsolve` output struct, which includes dense output and auxiliary data.
+    Export-compatible variant of `solve_ivp_diffrax` returning the full Diffrax result,
+    with optional direct evaluation at specific time points (no dense interpolation).
 
     Args:
-        f (Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray]): ODE right-hand side; signature f(t, y, *args) -> dy/dt.
-        tau_final (float): Final integration time.
-        y_0 (jnp.ndarray): Initial state at tau_0.
-        args (tuple): Extra arguments to pass to `f` in the solver term.
-        tau_0 (float, optional): Initial time. Defaults to 0.0.
-        num_substeps (int, optional): Number of save points. Defaults to 50.
-        solver_name (str, optional): Key into SOLVER_MAP. Defaults to "Dopri8".
-        rtol (float, optional): Relative tolerance. Defaults to 1e-3.
-        atol (float, optional): Absolute tolerance. Defaults to 1e-6.
-        extra_kwargs (dict, optional): Additional kwargs for `diffeqsolve`.
-
-    Returns:
-        diffrax.Solution: Full solver output, including `ys` and interpolation functions.
-
-    Raises:
-        ValueError: If `solver_name` is not recognized.
+        ...
+        save_times (jnp.ndarray, optional): Time points to evaluate solution at.
     """
-    substeps = jnp.linspace(tau_0, tau_final, num_substeps)
+    if save_times is None:
+        save_times = jnp.linspace(tau_0, tau_final, num_substeps)
 
     solver_class = SOLVER_MAP.get(solver_name)
     if solver_class is None:
@@ -212,17 +242,17 @@ def solve_ivp_diffrax_prop(
 
     term = dfx.ODETerm(lambda t, y, args: f(t, y, *args))
     stepsize_controller = dfx.PIDController(rtol=rtol, atol=atol)
+
     solution = dfx.diffeqsolve(
         term,
         solver=solver,
         t0=tau_0,
         t1=tau_final,
-        dt0=(tau_final - tau_0) / (len(substeps) - 1),
+        dt0=(tau_final - tau_0) / (save_times.shape[0] - 1),  # Avoid divide by zero, max(save_times.shape[0] - 1, 1)
         y0=y_0,
         args=args,
         stepsize_controller=stepsize_controller,
-        saveat=dfx.SaveAt(dense=True, ts=substeps),
+        saveat=dfx.SaveAt(dense=True),
         **(extra_kwargs or {}),
     )
-
-    return solution
+    return jax.vmap(solution.evaluate)(save_times)

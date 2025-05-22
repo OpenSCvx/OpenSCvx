@@ -126,7 +126,7 @@ def PTR_subproblem(cpg_solve, x_bar, u_bar, aug_dy, prob, params: Config):
     prob.param_dict['u_bar'].value = u_bar
     
     t0 = time.time()
-    A_bar, B_bar, C_bar, z_bar, V_multi_shoot = aug_dy(x_bar, u_bar.astype(float))
+    A_bar, B_bar, C_bar, z_bar, V_multi_shoot = aug_dy.call(x_bar, u_bar.astype(float))
 
     prob.param_dict['A_d'].value = A_bar.__array__()
     prob.param_dict['B_d'].value = B_bar.__array__()

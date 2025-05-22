@@ -137,6 +137,7 @@ class SimConfig:
     idx_y: slice
     idx_y_prop: slice
     idx_s: slice
+    save_compiled: bool = False
     ctcs_node_intervals: list = None
     constraints_ctcs: List[callable] = field(
         default_factory=list

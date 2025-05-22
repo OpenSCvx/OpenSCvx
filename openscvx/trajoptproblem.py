@@ -6,6 +6,7 @@ import time
 
 import cvxpy as cp
 import jax
+from jax import export, ShapeDtypeStruct
 import numpy as np
 
 from openscvx.config import (
@@ -30,7 +31,6 @@ from openscvx.ptr import PTR_init, PTR_main
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.ocp import OptimalControlProblem
 from openscvx import io
-
 
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
 class TrajOptProblem:
@@ -251,27 +251,63 @@ class TrajOptProblem:
         self.propagation_solver = get_propagation_solver(self.dynamics_augmented_prop.f, self.params)
         self.optimal_control_problem = OptimalControlProblem(self.params)
 
-        # Initialize the PTR loop
-        self.cpg_solve = PTR_init(
-            self.optimal_control_problem,
-            self.discretization_solver,
-            self.params,
-        )
-
         # Compile the solvers
         if not self.params.dev.debug:
-            self.discretization_solver = (
-                jax.jit(self.discretization_solver)
-                .lower(
-                    np.ones((self.params.scp.n, self.params.sim.n_states)),
-                    np.ones((self.params.scp.n, self.params.sim.n_controls)),
-                )
-                .compile()
-            )
+            if self.params.sim.save_compiled:
+                # Check if the compiled file already exists 
+                try:
+                    with open(".tmp/compiled_discretization_solver", "rb") as f:
+                        serial_dis = f.read()
+                    # Load the compiled code
+                    self.discretization_solver = export.deserialize(serial_dis)
+                except FileNotFoundError:
+                    # Compile the discretization solver and save it
+                    discretization_solver = export.export(jax.jit(self.discretization_solver))(
+                        np.ones((self.params.scp.n, self.params.sim.n_states)),
+                        np.ones((self.params.scp.n, self.params.sim.n_controls)),
+                    )
+                    # Serialize and Save the compiled code in a temp directory
+                    serial_dis = discretization_solver.serialize()
+                    with open(".tmp/compiled_discretization_solver", "wb") as f:
+                        f.write(serial_dis)
+                    self.discretization_solver = discretization_solver
+            else:
+                self.discretization_solver = export.export(jax.jit(self.discretization_solver))(np.ones((self.params.scp.n, self.params.sim.n_states)),
+                 np.ones((self.params.scp.n, self.params.sim.n_controls)))
+                # Serialize and Save the compiled code in a temp directory
+                serial_dis = self.discretization_solver.serialize()
+                with open(".tmp/compiled_discretization_solver", "wb") as f:
+                    f.write(serial_dis)
 
-        self.propagation_solver = (
-            jax.jit(self.propagation_solver)
-            .lower(
+        save_times_dim = (export.symbolic_shape("n"))
+
+        if self.params.sim.save_compiled:
+            # Check if the compiled file already exists 
+            try:
+                with open(".tmp/compiled_propagation_solver", "rb") as f:
+                    serial_prop = f.read()
+                # Load the compiled code
+                self.propagation_solver = export.deserialize(serial_prop)
+            except FileNotFoundError:
+                # Compile the discretization solver and save it
+                propagation_solver = export.export(jax.jit(self.propagation_solver))(
+                    np.ones((self.params.sim.n_states_prop)),
+                    (0.0, 0.0),
+                    np.ones((1, self.params.sim.n_controls)),
+                    np.ones((1, self.params.sim.n_controls)),
+                    np.ones((1, 1)),
+                    np.ones((1, 1)).astype("int"),
+                    0,
+                    ShapeDtypeStruct(save_times_dim, jnp.float32),
+                )
+                # Serialize and Save the compiled code in a temp directory
+                self.propagation_solver = propagation_solver
+
+                serial_prop = propagation_solver.serialize()
+                with open(".tmp/compiled_propagation_solver", "wb") as f:
+                    f.write(serial_prop)
+        else:
+            self.propagation_solver = export.export(jax.jit(self.propagation_solver))(
                 np.ones((self.params.sim.n_states_prop)),
                 (0.0, 0.0),
                 np.ones((1, self.params.sim.n_controls)),
@@ -279,8 +315,18 @@ class TrajOptProblem:
                 np.ones((1, 1)),
                 np.ones((1, 1)).astype("int"),
                 0,
+                ShapeDtypeStruct(save_times_dim, jnp.float32)
             )
-            .compile()
+            # Serialize and Save the compiled code in a temp directory
+            serial_prop = self.propagation_solver.serialize()
+            with open(".tmp/compiled_propagation_solver", "wb") as f:
+                f.write(serial_prop)
+
+        # Initialize the PTR loop
+        self.cpg_solve = PTR_init(
+            self.optimal_control_problem,
+            self.discretization_solver,
+            self.params,
         )
 
         t_f_while = time.time()
