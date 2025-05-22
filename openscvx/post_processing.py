@@ -11,7 +11,7 @@ def propagate_trajectory_results(params: Config, result: dict, propagation_solve
 
     t = np.array(s_to_t(u, params))
 
-    t_full = np.arange(0, t[-1], params.prp.dt)
+    t_full = np.arange(t[0], t[-1], params.prp.dt)
 
     tau_vals, u_full = t_to_tau(u, t_full, u, t, params)
 

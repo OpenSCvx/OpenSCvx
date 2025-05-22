@@ -51,7 +51,7 @@ def get_propagation_solver(state_dot, params):
 
 
 def s_to_t(u, params: Config):
-    t = [0]
+    t = [params.sim.initial_state.value[params.sim.idx_t][0]]
     tau = np.linspace(0, 1, params.scp.n)
     for k in range(1, params.scp.n):
         s_kp = u[k - 1, -1]
