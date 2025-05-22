@@ -3,9 +3,6 @@ from typing import List, Union, Optional
 import queue
 import threading
 import time
-import hashlib
-import inspect
-import types
 from pathlib import Path
 
 import cvxpy as cp
@@ -35,26 +32,8 @@ from openscvx.ptr import PTR_init, PTR_main
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.ocp import OptimalControlProblem
 from openscvx import io
+from openscvx.utils import stable_function_hash
 
-def stable_function_hash(funcs):
-    hasher = hashlib.sha256()
-
-    for func in funcs:
-        try:
-            if isinstance(func, types.FunctionType):
-                # Use the code object and constants for stability
-                hasher.update(func.__code__.co_code)
-                hasher.update(str(func.__code__.co_consts).encode())
-                hasher.update(str(func.__code__.co_varnames).encode())
-                hasher.update(func.__name__.encode())
-            else:
-                # Fallback to inspect (less stable)
-                src = inspect.getsource(func)
-                hasher.update(src.encode())
-        except Exception as e:
-            raise ValueError(f"Could not hash function {func}: {e}")
-
-    return hasher.hexdigest()
 
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
 class TrajOptProblem:
