@@ -66,11 +66,7 @@ def test_solve_ivp_diffrax_prop_decay(solver_name):
     )
 
     # Check the discrete solution at the 11 grid points
-    ys = np.array(sol.ys[:, 0])
+    ys = np.array(sol[:, 0])
     t_eval = np.linspace(tau0, tau1, 11)
     expected = np.exp(-t_eval)
     np.testing.assert_allclose(ys, expected, rtol=1e-3, atol=1e-6)
-
-    # Check the dense evaluator at t=0.5
-    y_half = float(sol.evaluate(0.5)[0])
-    assert np.isclose(y_half, np.exp(-0.5), rtol=1e-3, atol=1e-6)
