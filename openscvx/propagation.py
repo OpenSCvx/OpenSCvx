@@ -28,7 +28,7 @@ def prop_aug_dy(
 
 
 def get_propagation_solver(state_dot, params):
-    def propagation_solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_times):
+    def propagation_solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time):
         return solve_ivp_diffrax_prop(
             f=prop_aug_dy,
             tau_final=tau_grid[1],
@@ -44,7 +44,7 @@ def get_propagation_solver(state_dot, params):
                 params.scp.n,
             ),
             tau_0=tau_grid[0],
-            save_times=save_times,
+            save_time=save_time,
         )
 
     return propagation_solver
@@ -112,18 +112,20 @@ def simulate_nonlinear_time(x_0, u, tau_vals, t, params, propagation_solver):
         tau_cur = np.concatenate([tau_cur, np.array([tau[k + 1]])])
 
         if count > 0:
-            # ⚠️ Directly evaluate at specific times using `saveat=SaveAt(ts=...)`
-            sol = propagation_solver.call(
-                x_0,
-                (tau[k], tau[k + 1]),
-                controls_current,
-                controls_next,
-                np.array([[tau[k]]]),
-                np.array([[k]]),
-                params.sim.idx_s.stop,
-                tau_cur,  # <- pass these to `saveat=SaveAt(ts=...)` internally
-            )
-            x = sol  # Already evaluated at tau_cur
+            solutions = []
+            for tau_val in tau_cur:
+                sol = propagation_solver.call(
+                    x_0,
+                    (tau[k], tau[k + 1]),
+                    controls_current,
+                    controls_next,
+                    np.array([[tau[k]]]),
+                    np.array([[k]]),
+                    params.sim.idx_s.stop,
+                    tau_val,  # one scalar at a time cause shape polymorphism is dumb
+                )
+                solutions.append(sol)
+            x = np.array(solutions)  # Already evaluated at tau_cur
             states = np.concatenate([states, x[:-1].T], axis=1)
 
             x_0 = x[-1]  # Final state becomes initial for next segment

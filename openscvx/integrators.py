@@ -222,7 +222,7 @@ def solve_ivp_diffrax_prop(
     rtol: float = 1e-3,
     atol: float = 1e-6,
     extra_kwargs=None,
-    save_times: Optional[jnp.ndarray] = None,
+    save_time = None,
 ):
     """
     Export-compatible integrator returning the Diffrax result evaluated at `save_time`,
@@ -247,8 +247,8 @@ def solve_ivp_diffrax_prop(
     Raises:
         ValueError: If `solver_name` is not recognized.
     """
-    if save_times is None:
-        save_times = jnp.linspace(tau_0, tau_final, num_substeps)
+    if save_time is None:
+        save_time = 0.0
 
     solver_class = SOLVER_MAP.get(solver_name)
     if solver_class is None:
@@ -263,11 +263,12 @@ def solve_ivp_diffrax_prop(
         solver=solver,
         t0=tau_0,
         t1=tau_final,
-        dt0=(tau_final - tau_0) / (save_times.shape[0] - 1),  # Avoid divide by zero, max(save_times.shape[0] - 1, 1)
+        dt0=(tau_final - tau_0) / (1),  # Avoid divide by zero, max(save_times.shape[0] - 1, 1)
         y0=y_0,
         args=args,
         stepsize_controller=stepsize_controller,
         saveat=dfx.SaveAt(dense=True),
         **(extra_kwargs or {}),
     )
-    return jax.vmap(solution.evaluate)(save_times)
+    # return jax.vmap(solution.evaluate)(save_times)
+    return solution.evaluate(save_time)

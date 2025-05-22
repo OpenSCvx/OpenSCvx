@@ -52,19 +52,24 @@ def test_solve_ivp_diffrax_prop_decay(solver_name):
     y0 = jnp.array([1.0])
     args = ()  # our f ignores args
 
-    sol = solve_ivp_diffrax_prop(
-        f=decay,
-        tau_final=tau1,
-        y_0=y0,
-        args=args,
-        tau_0=tau0,
-        num_substeps=11,
-        solver_name=solver_name,
-        rtol=1e-6,
-        atol=1e-9,
-        extra_kwargs={}
-    )
+    t_eval = np.linspace(tau0, tau1, 11)
 
+    solution = []
+    for t in t_eval:
+        sol = solve_ivp_diffrax_prop(
+            f=decay,
+            tau_final=tau1,
+            y_0=y0,
+            args=args,
+            tau_0=tau0,
+            solver_name=solver_name,
+            rtol=1e-6,
+            atol=1e-9,
+            extra_kwargs={},
+            save_time=t,
+        )
+        solution.append(sol)
+    sol = np.array(solution)
     # Check the discrete solution at the 11 grid points
     ys = np.array(sol[:, 0])
     t_eval = np.linspace(tau0, tau1, 11)
