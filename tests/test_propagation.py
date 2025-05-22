@@ -157,9 +157,13 @@ def test_propagation_solver_decay(dis_type):
     idx_s = 1  # slack lives in column 1
 
     node = 0  # dummy node index
+    
+    solution = []
+    for t in tau_eval:
+        sol = solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, t)
+        solution.append(sol)
 
-    sol = solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, tau_eval)
-
+    sol = np.array(solution)
     # check discrete output
     ys = np.array(sol[:, 0])
     times = np.linspace(0.0, 1.0, ys.shape[0])
@@ -196,15 +200,13 @@ def test_jit_propagation_solver_compiles(dis_type):
 
     node = 0  # dummy node index
 
-    save_times_dim = (export.symbolic_shape("n"))
-
     # JIT only the ys output (the array of solution states)
     jitted = jax.jit(
         lambda V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_times: solver(
-            V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_times
+            V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, 0.
         )
     )
 
     # Export the function
-    exported = export.export(jitted)(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, jax.ShapeDtypeStruct(save_times_dim, jnp.float32))
+    exported = export.export(jitted)(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, 0.)
     serial = exported.serialize()
