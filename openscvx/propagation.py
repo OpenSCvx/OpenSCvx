@@ -86,7 +86,7 @@ def t_to_tau(u, t, u_nodal, t_nodal, params: Config):
 
 
 def simulate_nonlinear_time(x_0, u, tau_vals, t, params, propagation_solver):
-    MAX_TAU_LEN = 50  # Adjust to the maximum number of save points expected per segment
+    MAX_TAU_LEN = 200  # Adjust to the maximum number of save points expected per segment
 
     n_segments = params.scp.n - 1
     n_states = x_0.shape[0]
