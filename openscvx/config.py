@@ -14,7 +14,7 @@ def get_affine_scaling_matrices(n, minimum, maximum):
 @dataclass
 class DiscretizationConfig:
     dis_type: str = "FOH"
-    custom_integrator: bool = True
+    custom_integrator: bool = False
     solver: str = "Tsit5"
     args: Dict = field(default_factory=dict)
     atol: float = 1e-3

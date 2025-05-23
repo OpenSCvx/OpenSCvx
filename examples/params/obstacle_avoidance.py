@@ -108,7 +108,7 @@ problem.params.scp.w_tr_adapt = 1.8
 problem.params.dev.printing = True
 
 problem.params.prp.dt = 0.01
-problem.params.dis.custom_integrator = True
+problem.params.dis.custom_integrator = False
 problem.params.cvx.cvxpygen = False
 
 plotting_dict = dict(

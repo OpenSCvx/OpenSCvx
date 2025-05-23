@@ -103,7 +103,6 @@ problem = TrajOptProblem(
 )
 
 problem.params.prp.dt = 0.01
-problem.params.dis.custom_integrator = True
 
 problem.params.scp.lam_vb = 1E0
 
