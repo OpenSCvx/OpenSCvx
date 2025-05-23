@@ -65,6 +65,37 @@ class TrajOptProblem:
         time_dilation_factor_min=0.3,
         time_dilation_factor_max=3.0,
     ):
+        """
+        The primary class in charge of compiling and exporting the solvers 
+
+
+        Args:
+            dynamics (Dynamics): Dynamics function decorated with @dynamics
+            constraints (List[Union[CTCSConstraint, NodalConstraint]]): List of constraints decorated with @ctcs or @nodal
+            idx_time (int): Index of the time variable in the state vector
+            N (int): Number of segments in the trajectory
+            time_init (float): Initial time for the trajectory
+            x_guess (jnp.ndarray): Initial guess for the state trajectory
+            u_guess (jnp.ndarray): Initial guess for the control trajectory
+            initial_state (BoundaryConstraint): Initial state constraint
+            final_state (BoundaryConstraint): Final state constraint
+            x_max (jnp.ndarray): Upper bound on the state variables
+            x_min (jnp.ndarray): Lower bound on the state variables
+            u_max (jnp.ndarray): Upper bound on the control variables
+            u_min (jnp.ndarray): Lower bound on the control variables
+            dynamics_prop: Propagation dynamics function decorated with @dynamics
+            initial_state_prop: Propagation initial state constraint
+            scp: SCP configuration object
+            dis: Discretization configuration object
+            prp: Propagation configuration object
+            sim: Simulation configuration object
+            dev: Development configuration object
+            cvx: Convex solver configuration object
+
+        Returns:
+            None
+        """
+
         if dynamics_prop is None:
             dynamics_prop = dynamics
         
