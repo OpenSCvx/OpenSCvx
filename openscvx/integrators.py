@@ -210,7 +210,6 @@ def solve_ivp_diffrax(
     return solution.ys
 
 
-# TODO: (norrisg) this function is basically identical to `solve_ivp_diffrax`, could combine, but requires returning solution and getting `.ys` wherever the `solve_ivp_diffrax` is called
 def solve_ivp_diffrax_prop(
     f: Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray],
     tau_final: float,
@@ -222,33 +221,13 @@ def solve_ivp_diffrax_prop(
     rtol: float = 1e-3,
     atol: float = 1e-6,
     extra_kwargs=None,
-    save_time = None,
+    save_time: jnp.ndarray = None,
+    mask: jnp.ndarray = None,
 ):
-    """
-    Export-compatible integrator returning the Diffrax result evaluated at `save_time`,
-    with optional direct evaluation at specific time points (dense interpolation is handeled internally
-    as it is not export-compatible).
-
-    Args:
-        f (Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray]): ODE right-hand side; signature f(t, y, *args) -> dy/dt.
-        tau_final (float): Final integration time.
-        y_0 (jnp.ndarray): Initial state at tau_0.
-        args (tuple): Extra arguments to pass to `f` in the solver term.
-        tau_0 (float, optional): Initial time. Defaults to 0.0.
-        num_substeps (int, optional): Number of save points. Defaults to 50.
-        solver_name (str, optional): Key into SOLVER_MAP. Defaults to "Dopri8".
-        rtol (float, optional): Relative tolerance. Defaults to 1e-3.
-        atol (float, optional): Absolute tolerance. Defaults to 1e-6.
-        extra_kwargs (dict, optional): Additional kwargs for `diffeqsolve`.
-        save_times (jnp.ndarray, optional): Time points to evaluate solution at.
-    
-    Returns:
-        sol.ys: Solution evaluated at save_times
-    Raises:
-        ValueError: If `solver_name` is not recognized.
-    """
     if save_time is None:
-        save_time = 0.0
+        raise ValueError("save_time must be provided for export compatibility.")
+    if mask is None:
+        mask = jnp.ones_like(save_time, dtype=bool)
 
     solver_class = SOLVER_MAP.get(solver_name)
     if solver_class is None:
@@ -263,12 +242,17 @@ def solve_ivp_diffrax_prop(
         solver=solver,
         t0=tau_0,
         t1=tau_final,
-        dt0=(tau_final - tau_0) / (1),  # Avoid divide by zero, max(save_times.shape[0] - 1, 1)
+        dt0=(tau_final - tau_0) / 1,
         y0=y_0,
         args=args,
         stepsize_controller=stepsize_controller,
         saveat=dfx.SaveAt(dense=True),
         **(extra_kwargs or {}),
     )
-    # return jax.vmap(solution.evaluate)(save_times)
-    return solution.evaluate(save_time)
+
+    # Evaluate all save_time points (static size), then mask them
+    all_evals = jax.vmap(solution.evaluate)(save_time)  # shape: (MAX_TAU_LEN, n_states)
+    masked_array = jnp.where(mask[:, None], all_evals, jnp.zeros_like(all_evals))
+         # shape: (variable_len, n_states)
+
+    return masked_array

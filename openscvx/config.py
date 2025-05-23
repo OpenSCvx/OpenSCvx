@@ -91,6 +91,7 @@ class PropagationConfig:
     inter_sample: int = 30
     dt: float = 0.1
     solver: str = "Dopri8"
+    max_tau_len: int = 1000
     args: Dict = field(default_factory=dict)
     atol: float = 1e-3
     rtol: float = 1e-6
@@ -111,6 +112,7 @@ class PropagationConfig:
     The solver should likley not to be changed as it is a high accuracy 8th order runga kutta method.
     
     Args:
+        max_tau_len (int): The maximum length of the time vector for propagation. Defaults to 1000.
         solver (str): The numerical solver to use for propagation (e.g., "Dopri8"). Defaults to "Dopri8".
         args (Dict): Additional arguments to pass to the solver. Defaults to an empty dictionary.
         atol (float): Absolute tolerance for the solver. Defaults to 1e-3.

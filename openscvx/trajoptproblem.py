@@ -288,6 +288,12 @@ class TrajOptProblem:
                 with open(dis_solver_file, "wb") as f:
                     f.write(self.discretization_solver.serialize())
 
+        # Compile the discretization solver and save it
+        dtau = 1.0 / (self.params.scp.n - 1) 
+        dt_max = self.params.sim.max_control[self.params.sim.idx_s][0] * dtau
+
+        self.params.prp.max_tau_len = int(dt_max / self.params.prp.dt) + 1
+
         # Check if the compiled file already exists 
         try:
             with open(prop_solver_file, "rb") as f:
@@ -295,17 +301,18 @@ class TrajOptProblem:
             # Load the compiled code
             self.propagation_solver = export.deserialize(serial_prop)
         except FileNotFoundError:
-            # Compile the discretization solver and save it
             propagation_solver = export.export(jax.jit(self.propagation_solver))(
-                np.ones((self.params.sim.n_states_prop)),
-                (0.0, 0.0),
-                np.ones((1, self.params.sim.n_controls)),
-                np.ones((1, self.params.sim.n_controls)),
-                np.ones((1, 1)),
-                np.ones((1, 1)).astype("int"),
-                0,
-                0.0,
+                np.ones((self.params.sim.n_states_prop)),                  # x_0
+                (0.0, 0.0),                                                # time span
+                np.ones((1, self.params.sim.n_controls)),                 # controls_current
+                np.ones((1, self.params.sim.n_controls)),                 # controls_next
+                np.ones((1, 1)),                                           # tau_0
+                np.ones((1, 1)).astype("int"),                             # segment index
+                0,                                                         # idx_s_stop
+                np.ones((self.params.prp.max_tau_len,)),                                   # save_time (tau_cur_padded)
+                np.ones((self.params.prp.max_tau_len,), dtype=bool),                       # mask_padded (boolean mask)
             )
+
             # Serialize and Save the compiled code in a temp directory
             self.propagation_solver = propagation_solver
 
