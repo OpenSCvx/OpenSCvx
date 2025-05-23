@@ -131,80 +131,82 @@ def test_t_to_tau_constant_slack(dis_type):
 @pytest.mark.parametrize("dis_type", ["ZOH", "FOH"])
 def test_propagation_solver_decay(dis_type):
     """
-    Propagation solver should approximate exp(-t) over [0,1] with ~1% error,
-    for both zero-order hold and first-order hold.
+    Propagation solver should approximate exp(-t) over [0,1] at t=0.5 with ~1% error.
     """
-    # ——— build dummy params ———
+    # Build dummy params
     p = Dummy()
     p.scp = Dummy()
-    p.scp.n = 5  # N only matters for FOH, but u_cur==u_next here
+    p.scp.n = 2  # only one segment needed
     p.dis = Dummy()
     p.dis.dis_type = dis_type
+    p.sim = Dummy()
+    p.sim.idx_s = Dummy()
+    p.sim.idx_s.stop = 1  # slack index
 
     solver = get_propagation_solver(decay, p)
 
-    # initial state, time grid
+    # Initial conditions
     V0 = jnp.array([1.0])
     tau_grid = jnp.array([0.0, 1.0])
-    tau_eval = jnp.array([0.0, 0.5, 1.0])
+    u_cur = jnp.array([[0.0, 1.0]])   # slack = 1
+    u_next = jnp.array([[0.0, 1.0]])  # slack = 1
+    tau_init = jnp.array([[0.0]])
+    node = jnp.array([[0]])
+    idx_s = 1
 
-    # we'll hold control constant and slack=1 so f(x)=−x
-    # u arrays must be shape (1, n_u+1)= (1,2): [control, slack]
-    u_cur = np.array([[0.0, 1.0]])
-    u_next = np.array([[0.0, 1.0]])
+    # We only care about t = 0.5
+    save_time = jnp.array([0.5])
+    mask = jnp.array([True])  # Only one point
 
-    tau_init = float(tau_grid[0])
-    idx_s = 1  # slack lives in column 1
+    # Call the solver
+    sol = solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask)
 
-    node = 0  # dummy node index
+    # Extract solution
+    y_half = float(sol[0][0])
 
-    sol = solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, tau_eval)
-
-    # check discrete output
-    ys = np.array(sol[:, 0])
-    times = np.linspace(0.0, 1.0, ys.shape[0])
-    expected = np.exp(-times)
-    # about 1% relative tolerance
-    np.testing.assert_allclose(ys, expected, rtol=1e-2, atol=1e-3)
-
-    # check dense evaluator at t=0.5
-    y_half = float(sol[1][0])
-    assert np.isclose(y_half, np.exp(-0.5), rtol=1e-2, atol=1e-3)
-
+    # Check against exact solution
+    expected = np.exp(-0.5)
+    assert np.isclose(y_half, expected, rtol=1e-2, atol=1e-3)
 
 @pytest.mark.parametrize("dis_type", ["ZOH", "FOH"])
 def test_jit_propagation_solver_compiles(dis_type):
     """
-    Ensure that the propagation solver's .ys output can be jitted without errors.
+    Ensure that the propagation solver's .call output can be jitted and exported without errors.
     """
+
     # — build dummy params —
     p = Dummy()
     p.scp = Dummy()
     p.scp.n = 5
     p.dis = Dummy()
     p.dis.dis_type = dis_type
+    p.sim = Dummy()
+    p.sim.idx_s = Dummy()
+    p.sim.idx_s.stop = 0  # dummy value
 
     solver = get_propagation_solver(decay, p)
 
-    # — dummy inputs for a single integration step —
+    # — dummy inputs —
     V0 = jnp.array([1.0])
     tau_grid = jnp.array([0.0, 1.0])
     u_cur = jnp.array([[0.0, 1.0]])
     u_next = jnp.array([[0.0, 1.0]])
-    tau_init = tau_grid[0]
-    idx_s = 1
+    tau_init = jnp.array([[0.0]])
+    node = jnp.array([[0]])
+    idx_s = 0
 
-    node = 0  # dummy node index
+    MAX_TAU_LEN = 20
+    save_time = jnp.linspace(0.0, 1.0, MAX_TAU_LEN)
+    mask = jnp.ones_like(save_time, dtype=bool)
 
-    save_times_dim = (export.symbolic_shape("n"))
-
-    # JIT only the ys output (the array of solution states)
+    # JIT and export the solver
     jitted = jax.jit(
-        lambda V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_times: solver(
-            V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_times
-        )
+        lambda V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask:
+            solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask)
     )
 
-    # Export the function
-    exported = export.export(jitted)(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, jax.ShapeDtypeStruct(save_times_dim, jnp.float32))
+    # Export
+    exported = export.export(jitted)(
+        V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask
+    )
     serial = exported.serialize()

@@ -7,7 +7,7 @@ from openscvx.constraints import boundary, ctcs, nodal
 from openscvx.utils import qdcm, SSMP, SSM, generate_orthogonal_unit_vectors
 
 n = 8
-total_time = 2  # Total time for the simulation
+total_time = 2.0  # Total time for the simulation
 
 #                      rx,  ry,     theta,   t
 max_state = np.array([ 5.,  5.,  2*jnp.pi,  50])
@@ -66,14 +66,12 @@ problem = TrajOptProblem(
 
 problem.params.prp.dt = 0.01
 
-problem.params.scp.w_tr_adapt = 1.1
+problem.params.scp.w_tr_adapt = 1.3
 
 problem.params.scp.w_tr = 1e0        # Weight on the Trust Reigon
 problem.params.scp.lam_cost = 1e-1   # Weight on the Minimal Time Objective
-problem.params.scp.lam_vc = 1e2      # Weight on the Virtual Control Objective
+problem.params.scp.lam_vc = 6e2      # Weight on the Virtual Control Objective
 problem.params.scp.uniform_time_grid = True
-
-problem.params.dis.custom_integrator = False
 
 plotting_dict = dict(
     obs_radius = obs_radius,

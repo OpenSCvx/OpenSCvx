@@ -141,7 +141,6 @@ problem = TrajOptProblem(
 )
 
 problem.params.prp.dt = 0.1
-problem.params.dis.custom_integrator = True
 
 problem.params.scp.w_tr = 4e0  # Weight on the Trust Reigon
 problem.params.scp.lam_cost = 1e-2  # Weight on the Minimal Fuel Objective

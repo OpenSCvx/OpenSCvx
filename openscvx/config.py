@@ -14,7 +14,7 @@ def get_affine_scaling_matrices(n, minimum, maximum):
 @dataclass
 class DiscretizationConfig:
     dis_type: str = "FOH"
-    custom_integrator: bool = True
+    custom_integrator: bool = False
     solver: str = "Tsit5"
     args: Dict = field(default_factory=dict)
     atol: float = 1e-3
@@ -107,40 +107,13 @@ class ConvexSolverConfig:
 
 @dataclass
 class PropagationConfig:
-    def __init__(self, 
-                 inter_sample: int = 30, 
-                 dt: float = 0.1, 
-                 solver: str = "Dopri8", 
-                 args: Dict = None, 
-                 atol: float = 1e-3, 
-                 rtol: float = 1e-6):
-        """
-        Configuration class for propagation settings.
-
-        This class defines the parameters required for propagating the nonlinear system dynamics using the optimal control sequence.
-
-        Main arguments:
-        These are the arguments most commonly used day-to-day.
-        
-        Args:
-            inter_sample (int): Unused to be depreciated. TODO haynec Remove this
-            dt (float): The time step for propagation. Defaults to 0.1.
-
-        Other arguments:
-        The solver should likley not to be changed as it is a high accuracy 8th order runga kutta method.
-        
-        Args:
-            solver (str): The numerical solver to use for propagation (e.g., "Dopri8"). Defaults to "Dopri8".
-            args (Dict): Additional arguments to pass to the solver. Defaults to an empty dictionary.
-            atol (float): Absolute tolerance for the solver. Defaults to 1e-3.
-            rtol (float): Relative tolerance for the solver. Defaults to 1e-6.
-        """
-        self.inter_sample = inter_sample
-        self.dt = dt
-        self.solver = solver
-        self.args = args if args is not None else {}
-        self.atol = atol
-        self.rtol = rtol
+    inter_sample: int = 30
+    dt: float = 0.1
+    solver: str = "Dopri8"
+    max_tau_len: int = 1000
+    args: Dict = field(default_factory=dict)
+    atol: float = 1e-3
+    rtol: float = 1e-6
 
     """
     Configuration class for propagation settings.
@@ -158,6 +131,7 @@ class PropagationConfig:
     The solver should likley not to be changed as it is a high accuracy 8th order runga kutta method.
     
     Args:
+        max_tau_len (int): The maximum length of the time vector for propagation. Defaults to 1000.
         solver (str): The numerical solver to use for propagation (e.g., "Dopri8"). Defaults to "Dopri8".
         args (Dict): Additional arguments to pass to the solver. Defaults to an empty dictionary.
         atol (float): Absolute tolerance for the solver. Defaults to 1e-3.

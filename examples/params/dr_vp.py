@@ -184,7 +184,6 @@ problem = TrajOptProblem(
 )
 
 problem.params.prp.dt = 0.1
-problem.params.dis.custom_integrator = True
 
 problem.params.dev.debug_printing = False
 
