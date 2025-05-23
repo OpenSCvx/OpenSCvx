@@ -2,35 +2,69 @@
 !!! Warning
     This page is still under development :construction:.
 
+## Constraints
+
+### BoundaryConstraint
+
+::: openscvx.constraints.boundary.BoundaryConstraint
+    options:
+      show_source: false
+      show_root_heading: true
+      show_anchors: true
+
 ## TrajOptProblem
 
-::: openscvx.trajoptproblem.TrajOptProblem.__init__
+::: openscvx.trajoptproblem.TrajOptProblem
+    options:
+      show_source: false
+      show_root_heading: true
+      show_anchors: true
 
 
-## BoundaryConstraint
-
-::: openscvx.constraints.boundary.BoundaryConstraint.__init__
-
-## ScpConfig
+### ScpConfig
 
 ::: openscvx.config.ScpConfig.__init__
+    options:
+      show_source: false
+      show_root_heading: true
+      show_anchors: true
 
-## DiscretizationConfig
+### DiscretizationConfig
 
 ::: openscvx.config.DiscretizationConfig.__init__
+    options:
+      show_source: false
+      show_root_heading: true
+      show_anchors: true
 
-## PropagationConfig
+### PropagationConfig
 
 ::: openscvx.config.PropagationConfig.__init__
+    options:
+      show_source: false
+      show_root_heading: true
+      show_anchors: true
 
-## SimConfig
+### SimConfig
 
 ::: openscvx.config.SimConfig.__init__
+    options:
+      show_source: false
+      show_root_heading: true
+      show_anchors: true
 
-## ConvexSolverConfig
+### ConvexSolverConfig
 
 ::: openscvx.config.ConvexSolverConfig.__init__
+    options:
+      show_source: false
+      show_root_heading: true
+      show_anchors: true
 
-## DevConfig
+### DevConfig
 
 ::: openscvx.config.DevConfig.__init__
+    options:
+      show_source: false
+      show_root_heading: true
+      show_anchors: true
