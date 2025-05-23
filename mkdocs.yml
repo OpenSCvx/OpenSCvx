@@ -16,6 +16,8 @@ theme:
   name: material
   custom_dir: material/overrides
   logo: assets/logo.svg
+  # toc:
+  #   depth: 2
   features:
     - announce.dismiss
     - content.action.edit
@@ -80,24 +82,15 @@ plugins:
       separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
   - typeset
   - mkdocstrings:
-      setup_commands:
-            - import pytkdocs_tweaks
-            - pytkdocs_tweaks.main()
-            - import jax.tree_util
-            - jax.tree_util.Partial.__module__ = "jax.tree_util"
       handlers:
         python:
           options:
-            show_root_heading: true
-            show_root_full_path: true
-            show_if_no_docstring: true
-            show_signature_annotations: true
-            show_source: false
-            members_order: source
+            show_signature: true
             heading_level: 4
-            inherited_members: false  # Allow looking up inherited methods
-          paths: [openscvx.src]
-
+            show_signature_annotations: true
+            show_docstring: true
+            docstring_style: google
+            
 # Hooks
 hooks:
   - material/overrides/hooks/shortcodes.py
