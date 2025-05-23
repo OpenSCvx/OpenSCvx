@@ -7,3 +7,5 @@ jax
 plotly
 termcolor
 diffrax
+absl-py
+flatbuffers

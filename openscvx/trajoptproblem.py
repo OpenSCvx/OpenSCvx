@@ -3,9 +3,11 @@ from typing import List, Union, Optional
 import queue
 import threading
 import time
+from pathlib import Path
 
 import cvxpy as cp
 import jax
+from jax import export, ShapeDtypeStruct
 import numpy as np
 
 from openscvx.config import (
@@ -30,6 +32,7 @@ from openscvx.ptr import PTR_init, PTR_main
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.ocp import OptimalControlProblem
 from openscvx import io
+from openscvx.utils import stable_function_hash
 
 
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
@@ -251,27 +254,51 @@ class TrajOptProblem:
         self.propagation_solver = get_propagation_solver(self.dynamics_augmented_prop.f, self.params)
         self.optimal_control_problem = OptimalControlProblem(self.params)
 
-        # Initialize the PTR loop
-        self.cpg_solve = PTR_init(
-            self.optimal_control_problem,
-            self.discretization_solver,
-            self.params,
-        )
+        # Collect all relevant functions
+        functions_to_hash = [self.dynamics_augmented.f, self.dynamics_augmented_prop.f]
+        for constraint in self.params.sim.constraints_nodal:
+            functions_to_hash.append(constraint.func)
+        for constraint in self.params.sim.constraints_ctcs:
+            functions_to_hash.append(constraint.func)
+
+        # Get unique source-based hash
+        function_hash = stable_function_hash(functions_to_hash)
+
+        solver_dir = Path(".tmp")
+        solver_dir.mkdir(parents=True, exist_ok=True)
+        dis_solver_file = solver_dir / f"compiled_discretization_solver_{function_hash}.jax"
+        prop_solver_file = solver_dir / f"compiled_propagation_solver_{function_hash}.jax"
+
 
         # Compile the solvers
         if not self.params.dev.debug:
-            self.discretization_solver = (
-                jax.jit(self.discretization_solver)
-                .lower(
+            # Check if the compiled file already exists 
+            try:
+                with open(dis_solver_file, "rb") as f:
+                    serial_dis = f.read()
+                # Load the compiled code
+                self.discretization_solver = export.deserialize(serial_dis)
+            except FileNotFoundError:
+                # Compile the discretization solver and save it
+                self.discretization_solver = export.export(jax.jit(self.discretization_solver))(
                     np.ones((self.params.scp.n, self.params.sim.n_states)),
                     np.ones((self.params.scp.n, self.params.sim.n_controls)),
                 )
-                .compile()
-            )
+                # Serialize and Save the compiled code in a temp directory
+                with open(dis_solver_file, "wb") as f:
+                    f.write(self.discretization_solver.serialize())
 
-        self.propagation_solver = (
-            jax.jit(self.propagation_solver)
-            .lower(
+        save_times_dim = (export.symbolic_shape("n"))
+
+        # Check if the compiled file already exists 
+        try:
+            with open(prop_solver_file, "rb") as f:
+                serial_prop = f.read()
+            # Load the compiled code
+            self.propagation_solver = export.deserialize(serial_prop)
+        except FileNotFoundError:
+            # Compile the discretization solver and save it
+            propagation_solver = export.export(jax.jit(self.propagation_solver))(
                 np.ones((self.params.sim.n_states_prop)),
                 (0.0, 0.0),
                 np.ones((1, self.params.sim.n_controls)),
@@ -279,8 +306,19 @@ class TrajOptProblem:
                 np.ones((1, 1)),
                 np.ones((1, 1)).astype("int"),
                 0,
+                ShapeDtypeStruct(save_times_dim, jnp.float32),
             )
-            .compile()
+            # Serialize and Save the compiled code in a temp directory
+            self.propagation_solver = propagation_solver
+
+            with open(prop_solver_file, "wb") as f:
+                f.write(self.propagation_solver.serialize())
+
+        # Initialize the PTR loop
+        self.cpg_solve = PTR_init(
+            self.optimal_control_problem,
+            self.discretization_solver,
+            self.params,
         )
 
         t_f_while = time.time()
