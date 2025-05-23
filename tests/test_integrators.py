@@ -47,31 +47,36 @@ def test_solve_ivp_diffrax_decay(solver_name, num_steps):
 
 @pytest.mark.parametrize("solver_name", ["Tsit5", "Dopri5", "Dopri8"])
 def test_solve_ivp_diffrax_prop_decay(solver_name):
-    # Integrate y' = -y, y(0)=1, from t=0 to t=1
+    # Setup integration bounds
     tau0, tau1 = 0.0, 1.0
     y0 = jnp.array([1.0])
-    args = ()  # our f ignores args
+    args = ()  # decay doesn't need extra args
 
-    t_eval = np.linspace(tau0, tau1, 11)
+    # Determine dt and MAX_TAU_LEN
+    dt = 0.1
+    dtau = tau1 - tau0
+    MAX_TAU_LEN = int(jnp.ceil(dtau / dt)) + 1  # +1 to ensure coverage
 
-    solution = []
-    for t in t_eval:
-        sol = solve_ivp_diffrax_prop(
-            f=decay,
-            tau_final=tau1,
-            y_0=y0,
-            args=args,
-            tau_0=tau0,
-            solver_name=solver_name,
-            rtol=1e-6,
-            atol=1e-9,
-            extra_kwargs={},
-            save_time=t,
-        )
-        solution.append(sol)
-    sol = np.array(solution)
-    # Check the discrete solution at the 11 grid points
+    # Define save_time and mask
+    save_time_raw = jnp.linspace(tau0, tau1, MAX_TAU_LEN)
+    mask = jnp.ones(MAX_TAU_LEN, dtype=bool)
+
+    # Run solver
+    sol = solve_ivp_diffrax_prop(
+        f=decay,
+        tau_final=tau1,
+        y_0=y0,
+        args=args,
+        tau_0=tau0,
+        solver_name=solver_name,
+        rtol=1e-6,
+        atol=1e-9,
+        extra_kwargs={},
+        save_time=save_time_raw,
+        mask=mask,
+    )
+
+    # Check the solution
     ys = np.array(sol[:, 0])
-    t_eval = np.linspace(tau0, tau1, 11)
-    expected = np.exp(-t_eval)
+    expected = np.exp(-np.linspace(tau0, tau1, MAX_TAU_LEN))
     np.testing.assert_allclose(ys, expected, rtol=1e-3, atol=1e-6)
