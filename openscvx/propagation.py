@@ -86,8 +86,6 @@ def t_to_tau(u, t, u_nodal, t_nodal, params: Config):
 
 
 def simulate_nonlinear_time(x_0, u, tau_vals, t, params, propagation_solver):
-    MAX_TAU_LEN = 200  # Adjust to the maximum number of save points expected per segment
-
     n_segments = params.scp.n - 1
     n_states = x_0.shape[0]
     n_tau = len(tau_vals)
@@ -120,7 +118,7 @@ def simulate_nonlinear_time(x_0, u, tau_vals, t, params, propagation_solver):
         count += 1
 
         # Pad to fixed length
-        pad_len = MAX_TAU_LEN - count
+        pad_len = params.prp.max_tau_len - count
         tau_cur_padded = np.pad(tau_cur, (0, pad_len), constant_values=tau[k + 1])
         mask_padded = np.concatenate([np.ones(count), np.zeros(pad_len)]).astype(bool)
 
