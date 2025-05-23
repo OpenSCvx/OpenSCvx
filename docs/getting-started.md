@@ -132,3 +132,14 @@ Please cite the following works if you use the repository,
       url={https://arxiv.org/abs/2404.16826}, 
 }
 ```
+
+```
+@misc{chari2025qoco,
+  title = {QOCO: A Quadratic Objective Conic Optimizer with Custom Solver Generation},
+  author = {Chari, Govind M and A{\c{c}}{\i}kme{\c{s}}e, Beh{\c{c}}et},
+  year = {2025},
+  eprint = {2503.12658},
+  archiveprefix = {arXiv},
+  primaryclass = {math.OC},
+}
+```
