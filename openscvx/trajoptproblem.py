@@ -296,16 +296,20 @@ class TrajOptProblem:
             self.propagation_solver = export.deserialize(serial_prop)
         except FileNotFoundError:
             # Compile the discretization solver and save it
+            MAX_TAU_LEN = 50
+
             propagation_solver = export.export(jax.jit(self.propagation_solver))(
-                np.ones((self.params.sim.n_states_prop)),
-                (0.0, 0.0),
-                np.ones((1, self.params.sim.n_controls)),
-                np.ones((1, self.params.sim.n_controls)),
-                np.ones((1, 1)),
-                np.ones((1, 1)).astype("int"),
-                0,
-                0.0,
+                np.ones((self.params.sim.n_states_prop)),                  # x_0
+                (0.0, 0.0),                                                # time span
+                np.ones((1, self.params.sim.n_controls)),                 # controls_current
+                np.ones((1, self.params.sim.n_controls)),                 # controls_next
+                np.ones((1, 1)),                                           # tau_0
+                np.ones((1, 1)).astype("int"),                             # segment index
+                0,                                                         # idx_s_stop
+                np.ones((MAX_TAU_LEN,)),                                   # save_time (tau_cur_padded)
+                np.ones((MAX_TAU_LEN,), dtype=bool),                       # mask_padded (boolean mask)
             )
+
             # Serialize and Save the compiled code in a temp directory
             self.propagation_solver = propagation_solver
 
