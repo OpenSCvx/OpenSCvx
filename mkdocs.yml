@@ -16,8 +16,8 @@ theme:
   name: material
   custom_dir: material/overrides
   logo: assets/logo.svg
-  # toc:
-  #   depth: 2
+  toc:
+    depth: 2
   features:
     - announce.dismiss
     - content.action.edit

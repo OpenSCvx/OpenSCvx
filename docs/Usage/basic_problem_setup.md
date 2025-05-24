@@ -36,6 +36,9 @@ min_control = np.array(["Minimum value of each element of the control"])
 The dynamics function must take the following form:
 
 ```python
+from openscvx.dynamics import dynamics
+
+@dynamics
 def dynamics(x, u):
     "Insert your dynamics functions here"
     return jnp.hstack(["Stack up your dynamics here"]) 
@@ -50,6 +53,9 @@ Here ```x``` is the state and ```u``` is the control. The function must return a
 We can choose a state to either maximize or minimize. Additional augmented states can be created here to capture costs that are not already defined within the states. For example, if you have a minimum fuel problem, you can do so by adding a new state, $\mathrm{fuel} = \int^{t_f}_{t_i}\|u\|_2\, dt$, in which case the dynamics will simply be $\dot{\mathrm{fuel}} = \|u\|_2$. 
 
 ```python
+from openscvx.dynamics import dynamics
+
+@dynamics
 def dynamics(x, u):
     "Insert your dynamics functions here"
 
