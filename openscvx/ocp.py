@@ -97,9 +97,9 @@ def OptimalControlProblem(params: Config):
         if params.sim.final_state.type[i] == 'Minimize':
             cost += lam_cost * x_nonscaled[-1][i]
         if params.sim.initial_state.type[i] == 'Maximize':
-            cost += lam_cost * x_nonscaled[0][i]
+            cost -= lam_cost * x_nonscaled[0][i]
         if params.sim.final_state.type[i] == 'Maximize':
-            cost += lam_cost * x_nonscaled[-1][i]
+            cost -= lam_cost * x_nonscaled[-1][i]
 
     if params.scp.uniform_time_grid:
         constr += [u_nonscaled[i][params.sim.idx_s] == u_nonscaled[i-1][params.sim.idx_s] for i in range(1, params.scp.n)]
