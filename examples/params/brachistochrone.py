@@ -66,16 +66,14 @@ problem = TrajOptProblem(
 
 problem.params.prp.dt = 0.01
 
-problem.params.scp.w_tr_adapt = 1.05
+problem.params.scp.w_tr_adapt = 1.00
 
-# problem.params.cvx.solver = "qocogen"
-# problem.params.cvx.cvxpygen = True
+problem.params.cvx.solver = "qocogen"
+problem.params.cvx.cvxpygen = True
 
 problem.params.scp.w_tr = 1e1        # Weight on the Trust Reigon
-problem.params.scp.lam_cost = 1e1    # Weight on the Minimal Time Objective
-problem.params.scp.lam_vc = 1e2      # Weight on the Virtual Control Objective
-# problem.params.scp.ep_tr = 1e-4      # Trust Region Tolerance
-# problem.params.scp.ep_vb = 1e-4      # Virtual Control Tolerance
+problem.params.scp.lam_cost = 1e0    # Weight on the Minimal Time Objective
+problem.params.scp.lam_vc = 1e1      # Weight on the Virtual Control Objective
 problem.params.scp.uniform_time_grid = True
 
 plotting_dict = dict()
