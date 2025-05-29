@@ -33,6 +33,7 @@ from openscvx.post_processing import propagate_trajectory_results
 from openscvx.ocp import OptimalControlProblem
 from openscvx import io
 from openscvx.utils import stable_function_hash
+from openscvx.backend.expr import State, Control, Parameter, Free
 
 
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
@@ -44,14 +45,8 @@ class TrajOptProblem:
         idx_time: int,
         N: int,
         time_init: float,
-        x_guess: jnp.ndarray,
-        u_guess: jnp.ndarray,
-        initial_state: BoundaryConstraint,
-        final_state: BoundaryConstraint,
-        x_max: jnp.ndarray,
-        x_min: jnp.ndarray,
-        u_max: jnp.ndarray,
-        u_min: jnp.ndarray,
+        x: State,
+        u: Control,
         dynamics_prop: callable = None,
         initial_state_prop: BoundaryConstraint = None,
         scp: Optional[ScpConfig] = None,
@@ -100,7 +95,7 @@ class TrajOptProblem:
             dynamics_prop = dynamics
         
         if initial_state_prop is None:
-            initial_state_prop = initial_state
+            initial_state_prop = x.initial
 
         # TODO (norrisg) move this into some augmentation function, if we want to make this be executed after the init (i.e. within problem.initialize) need to rethink how problem is defined
         constraints_ctcs = []
@@ -122,9 +117,9 @@ class TrajOptProblem:
         constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(constraints_ctcs, N)
 
         # Index tracking
-        idx_x_true = slice(0, len(initial_state.value))
-        idx_x_true_prop = slice(0, len(initial_state_prop.value))
-        idx_u_true = slice(0, len(u_max))
+        idx_x_true = slice(0, x.shape[0])
+        idx_x_true_prop = slice(0, len(initial_state_prop))
+        idx_u_true = slice(0, u.shape[0])
         idx_constraint_violation = slice(
             idx_x_true.stop, idx_x_true.stop + num_augmented_states
         )
@@ -136,43 +131,53 @@ class TrajOptProblem:
 
         # check that idx_time is in the correct range
         assert idx_time >= 0 and idx_time < len(
-            x_max
+            x.max
         ), "idx_time must be in the range of the state vector and non-negative"
         idx_time = slice(idx_time, idx_time + 1)
 
-        x_min_augmented = np.hstack([x_min, np.repeat(licq_min, num_augmented_states)])
-        x_max_augmented = np.hstack([x_max, np.repeat(licq_max, num_augmented_states)])
+        # Create a new state object for the augmented states
+        y = State(name="y", shape=(num_augmented_states,))
+        y.initial = np.zeros((num_augmented_states,))
+        y.final = np.array([Free(0)] * num_augmented_states)
+        y.guess = np.zeros((N, num_augmented_states,))
+        y.min = np.zeros((num_augmented_states,))
+        y.max = N * licq_max * np.ones((num_augmented_states,)) # TODO Verify if N is needed
+        
+        x.append(y)
 
-        u_min_augmented = np.hstack([u_min, time_dilation_factor_min * time_init])
-        u_max_augmented = np.hstack([u_max, time_dilation_factor_max * time_init])
+        s = Control(name="s", shape=(1,))
+        s.min = np.array([time_dilation_factor_min * time_init])
+        s.max = np.array([time_dilation_factor_max * time_init])
+        s.guess = np.ones((N, 1)) * time_init
+        
+        u.append(s)
 
-        x_bar_augmented = np.hstack([x_guess, np.full((x_guess.shape[0], num_augmented_states), 0)])
+        x_min_augmented = np.hstack([x.min, np.repeat(licq_min, num_augmented_states)])
+        x_max_augmented = np.hstack([x.max, np.repeat(licq_max, num_augmented_states)])
+
+        u_min_augmented = np.hstack([u.min, time_dilation_factor_min * time_init])
+        u_max_augmented = np.hstack([u.max, time_dilation_factor_max * time_init])
+
+        x_bar_augmented = np.hstack([x.guess, np.full((x.guess.shape[0], num_augmented_states), 0)])
         u_bar_augmented = np.hstack(
-            [u_guess, np.full((u_guess.shape[0], 1), time_init)]
+            [u.guess, np.full((u.guess.shape[0], 1), time_init)]
         )
 
-        initial_state_prop_values = np.hstack([initial_state_prop.value, np.repeat(licq_min, num_augmented_states)])
-        initial_state_prop_types = np.hstack([initial_state_prop.type, ["Fix"] * num_augmented_states])
-        initial_state_prop = boundary(initial_state_prop_values)
-        initial_state_prop.types = initial_state_prop_types
+        # initial_state_prop_values = np.hstack([initial_state_prop, np.repeat(licq_min, num_augmented_states)])
+        # initial_state_prop_types = np.hstack([initial_state_prop.type, ["Fix"] * num_augmented_states])
+        # initial_state_prop = boundary(initial_state_prop_values)
+        # initial_state_prop.types = initial_state_prop_types
 
         if dis is None:
             dis = DiscretizationConfig()
 
         if sim is None:
             sim = SimConfig(
-                x_bar=x_bar_augmented,
-                u_bar=u_bar_augmented,
-                initial_state=initial_state,
-                initial_state_prop=initial_state_prop,
-                final_state=final_state,
-                max_state=x_max_augmented,
-                min_state=x_min_augmented,
-                max_control=u_max_augmented,
-                min_control=u_min_augmented,
+                x=x,
+                u=u,
                 total_time=time_init,
-                n_states=len(initial_state.value),
-                n_states_prop=len(initial_state_prop.value),
+                n_states=x.initial.shape[0],
+                n_states_prop=len(initial_state_prop),
                 idx_x_true=idx_x_true,
                 idx_x_true_prop=idx_x_true_prop,
                 idx_u_true=idx_u_true,
@@ -218,7 +223,7 @@ class TrajOptProblem:
         self.dynamics_augmented = build_augmented_dynamics(dynamics, ctcs_violation_funcs, idx_x_true, idx_u_true)
         self.dynamics_augmented_prop = build_augmented_dynamics(dynamics_prop, ctcs_violation_funcs, idx_x_true_prop, idx_u_true)
 
-        self.params = Config(
+        self.settings = Config(
             sim=sim,
             scp=scp,
             dis=dis,
@@ -232,12 +237,12 @@ class TrajOptProblem:
         self.cpg_solve = None
 
         # set up emitter & thread only if printing is enabled
-        if self.params.dev.printing:
+        if self.settings.dev.printing:
             self.print_queue      = queue.Queue()
             self.emitter_function = lambda data: self.print_queue.put(data)
             self.print_thread     = threading.Thread(
                 target=io.intermediate,
-                args=(self.print_queue, self.params),
+                args=(self.print_queue, self.settings),
                 daemon=True,
             )
             self.print_thread.start()
@@ -254,7 +259,7 @@ class TrajOptProblem:
         io.intro()
 
         # Enable the profiler
-        if self.params.dev.profiling:
+        if self.settings.dev.profiling:
             import cProfile
 
             pr = cProfile.Profile()
@@ -262,8 +267,8 @@ class TrajOptProblem:
 
         t_0_while = time.time()
         # Ensure parameter sizes and normalization are correct
-        self.params.scp.__post_init__()
-        self.params.sim.__post_init__()
+        self.settings.scp.__post_init__()
+        self.settings.sim.__post_init__()
 
         # Compile dynamics and jacobians
         self.dynamics_augmented.f = jax.vmap(self.dynamics_augmented.f)
@@ -273,7 +278,7 @@ class TrajOptProblem:
 
         self.dynamics_augmented_prop.f = jax.vmap(self.dynamics_augmented_prop.f)
 
-        for constraint in self.params.sim.constraints_nodal:
+        for constraint in self.settings.sim.constraints_nodal:
             if not constraint.convex:
                 # TODO: (haynec) switch to AOT instead of JIT
                 constraint.g = jax.jit(constraint.g)
@@ -281,15 +286,15 @@ class TrajOptProblem:
                 constraint.grad_g_u = jax.jit(constraint.grad_g_u)
 
         # Generate solvers and optimal control problem
-        self.discretization_solver = get_discretization_solver(self.dynamics_augmented, self.params)
-        self.propagation_solver = get_propagation_solver(self.dynamics_augmented_prop.f, self.params)
-        self.optimal_control_problem = OptimalControlProblem(self.params)
+        self.discretization_solver = get_discretization_solver(self.dynamics_augmented, self.settings)
+        self.propagation_solver = get_propagation_solver(self.dynamics_augmented_prop.f, self.settings)
+        self.optimal_control_problem = OptimalControlProblem(self.settings)
 
         # Collect all relevant functions
         functions_to_hash = [self.dynamics_augmented.f, self.dynamics_augmented_prop.f]
-        for constraint in self.params.sim.constraints_nodal:
+        for constraint in self.settings.sim.constraints_nodal:
             functions_to_hash.append(constraint.func)
-        for constraint in self.params.sim.constraints_ctcs:
+        for constraint in self.settings.sim.constraints_ctcs:
             functions_to_hash.append(constraint.func)
 
         # Get unique source-based hash
@@ -302,7 +307,7 @@ class TrajOptProblem:
 
 
         # Compile the solvers
-        if not self.params.dev.debug:
+        if not self.settings.dev.debug:
             # Check if the compiled file already exists 
             try:
                 with open(dis_solver_file, "rb") as f:
@@ -312,18 +317,18 @@ class TrajOptProblem:
             except FileNotFoundError:
                 # Compile the discretization solver and save it
                 self.discretization_solver = export.export(jax.jit(self.discretization_solver))(
-                    np.ones((self.params.scp.n, self.params.sim.n_states)),
-                    np.ones((self.params.scp.n, self.params.sim.n_controls)),
+                    np.ones((self.settings.scp.n, self.settings.sim.n_states)),
+                    np.ones((self.settings.scp.n, self.settings.sim.n_controls)),
                 )
                 # Serialize and Save the compiled code in a temp directory
                 with open(dis_solver_file, "wb") as f:
                     f.write(self.discretization_solver.serialize())
 
         # Compile the discretization solver and save it
-        dtau = 1.0 / (self.params.scp.n - 1) 
-        dt_max = self.params.sim.max_control[self.params.sim.idx_s][0] * dtau
+        dtau = 1.0 / (self.settings.scp.n - 1) 
+        dt_max = self.settings.sim.max_control[self.settings.sim.idx_s][0] * dtau
 
-        self.params.prp.max_tau_len = int(dt_max / self.params.prp.dt) + 1
+        self.settings.prp.max_tau_len = int(dt_max / self.settings.prp.dt) + 1
 
         # Check if the compiled file already exists 
         try:
@@ -333,15 +338,15 @@ class TrajOptProblem:
             self.propagation_solver = export.deserialize(serial_prop)
         except FileNotFoundError:
             propagation_solver = export.export(jax.jit(self.propagation_solver))(
-                np.ones((self.params.sim.n_states_prop)),                  # x_0
+                np.ones((self.settings.sim.n_states_prop)),                  # x_0
                 (0.0, 0.0),                                                # time span
-                np.ones((1, self.params.sim.n_controls)),                 # controls_current
-                np.ones((1, self.params.sim.n_controls)),                 # controls_next
+                np.ones((1, self.settings.sim.n_controls)),                 # controls_current
+                np.ones((1, self.settings.sim.n_controls)),                 # controls_next
                 np.ones((1, 1)),                                           # tau_0
                 np.ones((1, 1)).astype("int"),                             # segment index
                 0,                                                         # idx_s_stop
-                np.ones((self.params.prp.max_tau_len,)),                                   # save_time (tau_cur_padded)
-                np.ones((self.params.prp.max_tau_len,), dtype=bool),                       # mask_padded (boolean mask)
+                np.ones((self.settings.prp.max_tau_len,)),                                   # save_time (tau_cur_padded)
+                np.ones((self.settings.prp.max_tau_len,), dtype=bool),                       # mask_padded (boolean mask)
             )
 
             # Serialize and Save the compiled code in a temp directory
@@ -354,22 +359,22 @@ class TrajOptProblem:
         self.cpg_solve = PTR_init(
             self.optimal_control_problem,
             self.discretization_solver,
-            self.params,
+            self.settings,
         )
 
         t_f_while = time.time()
         self.timing_init = t_f_while - t_0_while
         print("Total Initialization Time: ", self.timing_init)
 
-        if self.params.dev.profiling:
+        if self.settings.dev.profiling:
             pr.disable()
             # Save results so it can be viusualized with snakeviz
             pr.dump_stats("profiling_initialize.prof")
 
     def solve(self):
         # Ensure parameter sizes and normalization are correct
-        self.params.scp.__post_init__()
-        self.params.sim.__post_init__()
+        self.settings.scp.__post_init__()
+        self.settings.sim.__post_init__()
 
         if self.optimal_control_problem is None or self.discretization_solver is None:
             raise ValueError(
@@ -377,7 +382,7 @@ class TrajOptProblem:
             )
 
         # Enable the profiler
-        if self.params.dev.profiling:
+        if self.settings.dev.profiling:
             import cProfile
 
             pr = cProfile.Profile()
@@ -388,7 +393,7 @@ class TrajOptProblem:
         io.header()
 
         result = PTR_main(
-            self.params,
+            self.settings,
             self.optimal_control_problem,
             self.discretization_solver,
             self.cpg_solve,
@@ -405,7 +410,7 @@ class TrajOptProblem:
         io.footer(self.timing_solve)
 
         # Disable the profiler
-        if self.params.dev.profiling:
+        if self.settings.dev.profiling:
             pr.disable()
             # Save results so it can be viusualized with snakeviz
             pr.dump_stats("profiling_solve.prof")
@@ -414,21 +419,21 @@ class TrajOptProblem:
 
     def post_process(self, result):
         # Enable the profiler
-        if self.params.dev.profiling:
+        if self.settings.dev.profiling:
             import cProfile
 
             pr = cProfile.Profile()
             pr.enable()
 
         t_0_post = time.time()
-        result = propagate_trajectory_results(self.params, result, self.propagation_solver)
+        result = propagate_trajectory_results(self.settings, result, self.propagation_solver)
         t_f_post = time.time()
 
         self.timing_post = t_f_post - t_0_post
         print("Total Post Processing Time: ", self.timing_post)
 
         # Disable the profiler
-        if self.params.dev.profiling:
+        if self.settings.dev.profiling:
             pr.disable()
             # Save results so it can be viusualized with snakeviz
             pr.dump_stats("profiling_postprocess.prof")

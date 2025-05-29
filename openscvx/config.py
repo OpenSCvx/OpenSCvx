@@ -152,15 +152,8 @@ class SimConfig:
     
     def __init__(
         self,
-        x_bar: np.ndarray,
-        u_bar: np.ndarray,
-        initial_state: 'BoundaryConstraint',
-        initial_state_prop: 'BoundaryConstraint',
-        final_state: np.ndarray,
-        max_state: np.ndarray,
-        min_state: np.ndarray,
-        max_control: np.ndarray,
-        min_control: np.ndarray,
+        x: np.ndarray,
+        u: np.ndarray,
         total_time: float,
         idx_x_true: slice,
         idx_x_true_prop: slice,
@@ -216,15 +209,8 @@ class SimConfig:
             c_u (np.ndarray, optional): Control offset vector. Defaults to `None`.
         """
         # Assign all arguments to self
-        self.x_bar = x_bar
-        self.u_bar = u_bar
-        self.initial_state = initial_state
-        self.initial_state_prop = initial_state_prop
-        self.final_state = final_state
-        self.max_state = max_state
-        self.min_state = min_state
-        self.max_control = max_control
-        self.min_control = min_control
+        self.x = x
+        self.u = u
         self.total_time = total_time
         self.idx_x_true = idx_x_true
         self.idx_x_true_prop = idx_x_true_prop
@@ -256,10 +242,10 @@ class SimConfig:
         self.n_controls = len(self.max_control)
 
         assert (
-            len(self.initial_state.value) == self.n_states - (self.idx_y.stop - self.idx_y.start)
+            self.initial_state.shape[0] == self.n_states - (self.idx_y.stop - self.idx_y.start)
         ), f"Initial state must have {self.n_states - (self.idx_y.stop - self.idx_y.start)} elements"
         assert (
-            len(self.final_state.value) == self.n_states - (self.idx_y.stop - self.idx_y.start)
+            self.final_state.shape[0] == self.n_states - (self.idx_y.stop - self.idx_y.start)
         ), f"Final state must have {self.n_states - (self.idx_y.stop - self.idx_y.start)} elements"
         assert (
             self.max_state.shape[0] == self.n_states
