@@ -1427,6 +1427,35 @@ def plot_animation(result: dict,
 
     return fig
 
+def plot_brachistochrone_position(result: dict,
+                                   params = None):
+    tof = result["t_final"]
+
+    x_full = result["x_full"]
+    title = f'Brachistochrone Simulation: {tof} seconds'
+
+    # Make a 2D Scatter Plot
+    fig = go.Figure(go.Scatter(x=x_full[:, 0], y=x_full[:, 1], mode='lines+markers', line=dict(color='blue', width=2), name='Trajectory'))
+
+    fig.update_layout(title=title, xaxis_title='x (m)', yaxis_title='y (m)', template='plotly_dark')
+    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=1, y=1, z=1)))
+    fig.update_layout(scene=dict(xaxis=dict(range=[-10, 10]), yaxis=dict(range=[-10, 10])), template='plotly_dark')
+    return fig
+    
+def plot_brachistochrone_velocity(results: dict,
+                                  params = None):
+    tof = results["t_final"]
+    x_full = results["x_full"]
+    t_full = results["t_full"]
+    title = f'Brachistochrone Simulation: {tof} seconds'
+
+    # Make a 2D Scatter Plot
+    fig = go.Figure(go.Scatter(x=t_full, y=x_full[:, 2], mode='lines+markers', line=dict(color='blue', width=2), name='Trajectory'))
+    fig.update_layout(title=title, xaxis_title='Time (s)', yaxis_title='Velocity (m/s)', template='plotly_dark')
+    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=1, y=1, z=1))) 
+    fig.update_layout(scene=dict(xaxis=dict(range=[0, tof]), yaxis=dict(range=[-10, 10])), template='plotly_dark')
+    return fig
+
 
 def plot_scp_animation(result: dict,
                        params = None,

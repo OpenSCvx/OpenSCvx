@@ -140,10 +140,10 @@ Check out the problem definitions inside `examples/params` to see how to define 
 
 - [X] Standardized Vehicle and Constraint classes
 - [X] Implement QOCOGen with CVPYGEN
-- [X] Non-Dilated Time Propagation 
+- [X] Non-Dilated Time Propagation
+- [X] Save and reload the compiled JAX code
 - [ ] Auto-SCvx Weight Tuning
 - [ ] Compiled at the subproblem level with JAX
-- [ ] Save and reload the compiled JAX code
 - [ ] Single Shot propagation
 - [ ] Unified Mathematical Interface
 
