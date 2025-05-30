@@ -11,22 +11,41 @@ n = 8
 total_time = 2.0  # Total simulation time
 
 # Define State and Control symbolic variables
-x = State("x", shape=(4,))
-u = Control("u", shape=(2,))
+r =     State("r", shape=(2,))
+theta = State("theta", shape=(1,))
+t =     State("t", shape=(1,))
+
+v = Control("v", shape=(1,))
+w = Control("w", shape=(1,))
 
 # Set bounds on state
-x.min = np.array([-5., -5., -2 * jnp.pi, 0])
-x.max = np.array([5., 5., 2 * jnp.pi, 50])
+r.min = np.array([0., -5.])
+r.max = np.array([5., 5.])
+r.initial = np.array([0, -2])
+r.final   = np.array([0, 2])
+r.guess = np.linspace([0, -2], [0, 2], n)
 
-# Set initial, final, and guess for state trajectory using symbolic boundary expressions
-x.initial = np.array([0, -2, Free(0), 0])
-x.final   = np.array([0, 2, Free(0), Minimize(total_time)])
-x.guess   = np.linspace([0, -2, 0, 0], [0, 2, 0, total_time], n)
+theta.min = -2 * jnp.pi
+theta.max = 2 * jnp.pi
+theta.initial = Free(0)
+theta.final   = Free(0)
+theta.guess = np.linspace(0, 0, n)
+
+t.min = 0
+t.max = 5
+t.initial = Free(0)
+t.final   = Minimize(total_time)
+t.guess = np.linspace(0, total_time, n)
 
 # Set bounds and guess for control
-u.min = np.array([0, -5])
-u.max = np.array([10, 5])
-u.guess = np.repeat(np.expand_dims(np.array([0, 0]), axis=0), n, axis=0)
+v.min = np.array([0])
+v.max = np.array([10])
+v.guess = np.repeat(np.expand_dims(np.array([0]), axis=0), n, axis=0)
+
+w.min = np.array([-5])
+w.max = np.array([5])
+w.guess = np.repeat(np.expand_dims(np.array([0]), axis=0), n, axis=0)
+
 
 # Define Parameters for obstacle radius and center
 obs_radius = Parameter("obs_radius")
@@ -37,30 +56,26 @@ obs_center.value = np.array([-0.01, 0.0])
 
 # Define constraints using symbolic x, u, and parameters
 constraints = [
-    ctcs(lambda x, u, obs_center, obs_radius: obs_radius - jnp.linalg.norm(x[:2] - obs_center)),
-    ctcs(lambda x, u: x - x.max),
-    ctcs(lambda x, u: x.min - x)
+    ctcs(obs_radius - norm(x[:2] - obs_center)),
+    ctcs(r - r.max),
+    ctcs(r.min - r),
+    ctcs(theta - theta.max),
+    ctcs(theta.min - theta),
+    ctcs(t - t.max),
+    ctcs(t.min - t)
 ]
 
 # Define dynamics
-@dynamics
-def dynamics_fn(x, u):
-    rx_dot = u[0] * sin(x[2])
-    ry_dot = u[0] * cos(x[2])
-    theta_dot = u[1]
-    x_dot = asarray([rx_dot, ry_dot, theta_dot])
-    t_dot = 1
-    return hstack([x_dot, t_dot])
+f = [u[0] * sin(theta),
+     u[0] * cos(theta),
+     u[1],
+     1]
 
 # Build the problem
 problem = TrajOptProblem(
-    dynamics=dynamics_fn,
+    dynamics=f,
     constraints=constraints,
-    idx_time=3,
     N=n,
-    time_init=total_time,
-    x=x,
-    u=u,
     licq_max=1e-8,
 )
 

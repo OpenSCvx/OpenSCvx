@@ -42,11 +42,7 @@ class TrajOptProblem:
         self,
         dynamics: Dynamics,
         constraints: List[Union[CTCSConstraint, NodalConstraint]],
-        idx_time: int,
         N: int,
-        time_init: float,
-        x: State,
-        u: Control,
         dynamics_prop: callable = None,
         initial_state_prop: BoundaryConstraint = None,
         scp: Optional[ScpConfig] = None,
@@ -151,17 +147,6 @@ class TrajOptProblem:
         s.guess = np.ones((N, 1)) * time_init
         
         u.append(s)
-
-        x_min_augmented = np.hstack([x.min, np.repeat(licq_min, num_augmented_states)])
-        x_max_augmented = np.hstack([x.max, np.repeat(licq_max, num_augmented_states)])
-
-        u_min_augmented = np.hstack([u.min, time_dilation_factor_min * time_init])
-        u_max_augmented = np.hstack([u.max, time_dilation_factor_max * time_init])
-
-        x_bar_augmented = np.hstack([x.guess, np.full((x.guess.shape[0], num_augmented_states), 0)])
-        u_bar_augmented = np.hstack(
-            [u.guess, np.full((u.guess.shape[0], 1), time_init)]
-        )
 
         # initial_state_prop_values = np.hstack([initial_state_prop, np.repeat(licq_min, num_augmented_states)])
         # initial_state_prop_types = np.hstack([initial_state_prop.type, ["Fix"] * num_augmented_states])
