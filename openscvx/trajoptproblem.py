@@ -33,7 +33,9 @@ from openscvx.post_processing import propagate_trajectory_results
 from openscvx.ocp import OptimalControlProblem
 from openscvx import io
 from openscvx.utils import stable_function_hash
-from openscvx.backend.expr import State, Control, Parameter, Free
+from openscvx.backend.state import State, Free
+from openscvx.backend.control import Control
+
 
 
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.

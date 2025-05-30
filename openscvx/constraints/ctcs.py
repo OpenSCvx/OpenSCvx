@@ -9,7 +9,9 @@ import jax.numpy as jnp
 # TODO: (norrisg) Unclear if should specify behavior for `idx`, `jacfwd` behavior for Jacobians, etc. since that logic is handled elsewhere and could change
 from dataclasses import dataclass
 from typing import Callable, Optional, Tuple, Union
-from openscvx.backend.expr import State, Control, Parameter, Variable
+from openscvx.backend.state import State, Variable
+from openscvx.backend.control import Control
+from openscvx.backend.parameter import Parameter
 import jax.numpy as jnp
 from jax.lax import cond
 import functools

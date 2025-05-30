@@ -4,7 +4,10 @@ import jax.numpy as jnp
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.dynamics import dynamics
 from openscvx.constraints import ctcs, nodal
-from openscvx.backend.expr import State, Control, Parameter, Free, Minimize
+from openscvx.backend.state import State, Free, Minimize
+from openscvx.backend.parameter import Parameter
+from openscvx.backend.control import Control
+
 
 
 n = 8
@@ -19,23 +22,13 @@ v = Control("v", shape=(1,))
 w = Control("w", shape=(1,))
 
 # Set bounds on state
-r.min = np.array([0., -5.])
-r.max = np.array([5., 5.])
-r.initial = np.array([0, -2])
-r.final   = np.array([0, 2])
-r.guess = np.linspace([0, -2], [0, 2], n)
+x.min = np.array([-5., -5., -2 * jnp.pi, 0])
+x.max = np.array([ 5.,  5.,  2 * jnp.pi, 5])
 
-theta.min = -2 * jnp.pi
-theta.max = 2 * jnp.pi
-theta.initial = Free(0)
-theta.final   = Free(0)
-theta.guess = np.linspace(0, 0, n)
-
-t.min = 0
-t.max = 5
-t.initial = Free(0)
-t.final   = Minimize(total_time)
-t.guess = np.linspace(0, total_time, n)
+# Set initial, final, and guess for state trajectory using symbolic boundary expressions
+x.initial = np.array([0, -2, Free(0), 0])
+x.final   = np.array([0, 2, Free(0), Minimize(total_time)])
+x.guess   = np.linspace([0, -2, 0, 0], [0, 2, 0, total_time], n)
 
 # Set bounds and guess for control
 v.min = np.array([0])
@@ -51,25 +44,29 @@ w.guess = np.repeat(np.expand_dims(np.array([0]), axis=0), n, axis=0)
 obs_radius = Parameter("obs_radius")
 obs_radius.value = 1.0
 
+obs_radius = 1.0
+
 obs_center = Parameter("obs_center", shape=(2,))
 obs_center.value = np.array([-0.01, 0.0])
 
+obs_center = np.array([-0.01, 0.0])  # Center of the obstacle
+
 # Define constraints using symbolic x, u, and parameters
 constraints = [
-    ctcs(obs_radius - norm(x[:2] - obs_center)),
-    ctcs(r - r.max),
-    ctcs(r.min - r),
-    ctcs(theta - theta.max),
-    ctcs(theta.min - theta),
-    ctcs(t - t.max),
-    ctcs(t.min - t)
+    ctcs(lambda x_var, u_var: obs_radius - jnp.linalg.norm(x_var[:2] - obs_center)),
+    ctcs(lambda x_var, u_var: x_var - x.max),
+    ctcs(lambda x_var, u_var: x.min - x_var)
 ]
 
 # Define dynamics
-f = [u[0] * sin(theta),
-     u[0] * cos(theta),
-     u[1],
-     1]
+@dynamics
+def dynamics_fn(x_var, u_var):
+    rx_dot = u_var[0] * jnp.sin(x_var[2])
+    ry_dot = u_var[0] * jnp.cos(x_var[2])
+    theta_dot = u_var[1]
+    x_dot = jnp.asarray([rx_dot, ry_dot, theta_dot])
+    t_dot = 1
+    return jnp.hstack([x_dot, t_dot])
 
 # Build the problem
 problem = TrajOptProblem(
@@ -89,6 +86,6 @@ problem.settings.scp.uniform_time_grid = True
 
 # Optional: For plotting
 plotting_dict = dict(
-    obs_radius=obs_radius.value,
-    obs_center=obs_center.value,
+    obs_radius=obs_radius,
+    obs_center=obs_center,
 )

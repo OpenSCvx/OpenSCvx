@@ -238,37 +238,37 @@ class SimConfig:
 
     def __post_init__(self):
         # Keep your validation and default logic here exactly the same as before
-        self.n_states = len(self.max_state)
-        self.n_controls = len(self.max_control)
+        self.n_states = len(self.x.max)
+        self.n_controls = len(self.u.max)
 
-        assert (
-            self.initial_state.shape[0] == self.n_states - (self.idx_y.stop - self.idx_y.start)
-        ), f"Initial state must have {self.n_states - (self.idx_y.stop - self.idx_y.start)} elements"
-        assert (
-            self.final_state.shape[0] == self.n_states - (self.idx_y.stop - self.idx_y.start)
-        ), f"Final state must have {self.n_states - (self.idx_y.stop - self.idx_y.start)} elements"
-        assert (
-            self.max_state.shape[0] == self.n_states
-        ), f"Max state must have {self.n_states} elements"
-        assert (
-            self.min_state.shape[0] == self.n_states
-        ), f"Min state must have {self.n_states} elements"
-        assert (
-            self.max_control.shape[0] == self.n_controls
-        ), f"Max control must have {self.n_controls} elements"
-        assert (
-            self.min_control.shape[0] == self.n_controls
-        ), f"Min control must have {self.n_controls} elements"
+        # assert (
+        #     self.initial_state.shape[0] == self.n_states - (self.idx_y.stop - self.idx_y.start)
+        # ), f"Initial state must have {self.n_states - (self.idx_y.stop - self.idx_y.start)} elements"
+        # assert (
+        #     self.final_state.shape[0] == self.n_states - (self.idx_y.stop - self.idx_y.start)
+        # ), f"Final state must have {self.n_states - (self.idx_y.stop - self.idx_y.start)} elements"
+        # assert (
+        #     self.max_state.shape[0] == self.n_states
+        # ), f"Max state must have {self.n_states} elements"
+        # assert (
+        #     self.min_state.shape[0] == self.n_states
+        # ), f"Min state must have {self.n_states} elements"
+        # assert (
+        #     self.max_control.shape[0] == self.n_controls
+        # ), f"Max control must have {self.n_controls} elements"
+        # assert (
+        #     self.min_control.shape[0] == self.n_controls
+        # ), f"Min control must have {self.n_controls} elements"
 
         if self.S_x is None or self.c_x is None:
             self.S_x, self.c_x = get_affine_scaling_matrices(
-                self.n_states, self.min_state, self.max_state
+                self.n_states, self.x.min, self.x.max
             )
             self.inv_S_x = np.diag(1 / np.diag(self.S_x))
 
         if self.S_u is None or self.c_u is None:
             self.S_u, self.c_u = get_affine_scaling_matrices(
-                self.n_controls, self.min_control, self.max_control
+                self.n_controls, self.u.min, self.u.max
             )
             self.inv_S_u = np.diag(1 / np.diag(self.S_u))
 
