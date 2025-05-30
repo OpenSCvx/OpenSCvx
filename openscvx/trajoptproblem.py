@@ -4,6 +4,7 @@ import queue
 import threading
 import time
 from pathlib import Path
+from copy import deepcopy
 
 import cvxpy as cp
 import jax
@@ -44,7 +45,10 @@ class TrajOptProblem:
         self,
         dynamics: Dynamics,
         constraints: List[Union[CTCSConstraint, NodalConstraint]],
+        x: State,
+        u: Control,
         N: int,
+        idx_time: int,
         dynamics_prop: callable = None,
         initial_state_prop: BoundaryConstraint = None,
         scp: Optional[ScpConfig] = None,
@@ -93,7 +97,7 @@ class TrajOptProblem:
             dynamics_prop = dynamics
         
         if initial_state_prop is None:
-            initial_state_prop = x.initial
+            x_prop = deepcopy(x)
 
         # TODO (norrisg) move this into some augmentation function, if we want to make this be executed after the init (i.e. within problem.initialize) need to rethink how problem is defined
         constraints_ctcs = []
@@ -116,7 +120,7 @@ class TrajOptProblem:
 
         # Index tracking
         idx_x_true = slice(0, x.shape[0])
-        idx_x_true_prop = slice(0, len(initial_state_prop))
+        idx_x_true_prop = slice(0, x_prop.shape[0])
         idx_u_true = slice(0, u.shape[0])
         idx_constraint_violation = slice(
             idx_x_true.stop, idx_x_true.stop + num_augmented_states
@@ -139,21 +143,17 @@ class TrajOptProblem:
         y.final = np.array([Free(0)] * num_augmented_states)
         y.guess = np.zeros((N, num_augmented_states,))
         y.min = np.zeros((num_augmented_states,))
-        y.max = N * licq_max * np.ones((num_augmented_states,)) # TODO Verify if N is needed
+        y.max = licq_max * np.ones((num_augmented_states,))
         
-        x.append(y)
+        x.append(y, augmented=True)
+        x_prop.append(y, augmented=True)
 
         s = Control(name="s", shape=(1,))
-        s.min = np.array([time_dilation_factor_min * time_init])
-        s.max = np.array([time_dilation_factor_max * time_init])
-        s.guess = np.ones((N, 1)) * time_init
+        s.min = np.array([time_dilation_factor_min * x.final[idx_time][0]])
+        s.max = np.array([time_dilation_factor_max * x.final[idx_time][0]])
+        s.guess = np.ones((N, 1)) * x.final[idx_time][0]
         
-        u.append(s)
-
-        # initial_state_prop_values = np.hstack([initial_state_prop, np.repeat(licq_min, num_augmented_states)])
-        # initial_state_prop_types = np.hstack([initial_state_prop.type, ["Fix"] * num_augmented_states])
-        # initial_state_prop = boundary(initial_state_prop_values)
-        # initial_state_prop.types = initial_state_prop_types
+        u.append(s, augmented=True)
 
         if dis is None:
             dis = DiscretizationConfig()
@@ -162,9 +162,9 @@ class TrajOptProblem:
             sim = SimConfig(
                 x=x,
                 u=u,
-                total_time=time_init,
+                total_time=x.initial[idx_time][0],
                 n_states=x.initial.shape[0],
-                n_states_prop=len(initial_state_prop),
+                n_states_prop=x_prop.initial.shape[0],
                 idx_x_true=idx_x_true,
                 idx_x_true_prop=idx_x_true_prop,
                 idx_u_true=idx_u_true,
@@ -193,7 +193,7 @@ class TrajOptProblem:
             )
         else:
             assert (
-                self.scp.n == N
+                self.settings.scp.n == N
             ), "Number of segments must be the same as in the config"
 
         if dev is None:
@@ -313,7 +313,7 @@ class TrajOptProblem:
 
         # Compile the discretization solver and save it
         dtau = 1.0 / (self.settings.scp.n - 1) 
-        dt_max = self.settings.sim.max_control[self.settings.sim.idx_s][0] * dtau
+        dt_max = self.settings.sim.u.max[self.settings.sim.idx_s][0] * dtau
 
         self.settings.prp.max_tau_len = int(dt_max / self.settings.prp.dt) + 1
 
