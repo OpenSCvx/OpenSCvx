@@ -57,18 +57,26 @@ class Variable(Expr):
             self._max = self._append_array(self._max, process_val(max))
             self._guess = self._append_guess(self._guess, process_val(guess))
             self._shape = (self._shape[0] + 1,)
-
+            
     def _append_array(self, existing, new):
         new = np.atleast_1d(new)
         if existing is None:
             return new
-        return np.append(existing, new)
+        existing = np.atleast_1d(existing)
+        return np.concatenate([existing, new], axis=0)
 
     def _append_guess(self, existing, new):
         new = np.atleast_2d(new)
+        if new.shape[0] == 1 and new.shape[1] != 1:
+            # Ensure it's a column vector if it was (1, N)
+            new = new.T
         if existing is None:
             return new
+        existing = np.atleast_2d(existing)
+        if existing.shape[0] == 1 and existing.shape[1] != 1:
+            existing = existing.T
         return np.concatenate([existing, new], axis=1)
+
 
     def __getitem__(self, idx):
         if isinstance(idx, int):

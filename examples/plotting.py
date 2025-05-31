@@ -39,7 +39,7 @@ def plot_dubins_car(results, params):
 
 def full_subject_traj_time(results, params):
     x_full = results["x_full"]
-    x_nodes = results["x"]
+    x_nodes = results["x"].guess
     t_nodes = x_nodes[:,params.sim.idx_t]
     t_full = results['t_full']
     subs_traj = []

@@ -104,7 +104,7 @@ def simulate_nonlinear_time(x, u, tau_vals, t, params, propagation_solver):
     prev_count = 0
     out_idx = 0
 
-    x_0 = x.initial
+    x_0 = x.guess[0, :]
     for k in range(n_segments):
         controls_current = u_interp[k][None, :]
         controls_next = u_interp[k + 1][None, :]

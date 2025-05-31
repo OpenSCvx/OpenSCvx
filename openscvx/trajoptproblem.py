@@ -138,20 +138,22 @@ class TrajOptProblem:
         idx_time = slice(idx_time, idx_time + 1)
 
         # Create a new state object for the augmented states
-        y = State(name="y", shape=(num_augmented_states,))
-        y.initial = np.zeros((num_augmented_states,))
-        y.final = np.array([Free(0)] * num_augmented_states)
-        y.guess = np.zeros((N, num_augmented_states,))
-        y.min = np.zeros((num_augmented_states,))
-        y.max = licq_max * np.ones((num_augmented_states,))
-        
-        x.append(y, augmented=True)
-        x_prop.append(y, augmented=True)
+        if num_augmented_states != 0:
+            y = State(name="y", shape=(num_augmented_states,))
+            y.initial = np.zeros((num_augmented_states,))
+            y.final = np.array([Free(0)] * num_augmented_states)
+            y.guess = np.zeros((N, num_augmented_states,))
+            y.min = np.zeros((num_augmented_states,))
+            y.max = licq_max * np.ones((num_augmented_states,))
+            
+            x.append(y, augmented=True)
+            x_prop.append(y, augmented=True)
 
         s = Control(name="s", shape=(1,))
         s.min = np.array([time_dilation_factor_min * x.final[idx_time][0]])
         s.max = np.array([time_dilation_factor_max * x.final[idx_time][0]])
-        s.guess = np.ones((N, 1)) * x.final[idx_time][0]
+        s.guess =np.ones((N, 1)) * x.final[idx_time][0]
+        # np.ones((N, 1)) * x.final[idx_time][0]
         
         u.append(s, augmented=True)
 

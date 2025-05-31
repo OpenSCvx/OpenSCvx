@@ -60,8 +60,8 @@ def PTR_main(params: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emit
         J_tr = np.sum(np.array(J_tr_vec))
         J_vb = np.sum(np.array(J_vb_vec))
         J_vc = np.sum(np.array(J_vc_vec))
-        scp_trajs.append(x)
-        scp_controls.append(u)
+        scp_trajs.append(x.guess)
+        scp_controls.append(u.guess)
 
         params.scp.w_tr = min(params.scp.w_tr * params.scp.w_tr_adapt, params.scp.w_tr_max)
         if k > params.scp.cost_drop:
@@ -114,9 +114,9 @@ def PTR_subproblem(cpg_solve, x, u, aug_dy, prob, params: Config):
     if params.sim.constraints_nodal:
         for g_id, constraint in enumerate(params.sim.constraints_nodal):
             if not constraint.convex:
-                prob.param_dict['g_' + str(g_id)].value = np.asarray(constraint.g(x_bar, u_bar))
-                prob.param_dict['grad_g_x_' + str(g_id)].value = np.asarray(constraint.grad_g_x(x_bar, u_bar))
-                prob.param_dict['grad_g_u_' + str(g_id)].value = np.asarray(constraint.grad_g_u(x_bar, u_bar))
+                prob.param_dict['g_' + str(g_id)].value = np.asarray(constraint.g(x.guess, u.guess))
+                prob.param_dict['grad_g_x_' + str(g_id)].value = np.asarray(constraint.grad_g_x(x.guess, u.guess))
+                prob.param_dict['grad_g_u_' + str(g_id)].value = np.asarray(constraint.grad_g_u(x.guess, u.guess))
     
     prob.param_dict['w_tr'].value = params.scp.w_tr
     prob.param_dict['lam_cost'].value = params.scp.lam_cost

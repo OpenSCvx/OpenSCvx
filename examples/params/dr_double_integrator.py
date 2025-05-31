@@ -6,6 +6,9 @@ from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.dynamics import dynamics
 from openscvx.constraints import boundary, ctcs, nodal
 from openscvx.utils import qdcm, SSMP, SSM, rot, gen_vertices
+from openscvx.backend.state import State, Free, Minimize
+from openscvx.backend.parameter import Parameter
+from openscvx.backend.control import Control
 
 n = 22  # Number of Nodes
 total_time = 24.0  # Total time for the simulation

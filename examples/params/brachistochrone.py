@@ -5,75 +5,67 @@ from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.dynamics import dynamics
 from openscvx.constraints import boundary, ctcs, nodal
 from openscvx.utils import qdcm, SSMP, SSM, generate_orthogonal_unit_vectors
+from openscvx.backend.state import State, Free, Minimize
+from openscvx.backend.parameter import Parameter
+from openscvx.backend.control import Control
 
 
 n = 2
 total_time = 2.0
 
-max_state = np.array([10.0, 10.0, 10.0, 10.0])  # Upper Bound on the states
-min_state = np.array([0.0, 0.0, 0.0, 0.0])  # Lower Bound on the states
-initial_state = boundary(jnp.array([0, 10, 0, 0]))
+x = State("x", shape=(4,))  # State variable with 4 dimensions
 
-final_state = boundary(jnp.array([10, 5, 10, total_time]))
-final_state.type[2] = "Free"
-final_state.type[3] = "Minimize"
+x.max = np.array([10.0, 10.0, 10.0, total_time])  # Upper Bound on the states
+x.min = np.array([0.0, 0.0, 0.0, 0.0])  # Lower Bound on the states
+x.initial = np.array([0, 10, 0, 0])
+x.final = np.array([10, 5, Free(10), Minimize(total_time)])
+x.guess = np.linspace(x.initial, x.final, n)
 
-
-max_control = np.array([100.5 * jnp.pi / 180])  # Upper Bound on the controls
-min_control = np.array([0])  # Lower Bound on the controls
-initial_control = np.array([5 * jnp.pi / 180])
-final_control = np.array([100.5 * jnp.pi / 180])
+u = Control("u", shape=(1,))  # Control variable with 1 dimension
+u.max = np.array([100.5 * jnp.pi / 180])  # Upper Bound on the controls
+u.min = np.array([0])  # Lower Bound on the controls
+u.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n)
 
 g = 9.81
 
 @dynamics
-def dynamics(x, u):
+def dynamics(x_, u_):
     # Ensure the control is within bounds
-    u = jnp.clip(u, min_control, max_control)
+    u_ = jnp.clip(u_, u.min, u.max)
 
-    x_dot =  x[2] * jnp.sin(u[0])
-    y_dot = -x[2] * jnp.cos(u[0])
-    v_dot = g * jnp.cos(u[0])
+    x_dot =  x_[2] * jnp.sin(u_[0])
+    y_dot = -x_[2] * jnp.cos(u_[0])
+    v_dot = g * jnp.cos(u_[0])
 
     t_dot = 1
     return jnp.hstack([x_dot, y_dot, v_dot, t_dot])
 
 constraints = [
-    ctcs(lambda x, u: x - max_state),
-    ctcs(lambda x, u: min_state - x)
+    ctcs(lambda x_, u_: x_ - x.true_state.max),
+    ctcs(lambda x_, u_: x.true_state.min - x_)
 ]
-
-x_bar = np.linspace(initial_state.value, final_state.value, n)
-u_bar = np.linspace(initial_control, final_control, n)
 
 
 problem = TrajOptProblem(
     dynamics=dynamics,
+    x=x,
+    u=u,
+    idx_time=3,  # Index of time variable in state vector
     constraints=constraints,
-    idx_time=len(max_state)-1,
     N=n,
-    time_init=total_time,
-    x_guess=x_bar,
-    u_guess=u_bar,
-    initial_state=initial_state,  # Initial State
-    final_state=final_state,
-    x_max=max_state,
-    x_min=min_state,
-    u_max=max_control,
-    u_min=min_control,
-    licq_max=1e-4,
+    licq_max=1e-8,
 )
 
-problem.params.prp.dt = 0.01
+problem.settings.prp.dt = 0.01
 
-problem.params.scp.w_tr_adapt = 1.00
+problem.settings.scp.w_tr_adapt = 1.00
 
-problem.params.cvx.solver = "qocogen"
-problem.params.cvx.cvxpygen = True
+problem.settings.cvx.solver = "qocogen"
+problem.settings.cvx.cvxpygen = True
 
-problem.params.scp.w_tr = 1e1        # Weight on the Trust Reigon
-problem.params.scp.lam_cost = 1e0    # Weight on the Minimal Time Objective
-problem.params.scp.lam_vc = 1e1      # Weight on the Virtual Control Objective
-problem.params.scp.uniform_time_grid = True
+problem.settings.scp.w_tr = 1e1        # Weight on the Trust Reigon
+problem.settings.scp.lam_cost = 1e0    # Weight on the Minimal Time Objective
+problem.settings.scp.lam_vc = 1e1      # Weight on the Virtual Control Objective
+problem.settings.scp.uniform_time_grid = True
 
 plotting_dict = dict()
