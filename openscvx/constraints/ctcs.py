@@ -163,9 +163,9 @@ def ctcs(
     else:
         raise ValueError(f"Unknown penalty {penalty}")
 
-    def decorator(user_func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]) -> CTCSConstraint:
+    def decorator(f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]) -> CTCSConstraint:
         # wrap so name, doc, signature stay on f
-        wrapped = functools.wraps(user_func)(user_func)
+        wrapped = functools.wraps(f)(f)
         return CTCSConstraint(
             func=wrapped,
             penalty=pen,
@@ -175,7 +175,7 @@ def ctcs(
             grad_f_u=grad_f_u,
         )
 
-     # if called as @ctcs or @ctcs(...), _func will be None and we return decorator
+    # if called as @ctcs or @ctcs(...), _func will be None and we return decorator
     if _func is None:
         return decorator
     # if called as ctcs(func), we immediately decorate
