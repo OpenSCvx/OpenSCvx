@@ -35,12 +35,18 @@ u.max = np.array([10, 5])
 u.guess = np.repeat(np.expand_dims(np.array([0, 0]), axis=0), n, axis=0)
 
 # Define Parameters for obstacle radius and center
-obs_radius = 1.0
-obs_center = np.array([-0.01, 0.0])  # Center of the obstacle
+# obs_radius = 1.0
+# obs_center = np.array([-0.01, 0.0])  # Center of the obstacle
+
+obs_radius = Parameter("obs_radius", shape=())
+obs_center = Parameter("obs_center", shape=(2,))
+
+obs_radius.value = 1.0
+obs_center.value = np.array([-0.01, 0.0])  # Center of the obstacle
 
 # Define constraints using symbolic x, u, and parameters
 constraints = [
-    ctcs(lambda x_, u_: obs_radius - jnp.linalg.norm(x_[:2] - obs_center)),
+    ctcs(lambda x_, u_, obs_radius, obs_center: obs_radius - jnp.linalg.norm(x_[:2] - obs_center)),
     ctcs(lambda x_, u_: x_ - x.true_state.max),
     ctcs(lambda x_, u_: x.true_state.min - x_)
 ]

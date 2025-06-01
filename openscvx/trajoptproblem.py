@@ -36,6 +36,7 @@ from openscvx import io
 from openscvx.utils import stable_function_hash
 from openscvx.backend.state import State, Free
 from openscvx.backend.control import Control
+from openscvx.backend.parameter import Parameter
 
 
 
@@ -275,7 +276,8 @@ class TrajOptProblem:
                 constraint.grad_g_u = jax.jit(constraint.grad_g_u)
 
         # Generate solvers and optimal control problem
-        self.discretization_solver = get_discretization_solver(self.dynamics_augmented, self.settings)
+        # self.discretization_solver = get_discretization_solver(self.dynamics_augmented, self.settings)
+        self.discretization_solver = get_discretization_solver(self.dynamics_augmented, self.settings, Parameter.get_all())
         self.propagation_solver = get_propagation_solver(self.dynamics_augmented_prop.f, self.settings)
         self.optimal_control_problem = OptimalControlProblem(self.settings)
 
@@ -305,9 +307,20 @@ class TrajOptProblem:
                 self.discretization_solver = export.deserialize(serial_dis)
             except FileNotFoundError:
                 # Compile the discretization solver and save it
+                # Fetch all registered parameters
+                all_params = Parameter.get_all()
+
+                # Sort by name to ensure consistent ordering
+                param_items = sorted(all_params.items(), key=lambda kv: kv[0])  # kv = (name, Parameter)
+
+                # Extract parameter values and names in order
+                param_values = [param.value for _, param in param_items]
+                param_names = [name for name, _ in param_items]
+                
                 self.discretization_solver = export.export(jax.jit(self.discretization_solver))(
                     np.ones((self.settings.scp.n, self.settings.sim.n_states)),
                     np.ones((self.settings.scp.n, self.settings.sim.n_controls)),
+                    *param_values
                 )
                 # Serialize and Save the compiled code in a temp directory
                 with open(dis_solver_file, "wb") as f:
