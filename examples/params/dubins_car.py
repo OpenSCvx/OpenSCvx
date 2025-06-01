@@ -3,77 +3,79 @@ import jax.numpy as jnp
 
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.dynamics import dynamics
-from openscvx.constraints import boundary, ctcs, nodal
-from openscvx.utils import qdcm, SSMP, SSM, generate_orthogonal_unit_vectors
+from openscvx.constraints import ctcs, nodal
+from openscvx.backend.state import State, Free, Minimize
+from openscvx.backend.parameter import Parameter
+from openscvx.backend.control import Control
+
+
 
 n = 8
-total_time = 2.0  # Total time for the simulation
+total_time = 2.0  # Total simulation time
 
-#                      rx,  ry,     theta,   t
-max_state = np.array([ 5.,  5.,  2*jnp.pi,  50])
-min_state = np.array([-5., -5., -2*jnp.pi,   0])
+# Define State and Control symbolic variables
+x = State("x", shape=(4,))
 
-initial_state = boundary(jnp.array([0, -2, 0, 0]))
+u = Control("u", shape=(2,))
 
-final_state = boundary(jnp.array([0, 2, 0, total_time]))
-final_state.type[2] = "Free"
-final_state.type[3] = "Minimize"
+# Set bounds on state
+x.min = np.array([-5., -5., -2 * jnp.pi,  0])
+x.max = np.array([ 5.,  5.,  2 * jnp.pi, 50])
 
-#                           v, omega
-initial_control = np.array([0,    0.])
-max_control = np.array([10,  5])  # Upper Bound on the controls
-min_control = np.array([ 0, -5])  # Lower Bound on the controls
+# Set initial, final, and guess for state trajectory using symbolic boundary expressions
+x.initial = np.array([0, -2, 0, 0])
+x.final   = np.array([0, 2, Free(0), Minimize(total_time)])
+x.guess   = np.linspace([0, -2, 0, 0], [0, 2, 0, total_time], n)
 
+# Set bounds on control
+u.min = np.array([0, -5])
+u.max = np.array([10, 5])
 
+# Set initial control guess
+u.guess = np.repeat(np.expand_dims(np.array([0, 0]), axis=0), n, axis=0)
+
+# Define Parameters for obstacle radius and center
+obs_radius = 1.0
+obs_center = np.array([-0.01, 0.0])  # Center of the obstacle
+
+# Define constraints using symbolic x, u, and parameters
+constraints = [
+    ctcs(lambda x_, u_: obs_radius - jnp.linalg.norm(x_[:2] - obs_center)),
+    ctcs(lambda x_, u_: x_ - x.true_state.max),
+    ctcs(lambda x_, u_: x.true_state.min - x_)
+]
+
+# Define dynamics
 @dynamics
-def dynamics(x, u):
-    rx_dot = u[0] * jnp.sin(x[2])
-    ry_dot = u[0] * jnp.cos(x[2])
-    theta_dot = u[1]
-    x_dot = jnp.array([rx_dot, ry_dot, theta_dot])
-
+def dynamics_fn(x_, u_):
+    rx_dot = u_[0] * jnp.sin(x_[2])
+    ry_dot = u_[0] * jnp.cos(x_[2])
+    theta_dot = u_[1]
+    x_dot = jnp.asarray([rx_dot, ry_dot, theta_dot])
     t_dot = 1
     return jnp.hstack([x_dot, t_dot])
 
-obs_radius = 1
-obs_center = np.array([-0.01, 0])
-constraints = [
-    ctcs(lambda x, u: obs_radius - jnp.linalg.norm(x[:2] - obs_center)),
-    ctcs(lambda x, u: x - max_state),
-    ctcs(lambda x, u: min_state - x)
-]
-
-
-u_bar = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
-x_bar = np.linspace(initial_state.value, final_state.value, n)
-
+# Build the problem
 problem = TrajOptProblem(
-    dynamics=dynamics,
+    dynamics=dynamics_fn,
+    x=x,
+    u=u,
+    idx_time=3,  # Index of time variable in state vector
     constraints=constraints,
-    idx_time=len(max_state)-1,
     N=n,
-    time_init=total_time,
-    x_guess=x_bar,
-    u_guess=u_bar,
-    initial_state=initial_state,  # Initial State
-    final_state=final_state,
-    x_max=max_state,
-    x_min=min_state,
-    u_max=max_control,
-    u_min=min_control,
     licq_max=1e-8,
 )
 
-problem.params.prp.dt = 0.01
+# Set solver parameters
+problem.settings.prp.dt = 0.01
+problem.settings.scp.w_tr_adapt = 1.3
+problem.settings.scp.w_tr = 1e0
+problem.settings.scp.lam_cost = 1e-1
+problem.settings.scp.lam_vc = 6e2
+problem.settings.scp.uniform_time_grid = True
 
-problem.params.scp.w_tr_adapt = 1.3
-
-problem.params.scp.w_tr = 1e0        # Weight on the Trust Reigon
-problem.params.scp.lam_cost = 1e-1   # Weight on the Minimal Time Objective
-problem.params.scp.lam_vc = 6e2      # Weight on the Virtual Control Objective
-problem.params.scp.uniform_time_grid = True
-
+# Optional: For plotting
 plotting_dict = dict(
-    obs_radius = obs_radius,
-    obs_center = obs_center,
+    obs_radius=obs_radius,
+    obs_center=obs_center,
 )

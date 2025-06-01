@@ -50,12 +50,12 @@ def get_propagation_solver(state_dot, params):
     return propagation_solver
 
 
-def s_to_t(u, params: Config):
-    t = [params.sim.initial_state.value[params.sim.idx_t][0]]
+def s_to_t(x, u, params: Config):
+    t = [x.guess[:,params.sim.idx_t][0]]
     tau = np.linspace(0, 1, params.scp.n)
     for k in range(1, params.scp.n):
-        s_kp = u[k - 1, -1]
-        s_k = u[k, -1]
+        s_kp = u.guess[k - 1, -1]
+        s_k = u.guess[k, -1]
         if params.dis.dis_type == "ZOH":
             t.append(t[k - 1] + (tau[k] - tau[k - 1]) * (s_kp))
         else:
@@ -63,17 +63,16 @@ def s_to_t(u, params: Config):
     return t
 
 
-def t_to_tau(u, t, u_nodal, t_nodal, params: Config):
-    u_lam = lambda new_t: np.array(
-        [np.interp(new_t, t_nodal, u[:, i]) for i in range(u.shape[1])]
-    ).T
+def t_to_tau(u, t, t_nodal, params: Config):
+    u_guess = u.guess
+    u_lam = lambda new_t: np.array([np.interp(new_t, t_nodal, u_guess[:,i]) for i in range(u_guess.shape[1])]).T
     u = np.array([u_lam(t_i) for t_i in t])
 
     tau = np.zeros(len(t))
     tau_nodal = np.linspace(0, 1, params.scp.n)
     for k in range(1, len(t)):
         k_nodal = np.where(t_nodal < t[k])[0][-1]
-        s_kp = u_nodal[k_nodal, -1]
+        s_kp = u_guess[k_nodal, -1]
         tp = t_nodal[k_nodal]
         tau_p = tau_nodal[k_nodal]
 
@@ -85,9 +84,9 @@ def t_to_tau(u, t, u_nodal, t_nodal, params: Config):
     return tau, u
 
 
-def simulate_nonlinear_time(x_0, u, tau_vals, t, params, propagation_solver):
+def simulate_nonlinear_time(x, u, tau_vals, t, params, propagation_solver):
     n_segments = params.scp.n - 1
-    n_states = x_0.shape[0]
+    n_states = x.shape[0]
     n_tau = len(tau_vals)
 
     states = np.empty((n_states, n_tau))
@@ -95,7 +94,7 @@ def simulate_nonlinear_time(x_0, u, tau_vals, t, params, propagation_solver):
 
     # Precompute control interpolation
     u_interp = np.stack([
-        np.interp(t, t, u[:, i]) for i in range(u.shape[1])
+        np.interp(t, t, u.guess[:, i]) for i in range(u.guess.shape[1])
     ], axis=-1)
 
     # Bin tau_vals into segments of tau
@@ -105,6 +104,7 @@ def simulate_nonlinear_time(x_0, u, tau_vals, t, params, propagation_solver):
     prev_count = 0
     out_idx = 0
 
+    x_0 = x.guess[0, :]
     for k in range(n_segments):
         controls_current = u_interp[k][None, :]
         controls_next = u_interp[k + 1][None, :]

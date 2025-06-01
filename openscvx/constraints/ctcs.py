@@ -1,10 +1,14 @@
 from dataclasses import dataclass
-from typing import Callable, Tuple, Optional, Union
+from typing import Callable, Optional, Tuple, Union
+
+import jax.numpy as jnp
+from jax.lax import cond
 import functools
 import types
 
-from jax.lax import cond
-import jax.numpy as jnp
+from openscvx.backend.state import State, Variable
+from openscvx.backend.control import Control
+from openscvx.backend.parameter import Parameter
 
 # TODO: (norrisg) Unclear if should specify behavior for `idx`, `jacfwd` behavior for Jacobians, etc. since that logic is handled elsewhere and could change
 
@@ -12,11 +16,9 @@ import jax.numpy as jnp
 class CTCSConstraint:
     """
     Dataclass for continuous-time constraint satisfaction (CTCS) constraints over a trajectory interval.
-
     A `CTCSConstraint` wraps a residual function `func(x, u)`, applies a
     pointwise `penalty` to its outputs, and accumulates the penalized sum
     only within a specified node interval [nodes[0], nodes[1]).
-
     Note: the user is intended to instantiate `CTCSConstraint`s using the `@ctcs` decorator
 
     Args:
@@ -38,8 +40,7 @@ class CTCSConstraint:
             User-supplied gradient of `func` w.r.t. input `u`, signature (x, u) -> jacobian.
             If None, computed via `jax.jacfwd(func, argnums=1)` during state augmentation.
     """
-
-    func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
+    func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]  # takes (x_expr, u_expr, *param_exprs)
     penalty: Callable[[jnp.ndarray], jnp.ndarray]
     nodes: Optional[Tuple[int, int]] = None
     idx: Optional[int] = None
@@ -60,26 +61,27 @@ class CTCSConstraint:
             _grad_f_u = self.grad_f_u
             self.grad_f_u = lambda x, u, nodes: _grad_f_u(x, u)
 
-    def __call__(self, x: jnp.ndarray, u: jnp.ndarray, node: int):
+    def __call__(self, x, u, node: int):
         """
         Evaluate the penalized constraint at a given node index.
-
         The penalty is summed only if `node` lies within the active interval.
-
         Args:
             x (jnp.ndarray): State vector at this node.
             u (jnp.ndarray): Input vector at this node.
             node (int): Trajectory time-step index.
-
         Returns:
             jnp.ndarray or float:
                 The total penalty (sum over selected residuals) if inside interval,
                 otherwise zero.
         """
+        x_expr = x.expr if isinstance(x, (State, Variable)) else x
+        u_expr = u.expr if isinstance(u, (Control, Variable)) else u
+
         # check if within [start, end)
         return cond(
-            jnp.all((self.nodes[0] <= node) & (node < self.nodes[1])),
-            lambda _: jnp.sum(self.penalty(self.func(x, u))),
+            jnp.all((self.nodes[0] <= node) & (node < self.nodes[1]))
+            if self.nodes is not None else True,
+            lambda _: jnp.sum(self.penalty(self.func(x_expr, u_expr))),
             lambda _: 0.0,
             operand=None,
         )
@@ -150,20 +152,16 @@ def ctcs(
         pen = lambda x: jnp.maximum(0, x) ** 2
     elif penalty == "huber":
         delta = 0.25
-
-        def pen(x):
-            r = jnp.maximum(0, x)
-            return jnp.where(r < delta, 0.5 * r**2, r - 0.5 * delta)
-
+        def pen(x): return jnp.where(x < delta, 0.5 * x**2, x - 0.5 * delta)
     elif penalty == "smooth_relu":
         c = 1e-8
         pen = lambda x: (jnp.maximum(0, x) ** 2 + c**2) ** 0.5 - c
-    elif isinstance(penalty, types.LambdaType):
+    elif callable(penalty):
         pen = penalty
     else:
         raise ValueError(f"Unknown penalty {penalty}")
 
-    def decorator(f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
+    def decorator(f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]) -> CTCSConstraint:
         # wrap so name, doc, signature stay on f
         wrapped = functools.wraps(f)(f)
         return CTCSConstraint(

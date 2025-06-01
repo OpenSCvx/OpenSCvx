@@ -7,7 +7,8 @@ import jax.numpy as jnp
 import pytest
 
 from openscvx.propagation import prop_aug_dy, s_to_t, t_to_tau, get_propagation_solver
-
+from openscvx.backend.state import State
+from openscvx.backend.control import Control
 
 # simple scalar decay: x' = -x
 def decay(x, u, node):
@@ -79,23 +80,25 @@ def test_s_to_t_basic(dis_type):
     p.sim.idx_t = slice(0, 1)
 
     # build u with slack values [1,2,3,4]
-    u = np.stack([[0.0, float(s)] for s in [1, 2, 3, 4]])
-
-    t = s_to_t(u, p)
+    u = Control("u", shape=(p.scp.n, 2))  # 2 controls, last is slack
+    u.guess = np.stack([[0.0, float(s)] for s in [1, 2, 3, 4]])
+    x = State("x", shape=(1,))  # dummy initial state
+    x.guess = np.array([[0.0], [1.0]])
+    t = s_to_t(x, u, p)
 
     # manually reconstruct expected t
     tau = np.linspace(0, 1, p.scp.n)
     expected = [0.0]
     for k in range(1, p.scp.n):
-        s_kp = u[k - 1, -1]
-        s_k = u[k, -1]
+        s_kp = u.guess[k - 1, -1]
+        s_k = u.guess[k, -1]
         if dis_type == "ZOH":
             dt = (tau[k] - tau[k - 1]) * s_kp
         else:
             dt = 0.5 * (s_k + s_kp) * (tau[k] - tau[k - 1])
         expected.append(expected[-1] + dt)
 
-    np.testing.assert_allclose(t, expected, rtol=1e-6)
+    np.testing.assert_allclose(np.array(t).squeeze(), np.array(expected).squeeze(), rtol=1e-6)
 
 
 @pytest.mark.parametrize("dis_type", ["ZOH", "FOH"])
@@ -115,14 +118,19 @@ def test_t_to_tau_constant_slack(dis_type):
     p.sim.idx_t = slice(0, 1)
 
     # constant slack = 2.0, control doesn't matter
+    x = State("x", shape=(1,))  # dummy initial state
+    x.guess = np.array([[0.0], [1.0]])  # dummy initial state guess
+
     N = p.scp.n
-    u_nodal = np.tile(np.array([0.0, 2.0]), (N, 1))
+
+    u = Control("u", shape=(2,))  # 2 controls, last is slack
+    u.guess = np.tile(np.array([0.0, 2.0]), (N, 1))  # constant slack of 2.0
 
     # get the “nodal” times via s_to_t
-    t_nodal = s_to_t(u_nodal, p)
+    t_nodal = s_to_t(x, u, p)
 
     # invert back
-    tau, u_interp = t_to_tau(u_nodal, t_nodal, u_nodal, np.array(t_nodal), p)
+    tau, u_interp = t_to_tau(u, np.array(t_nodal).squeeze(), np.array(t_nodal).squeeze(), p)
 
     np.testing.assert_allclose(tau, np.linspace(0, 1, N), rtol=1e-6)
     # since slack & control are constant, interpolation must reprodu
