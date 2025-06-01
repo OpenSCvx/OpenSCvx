@@ -80,8 +80,9 @@ def test_s_to_t_basic(dis_type):
 
     # build u with slack values [1,2,3,4]
     u = np.stack([[0.0, float(s)] for s in [1, 2, 3, 4]])
-
-    t = s_to_t(u, p)
+    x = Dummy()  # dummy initial state
+    x.guess = np.array([[0.0]])
+    t = s_to_t(x, u, p)
 
     # manually reconstruct expected t
     tau = np.linspace(0, 1, p.scp.n)
