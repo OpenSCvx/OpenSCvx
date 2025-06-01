@@ -56,7 +56,7 @@ def test_decorator_sets_attributes_and_type():
 def test_ctcs_called_directly_without_parentheses():
     """Using `c = ctcs(fn)` should wrap but leave nodes=None, idx=None."""
 
-    def raw_fn(x, u):
+    def raw_fn(x_, u_):
         return jnp.array([4.0, -1.0])
 
     c = ctcs(raw_fn)
