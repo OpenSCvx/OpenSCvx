@@ -20,7 +20,7 @@ x.min = np.array(
     [-200., -100, 0, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0]
 )
 
-x.initial = np.array([10., 0, 2, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0)])
+x.initial = np.array([10., 0, 2, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0])
 x.final = np.array([-10., 0, 2, Free(0), Free(0), Free(0), Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), Minimize(total_time)])
 
 u = Control("u", shape=(6,))  # Control variable with 6 dimensions
