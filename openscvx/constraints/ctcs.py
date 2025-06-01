@@ -61,7 +61,7 @@ class CTCSConstraint:
             _grad_f_u = self.grad_f_u
             self.grad_f_u = lambda x, u, nodes: _grad_f_u(x, u)
 
-    def __call__(self, x, u, node: int, *params):
+    def __call__(self, x, u, node: int):
         """
         Evaluate the penalized constraint at a given node index.
         The penalty is summed only if `node` lies within the active interval.
@@ -69,7 +69,6 @@ class CTCSConstraint:
             x (jnp.ndarray): State vector at this node.
             u (jnp.ndarray): Input vector at this node.
             node (int): Trajectory time-step index.
-            *params: parameters
         Returns:
             jnp.ndarray or float:
                 The total penalty (sum over selected residuals) if inside interval,
@@ -77,13 +76,12 @@ class CTCSConstraint:
         """
         x_expr = x.expr if isinstance(x, (State, Variable)) else x
         u_expr = u.expr if isinstance(u, (Control, Variable)) else u
-        param_exprs = [p.expr if isinstance(p, Parameter) else p for p in params]
 
         # check if within [start, end)
         return cond(
             jnp.all((self.nodes[0] <= node) & (node < self.nodes[1]))
             if self.nodes is not None else True,
-            lambda _: jnp.sum(self.penalty(self.func(x_expr, u_expr, *param_exprs))),
+            lambda _: jnp.sum(self.penalty(self.func(x_expr, u_expr))),
             lambda _: 0.0,
             operand=None,
         )
