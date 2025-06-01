@@ -47,6 +47,20 @@ class CTCSConstraint:
     grad_f_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
     grad_f_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
 
+    def __post_init__(self):
+        """
+        Adapt user-provided gradients to the three-argument signature (x, u, node).
+
+        If `grad_f_x` or `grad_f_u` are given as functions of (x, u), wrap them
+        so they accept the extra `node` argument to match `__call__`.
+        """
+        if self.grad_f_x is not None:
+            _grad_f_x = self.grad_f_x
+            self.grad_f_x = lambda x, u, nodes: _grad_f_x(x, u)
+        if self.grad_f_u is not None:
+            _grad_f_u = self.grad_f_u
+            self.grad_f_u = lambda x, u, nodes: _grad_f_u(x, u)
+
     def __call__(self, x, u, node: int, *params):
         """
         Evaluate the penalized constraint at a given node index.
