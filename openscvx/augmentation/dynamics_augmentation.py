@@ -26,18 +26,22 @@ def build_augmented_dynamics(
 
 
 def get_augmented_dynamics(
-    dynamics: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray],
+    dynamics: Callable[..., jnp.ndarray],
     violations: List[CTCSViolation],
     idx_x_true: slice,
     idx_u_true: slice,
-) -> Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray]:
-    def dynamics_augmented(x: jnp.array, u: jnp.array, node: int) -> jnp.array:
-        x_dot = dynamics(x[idx_x_true], u[idx_u_true])
+) -> Callable[..., jnp.ndarray]:
+    
+    def dynamics_augmented(x: jnp.ndarray, u: jnp.ndarray, node: int, *params) -> jnp.ndarray:
+        x_true = x[idx_x_true]
+        u_true = u[idx_u_true]
 
-        # Iterate through the g_func dictionary and stack the output each function
-        # to x_dot
+        # Pass params into the true dynamics function
+        x_dot = dynamics(x_true, u_true, *params)
+
         for v in violations:
-            x_dot = jnp.hstack([x_dot, v.g(x[idx_x_true], u[idx_u_true], node)])
+            g_val = v.g(x_true, u_true, node, *params)
+            x_dot = jnp.hstack([x_dot, g_val])
 
         return x_dot
 

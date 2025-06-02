@@ -61,7 +61,7 @@ class CTCSConstraint:
             _grad_f_u = self.grad_f_u
             self.grad_f_u = lambda x, u, nodes: _grad_f_u(x, u)
 
-    def __call__(self, x, u, node: int):
+    def __call__(self, x, u, node: int, *params):
         """
         Evaluate the penalized constraint at a given node index.
         The penalty is summed only if `node` lies within the active interval.
@@ -81,7 +81,7 @@ class CTCSConstraint:
         return cond(
             jnp.all((self.nodes[0] <= node) & (node < self.nodes[1]))
             if self.nodes is not None else True,
-            lambda _: jnp.sum(self.penalty(self.func(x_expr, u_expr))),
+            lambda _: jnp.sum(self.penalty(self.func(x_expr, u_expr, *params))),
             lambda _: 0.0,
             operand=None,
         )

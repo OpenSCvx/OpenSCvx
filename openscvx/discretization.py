@@ -53,15 +53,15 @@ def dVdt(
     u = u[: x.shape[0]]
 
     # Compute the nonlinear propagation term
-    f = state_dot(x, u[:, :-1], nodes, params)
+    f = state_dot(x, u[:, :-1], nodes, *params)
     F = s[:, None] * f
 
     # Evaluate the State Jacobian
-    dfdx = A(x, u[:, :-1], nodes, params)
+    dfdx = A(x, u[:, :-1], nodes, *params)
     sdfdx = s[:, None, None] * dfdx
 
     # Evaluate the Control Jacobian
-    dfdu_veh = B(x, u[:, :-1], nodes, params)
+    dfdu_veh = B(x, u[:, :-1], nodes, *params)
     dfdu = dfdu.at[:, :, :-1].set(s[:, None, None] * dfdu_veh)
     dfdu = dfdu.at[:, :, -1].set(f)
 
@@ -158,23 +158,7 @@ def calculate_discretization(
 
 
 
-# def get_discretization_solver(dyn: Dynamics, params):
-#     return lambda x, u: calculate_discretization(
-#         x=x,
-#         u=u,
-#         state_dot=dyn.f,
-#         A=dyn.A,
-#         B=dyn.B,
-#         n_x=params.sim.n_states,
-#         n_u=params.sim.n_controls,
-#         N=params.scp.n,
-#         custom_integrator=params.dis.custom_integrator,
-#         debug=params.dev.debug,
-#         solver=params.dis.solver,
-#         rtol=params.dis.rtol,
-#         atol=params.dis.atol,
-#         dis_type=params.dis.dis_type,
-#     )
+
 def get_discretization_solver(dyn: Dynamics, settings, param_map):
     return lambda x, u, *params: calculate_discretization(
         x=x,

@@ -25,8 +25,8 @@ def plot_dubins_car(results, params):
     fig.add_trace(go.Scatter(x=x, y=y, mode='lines', line=dict(color='blue', width=2), name='Trajectory'))
 
     # Plot the circular obstacle
-    fig.add_trace(go.Scatter(x=obs_center[0] + obs_radius * np.cos(np.linspace(0, 2 * np.pi, 100)),
-                             y=obs_center[1] + obs_radius * np.sin(np.linspace(0, 2 * np.pi, 100)),
+    fig.add_trace(go.Scatter(x=obs_center.value[0] + obs_radius.value * np.cos(np.linspace(0, 2 * np.pi, 100)),
+                             y=obs_center.value[1] + obs_radius.value * np.sin(np.linspace(0, 2 * np.pi, 100)),
                              mode='lines', line=dict(color='red', width=2), name='Obstacle'))
     
     fig.update_layout(title='Dubins Car Trajectory', title_x=0.5, template='plotly_dark')
