@@ -25,7 +25,7 @@ def PTR_init(ocp: cp.Problem, discretization_solver: callable, settings: Config)
         ocp.param_dict['x_term'].value = settings.sim.x.final
 
     # Extract the parameter values
-    params = sorted(Parameter.get_all().items(), key=lambda kv: kv[0])
+    params = Parameter.get_all().items()
 
     # Solve a dumb problem to intilize DPP and JAX jacobians
     _ = PTR_subproblem(cpg_solve, settings.sim.x, settings.sim.u, discretization_solver, ocp, params, settings)
@@ -38,7 +38,7 @@ def PTR_main(settings: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, em
     J_tr = 1E2
 
     # Extract the parameter values
-    params = sorted(Parameter.get_all().items(), key=lambda kv: kv[0])
+    params = Parameter.get_all().items()
 
     x = settings.sim.x
     u = settings.sim.u

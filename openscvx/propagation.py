@@ -30,6 +30,7 @@ def prop_aug_dy(
 
 def get_propagation_solver(state_dot, settings, param_map):
     def propagation_solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask, *params):
+        param_map_update = dict(zip(param_map.keys(), params))
         return solve_ivp_diffrax_prop(
             f=prop_aug_dy,
             tau_final=tau_grid[1],  # scalar
@@ -43,7 +44,7 @@ def get_propagation_solver(state_dot, settings, param_map):
                 state_dot,         # function or array
                 settings.dis.dis_type,
                 settings.scp.n,
-                *params
+                *param_map_update.items(),
                 # additional named parameters as **kwargs
             ),
             tau_0=tau_grid[0],      # scalar
@@ -95,7 +96,7 @@ def simulate_nonlinear_time(x, u, tau_vals, t, settings, propagation_solver):
     n_states = x.shape[0]
     n_tau = len(tau_vals)
 
-    params = sorted(Parameter.get_all().items(), key=lambda kv: kv[0])
+    params = Parameter.get_all().items()
     param_values = tuple([param.value for _, param in params])
     
     states = np.empty((n_states, n_tau))

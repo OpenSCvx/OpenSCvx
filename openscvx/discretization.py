@@ -17,7 +17,7 @@ def dVdt(
     n_u: int,
     N: int,
     dis_type: str,
-    *params
+    **params
 ) -> jnp.ndarray:
     # Define the nodes
     nodes = jnp.arange(0, N-1)
@@ -53,15 +53,15 @@ def dVdt(
     u = u[: x.shape[0]]
 
     # Compute the nonlinear propagation term
-    f = state_dot(x, u[:, :-1], nodes, *params)
+    f = state_dot(x, u[:, :-1], nodes, *params.items())
     F = s[:, None] * f
 
     # Evaluate the State Jacobian
-    dfdx = A(x, u[:, :-1], nodes, *params)
+    dfdx = A(x, u[:, :-1], nodes, *params.items())
     sdfdx = s[:, None, None] * dfdx
 
     # Evaluate the Control Jacobian
-    dfdu_veh = B(x, u[:, :-1], nodes, *params)
+    dfdu_veh = B(x, u[:, :-1], nodes, *params.items())
     dfdu = dfdu.at[:, :, :-1].set(s[:, None, None] * dfdu_veh)
     dfdu = dfdu.at[:, :, -1].set(f)
 
@@ -113,36 +113,41 @@ def calculate_discretization(
     )
 
     # Choose integrator
-    integrator_args = (
-        u[:-1].astype(float),
-        u[1:].astype(float),
-        state_dot,
-        A,
-        B,
-        n_x,
-        n_u,
-        N,
-        dis_type,
-        *kwargs.values()  # <--- Dynamically pass the values only
+    integrator_args = dict(
+        u_cur=u[:-1].astype(float),
+        u_next=u[1:].astype(float),
+        state_dot=state_dot,
+        A=A,
+        B=B,
+        n_x=n_x,
+        n_u=n_u,
+        N=N,
+        dis_type=dis_type,
+        **kwargs  # <-- adds parameter values with names
     )
 
+    # Define dVdt wrapper using named arguments
+    def dVdt_wrapped(t, y):
+        return dVdt(t, y, **integrator_args)
+
+    # Choose integrator
     if custom_integrator:
         sol = solve_ivp_rk45(
-            lambda t, y, *a: dVdt(t, y, *a),
+            dVdt_wrapped,
             1.0 / (N - 1),
             V0.reshape(-1),
-            args=integrator_args,
+            args=(),
             is_not_compiled=debug,
         )
     else:
         sol = solve_ivp_diffrax(
-            lambda t, y, *a: dVdt(t, y, *a),
+            dVdt_wrapped,
             1.0 / (N - 1),
             V0.reshape(-1),
-            args=integrator_args,
             solver_name=solver,
             rtol=rtol,
             atol=atol,
+            args=(),
             extra_kwargs=None,
         )
 

@@ -264,12 +264,11 @@ class TrajOptProblem:
         self.settings.sim.__post_init__()
 
         # Compile dynamics and jacobians
-        in_axes = (0, 0, 0) + (None,) * len(self.params)
-        self.dynamics_augmented.f = jax.vmap(self.dynamics_augmented.f, in_axes=in_axes)
-        self.dynamics_augmented.A = jax.vmap(self.dynamics_augmented.A, in_axes=in_axes)
-        self.dynamics_augmented.B = jax.vmap(self.dynamics_augmented.B, in_axes=in_axes)
+        self.dynamics_augmented.f = jax.vmap(self.dynamics_augmented.f, in_axes=(0, 0, 0, *(None,) * len(self.params)))
+        self.dynamics_augmented.A = jax.vmap(self.dynamics_augmented.A, in_axes=(0, 0, 0, *(None,) * len(self.params)))
+        self.dynamics_augmented.B = jax.vmap(self.dynamics_augmented.B, in_axes=(0, 0, 0, *(None,) * len(self.params)))
   
-        self.dynamics_augmented_prop.f = jax.vmap(self.dynamics_augmented_prop.f, in_axes=in_axes)
+        self.dynamics_augmented_prop.f = jax.vmap(self.dynamics_augmented_prop.f, in_axes=(0, 0, 0, *(None,) * len(self.params)))
 
         for constraint in self.settings.sim.constraints_nodal:
             if not constraint.convex:
@@ -308,14 +307,8 @@ class TrajOptProblem:
                 # Load the compiled code
                 self.discretization_solver = export.deserialize(serial_dis)
             except FileNotFoundError:
-                # Compile the discretization solver and save it
-
-                # Sort by name to ensure consistent ordering
-                param_items = sorted(self.params.items(), key=lambda kv: kv[0])  # kv = (name, Parameter)
-
                 # Extract parameter values and names in order
-                param_values = [param.value for _, param in param_items]
-                param_names = [name for name, _ in param_items]
+                param_values = [param.value for _, param in self.params.items()]
                 
                 self.discretization_solver = export.export(jax.jit(self.discretization_solver))(
                     np.ones((self.settings.scp.n, self.settings.sim.n_states)),
@@ -339,24 +332,19 @@ class TrajOptProblem:
             # Load the compiled code
             self.propagation_solver = export.deserialize(serial_prop)
         except FileNotFoundError:
-            # Sort by name to ensure consistent ordering
-            param_items = sorted(self.params.items(), key=lambda kv: kv[0])  # kv = (name, Parameter)
-
             # Extract parameter values and names in order
-            param_values = [param.value for _, param in param_items]
-            param_names = [name for name, _ in param_items]
-            
+            param_values = [param.value for _, param in self.params.items()]
 
             propagation_solver = export.export(jax.jit(self.propagation_solver))(
-                np.ones((self.settings.sim.n_states_prop)),                  # x_0
+                np.ones((self.settings.sim.n_states_prop)),                # x_0
                 (0.0, 0.0),                                                # time span
-                np.ones((1, self.settings.sim.n_controls)),                 # controls_current
-                np.ones((1, self.settings.sim.n_controls)),                 # controls_next
+                np.ones((1, self.settings.sim.n_controls)),                # controls_current
+                np.ones((1, self.settings.sim.n_controls)),                # controls_next
                 np.ones((1, 1)),                                           # tau_0
                 np.ones((1, 1)).astype("int"),                             # segment index
                 0,                                                         # idx_s_stop
-                np.ones((self.settings.prp.max_tau_len,)),                                   # save_time (tau_cur_padded)
-                np.ones((self.settings.prp.max_tau_len,), dtype=bool),                       # mask_padded (boolean mask)
+                np.ones((self.settings.prp.max_tau_len,)),                 # save_time (tau_cur_padded)
+                np.ones((self.settings.prp.max_tau_len,), dtype=bool),     # mask_padded (boolean mask)
                 *param_values,                                             # additional parameters
             )
 

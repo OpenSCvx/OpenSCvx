@@ -4,7 +4,7 @@ from typing import Callable, Optional, Tuple, Union
 import jax.numpy as jnp
 from jax.lax import cond
 import functools
-import types
+import inspect
 
 from openscvx.backend.state import State, Variable
 from openscvx.backend.control import Control
@@ -65,10 +65,13 @@ class CTCSConstraint:
         """
         Evaluate the penalized constraint at a given node index.
         The penalty is summed only if `node` lies within the active interval.
+
         Args:
             x (jnp.ndarray): State vector at this node.
             u (jnp.ndarray): Input vector at this node.
             node (int): Trajectory time-step index.
+            *params (tuple): Sequence of (name, value) pairs for parameters.
+
         Returns:
             jnp.ndarray or float:
                 The total penalty (sum over selected residuals) if inside interval,
@@ -77,11 +80,19 @@ class CTCSConstraint:
         x_expr = x.expr if isinstance(x, (State, Variable)) else x
         u_expr = u.expr if isinstance(u, (Control, Variable)) else u
 
-        # check if within [start, end)
+        # Inspect function signature for expected parameter names
+        func_signature = inspect.signature(self.func)
+        expected_args = set(func_signature.parameters.keys())
+
+        # Only include params whose name (with underscore) is in the function's signature
+        filtered_params = {
+            f"{name}_": value for name, value in params if f"{name}_" in expected_args
+        }
+
         return cond(
             jnp.all((self.nodes[0] <= node) & (node < self.nodes[1]))
             if self.nodes is not None else True,
-            lambda _: jnp.sum(self.penalty(self.func(x_expr, u_expr, *params))),
+            lambda _: jnp.sum(self.penalty(self.func(x_expr, u_expr, **filtered_params))),
             lambda _: 0.0,
             operand=None,
         )
@@ -161,21 +172,26 @@ def ctcs(
     else:
         raise ValueError(f"Unknown penalty {penalty}")
 
-    def decorator(f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]) -> CTCSConstraint:
-        # wrap so name, doc, signature stay on f
-        wrapped = functools.wraps(f)(f)
-        return CTCSConstraint(
-            func=wrapped,
+    def decorator(f: Callable):
+        @functools.wraps(f)  # preserves name, docstring, and signature on the wrapper
+        def wrapper(*args, **kwargs):
+            return f(*args, **kwargs)
+
+        # Now attach original function as attribute if needed
+        wrapper._original_func = f
+
+        # Return your CTCSConstraint with the original function, but keep the wrapper around it
+        constraint = CTCSConstraint(
+            func=wrapper,
             penalty=pen,
             nodes=nodes,
             idx=idx,
             grad_f_x=grad_f_x,
             grad_f_u=grad_f_u,
         )
+        return constraint
 
-    # if called as @ctcs or @ctcs(...), _func will be None and we return decorator
     if _func is None:
         return decorator
-    # if called as ctcs(func), we immediately decorate
     else:
         return decorator(_func)

@@ -37,7 +37,7 @@ def get_augmented_dynamics(
         u_true = u[idx_u_true]
 
         # Pass params into the true dynamics function
-        x_dot = dynamics(x_true, u_true, *params)
+        x_dot = dynamics(x_true, u_true)
 
         for v in violations:
             g_val = v.g(x_true, u_true, node, *params)
