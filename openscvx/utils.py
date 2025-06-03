@@ -12,11 +12,14 @@ def stable_function_hash(funcs):
     for func in funcs:
         try:
             if isinstance(func, types.FunctionType):
-                # Use the code object and constants for stability
                 hasher.update(func.__code__.co_code)
                 hasher.update(str(func.__code__.co_consts).encode())
                 hasher.update(str(func.__code__.co_varnames).encode())
                 hasher.update(func.__name__.encode())
+                hasher.update(func.__module__.encode())  # Add the module name
+                hasher.update(str(func.__defaults__).encode())  # Add default argument values
+                hasher.update(str(func.__kwdefaults__).encode())  # Add keyword default argument values
+                hasher.update(str(func.__annotations__).encode())  # Add type annotations`
             else:
                 # Fallback to inspect (less stable)
                 src = inspect.getsource(func)

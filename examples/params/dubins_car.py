@@ -7,6 +7,7 @@ from openscvx.constraints import ctcs, nodal
 from openscvx.backend.state import State, Free, Minimize
 from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
+from examples.plotting import plot_dubins_car
 
 
 
@@ -35,12 +36,16 @@ u.max = np.array([10, 5])
 u.guess = np.repeat(np.expand_dims(np.array([0, 0]), axis=0), n, axis=0)
 
 # Define Parameters for obstacle radius and center
-obs_radius = 1.0
-obs_center = np.array([-0.01, 0.0])  # Center of the obstacle
+obs_center = Parameter("obs_center", shape=(2,))
+obs_radius = Parameter("obs_radius", shape=())
+
+
+obs_radius.value = 1.0
+obs_center.value = np.array([-0.01, 0.0])  # Center of the obstacle
 
 # Define constraints using symbolic x, u, and parameters
 constraints = [
-    ctcs(lambda x_, u_: obs_radius - jnp.linalg.norm(x_[:2] - obs_center)),
+    ctcs(lambda x_, u_, obs_radius_, obs_center_: obs_radius_ - jnp.linalg.norm(x_[:2] - obs_center_)),
     ctcs(lambda x_, u_: x_ - x.true_state.max),
     ctcs(lambda x_, u_: x.true_state.min - x_)
 ]
@@ -74,8 +79,34 @@ problem.settings.scp.lam_cost = 1e-1
 problem.settings.scp.lam_vc = 6e2
 problem.settings.scp.uniform_time_grid = True
 
-# Optional: For plotting
+problem.settings.cvx.cvxpygen = True
+problem.settings.cvx.solver = "qocogen"
+
 plotting_dict = dict(
     obs_radius=obs_radius,
     obs_center=obs_center,
 )
+
+problem.initialize()
+results = problem.solve()
+results = problem.post_process(results)
+results.update(plotting_dict)
+
+plot_dubins_car(results, problem.settings).show()
+
+
+# # Second run with different parameters
+# obs_center.value = np.array([0.5, 0.0])
+# total_time = 0.7  # Adjust total time for second run
+# problem.settings.scp.lam_cost = 1E-1  # Disable minimal time objective for second run
+# problem.settings.scp.w_tr = 1e0
+# problem.settings.scp.lam_vc = 1e2  # Adjust virtual control weight
+# x.guess[:,0:4]   = np.linspace([0, -2, 0, 0], [0, 2, 0, total_time], n)
+# u.guess[:,0:2] = np.repeat(np.expand_dims(np.array([0, 0]), axis=0), n, axis=0)
+# u.guess[:,2] = np.repeat(total_time, n)  # Adjust initial control guess
+
+
+# results = problem.solve()
+# results = problem.post_process(results)
+# results.update(plotting_dict)
+# plot_dubins_car(results, problem.settings).show()

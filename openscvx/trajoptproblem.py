@@ -9,6 +9,7 @@ from copy import deepcopy
 import cvxpy as cp
 import jax
 from jax import export, ShapeDtypeStruct
+from functools import partial
 import numpy as np
 
 from openscvx.config import (
@@ -36,6 +37,7 @@ from openscvx import io
 from openscvx.utils import stable_function_hash
 from openscvx.backend.state import State, Free
 from openscvx.backend.control import Control
+from openscvx.backend.parameter import Parameter
 
 
 
@@ -92,6 +94,8 @@ class TrajOptProblem:
         Returns:
             None
         """
+
+        self.params = Parameter.get_all()
 
         if dynamics_prop is None:
             dynamics_prop = dynamics
@@ -260,12 +264,11 @@ class TrajOptProblem:
         self.settings.sim.__post_init__()
 
         # Compile dynamics and jacobians
-        self.dynamics_augmented.f = jax.vmap(self.dynamics_augmented.f)
-        self.dynamics_augmented.A = jax.vmap(self.dynamics_augmented.A, in_axes=(0, 0, 0))
-        self.dynamics_augmented.B = jax.vmap(self.dynamics_augmented.B, in_axes=(0, 0, 0))
-
-
-        self.dynamics_augmented_prop.f = jax.vmap(self.dynamics_augmented_prop.f)
+        self.dynamics_augmented.f = jax.vmap(self.dynamics_augmented.f, in_axes=(0, 0, 0, *(None,) * len(self.params)))
+        self.dynamics_augmented.A = jax.vmap(self.dynamics_augmented.A, in_axes=(0, 0, 0, *(None,) * len(self.params)))
+        self.dynamics_augmented.B = jax.vmap(self.dynamics_augmented.B, in_axes=(0, 0, 0, *(None,) * len(self.params)))
+  
+        self.dynamics_augmented_prop.f = jax.vmap(self.dynamics_augmented_prop.f, in_axes=(0, 0, 0, *(None,) * len(self.params)))
 
         for constraint in self.settings.sim.constraints_nodal:
             if not constraint.convex:
@@ -275,8 +278,8 @@ class TrajOptProblem:
                 constraint.grad_g_u = jax.jit(constraint.grad_g_u)
 
         # Generate solvers and optimal control problem
-        self.discretization_solver = get_discretization_solver(self.dynamics_augmented, self.settings)
-        self.propagation_solver = get_propagation_solver(self.dynamics_augmented_prop.f, self.settings)
+        self.discretization_solver = get_discretization_solver(self.dynamics_augmented, self.settings, self.params)
+        self.propagation_solver = get_propagation_solver(self.dynamics_augmented_prop.f, self.settings, self.params)
         self.optimal_control_problem = OptimalControlProblem(self.settings)
 
         # Collect all relevant functions
@@ -304,10 +307,13 @@ class TrajOptProblem:
                 # Load the compiled code
                 self.discretization_solver = export.deserialize(serial_dis)
             except FileNotFoundError:
-                # Compile the discretization solver and save it
+                # Extract parameter values and names in order
+                param_values = [param.value for _, param in self.params.items()]
+                
                 self.discretization_solver = export.export(jax.jit(self.discretization_solver))(
                     np.ones((self.settings.scp.n, self.settings.sim.n_states)),
                     np.ones((self.settings.scp.n, self.settings.sim.n_controls)),
+                    *param_values
                 )
                 # Serialize and Save the compiled code in a temp directory
                 with open(dis_solver_file, "wb") as f:
@@ -326,16 +332,20 @@ class TrajOptProblem:
             # Load the compiled code
             self.propagation_solver = export.deserialize(serial_prop)
         except FileNotFoundError:
+            # Extract parameter values and names in order
+            param_values = [param.value for _, param in self.params.items()]
+
             propagation_solver = export.export(jax.jit(self.propagation_solver))(
-                np.ones((self.settings.sim.n_states_prop)),                  # x_0
+                np.ones((self.settings.sim.n_states_prop)),                # x_0
                 (0.0, 0.0),                                                # time span
-                np.ones((1, self.settings.sim.n_controls)),                 # controls_current
-                np.ones((1, self.settings.sim.n_controls)),                 # controls_next
+                np.ones((1, self.settings.sim.n_controls)),                # controls_current
+                np.ones((1, self.settings.sim.n_controls)),                # controls_next
                 np.ones((1, 1)),                                           # tau_0
                 np.ones((1, 1)).astype("int"),                             # segment index
                 0,                                                         # idx_s_stop
-                np.ones((self.settings.prp.max_tau_len,)),                                   # save_time (tau_cur_padded)
-                np.ones((self.settings.prp.max_tau_len,), dtype=bool),                       # mask_padded (boolean mask)
+                np.ones((self.settings.prp.max_tau_len,)),                 # save_time (tau_cur_padded)
+                np.ones((self.settings.prp.max_tau_len,), dtype=bool),     # mask_padded (boolean mask)
+                *param_values,                                             # additional parameters
             )
 
             # Serialize and Save the compiled code in a temp directory

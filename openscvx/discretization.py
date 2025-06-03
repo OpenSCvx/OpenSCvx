@@ -17,6 +17,7 @@ def dVdt(
     n_u: int,
     N: int,
     dis_type: str,
+    **params
 ) -> jnp.ndarray:
     # Define the nodes
     nodes = jnp.arange(0, N-1)
@@ -52,15 +53,15 @@ def dVdt(
     u = u[: x.shape[0]]
 
     # Compute the nonlinear propagation term
-    f = state_dot(x, u[:, :-1], nodes)
+    f = state_dot(x, u[:, :-1], nodes, *params.items())
     F = s[:, None] * f
 
     # Evaluate the State Jacobian
-    dfdx = A(x, u[:, :-1], nodes)
+    dfdx = A(x, u[:, :-1], nodes, *params.items())
     sdfdx = s[:, None, None] * dfdx
 
     # Evaluate the Control Jacobian
-    dfdu_veh = B(x, u[:, :-1], nodes)
+    dfdu_veh = B(x, u[:, :-1], nodes, *params.items())
     dfdu = dfdu.at[:, :, :-1].set(s[:, None, None] * dfdu_veh)
     dfdu = dfdu.at[:, :, -1].set(f)
 
@@ -94,8 +95,8 @@ def calculate_discretization(
     rtol,
     atol,
     dis_type: str,
+    **kwargs  # <--- Accept any additional parameters
 ):
-
     # Define indices for slicing the augmented state vector
     i0 = 0
     i1 = n_x
@@ -104,67 +105,80 @@ def calculate_discretization(
     i4 = i3 + n_x * n_u
     i5 = i4 + n_x
 
-    # initial augmented state
+    # Initial augmented state
     V0 = jnp.zeros((N - 1, i5))
     V0 = V0.at[:, :n_x].set(x[:-1].astype(float))
-    V0 = V0.at[:, n_x : n_x + n_x * n_x].set(
+    V0 = V0.at[:, n_x:n_x + n_x * n_x].set(
         jnp.eye(n_x).reshape(1, -1).repeat(N - 1, axis=0)
     )
 
-    # choose integrator
+    # Choose integrator
+    integrator_args = dict(
+        u_cur=u[:-1].astype(float),
+        u_next=u[1:].astype(float),
+        state_dot=state_dot,
+        A=A,
+        B=B,
+        n_x=n_x,
+        n_u=n_u,
+        N=N,
+        dis_type=dis_type,
+        **kwargs  # <-- adds parameter values with names
+    )
+
+    # Define dVdt wrapper using named arguments
+    def dVdt_wrapped(t, y):
+        return dVdt(t, y, **integrator_args)
+
+    # Choose integrator
     if custom_integrator:
-        # fmt: off
         sol = solve_ivp_rk45(
-            lambda t,y,*a: dVdt(t, y, *a),
-            1.0/(N-1),
+            dVdt_wrapped,
+            1.0 / (N - 1),
             V0.reshape(-1),
-            args=(u[:-1].astype(float), u[1:].astype(float),
-                  state_dot, A, B, n_x, n_u, N, dis_type),
+            args=(),
             is_not_compiled=debug,
         )
-        # fmt: on
     else:
-        # fmt: off
         sol = solve_ivp_diffrax(
-            lambda t,y,*a: dVdt(t, y, *a),
-            1.0/(N-1),
+            dVdt_wrapped,
+            1.0 / (N - 1),
             V0.reshape(-1),
-            args=(u[:-1].astype(float), u[1:].astype(float),
-                  state_dot, A, B, n_x, n_u, N, dis_type),
             solver_name=solver,
             rtol=rtol,
             atol=atol,
+            args=(),
             extra_kwargs=None,
         )
-        # fmt: on
 
     Vend = sol[-1].T.reshape(-1, i5)
     Vmulti = sol.T
 
-    # fmt: off
-    A_bar = Vend[:, i1:i2].reshape(N-1, n_x, n_x).transpose(1,2,0).reshape(n_x*n_x, -1, order='F').T
-    B_bar = Vend[:, i2:i3].reshape(N-1, n_x, n_u).transpose(1,2,0).reshape(n_x*n_u, -1, order='F').T
-    C_bar = Vend[:, i3:i4].reshape(N-1, n_x, n_u).transpose(1,2,0).reshape(n_x*n_u, -1, order='F').T
+    A_bar = Vend[:, i1:i2].reshape(N - 1, n_x, n_x).transpose(1, 2, 0).reshape(n_x * n_x, -1, order='F').T
+    B_bar = Vend[:, i2:i3].reshape(N - 1, n_x, n_u).transpose(1, 2, 0).reshape(n_x * n_u, -1, order='F').T
+    C_bar = Vend[:, i3:i4].reshape(N - 1, n_x, n_u).transpose(1, 2, 0).reshape(n_x * n_u, -1, order='F').T
     z_bar = Vend[:, i4:i5]
-    # fmt: on
 
     return A_bar, B_bar, C_bar, z_bar, Vmulti
 
 
-def get_discretization_solver(dyn: Dynamics, params):
-    return lambda x, u: calculate_discretization(
+
+
+def get_discretization_solver(dyn: Dynamics, settings, param_map):
+    return lambda x, u, *params: calculate_discretization(
         x=x,
         u=u,
         state_dot=dyn.f,
         A=dyn.A,
         B=dyn.B,
-        n_x=params.sim.n_states,
-        n_u=params.sim.n_controls,
-        N=params.scp.n,
-        custom_integrator=params.dis.custom_integrator,
-        debug=params.dev.debug,
-        solver=params.dis.solver,
-        rtol=params.dis.rtol,
-        atol=params.dis.atol,
-        dis_type=params.dis.dis_type,
+        n_x=settings.sim.n_states,
+        n_u=settings.sim.n_controls,
+        N=settings.scp.n,
+        custom_integrator=settings.dis.custom_integrator,
+        debug=settings.dev.debug,
+        solver=settings.dis.solver,
+        rtol=settings.dis.rtol,
+        atol=settings.dis.atol,
+        dis_type=settings.dis.dis_type,
+        **dict(zip(param_map.keys(), params))  # <--- Named keyword args
     )

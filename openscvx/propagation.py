@@ -2,6 +2,7 @@ import numpy as np
 
 from openscvx.config import Config
 from openscvx.integrators import solve_ivp_diffrax_prop
+from openscvx.backend.parameter import Parameter
 
 
 def prop_aug_dy(
@@ -15,6 +16,7 @@ def prop_aug_dy(
     state_dot: callable,
     dis_type: str,
     N: int,
+    *params
 ) -> np.ndarray:
     x = x[None, :]
 
@@ -24,30 +26,35 @@ def prop_aug_dy(
         beta = (tau - tau_init) * N
     u = u_current + beta * (u_next - u_current)
 
-    return u[:, idx_s] * state_dot(x, u[:, :-1], node).squeeze()
+    return u[:, idx_s] * state_dot(x, u[:, :-1], node, *params).squeeze()
 
-def get_propagation_solver(state_dot, params):
-    def propagation_solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask):
+def get_propagation_solver(state_dot, settings, param_map):
+    def propagation_solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask, *params):
+        param_map_update = dict(zip(param_map.keys(), params))
         return solve_ivp_diffrax_prop(
             f=prop_aug_dy,
             tau_final=tau_grid[1],  # scalar
             y_0=V0,                 # shape (n_states,)
             args=(
                 u_cur,             # shape (1, n_controls)
-                u_next,           # shape (1, n_controls)
-                tau_init,         # shape (1, 1)
-                node,             # shape (1, 1)
-                idx_s,            # int
-                state_dot,        # function or array
-                params.dis.dis_type,
-                params.scp.n,
+                u_next,            # shape (1, n_controls)
+                tau_init,          # shape (1, 1)
+                node,              # shape (1, 1)
+                idx_s,             # int
+                state_dot,         # function or array
+                settings.dis.dis_type,
+                settings.scp.n,
+                *param_map_update.items(),
+                # additional named parameters as **kwargs
             ),
             tau_0=tau_grid[0],      # scalar
             save_time=save_time,    # shape (MAX_TAU_LEN,)
-            mask=mask,              # shape (MAX_TAU_LEN,), dtype=bool
+            mask=mask              # shape (MAX_TAU_LEN,), dtype=bool
         )
 
     return propagation_solver
+
+
 
 
 def s_to_t(x, u, params: Config):
@@ -84,13 +91,16 @@ def t_to_tau(u, t, t_nodal, params: Config):
     return tau, u
 
 
-def simulate_nonlinear_time(x, u, tau_vals, t, params, propagation_solver):
-    n_segments = params.scp.n - 1
+def simulate_nonlinear_time(x, u, tau_vals, t, settings, propagation_solver):
+    n_segments = settings.scp.n - 1
     n_states = x.shape[0]
     n_tau = len(tau_vals)
 
+    params = Parameter.get_all().items()
+    param_values = tuple([param.value for _, param in params])
+    
     states = np.empty((n_states, n_tau))
-    tau = np.linspace(0, 1, params.scp.n)
+    tau = np.linspace(0, 1, settings.scp.n)
 
     # Precompute control interpolation
     u_interp = np.stack([
@@ -99,7 +109,7 @@ def simulate_nonlinear_time(x, u, tau_vals, t, params, propagation_solver):
 
     # Bin tau_vals into segments of tau
     tau_inds = np.digitize(tau_vals, tau) - 1
-    tau_inds = np.where(tau_inds == params.scp.n - 1, params.scp.n - 2, tau_inds)
+    tau_inds = np.where(tau_inds == settings.scp.n - 1, settings.scp.n - 2, tau_inds)
 
     prev_count = 0
     out_idx = 0
@@ -118,7 +128,7 @@ def simulate_nonlinear_time(x, u, tau_vals, t, params, propagation_solver):
         count += 1
 
         # Pad to fixed length
-        pad_len = params.prp.max_tau_len - count
+        pad_len = settings.prp.max_tau_len - count
         tau_cur_padded = np.pad(tau_cur, (0, pad_len), constant_values=tau[k + 1])
         mask_padded = np.concatenate([np.ones(count), np.zeros(pad_len)]).astype(bool)
 
@@ -130,9 +140,10 @@ def simulate_nonlinear_time(x, u, tau_vals, t, params, propagation_solver):
             controls_next,
             np.array([[tau[k]]]),
             np.array([[k]]),
-            params.sim.idx_s.stop,
+            settings.sim.idx_s.stop,
             tau_cur_padded,
-            mask_padded
+            mask_padded,
+            *param_values
         )
 
         # Only store the valid portion (excluding the final point which becomes next x_0)
