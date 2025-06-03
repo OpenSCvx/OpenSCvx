@@ -1,4 +1,5 @@
 from typing import Callable, List, Tuple
+import inspect
 
 import jax
 import jax.numpy as jnp
@@ -36,8 +37,14 @@ def get_augmented_dynamics(
         x_true = x[idx_x_true]
         u_true = u[idx_u_true]
 
-        # Pass params into the true dynamics function
-        x_dot = dynamics(x_true, u_true)
+        # Determine the arguments of dynamics function
+        func_signature = inspect.signature(dynamics)
+        expected_args = set(func_signature.parameters.keys())
+        # Filter params to only those expected by the dynamics function
+        filtered_params = {
+            f"{name}_": value for name, value in params if f"{name}_" in expected_args
+        }
+        x_dot = dynamics(x_true, u_true, **filtered_params)
 
         for v in violations:
             g_val = v.g(x_true, u_true, node, *params)
