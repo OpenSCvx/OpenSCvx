@@ -79,6 +79,9 @@ problem.settings.scp.lam_cost = 1e-1
 problem.settings.scp.lam_vc = 6e2
 problem.settings.scp.uniform_time_grid = True
 
+problem.settings.cvx.cvxpygen = True
+problem.settings.cvx.solver = "qocogen"
+
 plotting_dict = dict(
     obs_radius=obs_radius,
     obs_center=obs_center,
@@ -92,14 +95,18 @@ results.update(plotting_dict)
 plot_dubins_car(results, problem.settings).show()
 
 
-# Second run with different parameters
-obs_radius.value = 0.7
-total_time = 1.0  # Adjust total time for second run
-problem.settings.scp.lam_cost = 1E-1  # Disable minimal time objective for second run
-x.guess[:,0:4]   = np.linspace([0, -2, 0, 0], [0, 2, 0, total_time], n)
+# # Second run with different parameters
+# obs_center.value = np.array([0.5, 0.0])
+# total_time = 0.7  # Adjust total time for second run
+# problem.settings.scp.lam_cost = 1E-1  # Disable minimal time objective for second run
+# problem.settings.scp.w_tr = 1e0
+# problem.settings.scp.lam_vc = 1e2  # Adjust virtual control weight
+# x.guess[:,0:4]   = np.linspace([0, -2, 0, 0], [0, 2, 0, total_time], n)
+# u.guess[:,0:2] = np.repeat(np.expand_dims(np.array([0, 0]), axis=0), n, axis=0)
+# u.guess[:,2] = np.repeat(total_time, n)  # Adjust initial control guess
 
 
-results = problem.solve()
-results = problem.post_process(results)
-results.update(plotting_dict)
-plot_dubins_car(results, problem.settings).show()
+# results = problem.solve()
+# results = problem.post_process(results)
+# results.update(plotting_dict)
+# plot_dubins_car(results, problem.settings).show()
