@@ -23,15 +23,35 @@ class Control(Variable):
             temp_control.guess = guess
             self.append(temp_control, augmented=augmented)
 
+    @property
     def true_control(self):
         return self[self._true_slice]
 
+    @property
     def augmented_control(self):
         return self[self._augmented_slice]
 
     def __getitem__(self, idx):
         new_control = super().__getitem__(idx)
         new_control.__class__ = Control
+
+        # Handle sliced sub-control slices for true/augmented tracking
+        if isinstance(idx, slice):
+            start = idx.start or 0
+            stop = idx.stop if idx.stop is not None else self.shape[0]
+
+            def adjust_slice(s):
+                return slice(
+                    max(0, s.start - start),
+                    max(0, min(stop - start, s.stop - start))
+                )
+
+            new_control._true_slice = adjust_slice(self._true_slice)
+            new_control._augmented_slice = adjust_slice(self._augmented_slice)
+        else:
+            new_control._true_slice = slice(0, 0)
+            new_control._augmented_slice = slice(0, 0)
+
         return new_control
 
     def __repr__(self):

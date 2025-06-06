@@ -158,7 +158,7 @@ class TrajOptProblem:
         s.min = np.array([time_dilation_factor_min * x.final[idx_time][0]])
         s.max = np.array([time_dilation_factor_max * x.final[idx_time][0]])
         s.guess =np.ones((N, 1)) * x.final[idx_time][0]
-        # np.ones((N, 1)) * x.final[idx_time][0]
+
         
         u.append(s, augmented=True)
 
