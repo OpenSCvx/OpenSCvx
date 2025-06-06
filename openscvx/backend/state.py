@@ -103,10 +103,14 @@ class State(Variable):
     def append(self, other=None, *, min=-np.inf, max=np.inf, guess=0.0, initial=0.0, final=0.0, augmented=False):
         if isinstance(other, State):
             super().append(other=other)
-            self._initial = self._append_array(self._initial, other._initial)
-            self._final = self._append_array(self._final, other._final)
-            self.initial_type = self._append_array(self.initial_type, other.initial_type)
-            self.final_type = self._append_array(self.final_type, other.final_type)
+            if self._initial is not None and other._initial is not None:
+                self._initial = self._append_array(self._initial, other._initial)
+            if self._final is not None and other._final is not None:
+                self._final = self._append_array(self._final, other._final)
+            if self.initial_type is not None and other.initial_type is not None:
+                self.initial_type = self._append_array(self.initial_type, other.initial_type)
+            if self.final_type is not None and other.final_type is not None:
+                self.final_type = self._append_array(self.final_type, other.final_type)
 
             new_total = self.shape[0]
             true_len = self._true_slice.stop

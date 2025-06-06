@@ -48,16 +48,22 @@ class Variable(Expr):
                 return val
 
         if isinstance(other, Variable):
-            self._min = self._append_array(self._min, process_val(other._min))
-            self._max = self._append_array(self._max, process_val(other._max))
-            self._guess = self._append_guess(self._guess, process_val(other._guess))
+            if self._min is not None and other._min is not None:
+                self._min = self._append_array(self._min, process_val(other._min))
+            if self._max is not None and other._max is not None:
+                self._max = self._append_array(self._max, process_val(other._max))
+            if self._guess is not None and other._guess is not None:
+                self._guess = self._append_guess(self._guess, process_val(other._guess))
             self._shape = (self._shape[0] + other._shape[0],)
         else:
-            self._min = self._append_array(self._min, process_val(min))
-            self._max = self._append_array(self._max, process_val(max))
-            self._guess = self._append_guess(self._guess, process_val(guess))
+            if self._min is not None and min is not None:
+                self._min = self._append_array(self._min, process_val(min))
+            if self._max is not None and max is not None:
+                self._max = self._append_array(self._max, process_val(max))
+            if self._guess is not None and guess is not None:
+                self._guess = self._append_guess(self._guess, process_val(guess))
             self._shape = (self._shape[0] + 1,)
-            
+
     def _append_array(self, existing, new):
         new = np.atleast_1d(new)
         if existing is None:

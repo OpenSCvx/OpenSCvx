@@ -2,7 +2,8 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Callable
 
-from openscvx.constraints.boundary import BoundaryConstraint
+from openscvx.backend.state import State
+from openscvx.backend.control import Control
 
 
 def get_affine_scaling_matrices(n, minimum, maximum):
@@ -152,8 +153,9 @@ class SimConfig:
     
     def __init__(
         self,
-        x: np.ndarray,
-        u: np.ndarray,
+        x: State,
+        x_prop: State,
+        u: Control,
         total_time: float,
         idx_x_true: slice,
         idx_x_true_prop: slice,
@@ -210,6 +212,7 @@ class SimConfig:
         """
         # Assign all arguments to self
         self.x = x
+        self.x_prop = x_prop
         self.u = u
         self.total_time = total_time
         self.idx_x_true = idx_x_true

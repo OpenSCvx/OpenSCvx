@@ -3,14 +3,14 @@ import numpy.linalg as la
 import cvxpy as cp
 import pickle
 import time
-from openscvx.backend.parameter import Parameter
 
+from openscvx.backend.parameter import Parameter
 from openscvx.config import Config
 
 import warnings
 warnings.filterwarnings("ignore")
 
-def PTR_init(ocp: cp.Problem, discretization_solver: callable, settings: Config):
+def PTR_init(params, ocp: cp.Problem, discretization_solver: callable, settings: Config):
     if settings.cvx.cvxpygen:
         from solver.cpg_solver import cpg_solve
         with open('solver/problem.pickle', 'rb') as f:
@@ -24,21 +24,15 @@ def PTR_init(ocp: cp.Problem, discretization_solver: callable, settings: Config)
     if 'x_term' in ocp.param_dict:
         ocp.param_dict['x_term'].value = settings.sim.x.final
 
-    # Extract the parameter values
-    params = Parameter.get_all().items()
-
     # Solve a dumb problem to intilize DPP and JAX jacobians
-    _ = PTR_subproblem(cpg_solve, settings.sim.x, settings.sim.u, discretization_solver, ocp, params, settings)
+    _ = PTR_subproblem(params.items(), cpg_solve, settings.sim.x, settings.sim.u, discretization_solver, ocp, settings)
 
     return cpg_solve
 
-def PTR_main(settings: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emitter_function) -> dict:
+def PTR_main(params, settings: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emitter_function) -> dict:
     J_vb = 1E2
     J_vc = 1E2
     J_tr = 1E2
-
-    # Extract the parameter values
-    params = Parameter.get_all().items()
 
     x = settings.sim.x
     u = settings.sim.u
@@ -57,7 +51,7 @@ def PTR_main(settings: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, em
     k = 1
 
     while k <= settings.scp.k_max and ((J_tr >= settings.scp.ep_tr) or (J_vb >= settings.scp.ep_vb) or (J_vc >= settings.scp.ep_vc)):
-        x_sol, u_sol, cost, J_total, J_vb_vec, J_vc_vec, J_tr_vec, prob_stat, V_multi_shoot, subprop_time, dis_time = PTR_subproblem(cpg_solve, x, u, aug_dy, prob, params, settings)
+        x_sol, u_sol, cost, J_total, J_vb_vec, J_vc_vec, J_tr_vec, prob_stat, V_multi_shoot, subprop_time, dis_time = PTR_subproblem(params.items(), cpg_solve, x, u, aug_dy, prob, settings)
 
         V_multi_shoot_traj.append(V_multi_shoot)
 
@@ -105,7 +99,7 @@ def PTR_main(settings: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, em
     return result
 
 
-def PTR_subproblem(cpg_solve, x, u, aug_dy, prob, params, settings: Config):
+def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
     prob.param_dict['x_bar'].value = x.guess
     prob.param_dict['u_bar'].value = u.guess
     

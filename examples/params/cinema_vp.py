@@ -133,10 +133,9 @@ problem.settings.prp.dt = 0.1
 
 problem.settings.scp.w_tr = 4e0  # Weight on the Trust Reigon
 problem.settings.scp.lam_cost = 1e-2  # Weight on the Minimal Fuel Objective
-problem.settings.scp.lam_vc = (
-    1e1  # Weight on the Virtual Control Objective
-)
-problem.settings.scp.ep_tr = 5e-6  # Trust Region Tolerance
+problem.settings.scp.lam_vc = 1e1  # Weight on the Virtual Control Objective
+
+problem.settings.scp.ep_tr = 1e-6  # Trust Region Tolerance
 problem.settings.scp.ep_vb = 1e-4  # Virtual Control Tolerance
 problem.settings.scp.ep_vc = 1e-8  # Virtual Control Tolerance for CTCS
 problem.settings.scp.w_tr_adapt = 1.3  # Trust Region Adaptation Factor

@@ -51,8 +51,9 @@ class TrajOptProblem:
         u: Control,
         N: int,
         idx_time: int,
+        params: dict = {},
         dynamics_prop: callable = None,
-        initial_state_prop: BoundaryConstraint = None,
+        x_prop: State = None,
         scp: Optional[ScpConfig] = None,
         dis: Optional[DiscretizationConfig] = None,
         prp: Optional[PropagationConfig] = None,
@@ -95,12 +96,12 @@ class TrajOptProblem:
             None
         """
 
-        self.params = Parameter.get_all()
+        self.params = params
 
         if dynamics_prop is None:
             dynamics_prop = dynamics
         
-        if initial_state_prop is None:
+        if x_prop is None:
             x_prop = deepcopy(x)
 
         # TODO (norrisg) move this into some augmentation function, if we want to make this be executed after the init (i.e. within problem.initialize) need to rethink how problem is defined
@@ -167,6 +168,7 @@ class TrajOptProblem:
         if sim is None:
             sim = SimConfig(
                 x=x,
+                x_prop=x_prop,
                 u=u,
                 total_time=x.initial[idx_time][0],
                 n_states=x.initial.shape[0],
@@ -224,7 +226,7 @@ class TrajOptProblem:
             cvx=cvx,
             prp=prp,
         )
-
+        
         self.optimal_control_problem: cp.Problem = None
         self.discretization_solver: callable = None
         self.cpg_solve = None
@@ -356,6 +358,7 @@ class TrajOptProblem:
 
         # Initialize the PTR loop
         self.cpg_solve = PTR_init(
+            self.params,
             self.optimal_control_problem,
             self.discretization_solver,
             self.settings,
@@ -392,6 +395,7 @@ class TrajOptProblem:
         io.header()
 
         result = PTR_main(
+            self.params,
             self.settings,
             self.optimal_control_problem,
             self.discretization_solver,
@@ -425,7 +429,7 @@ class TrajOptProblem:
             pr.enable()
 
         t_0_post = time.time()
-        result = propagate_trajectory_results(self.settings, result, self.propagation_solver)
+        result = propagate_trajectory_results(self.params, self.settings, result, self.propagation_solver)
         t_f_post = time.time()
 
         self.timing_post = t_f_post - t_0_post

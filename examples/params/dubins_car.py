@@ -65,6 +65,7 @@ problem = TrajOptProblem(
     dynamics=dynamics_fn,
     x=x,
     u=u,
+    params = Parameter.get_all(),
     idx_time=3,  # Index of time variable in state vector
     constraints=constraints,
     N=n,
@@ -79,20 +80,20 @@ problem.settings.scp.lam_cost = 1e-1
 problem.settings.scp.lam_vc = 6e2
 problem.settings.scp.uniform_time_grid = True
 
-problem.settings.cvx.cvxpygen = True
-problem.settings.cvx.solver = "qocogen"
+# problem.settings.cvx.cvxpygen = True
+# problem.settings.cvx.solver = "qocogen"
 
 plotting_dict = dict(
     obs_radius=obs_radius,
     obs_center=obs_center,
 )
 
-problem.initialize()
-results = problem.solve()
-results = problem.post_process(results)
-results.update(plotting_dict)
+# problem.initialize()
+# results = problem.solve()
+# results = problem.post_process(results)
+# results.update(plotting_dict)
 
-plot_dubins_car(results, problem.settings).show()
+# plot_dubins_car(results, problem.settings).show()
 
 
 # # Second run with different parameters

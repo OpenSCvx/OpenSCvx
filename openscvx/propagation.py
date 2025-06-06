@@ -91,12 +91,14 @@ def t_to_tau(u, t, t_nodal, params: Config):
     return tau, u
 
 
-def simulate_nonlinear_time(x, u, tau_vals, t, settings, propagation_solver):
+def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_solver):
+    x_0 = settings.sim.x_prop.initial
+
     n_segments = settings.scp.n - 1
-    n_states = x.shape[0]
+    n_states = x_0.shape[0]
     n_tau = len(tau_vals)
 
-    params = Parameter.get_all().items()
+    params = params.items()
     param_values = tuple([param.value for _, param in params])
     
     states = np.empty((n_states, n_tau))
@@ -114,7 +116,6 @@ def simulate_nonlinear_time(x, u, tau_vals, t, settings, propagation_solver):
     prev_count = 0
     out_idx = 0
 
-    x_0 = x.guess[0, :]
     for k in range(n_segments):
         controls_current = u_interp[k][None, :]
         controls_next = u_interp[k + 1][None, :]
