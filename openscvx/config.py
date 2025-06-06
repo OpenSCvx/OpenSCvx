@@ -80,6 +80,7 @@ class ConvexSolverConfig:
         solver: str = "QOCO",
         solver_args: dict = {"abstol": 1e-6, "reltol": 1e-9},
         cvxpygen: bool = False,
+        cvxpygen_override: bool = False,
     ):
         """
         Configuration class for convex solver settings.
@@ -103,6 +104,7 @@ class ConvexSolverConfig:
         self.solver = solver
         self.solver_args = solver_args if solver_args is not None else {"abstol": 1e-6, "reltol": 1e-9}
         self.cvxpygen = cvxpygen
+        self.cvxpygen_override = cvxpygen_override
 
 
 @dataclass

@@ -154,9 +154,12 @@ def OptimalControlProblem(settings: Config):
             cpg.generate_code(prob, solver = settings.cvx.solver, code_dir='solver', wrapper = True)
         else:
             # Prompt the use to indicate if they wish to overwrite the solver directory or use the existing compiled solver
-            overwrite = input("Solver directory already exists. Overwrite? (y/n): ")
-            if overwrite.lower() == 'y':
+            if settings.cvx.cvxpygen_override:
                 cpg.generate_code(prob, solver = settings.cvx.solver, code_dir='solver', wrapper = True)
             else:
-                pass
+                overwrite = input("Solver directory already exists. Overwrite? (y/n): ")
+                if overwrite.lower() == 'y':
+                    cpg.generate_code(prob, solver = settings.cvx.solver, code_dir='solver', wrapper = True)
+                else:
+                    pass
     return prob
