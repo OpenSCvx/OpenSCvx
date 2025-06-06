@@ -10,7 +10,7 @@ sys.path.append(grandparent_dir)
 
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.dynamics import dynamics
-from openscvx.constraints import boundary, ctcs, nodal
+from openscvx.constraints import ctcs, nodal
 from openscvx.utils import qdcm, SSMP, SSM, generate_orthogonal_unit_vectors
 from openscvx.backend.state import State, Free, Minimize
 from openscvx.backend.parameter import Parameter
