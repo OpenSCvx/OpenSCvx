@@ -2,13 +2,21 @@ import numpy as np
 import jax.numpy as jnp
 import cvxpy as cp
 
+import os
+import sys
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(grandparent_dir)
+
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.dynamics import dynamics
 from openscvx.constraints import ctcs, nodal
 from openscvx.utils import qdcm, SSMP, SSM, rot, gen_vertices
 from openscvx.backend.state import State, Free, Minimize
-from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
+
+from examples.plotting import plot_animation
 
 n = 22  # Number of Nodes
 total_time = 24.0  # Total time for the simulation
@@ -143,3 +151,12 @@ problem.settings.scp.w_tr_adapt = 1.4  # Trust Region Adaptation Factor
 problem.settings.scp.w_tr_max_scaling_factor = 1e2  # Maximum Trust Region Weight
 
 plotting_dict = dict(vertices=vertices)
+
+if __name__ == "__main__":
+    problem.initialize()
+    results = problem.solve()
+    results = problem.post_process(results)
+
+    results.update(plotting_dict)
+
+    plot_animation(results, problem.settings).show()
