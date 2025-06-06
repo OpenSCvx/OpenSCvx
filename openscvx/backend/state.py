@@ -43,8 +43,12 @@ class State(Variable):
         self._final = None
         self.final_type = None
 
-        self._true_slice = slice(0, shape[0])
-        self._augmented_slice = slice(shape[0], shape[0])
+        self._true_dim = shape[0]
+        self._update_slices()
+
+    def _update_slices(self):
+        self._true_slice = slice(0, self._true_dim)
+        self._augmented_slice = slice(self._true_dim, self.shape[0])
 
     @property
     def initial(self):
@@ -65,7 +69,7 @@ class State(Variable):
                 self.initial_type[i] = "Minimize"
             elif isinstance(v, Maximize):
                 self._initial[i] = v.guess
-                self.initial_type[i] = "Maximize"
+                self.final_type[i] = "Maximize"
             elif isinstance(v, Fix):
                 self._initial[i] = v.value
                 self.initial_type[i] = "Fix"
@@ -103,6 +107,7 @@ class State(Variable):
     def append(self, other=None, *, min=-np.inf, max=np.inf, guess=0.0, initial=0.0, final=0.0, augmented=False):
         if isinstance(other, State):
             super().append(other=other)
+
             if self._initial is not None and other._initial is not None:
                 self._initial = self._append_array(self._initial, other._initial)
             if self._final is not None and other._final is not None:
@@ -112,12 +117,9 @@ class State(Variable):
             if self.final_type is not None and other.final_type is not None:
                 self.final_type = self._append_array(self.final_type, other.final_type)
 
-            new_total = self.shape[0]
-            true_len = self._true_slice.stop
-            if augmented:
-                self._augmented_slice = slice(true_len, new_total)
-            else:
-                self._true_slice = slice(0, true_len + other.shape[0])
+            if not augmented:
+                self._true_dim += other._true_dim if hasattr(other, "_true_dim") else other.shape[0]
+            self._update_slices()
         else:
             temp_state = State(name=f"{self.name}_temp_append", shape=(1,))
             temp_state.min = min
@@ -151,8 +153,19 @@ class State(Variable):
         new_state._final = slice_attr(self._final)
         new_state.final_type = slice_attr(self.final_type)
 
-        new_state._true_slice = slice(0, new_state.shape[0])
-        new_state._augmented_slice = slice(new_state.shape[0], new_state.shape[0])
+        # Calculate the new _true_dim under the slice
+        if isinstance(idx, slice):
+            start = idx.start or 0
+            stop = idx.stop or self.shape[0]
+            step = idx.step or 1
+            selected = np.arange(self.shape[0])[idx]
+        elif isinstance(idx, (list, np.ndarray)):
+            selected = np.array(idx)
+        else:  # assume int
+            selected = np.array([idx])
+
+        new_state._true_dim = np.sum(selected < self._true_dim)
+        new_state._update_slices()
 
         return new_state
 
