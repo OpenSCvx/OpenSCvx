@@ -1,6 +1,13 @@
 import numpy as np
 import jax.numpy as jnp
 
+import os
+import sys
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(grandparent_dir)
+
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.dynamics import dynamics
 from openscvx.constraints import boundary, ctcs, nodal
@@ -9,7 +16,7 @@ from openscvx.backend.state import State, Free, Minimize
 from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
 
-
+from examples.plotting import plot_brachistochrone_position, plot_brachistochrone_velocity
 n = 2
 total_time = 2.0
 
@@ -69,3 +76,13 @@ problem.settings.scp.lam_vc = 1e1      # Weight on the Virtual Control Objective
 problem.settings.scp.uniform_time_grid = True
 
 plotting_dict = dict()
+
+if __name__ == "__main__":
+    problem.initialize()
+    results = problem.solve()
+    results = problem.post_process(results)
+
+    results.update(plotting_dict)
+
+    plot_brachistochrone_position(results).show()
+    plot_brachistochrone_velocity(results).show()

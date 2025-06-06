@@ -1,6 +1,13 @@
 import numpy as np
 import jax.numpy as jnp
 
+import os
+import sys
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(grandparent_dir)
+
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.dynamics import dynamics
 from openscvx.constraints import boundary, ctcs
@@ -8,6 +15,8 @@ from openscvx.utils import qdcm, SSMP, SSM, generate_orthogonal_unit_vectors
 from openscvx.backend.state import State, Free, Minimize
 from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
+
+from examples.plotting import plot_animation
 
 n = 6
 total_time = 4.0  # Total time for the simulation
@@ -113,3 +122,12 @@ plotting_dict = dict(
     obstacles_axes=axes,
     obstacles_radii=radius,
 )
+
+if __name__ == "__main__":
+    problem.initialize()
+    results = problem.solve()
+    results = problem.post_process(results)
+
+    results.update(plotting_dict)
+
+    plot_animation(results, problem.settings).show()
