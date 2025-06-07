@@ -21,7 +21,10 @@ class Variable(Expr):
 
     @min.setter
     def min(self, arr):
-        self._min = np.asarray(arr)
+        arr = np.asarray(arr, dtype=float)
+        if arr.ndim != 1 or arr.shape[0] != self.shape[0]:
+            raise ValueError(f"{self.__class__.__name__} min must be 1D with shape ({self.shape[0]},), got {arr.shape}")
+        self._min = arr
 
     @property
     def max(self):
@@ -29,7 +32,10 @@ class Variable(Expr):
 
     @max.setter
     def max(self, arr):
-        self._max = np.asarray(arr)
+        arr = np.asarray(arr, dtype=float)
+        if arr.ndim != 1 or arr.shape[0] != self.shape[0]:
+            raise ValueError(f"{self.__class__.__name__} max must be 1D with shape ({self.shape[0]},), got {arr.shape}")
+        self._max = arr
 
     @property
     def guess(self):
@@ -37,52 +43,46 @@ class Variable(Expr):
 
     @guess.setter
     def guess(self, arr):
-        self._guess = np.asarray(arr)
+        arr = np.asarray(arr)
+        if arr.ndim != 2:
+            raise ValueError(f"Guess must be a 2D array of shape (n_guess_points, {self.shape[0]}), got shape {arr.shape}")
+        if arr.shape[1] != self.shape[0]:
+            raise ValueError(f"Guess must have second dimension equal to variable dimension {self.shape[0]}, got {arr.shape[1]}")
+        self._guess = arr
 
     def append(self, other=None, *, min=-np.inf, max=np.inf, guess=0.0):
-        def process_val(val):
-            if isinstance(val, (np.ndarray, list, tuple)):
-                vec_func = np.vectorize(lambda v: v)
-                return vec_func(val)
-            else:
-                return val
+        def process_array(val, is_guess=False):
+            arr = np.asarray(val, dtype=float)
+            if is_guess:
+                return np.atleast_2d(arr)
+            return np.atleast_1d(arr)
 
         if isinstance(other, Variable):
+            self._shape = (self.shape[0] + other.shape[0],)
+
             if self._min is not None and other._min is not None:
-                self._min = self._append_array(self._min, process_val(other._min))
+                self._min = np.concatenate([self._min, process_array(other._min)], axis=0)
+
             if self._max is not None and other._max is not None:
-                self._max = self._append_array(self._max, process_val(other._max))
+                self._max = np.concatenate([self._max, process_array(other._max)], axis=0)
+
             if self._guess is not None and other._guess is not None:
-                self._guess = self._append_guess(self._guess, process_val(other._guess))
-            self._shape = (self._shape[0] + other._shape[0],)
+                self._guess = np.concatenate([self._guess, process_array(other._guess, is_guess=True)], axis=1)
+
         else:
-            if self._min is not None and min is not None:
-                self._min = self._append_array(self._min, process_val(min))
-            if self._max is not None and max is not None:
-                self._max = self._append_array(self._max, process_val(max))
-            if self._guess is not None and guess is not None:
-                self._guess = self._append_guess(self._guess, process_val(guess))
-            self._shape = (self._shape[0] + 1,)
+            self._shape = (self.shape[0] + 1,)
 
-    def _append_array(self, existing, new):
-        new = np.atleast_1d(new)
-        if existing is None:
-            return new
-        existing = np.atleast_1d(existing)
-        return np.concatenate([existing, new], axis=0)
+            if self._min is not None:
+                self._min = np.concatenate([self._min, process_array(min)], axis=0)
 
-    def _append_guess(self, existing, new):
-        new = np.atleast_2d(new)
-        if new.shape[0] == 1 and new.shape[1] != 1:
-            # Ensure it's a column vector if it was (1, N)
-            new = new.T
-        if existing is None:
-            return new
-        existing = np.atleast_2d(existing)
-        if existing.shape[0] == 1 and existing.shape[1] != 1:
-            existing = existing.T
-        return np.concatenate([existing, new], axis=1)
+            if self._max is not None:
+                self._max = np.concatenate([self._max, process_array(max)], axis=0)
 
+            if self._guess is not None:
+                guess_arr = process_array(guess, is_guess=True)
+                if guess_arr.shape[1] != 1:
+                    guess_arr = guess_arr.T
+                self._guess = np.concatenate([self._guess, guess_arr], axis=1)
 
     def __getitem__(self, idx):
         if isinstance(idx, int):
