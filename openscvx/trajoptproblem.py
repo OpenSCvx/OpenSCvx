@@ -27,7 +27,6 @@ from openscvx.augmentation.ctcs import sort_ctcs_constraints
 from openscvx.constraints.violation import get_g_funcs, CTCSViolation
 from openscvx.discretization import get_discretization_solver
 from openscvx.propagation import get_propagation_solver
-from openscvx.constraints.boundary import BoundaryConstraint, boundary
 from openscvx.constraints.ctcs import CTCSConstraint
 from openscvx.constraints.nodal import NodalConstraint
 from openscvx.ptr import PTR_init, PTR_main
@@ -157,7 +156,7 @@ class TrajOptProblem:
         s = Control(name="s", shape=(1,))
         s.min = np.array([time_dilation_factor_min * x.final[idx_time][0]])
         s.max = np.array([time_dilation_factor_max * x.final[idx_time][0]])
-        s.guess =np.ones((N, 1)) * x.final[idx_time][0]
+        s.guess = np.ones((N, 1)) * x.final[idx_time][0]
 
         
         u.append(s, augmented=True)
