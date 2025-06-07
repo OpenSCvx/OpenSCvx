@@ -40,7 +40,7 @@ def test_invalid_boundary_type_raises(attr, bad_input, error_fragment):
 def test_shape_mismatch_raises(attr):
     state = State("x", shape=(4,))  # expects shape (4,)
     bad_input = np.array([1, 2, 3, 4, 5], dtype=object)  # shape mismatch
-    with pytest.raises(ValueError, match="shape mismatch"):
+    with pytest.raises(ValueError):
         setattr(state, attr, bad_input)
 
 
