@@ -35,8 +35,8 @@ def get_g_grad_u(constraints_ctcs: List[CTCSConstraint]) -> Callable[[jnp.ndarra
 
 
 def get_g_func(constraints_ctcs: List[CTCSConstraint]) -> Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray]:
-    def g_func(x: jnp.array, u: jnp.array, node: int) -> jnp.array:
-        return sum(c(x, u, node) for c in constraints_ctcs)
+    def g_func(x: jnp.array, u: jnp.array, node: int, *params) -> jnp.array:
+        return sum(c(x, u, node, *params) for c in constraints_ctcs)
 
     return g_func
 

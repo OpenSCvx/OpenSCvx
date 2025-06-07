@@ -2,36 +2,41 @@ import numpy as np
 import jax.numpy as jnp
 import cvxpy as cp
 
+import os
+import sys
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(grandparent_dir)
+
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.dynamics import dynamics
-from openscvx.constraints import boundary, ctcs, nodal
-from openscvx.utils import qdcm, SSMP, SSM, rot, gen_vertices
+from openscvx.constraints import ctcs, nodal
+from openscvx.utils import rot, gen_vertices
+from openscvx.backend.state import State, Free, Minimize
+from openscvx.backend.parameter import Parameter
+from openscvx.backend.control import Control
+
+from examples.plotting import plot_animation_double_integrator
 
 n = 22  # Number of Nodes
 total_time = 24.0  # Total time for the simulation
 
-max_state = np.array(
-    [200.0, 100, 50, 100, 100, 100, 100]
-)  # Upper Bound on the states
-min_state = np.array(
-    [-200.0, -100, 15, -100, -100, -100, 0]
-)  # Lower Bound on the states
+x = State("x", shape=(7,))  # State variable with 14 dimensions
 
-initial_state = boundary(jnp.array([10.0, 0, 20, 0, 0, 0, 0]))
-initial_state.type[6] = "Free"
+x.max = np.array([200.0, 100, 50, 100, 100, 100, 100])  # Upper Bound on the states
+x.min = np.array([-200.0, -100, 15, -100, -100, -100, 0])  # Lower Bound on the states
 
-final_state = boundary(jnp.array([10.0, 0, 20, 0, 0, 0, total_time]))
-final_state.type[3:6] = "Free"
-final_state.type[6] = "Minimize"
+x.initial = np.array([10.0, 0, 20, 0, 0, 0, 0])
+x.final = np.array([10.0, 0, 20, Free(0), Free(0), Free(0), Minimize(total_time)])
+x.guess = np.linspace(x.initial, x.final, n)
 
-initial_control = np.array([0.0, 0, 10,])
+u = Control("u", shape=(3,))  # Control variable with 6 dimensions
 f_max = 4.179446268 * 9.81
-max_control = np.array(
-    [f_max, f_max, f_max]
-)
-min_control = np.array(
-    [-f_max, -f_max, -f_max]
-)
+u.max = np.array([f_max, f_max, f_max])
+u.min = np.array([-f_max, -f_max, -f_max])  # Lower Bound on the controls
+initial_control = np.array([0.0, 0, 10,])
+u.guess = np.repeat(initial_control[np.newaxis, :], n, axis=0)
 
 m = 1.0  # Mass of the drone
 g_const = -9.18
@@ -69,13 +74,13 @@ for center in gate_centers:
 
 
 constraints = [
-    ctcs(lambda x, u: (x - max_state)),
-    ctcs(lambda x, u: (min_state - x)),
+    ctcs(lambda x_, u_: (x_ - x.true.max)),
+    ctcs(lambda x_, u_: (x.true.min - x_)),
 ]
 for node, cen in zip(gate_nodes, A_gate_cen):
     constraints.append(
         nodal(
-            lambda x, u, A=A_gate, c=cen: cp.norm(A @ x[:3] - c, "inf") <= 1,
+            lambda x_, u_, A=A_gate, c=cen: cp.norm(A @ x_[:3] - c, "inf") <= 1,
             nodes=[node],
             convex=True,
         )
@@ -83,11 +88,11 @@ for node, cen in zip(gate_nodes, A_gate_cen):
 
 
 @dynamics
-def dynamics(x, u):
+def dynamics(x_, u_):
     # Unpack the state and control vectors
-    v = x[3:6]
+    v = x_[3:6]
 
-    f = u[:3]
+    f = u_[:3]
 
     # Compute the time derivatives of the state variables
     r_dot = v
@@ -96,16 +101,16 @@ def dynamics(x, u):
     return jnp.hstack([r_dot, v_dot, t_dot])
 
 
-u_bar = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
-x_bar = np.linspace(initial_state.value, final_state.value, n)
+
+x_bar = np.linspace(x.initial, x.final, n)
 
 i = 0
-origins = [initial_state.value[:3]]
+origins = [x.initial[:3]]
 ends = []
 for center in gate_centers:
     origins.append(center)
     ends.append(center)
-ends.append(final_state.value[:3])
+ends.append(x.final[:3])
 gate_idx = 0
 for _ in range(n_gates + 1):
     for k in range(n // (n_gates + 1)):
@@ -115,34 +120,38 @@ for _ in range(n_gates + 1):
         i += 1
     gate_idx += 1
 
+x.guess = x_bar
+
 problem = TrajOptProblem(
     dynamics=dynamics,
+    x=x,
+    u=u,
     constraints=constraints,
-    idx_time=len(max_state)-1,
+    idx_time=len(x.max)-1,
     N=n,
-    time_init=total_time,
-    x_guess=x_bar,
-    u_guess=u_bar,
-    initial_state=initial_state,  # Initial State
-    final_state=final_state,
-    x_max=max_state,
-    x_min=min_state,
-    u_max=max_control,  # Upper Bound on the controls
-    u_min=min_control,  # Lower Bound on the controls
 )
 
-problem.params.prp.dt = 0.01
-problem.params.dis.custom_integrator = True
+problem.settings.prp.dt = 0.01
+problem.settings.dis.custom_integrator = True
 
-problem.params.scp.w_tr = 2e0  # Weight on the Trust Reigon
-problem.params.scp.lam_cost = 1e-1  # 0e-1,  # Weight on the Minimal Time Objective
-problem.params.scp.lam_vc = 1e1  # 1e1,  # Weight on the Virtual Control Objective (not including CTCS Augmentation)
-problem.params.scp.ep_tr = 1e-3  # Trust Region Tolerance
-problem.params.scp.ep_vb = 1e-4  # Virtual Control Tolerance
-problem.params.scp.ep_vc = 1e-8  # Virtual Control Tolerance for CTCS
-problem.params.scp.cost_drop = 10  # SCP iteration to relax minimal final time objective
-problem.params.scp.cost_relax = 0.8  # Minimal Time Relaxation Factor
-problem.params.scp.w_tr_adapt = 1.4  # Trust Region Adaptation Factor
-problem.params.scp.w_tr_max_scaling_factor = 1e2  # Maximum Trust Region Weight
+problem.settings.scp.w_tr = 2e0  # Weight on the Trust Reigon
+problem.settings.scp.lam_cost = 1e-1  # 0e-1,  # Weight on the Minimal Time Objective
+problem.settings.scp.lam_vc = 1e1  # 1e1,  # Weight on the Virtual Control Objective (not including CTCS Augmentation)
+problem.settings.scp.ep_tr = 1e-3  # Trust Region Tolerance
+problem.settings.scp.ep_vb = 1e-4  # Virtual Control Tolerance
+problem.settings.scp.ep_vc = 1e-8  # Virtual Control Tolerance for CTCS
+problem.settings.scp.cost_drop = 10  # SCP iteration to relax minimal final time objective
+problem.settings.scp.cost_relax = 0.8  # Minimal Time Relaxation Factor
+problem.settings.scp.w_tr_adapt = 1.4  # Trust Region Adaptation Factor
+problem.settings.scp.w_tr_max_scaling_factor = 1e2  # Maximum Trust Region Weight
 
 plotting_dict = dict(vertices=vertices)
+
+if __name__ == "__main__":
+    problem.initialize()
+    results = problem.solve()
+    results = problem.post_process(results)
+
+    results.update(plotting_dict)
+
+    plot_animation_double_integrator(results, problem.settings).show()

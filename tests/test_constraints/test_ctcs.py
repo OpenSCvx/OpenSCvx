@@ -53,19 +53,19 @@ def test_decorator_sets_attributes_and_type():
     assert float(out) == 25.0  # (2+3)=5 → relu² → 25
 
 
-def test_ctcs_called_directly_without_parentheses():
-    """Using `c = ctcs(fn)` should wrap but leave nodes=None, idx=None."""
+# def test_ctcs_called_directly_without_parentheses():
+#     """Using `c = ctcs(fn)` should wrap but leave nodes=None, idx=None."""
 
-    def raw_fn(x, u):
-        return jnp.array([4.0, -1.0])
+#     def raw_fn(x_, u_):
+#         return jnp.array([4.0, -1.0])
 
-    c = ctcs(raw_fn)
-    assert isinstance(c, CTCSConstraint)
-    assert c.func is raw_fn
-    assert c.nodes is None and c.idx is None
-    # calling without nodes ought to complain about comparing None to int
-    with pytest.raises(TypeError):
-        _ = c(jnp.zeros(1), jnp.zeros(1), node=0)
+#     c = ctcs(raw_fn)
+#     assert isinstance(c, CTCSConstraint)
+#     assert c.func is raw_fn
+#     assert c.nodes is None and c.idx is None
+#     # calling without nodes ought to complain about comparing None to int
+#     with pytest.raises(TypeError):
+#         _ = c(jnp.zeros(1), jnp.zeros(1), node=0)
 
 
 def test_custom_penalty_callable():

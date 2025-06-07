@@ -3,33 +3,37 @@ import numpy.linalg as la
 import cvxpy as cp
 import jax.numpy as jnp
 
+import os
+import sys
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(grandparent_dir)
+
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.dynamics import dynamics
 from openscvx.utils import qdcm, SSMP, SSM, rot, gen_vertices
-from openscvx.constraints import boundary, nodal
+from openscvx.constraints import nodal
+from openscvx.backend.state import State, Free, Minimize
+from openscvx.backend.parameter import Parameter
+from openscvx.backend.control import Control
+
+from examples.plotting import plot_animation
 
 n = 33  # Number of Nodes
 total_time = 30.0  # Total time for the simulation
 
-max_state = np.array(
-    [200.0, 100, 50, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100]
-)  # Upper Bound on the states
-min_state = np.array(
-    [-200.0, -100, 15, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0]
-)  # Lower Bound on the states
+x = State("x", shape=(14,))  # State variable with 14 dimensions
 
-initial_state = boundary(jnp.array([10.0, 0, 20, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]))
-initial_state.type[6:13] = "Free"
+x.max = np.array([200.0, 100, 50, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100])  # Upper Bound on the states
+x.min = np.array([-200.0, -100, 15, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0])  # Lower Bound on the states
+x.initial = np.array([10.0, 0, 20, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0])
+x.final = np.array([10.0, 0, 20, Free(0), Free(0), Free(0), Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), Minimize(total_time)])
 
-final_state = boundary(jnp.array([10.0, 0, 20, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, total_time]))
-final_state.type[3:13] = "Free"
-final_state.type[13] = "Minimize"
-
-initial_control = np.array([0., 0., 10., 0., 0., 0.])
-max_control = np.array(
-    [0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562]
-)  # Upper Bound on the controls
-min_control = np.array([0, 0, 0, -18.665, -18.665, -0.55562])
+u = Control("u", shape=(6,))  # Control variable with 6 dimensions
+u.max = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])  # Upper Bound on the controls
+u.min = np.array([0, 0, 0, -18.665, -18.665, -0.55562])  # Lower Bound on the controls
+u.guess = np.repeat(np.expand_dims(np.array([0., 0., 10., 0., 0., 0.]), axis=0), n, axis=0)
 
 
 ### Sensor Params ###
@@ -88,42 +92,42 @@ for i in range(n_subs):
 init_poses = init_poses
 
 
-def g_vp(x, u, p_s_I):
-    p_s_s = R_sb @ qdcm(x[6:10]).T @ (p_s_I - x[0:3])
+def g_vp(x_, u_, p_s_I):
+    p_s_s = R_sb @ qdcm(x_[6:10]).T @ (p_s_I - x_[0:3])
     return jnp.linalg.norm(A_cone @ p_s_s, ord=norm_type) - (c.T @ p_s_s)
 
 
-def g_cvx_nodal(x):  # Nodal Convex Inequality Constraints
+def g_cvx_nodal(x_):  # Nodal Convex Inequality Constraints
     constr = []
     for node, cen in zip(gate_nodes, A_gate_cen):
-        constr += [cp.norm(A_gate @ x[node][:3] - cen, "inf") <= 1]
+        constr += [cp.norm(A_gate @ x_[node][:3] - cen, "inf") <= 1]
     return constr
 
 
 constraints = []
 for pose in init_poses:
-    constraints.append(nodal(lambda x, u, p = pose: g_vp(x, u, p), convex=False))
+    constraints.append(nodal(lambda x_, u_, p = pose: g_vp(x_, u_, p), convex=False))
 for node, cen in zip(gate_nodes, A_gate_cen):
     constraints.append(
         nodal(
-            lambda x, u, A=A_gate, c=cen: cp.norm(A @ x[:3] - c, "inf") <= 1,
+            lambda x_, u_, A=A_gate, c=cen: cp.norm(A @ x_[:3] - c, "inf") <= 1,
             nodes=[node], convex=True,
         )
     )  # use local variables inside the lambda function
 
 
 @dynamics
-def dynamics(x, u):
+def dynamics(x_, u_):
     m = 1.0  # Mass of the drone
     g_const = -9.81
     J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
     # Unpack the state and control vectors
-    v = x[3:6]
-    q = x[6:10]
-    w = x[10:13]
+    v = x_[3:6]
+    q = x_[6:10]
+    w = x_[10:13]
 
-    f = u[:3]
-    tau = u[3:]
+    f = u_[:3]
+    tau = u_[3:]
 
     q_norm = jnp.linalg.norm(q)
     q = q / q_norm
@@ -137,16 +141,15 @@ def dynamics(x, u):
     return jnp.hstack([r_dot, v_dot, q_dot, w_dot, t_dot])
 
 
-u_bar = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
-x_bar = np.linspace(initial_state.value, final_state.value, n)
+x_bar = np.linspace(x.initial, x.final, n)
 
 i = 0
-origins = [initial_state.value[:3]]
+origins = [x.initial[:3]]
 ends = []
 for center in gate_centers:
     origins.append(center)
     ends.append(center)
-ends.append(final_state.value[:3])
+ends.append(x.final[:3])
 gate_idx = 0
 for _ in range(n_gates + 1):
     for k in range(n // (n_gates + 1)):
@@ -171,35 +174,30 @@ for k in range(n):
     q = q_no_norm / la.norm(q_no_norm)
     x_bar[k, 6:10] = q
 
+x.guess = x_bar
+
 problem = TrajOptProblem(
     dynamics=dynamics,
+    x=x,
+    u=u,
     constraints=constraints,
-    idx_time=len(max_state)-1,
+    idx_time=len(x.max)-1,
     N=n,
-    time_init=total_time,
-    x_guess=x_bar,
-    u_guess=u_bar,
-    initial_state=initial_state,  # Initial State
-    final_state=final_state,
-    x_max=max_state,
-    x_min=min_state,
-    u_max=max_control,  # Upper Bound on the controls
-    u_min=min_control,  # Lower Bound on the controls
 )
 
-problem.params.prp.dt = 0.1
+problem.settings.prp.dt = 0.1
 
-problem.params.scp.w_tr = 8e1  # Weight on the Trust Reigon
-problem.params.scp.lam_cost = 2e1  # Weight on the Minimal Time Objective
-problem.params.scp.lam_vc = 1e2  # Weight on the Virtual Control Objective (not including CTCS Augmentation)
-problem.params.scp.lam_vb = 4e0  # Weight on the Virtual Control Objective (not including CTCS Augmentation)
-problem.params.scp.ep_tr = 1e-3  # Trust Region Tolerance
-problem.params.scp.ep_vb = 1e-4  # Virtual Control Tolerance
-problem.params.scp.ep_vc = 1e-8  # Virtual Control Tolerance
-problem.params.scp.cost_drop = 10  # SCP iteration to relax minimal final time objective
-problem.params.scp.cost_relax = 0.8  # Minimal Time Relaxation Factor
-problem.params.scp.w_tr_adapt = 1.05  # Trust Region Adaptation Factor
-problem.params.scp.w_tr_max_scaling_factor = 1e2  # Maximum Trust Region Weight
+problem.settings.scp.w_tr = 8e1  # Weight on the Trust Reigon
+problem.settings.scp.lam_cost = 2e1  # Weight on the Minimal Time Objective
+problem.settings.scp.lam_vc = 1e2  # Weight on the Virtual Control Objective (not including CTCS Augmentation)
+problem.settings.scp.lam_vb = 4e0  # Weight on the Virtual Control Objective (not including CTCS Augmentation)
+problem.settings.scp.ep_tr = 1e-3  # Trust Region Tolerance
+problem.settings.scp.ep_vb = 1e-4  # Virtual Control Tolerance
+problem.settings.scp.ep_vc = 1e-8  # Virtual Control Tolerance
+problem.settings.scp.cost_drop = 10  # SCP iteration to relax minimal final time objective
+problem.settings.scp.cost_relax = 0.8  # Minimal Time Relaxation Factor
+problem.settings.scp.w_tr_adapt = 1.05  # Trust Region Adaptation Factor
+problem.settings.scp.w_tr_max_scaling_factor = 1e2  # Maximum Trust Region Weight
 
 plotting_dict = dict(
     vertices=vertices,
@@ -210,3 +208,12 @@ plotting_dict = dict(
     init_poses=init_poses,
     norm_type=norm_type,
 )
+
+if __name__ == "__main__":
+    problem.initialize()
+    results = problem.solve()
+    results = problem.post_process(results)
+
+    results.update(plotting_dict)
+
+    plot_animation(results, problem.settings).show()

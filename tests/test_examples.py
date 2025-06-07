@@ -14,6 +14,7 @@ from examples.params.obstacle_avoidance import (
 )
 from examples.params.dr_vp_nodal import problem as dr_vp_polytope_problem
 from examples.params.dr_vp_nodal import plotting_dict as dr_vp_polytope_plotting_dict
+from examples.params.brachistochrone import problem as brachistochrone_problem
 from examples.plotting import plot_camera_animation, plot_animation, plot_scp_animation
 
 CI_OS = os.getenv("RUNNER_OS", platform.system())
@@ -47,8 +48,8 @@ TEST_CASES = {
         "max_vio": -1,
         "timing": {"init": 35.0, "solve": 2.0, "post": 6.0},
         "pre_init": [
-            lambda p: setattr(p.params.dis, "custom_integrator", False),
-            lambda p: setattr(p.params.dev, "printing", False),
+            lambda p: setattr(p.settings.dis, "custom_integrator", False),
+            lambda p: setattr(p.settings.dev, "printing", False),
         ],
     },
     "dr_vp": {
@@ -61,8 +62,8 @@ TEST_CASES = {
         "max_vio": 1.0,
         "timing": {"init": 50.0, "solve": 2.0, "post": 6.0},
         "pre_init": [
-            lambda p: setattr(p.params.dis, "custom_integrator", False),
-            lambda p: setattr(p.params.dev, "printing", False),
+            lambda p: setattr(p.settings.dis, "custom_integrator", False),
+            lambda p: setattr(p.settings.dev, "printing", False),
         ],
     },
     "cinema_vp": {
@@ -75,8 +76,25 @@ TEST_CASES = {
         "max_vio": 1.0,
         "timing": {"init": 15.0, "solve": 1.0, "post": 5.0},
         "pre_init": [
-            lambda p: setattr(p.params.dis, "custom_integrator", False),
-            lambda p: setattr(p.params.dev, "printing", False),
+            lambda p: setattr(p.settings.dis, "custom_integrator", False),
+            lambda p: setattr(p.settings.dev, "printing", False),
+        ],
+    },
+    "brachistochrone": {
+        "problem": brachistochrone_problem,
+        "plotting_dict": {},
+        "plot_funcs": [],
+        "cost_idx": -2,
+        "vio_idx": -1,
+        "max_cost": 1.81,
+        "max_vio": 1.0,
+        "max_iters": 5,
+        "timing": {"init": 1E2, "solve": 0.01, "post": 5.0},
+        "pre_init": [
+            lambda p: setattr(p.settings.cvx, "solver", "qocogen"),
+            lambda p: setattr(p.settings.cvx, "cvxpygen", True),
+            lambda p: setattr(p.settings.cvx, "cvxpygen_override", True),
+            
         ],
     },
 }
@@ -105,13 +123,13 @@ def test_example_problem(name, conf):
     # merge in plotting metadata and run plots
     result.update(conf["plotting_dict"])
     for fn in conf["plot_funcs"]:
-        fn(result, problem.params)
+        fn(result, problem.settings)
 
     # extract metrics
     scp_iters = len(result["discretization_history"])
-    sol_cost = result["x"][:, conf["cost_idx"]][-1]
+    sol_cost = result["x"].guess[:, conf["cost_idx"]][-1]
     prop_cost = result["x_full"][:, conf["cost_idx"]][-1]
-    sol_constr_vio = result["x"][:, conf["vio_idx"]][-1]
+    sol_constr_vio = result["x"].guess[:, conf["vio_idx"]][-1]
     prop_constr_vio = result["x_full"][:, conf["vio_idx"]][-1]
 
     # assertions

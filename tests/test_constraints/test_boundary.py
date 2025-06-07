@@ -1,72 +1,55 @@
 import pytest
-import jax.numpy as jnp
-from openscvx.constraints.boundary import BoundaryConstraint, boundary
+import numpy as np
+
+from openscvx.backend.state import State, Free, Maximize, Minimize, Fix
 
 
-@pytest.fixture
-def arr():
-    return jnp.array([1.0, 2.0, 3.0])
+@pytest.mark.parametrize("attr", ["initial", "final"])
+def test_valid_boundary_types_parsing(attr):
+    state = State("x", shape=(5,))
+    data = np.array([1, Free(2), Minimize(3), Maximize(4), Fix(5)], dtype=object)
 
+    setattr(state, attr, data)
 
-def test_default_types_and_value_get_set(arr):
-    bc = BoundaryConstraint(arr)
-    # default types
-    assert bc.types == ["Fix", "Fix", "Fix"]
-    # __getitem__
-    assert float(bc[1]) == 2.0
-    # __setitem__
-    bc[0] = 5.5
-    assert float(bc[0]) == 5.5
+    expected_values = [1, 2, 3, 4, 5]
+    expected_types = ["Fix", "Free", "Minimize", "Maximize", "Fix"]
 
+    actual_values = getattr(state, f"_{attr}")
+    actual_types = getattr(state, f"{attr}_type")
 
-@pytest.mark.parametrize(
-    "key,val,expected",
-    [
-        # single-index assignment
-        (1, "Free", ["Fix", "Free", "Fix"]),
-        # slice with list
-        (slice(0, 2), ["Minimize", "Maximize"], ["Minimize", "Maximize", "Fix"]),
-        # slice with scalar
-        (slice(1, 3), "Free", ["Fix", "Free", "Free"]),
-    ],
-)
-def test_type_set_valid(arr, key, val, expected):
-    bc = BoundaryConstraint(arr)
-    tp = bc.type
-    tp[key] = val
-    assert bc.types == expected
+    assert np.allclose(actual_values, expected_values)
+    assert (actual_types == expected_types).all()
 
 
 @pytest.mark.parametrize(
-    "key,val,msg",
+    "attr, bad_input, error_fragment",
     [
-        # mismatched lengths
-        (slice(0, 2), ["Free"], "Mismatch between"),
-        # invalid type name
-        (1, "NotAValidType", "Invalid type"),
-    ],
+        ("initial", np.array([1, 2, "Fixed", 4, 5], dtype=object), "Fixed"),
+        ("initial", np.array([1, "Freee", 3, 4, 5], dtype=object), "Freee"),
+        ("final",   np.array([1, "Minim", 3, 4, 5], dtype=object), "Minim"),
+        ("final",   np.array(["Max", 2, 3, 4, 5], dtype=object), "Max"),
+    ]
 )
-def test_type_set_invalid(arr, key, val, msg):
-    bc = BoundaryConstraint(arr)
-    tp = bc.type
-    with pytest.raises(ValueError) as exc:
-        tp[key] = val
-    assert msg in str(exc.value)
+def test_invalid_boundary_type_raises(attr, bad_input, error_fragment):
+    state = State("x", shape=(5,))
+    with pytest.raises(ValueError, match=error_fragment):
+        setattr(state, attr, bad_input)
 
 
-def test_type_get_slice_len_and_repr(arr):
-    bc = BoundaryConstraint(arr)
-    tp = bc.type
-    # single get and slice get
-    assert tp[0] == "Fix"
-    assert tp[1:3] == ["Fix", "Fix"]
-    # len and repr
-    assert len(tp) == 3
-    assert repr(tp) == repr(bc.types)
+@pytest.mark.parametrize("attr", ["initial", "final"])
+def test_shape_mismatch_raises(attr):
+    state = State("x", shape=(4,))  # expects shape (4,)
+    bad_input = np.array([1, 2, 3, 4, 5], dtype=object)  # shape mismatch
+    with pytest.raises(ValueError):
+        setattr(state, attr, bad_input)
 
 
-def test_boundary_factory_preserves_array_and_types(arr):
-    bc = boundary(arr)
-    assert isinstance(bc, BoundaryConstraint)
-    assert jnp.all(bc.value == arr)
-    assert bc.types == ["Fix", "Fix", "Fix"]
+@pytest.mark.parametrize("attr, type_wrapper, expected_type", [
+    ("initial", Free(1.0), "Free"),
+    ("final", Minimize(2.0), "Minimize"),
+])
+def test_single_type_assignment_correct(attr, type_wrapper, expected_type):
+    state = State("x", shape=(3,))
+    setattr(state, attr, np.array([type_wrapper] * 3))
+    actual_types = getattr(state, f"{attr}_type")
+    assert (actual_types == [expected_type] * 3).all()
