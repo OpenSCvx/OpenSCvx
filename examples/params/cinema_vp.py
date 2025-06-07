@@ -104,8 +104,8 @@ def g_max(x_):
 
 constraints = [
     ctcs(lambda x_, u_: np.sqrt(2e1) * g_vp(x_)),
-    ctcs(lambda x_, u_: x_ - x.true_state.max),
-    ctcs(lambda x_, u_: x.true_state.min - x_),
+    ctcs(lambda x_, u_: x_ - x.true.max),
+    ctcs(lambda x_, u_: x.true.min - x_),
     ctcs(lambda x_, u_: g_min(x_)),
     ctcs(lambda x_, u_: g_max(x_)),
 ]

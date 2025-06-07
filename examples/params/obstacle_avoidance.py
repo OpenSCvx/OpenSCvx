@@ -38,7 +38,7 @@ u.max=np.array(
 u.min=np.array(
     [0, 0, 0, -18.665, -18.665, -0.55562]
 )  # Lower Bound on the controls
-initial_control = np.array([0., 0., 50., 0., 0., 0.])
+initial_control = np.array([0., 0., u.max[2], 0., 0., 0.])
 u.guess = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
 
 
@@ -94,8 +94,8 @@ for _ in obstacle_centers:
 constraints = []
 for center, A in zip(obstacle_centers, A_obs):
     constraints.append(ctcs(lambda x_, u_: g_obs(center, A, x_)))
-constraints.append(ctcs(lambda x_, u_: x_ - x.true_state.max))
-constraints.append(ctcs(lambda x_, u_: x.true_state.min - x_))
+constraints.append(ctcs(lambda x_, u_: x_ - x.true.max))
+constraints.append(ctcs(lambda x_, u_: x.true.min - x_))
 
 
 x.guess = np.linspace(x.initial, x.final, n)
@@ -115,7 +115,6 @@ problem.settings.dev.printing = True
 
 problem.settings.prp.dt = 0.01
 problem.settings.dis.custom_integrator = False
-problem.settings.cvx.cvxpygen = False
 
 plotting_dict = dict(
     obstacles_centers=obstacle_centers,

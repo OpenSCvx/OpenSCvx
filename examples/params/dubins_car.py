@@ -51,8 +51,8 @@ obs_center.value = np.array([-0.01, 0.0])  # Center of the obstacle
 # Define constraints using symbolic x, u, and parameters
 constraints = [
     ctcs(lambda x_, u_, obs_radius_, obs_center_: obs_radius_ - jnp.linalg.norm(x_[:2] - obs_center_)),
-    ctcs(lambda x_, u_: x_ - x.true_state.max),
-    ctcs(lambda x_, u_: x.true_state.min - x_)
+    ctcs(lambda x_, u_: x_ - x.true.max),
+    ctcs(lambda x_, u_: x.true.min - x_)
 ]
 
 # Define dynamics
