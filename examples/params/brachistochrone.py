@@ -10,13 +10,14 @@ sys.path.append(grandparent_dir)
 
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.dynamics import dynamics
-from openscvx.constraints import boundary, ctcs, nodal
+from openscvx.constraints import ctcs, nodal
 from openscvx.utils import qdcm, SSMP, SSM, generate_orthogonal_unit_vectors
 from openscvx.backend.state import State, Free, Minimize
 from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
 
 from examples.plotting import plot_brachistochrone_position, plot_brachistochrone_velocity
+
 n = 2
 total_time = 2.0
 
@@ -31,7 +32,7 @@ x.guess = np.linspace(x.initial, x.final, n)
 u = Control("u", shape=(1,))  # Control variable with 1 dimension
 u.max = np.array([100.5 * jnp.pi / 180])  # Upper Bound on the controls
 u.min = np.array([0])  # Lower Bound on the controls
-u.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n)
+u.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1) # Reshaped as a guess needs to be set with a 2D array, in this case (n,1)
 
 g = 9.81
 
@@ -48,8 +49,8 @@ def dynamics(x_, u_):
     return jnp.hstack([x_dot, y_dot, v_dot, t_dot])
 
 constraints = [
-    ctcs(lambda x_, u_: x_ - x.true_state.max),
-    ctcs(lambda x_, u_: x.true_state.min - x_)
+    ctcs(lambda x_, u_: x_ - x.true.max),
+    ctcs(lambda x_, u_: x.true.min - x_)
 ]
 
 

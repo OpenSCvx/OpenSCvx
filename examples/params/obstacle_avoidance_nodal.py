@@ -10,7 +10,7 @@ sys.path.append(grandparent_dir)
 
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.dynamics import dynamics
-from openscvx.constraints import boundary, ctcs, nodal
+from openscvx.constraints import ctcs, nodal
 from openscvx.utils import qdcm, SSMP, SSM, generate_orthogonal_unit_vectors
 from openscvx.backend.state import State, Free, Minimize
 from openscvx.backend.parameter import Parameter
@@ -93,8 +93,8 @@ constraints = []
 for center, A_obs_s in zip(obstacle_centers, A_obs):
     # constraints.append(ctcs(lambda x, u: g_obs(center, A, x)))
     constraints.append(nodal(lambda x_, u_, c=center, A=A_obs_s: g_obs(x_, u_, c, A), convex=False))
-constraints.append(ctcs(lambda x_, u_: x_ - x.true_state.max))
-constraints.append(ctcs(lambda x_, u_: x.true_state.min - x_))
+constraints.append(ctcs(lambda x_, u_: x_ - x.true.max))
+constraints.append(ctcs(lambda x_, u_: x.true.min - x_))
 
 
 x.guess = np.linspace(x.initial, x.final, n)

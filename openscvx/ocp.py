@@ -117,8 +117,8 @@ def OptimalControlProblem(settings: Config):
     constr += [u_nonscaled[i] <= settings.sim.u.max for i in range(settings.scp.n)]
     constr += [u_nonscaled[i] >= settings.sim.u.min for i in range(settings.scp.n)] # Control Constraints
 
-    constr += [x_nonscaled[i][settings.sim.idx_x_true] <= settings.sim.x.true_state.max for i in range(settings.scp.n)]
-    constr += [x_nonscaled[i][settings.sim.idx_x_true] >= settings.sim.x.true_state.min for i in range(settings.scp.n)] # State Constraints (Also implemented in CTCS but included for numerical stability)
+    constr += [x_nonscaled[i][settings.sim.idx_x_true] <= settings.sim.x.true.max for i in range(settings.scp.n)]
+    constr += [x_nonscaled[i][settings.sim.idx_x_true] >= settings.sim.x.true.min for i in range(settings.scp.n)] # State Constraints (Also implemented in CTCS but included for numerical stability)
 
     ########
     # COSTS

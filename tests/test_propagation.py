@@ -80,7 +80,7 @@ def test_s_to_t_basic(dis_type):
     p.sim.idx_t = slice(0, 1)
 
     # build u with slack values [1,2,3,4]
-    u = Control("u", shape=(p.scp.n, 2))  # 2 controls, last is slack
+    u = Control("u", shape=(2,))  # 2 controls, last is slack
     u.guess = np.stack([[0.0, float(s)] for s in [1, 2, 3, 4]])
     x = State("x", shape=(1,))  # dummy initial state
     x.guess = np.array([[0.0], [1.0]])

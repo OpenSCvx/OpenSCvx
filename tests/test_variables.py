@@ -2,7 +2,7 @@ import numpy as np
 import jax.numpy as jnp
 import pytest
 
-from openscvx.backend.state import State, Free, Minimize
+from openscvx.backend.state import State, Free, Minimize, Fix
 from openscvx.backend.control import Control
 
 @pytest.mark.parametrize("shape", [(3,), (2, 4), (5, 5, 5)])
@@ -13,7 +13,7 @@ def test_state_creation(shape):
     assert state.shape == shape  # Fix: Match the parameterized shape
     assert isinstance(state, State)
 
-@pytest.mark.parametrize("shapes", [[(3,), (2,)], [(4, 4), (5, 5)]])
+@pytest.mark.parametrize("shapes", [[(3,), (2,)], [(4, ), (5, )]])
 def test_append_non_augmented_state(shapes):
     shape_main, shape_new = shapes
     n_main = shape_main[0]
@@ -41,8 +41,8 @@ def test_append_non_augmented_state(shapes):
 
     # Shape checks
     assert state.shape == (n_main + n_new,)
-    assert state.true_state.shape == (n_main + n_new,)
-    assert state.augmented_state.shape == (0,)
+    assert state.true.shape == (n_main + n_new,)
+    assert state.augmented.shape == (0,)
 
     # Value checks
     np.testing.assert_array_equal(state.min, np.concatenate([
@@ -99,8 +99,8 @@ def test_append_augmented_state(shapes):
     state.append(augmented_state, augmented=True)
 
     # Check shapes
-    assert state.true_state.shape == shape_main
-    assert state.augmented_state.shape == shape_aug
+    assert state.true.shape == shape_main
+    assert state.augmented.shape == shape_aug
     assert state.shape == (n_main + n_aug,)
 
     # Check values
@@ -129,6 +129,86 @@ def test_append_augmented_state(shapes):
         np.full((n_aug,), 5.0)
     ]))
 
+@pytest.mark.parametrize("field, values, min_val, max_val, should_raise, expected_index", [
+    # Initial within bounds
+    ("initial", [Fix(0.0), Fix(-1.5)], [-1.0, -2.0], [1.0, 2.0], False, None),
+
+    # Final within bounds
+    ("final", [Fix(0.5), Fix(1.0)], [-1.0, -2.0], [1.0, 2.0], False, None),
+
+    # Initial below min (at index 0)
+    ("initial", [Fix(-0.5), Fix(0.0)], [0.0, -1.0], [1.0, 1.0], True, 0),
+
+    # Final above max (at index 1)
+    ("final", [Fix(0.0), Fix(1.0)], [-1.0, -1.0], [1.0, 0.5], True, 1),
+])
+def test_state_fix_bounds_check(field, values, min_val, max_val, should_raise, expected_index):
+    s = State("x", shape=(2,))
+    s.min = np.array(min_val)
+    s.max = np.array(max_val)
+
+    if should_raise:
+        with pytest.raises(ValueError) as excinfo:
+            setattr(s, field, values)
+        # Construct expected error message pattern
+        val = values[expected_index].value
+        i_str = expected_index if isinstance(expected_index, int) else expected_index[0]  # convert tuple index to int
+
+        if val < min_val[i_str]:
+            err_msg = f"{field.capitalize()} Fixed value at index {i_str} is lower then the min: {val} < {min_val[i_str]}"
+        elif val > max_val[i_str]:
+            err_msg = f"{field.capitalize()} Fixed value at index {i_str} is greater then the max: {val} > {max_val[i_str]}"
+        assert err_msg in str(excinfo.value)
+    else:
+        setattr(s, field, values)
+
+@pytest.mark.parametrize("field, values, min_val, should_raise, expected_index", [
+    # No error
+    ("initial", [Fix(0.0), Fix(-1.5)], [-1.0, -2.0], False, None),
+
+    # Error below min
+    ("initial", [Fix(-0.5), Fix(0.0)], [0.0, -1.0], True, 0),
+
+    # Error below min (final)
+    ("final", [Fix(-2.0), Fix(0.0)], [-1.0, -1.0], True, 0),
+])
+def test_state_fix_bounds_check_min_only(field, values, min_val, should_raise, expected_index):
+    s = State("x", shape=(2,))
+    setattr(s, field, values)
+
+    if should_raise:
+        with pytest.raises(ValueError) as excinfo:
+            s.min = np.array(min_val)
+        val = values[expected_index].value
+        i_str = expected_index if isinstance(expected_index, int) else expected_index[0]
+        err_msg = f"{field.capitalize()} Fixed value at index {i_str} is lower then the min: {val} < {min_val[i_str]}"
+        assert err_msg in str(excinfo.value)
+    else:
+        s.min = np.array(min_val)
+    
+@pytest.mark.parametrize("field, values, max_val, should_raise, expected_index", [
+    # No error
+    ("initial", [Fix(0.0), Fix(-1.5)], [1.0, 2.0], False, None),
+
+    # Error above max
+    ("initial", [Fix(1.5), Fix(0.0)], [1.0, 1.0], True, 0),
+
+    # Error above max (final)
+    ("final", [Fix(0.0), Fix(1.5)], [1.0, 1.0], True, 1),
+])
+def test_state_fix_bounds_check_max_only(field, values, max_val, should_raise, expected_index):
+    s = State("x", shape=(2,))
+    setattr(s, field, values)
+
+    if should_raise:
+        with pytest.raises(ValueError) as excinfo:
+            s.max = np.array(max_val)
+        val = values[expected_index].value
+        i_str = expected_index if isinstance(expected_index, int) else expected_index[0]
+        err_msg = f"{field.capitalize()} Fixed value at index {i_str} is greater then the max: {val} > {max_val[i_str]}"
+        assert err_msg in str(excinfo.value)
+    else:
+        s.max = np.array(max_val)
 
 @pytest.mark.parametrize("shapes", [[(3,), (2,)], [(4,), (5,)]])
 def test_append_augmented_control(shapes):
@@ -151,8 +231,8 @@ def test_append_augmented_control(shapes):
     control.append(control_aug, augmented=True)
 
     # Check shape tracking
-    assert control.true_control.shape == shape_main
-    assert control.augmented_control.shape == shape_aug
+    assert control.true.shape == shape_main
+    assert control.augmented.shape == shape_aug
     assert control.shape == (n_main + n_aug,)
 
     # Check concatenated values
@@ -193,8 +273,8 @@ def test_append_non_augmented_control(shapes):
 
     # Check shape tracking
     assert control.shape == (n_main + n_new,)
-    assert control.true_control.shape == (n_main + n_new,)
-    assert control.augmented_control.shape == (0,)
+    assert control.true.shape == (n_main + n_new,)
+    assert control.augmented.shape == (0,)
 
     # Check concatenated values
     np.testing.assert_array_equal(control.min, np.concatenate([
