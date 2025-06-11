@@ -5,6 +5,16 @@ class Expr:
     Note: This class is currently not being used.
     """
 
+
+    def __le__(self, other):
+        return Constraint(self, to_expr(other), op="<=")
+
+    def __ge__(self, other):
+        return Constraint(self, to_expr(other), op=">=")
+
+    def __eq__(self, other):
+        return Constraint(self, to_expr(other), op="==")
+
     def __add__(self, other):
         return Add(self, to_expr(other))
 
@@ -22,6 +32,7 @@ class Expr:
 
     def pretty(self, indent=0):
         pad = "  " * indent
+        pad = "  " * indent
         lines = [f"{pad}{self.__class__.__name__}"]
         for child in self.children():
             lines.append(child.pretty(indent + 1))
@@ -31,6 +42,7 @@ def to_expr(other):
     # TODO: (norrisg) Make it so that this converts non-expression inputs
     # (floats, np arrays, etc.) into expressions
     return other
+
 
 class Add(Expr):
     def __init__(self, left, right):
@@ -82,3 +94,17 @@ def to_expr(obj):
     if isinstance(obj, Expr):
         return obj
     return Literal(obj)
+
+
+
+class Constraint(Expr):
+    """
+    A comparison node.  op is one of '<=', '>=', or '=='.
+    """
+
+    def __init__(self, lhs: Expr, rhs: Expr, op: str):
+        assert op in ("<=", ">=", "=="), f"Invalid op {op}"
+        self.lhs, self.rhs, self.op = lhs, rhs, op
+
+    def __repr__(self):
+        return f"({self.lhs!r} {self.op} {self.rhs!r})"
