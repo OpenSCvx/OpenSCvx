@@ -27,6 +27,10 @@ class Expr:
             lines.append(child.pretty(indent + 1))
         return "\n".join(lines)
 
+def to_expr(other):
+    # TODO: (norrisg) Make it so that this converts non-expression inputs
+    # (floats, np arrays, etc.) into expressions
+    return other
 
 class Add(Expr):
     def __init__(self, left, right):
