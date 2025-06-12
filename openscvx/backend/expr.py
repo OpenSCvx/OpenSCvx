@@ -97,6 +97,14 @@ def to_expr(obj):
 
 
 
+class Constant(Expr):
+    def __init__(self, value: np.ndarray):
+        self.value = value
+
+    def __repr__(self):
+        return f"Const({self.value!r})"
+
+
 class Constraint(Expr):
     """
     A comparison node.  op is one of '<=', '>=', or '=='.
