@@ -29,7 +29,7 @@ x.min = np.array(
 )
 
 x.initial = np.array([10.0, 0, 2, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0])
-x.final = np.array([-10.0, 0, 2, Free(0), Free(0), Free(0), Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), total_time])
+x.final = np.array([-10.0, 0, 2, Free(0), Free(0), Free(0), Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), Minimize(total_time)])
 
 u = Control("u", shape=(6,))  # Control variable with 6 dimensions
 u.max=np.array(
@@ -111,13 +111,8 @@ problem = TrajOptProblem(
 )
 
 problem.settings.scp.w_tr_adapt = 1.8
-problem.settings.scp.ep_tr = 1e-6
-
-problem.settings.dev.printing = True
 
 problem.settings.prp.dt = 0.01
-problem.settings.dis.custom_integrator = False
-
 plotting_dict = dict(
     obstacles_centers=obstacle_centers,
     obstacles_axes=axes,
