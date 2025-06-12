@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Callable
 
 import numpy as np
 
@@ -47,6 +47,10 @@ class Expr:
 def to_expr(x: Union[Expr, float, int, np.ndarray]) -> Expr:
     return x if isinstance(x, Expr) else Constant(np.array(x))
 
+def traverse(expr: Expr, visit: Callable[[Expr], None]):
+    visit(expr)
+    for child in expr.children():
+        traverse(child, visit)
 
 class Add(Expr):
     def __init__(self, left, right):
