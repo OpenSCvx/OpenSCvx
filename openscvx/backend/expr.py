@@ -1,3 +1,8 @@
+from typing import Union
+
+import numpy as np
+
+
 class Expr:
     """
     Base class for symbolic expressions in optimization problems.
@@ -38,10 +43,9 @@ class Expr:
             lines.append(child.pretty(indent + 1))
         return "\n".join(lines)
 
-def to_expr(other):
-    # TODO: (norrisg) Make it so that this converts non-expression inputs
-    # (floats, np arrays, etc.) into expressions
-    return other
+
+def to_expr(x: Union[Expr, float, int, np.ndarray]) -> Expr:
+    return x if isinstance(x, Expr) else Constant(np.array(x))
 
 
 class Add(Expr):
