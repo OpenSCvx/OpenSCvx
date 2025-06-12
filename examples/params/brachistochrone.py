@@ -1,5 +1,6 @@
 import numpy as np
 import jax.numpy as jnp
+import cvxpy as cp
 
 import os
 import sys
@@ -48,6 +49,7 @@ def dynamics(x_, u_):
     t_dot = 1
     return jnp.hstack([x_dot, y_dot, v_dot, t_dot])
 
+
 constraints = [
     ctcs(lambda x_, u_: x_ - x.true.max),
     ctcs(lambda x_, u_: x.true.min - x_)
@@ -65,8 +67,6 @@ problem = TrajOptProblem(
 )
 
 problem.settings.prp.dt = 0.01
-
-problem.settings.scp.w_tr_adapt = 1.00
 
 problem.settings.cvx.solver = "qocogen"
 problem.settings.cvx.cvxpygen = True
