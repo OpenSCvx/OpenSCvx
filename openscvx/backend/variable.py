@@ -29,6 +29,7 @@ class Variable(Expr):
         super().__init__()
         self.name = name
         self._shape = shape
+        self._slice = None
         self._min = None
         self._max = None
         self._guess = None
