@@ -78,7 +78,7 @@ class ConvexSolverConfig:
     def __init__(
         self,
         solver: str = "QOCO",
-        solver_args: dict = {"abstol": 1e-6, "reltol": 1e-9},
+        solver_args: dict = {"abstol": 1e-6, "reltol": 1e-9, "enforce_dpp": True},
         cvxpygen: bool = False,
         cvxpygen_override: bool = False,
     ):
