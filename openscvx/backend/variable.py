@@ -33,6 +33,9 @@ class Variable(Expr):
         self._max = None
         self._guess = None
 
+    def __repr__(self):
+        return f"Var({self.name!r})"
+
     @property
     def shape(self):
         """Get the shape of the variable.
