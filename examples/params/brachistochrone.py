@@ -70,6 +70,7 @@ problem.settings.prp.dt = 0.01
 
 problem.settings.cvx.solver = "qocogen"
 problem.settings.cvx.cvxpygen = True
+problem.settings.cvx.solver_args = {"abstol": 1e-6, "reltol": 1e-9}
 
 problem.settings.scp.w_tr = 1e1        # Weight on the Trust Reigon
 problem.settings.scp.lam_cost = 1e0    # Weight on the Minimal Time Objective
