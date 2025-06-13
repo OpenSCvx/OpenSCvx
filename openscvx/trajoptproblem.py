@@ -324,7 +324,7 @@ class TrajOptProblem:
         dtau = 1.0 / (self.settings.scp.n - 1) 
         dt_max = self.settings.sim.u.max[self.settings.sim.idx_s][0] * dtau
 
-        self.settings.prp.max_tau_len = int(dt_max / self.settings.prp.dt) + 1
+        self.settings.prp.max_tau_len = int(dt_max / self.settings.prp.dt) + 2
 
         # Check if the compiled file already exists 
         try:

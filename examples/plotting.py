@@ -1483,7 +1483,7 @@ def plot_scp_animation(result: dict,
     fig.update_layout(template='plotly_dark', title=title)
 
     fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
-    fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
+    # fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
 
     # Extract the number of states and controls from the parameters
     n_x = params.sim.n_states
@@ -1520,30 +1520,30 @@ def plot_scp_animation(result: dict,
                     data.append(go.Scatter3d(x=pos_traj[:,j, 0], y=pos_traj[:,j, 1], z=pos_traj[:,j, 2], mode='lines', legendgroup='Multishot Trajectory', showlegend=False, line=dict(color='blue', width = 5)))
         
             
-        for i in range(drone_attitudes.shape[0]):
-            att = drone_attitudes[i]
+        # for i in range(drone_attitudes.shape[0]):
+        #     att = drone_attitudes[i]
 
-            # Convert quaternion to rotation matrix
-            rotation_matrix = qdcm(att)
+        #     # Convert quaternion to rotation matrix
+        #     rotation_matrix = qdcm(att)
 
-            # Extract axes from rotation matrix
-            axes = 2 * np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-            rotated_axes = np.dot(rotation_matrix, axes.T).T
+        #     # Extract axes from rotation matrix
+        #     axes = 2 * np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+        #     rotated_axes = np.dot(rotation_matrix, axes.T).T
 
-            colors = ['#FF0000', '#00FF00', '#0000FF']
+        #     colors = ['#FF0000', '#00FF00', '#0000FF']
 
-            for k in range(3):
-                axis = rotated_axes[k]
-                color = colors[k]
+        #     for k in range(3):
+        #         axis = rotated_axes[k]
+        #         color = colors[k]
 
-                data.append(go.Scatter3d(
-                    x=[scp_traj[i, 0], scp_traj[i, 0] + axis[0]],
-                    y=[scp_traj[i, 1], scp_traj[i, 1] + axis[1]],
-                    z=[scp_traj[i, 2], scp_traj[i, 2] + axis[2]],
-                    mode='lines+text',
-                    line=dict(color=color, width=4),
-                    showlegend=False
-                ))
+        #         data.append(go.Scatter3d(
+        #             x=[scp_traj[i, 0], scp_traj[i, 0] + axis[0]],
+        #             y=[scp_traj[i, 1], scp_traj[i, 1] + axis[1]],
+        #             z=[scp_traj[i, 2], scp_traj[i, 2] + axis[2]],
+        #             mode='lines+text',
+        #             line=dict(color=color, width=4),
+        #             showlegend=False
+        #         ))
         traj_iter += 1  
         frame.data = data
         frames.append(frame)
@@ -1590,10 +1590,9 @@ def plot_scp_animation(result: dict,
                 fig.add_trace(go.Scatter3d(x=sub_positions[:,0], y=sub_positions[:,1], z=sub_positions[:,2], mode='markers', marker=dict(size=10, color='red'), showlegend=False))
 
 
-    fig.add_trace(go.Surface(x=[-200, 200, 200, -200], y=[-200, -200, 200, 200], z=[[0, 0], [0, 0], [0, 0], [0, 0]], opacity=0.3, showscale=False, colorscale='Greys', showlegend = True, name='Ground Plane'))
-
+    fig.add_trace(go.Surface(x=[-2000, 2000, 2000, -2000], y=[-2000, -2000, 2000, 2000], z=[[0, 0], [0, 0], [0, 0], [0, 0]], opacity=0.3, showscale=False, colorscale='Greys', showlegend = True, name='Ground Plane'))
     fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
-    fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
+    # fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
 
     sliders = [
         {
@@ -1635,7 +1634,7 @@ def plot_scp_animation(result: dict,
     fig.update_layout(sliders=sliders)
 
     fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
-    fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
+    # fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
 
     # Overlay the title onto the plot
     fig.update_layout(title_y=0.95, title_x=0.5)
@@ -1691,6 +1690,69 @@ def plot_scp_animation(result: dict,
     if not "moving_subject" in result:
         fig.update_layout(scene_camera=dict(up=dict(x=0, y=0, z=90), center=dict(x=1, y=0.3, z=1), eye=dict(x=-1, y=2, z=1)))
 
+    return fig
+
+def plot_xy_xz_yz(result: dict, params: Config):
+
+    x_full = result["x_full"]
+    t_full = result["t_full"]
+
+    fig = make_subplots(rows=2, cols=2, 
+                        subplot_titles=('XY Plane', 'XZ Plane', 'YZ Plane'),
+                        specs=[[{}, {}],
+                               [{}, None]])
+
+    # Add trajectory traces
+    fig.add_trace(go.Scatter(x=x_full[:, 0], y=x_full[:, 1], mode='lines',
+                             line=dict(color='blue', width=2), name='Trajectory XY Plane'),
+                  row=1, col=1)
+    
+    fig.add_trace(go.Scatter(x=x_full[:, 0], y=x_full[:, 2], mode='lines',
+                             line=dict(color='blue', width=2), name='Trajectory XZ Plane'),
+                  row=1, col=2)
+    
+    fig.add_trace(go.Scatter(x=x_full[:, 1], y=x_full[:, 2], mode='lines',
+                             line=dict(color='blue', width=2), name='Trajectory YZ Plane'),
+                  row=2, col=1)
+
+    # Set axis titles
+    fig.update_xaxes(title_text='X (m)', row=1, col=1)
+    fig.update_yaxes(title_text='Y (m)', row=1, col=1)
+    fig.update_xaxes(title_text='X (m)', row=1, col=2)
+    fig.update_yaxes(title_text='Z (m)', row=1, col=2)
+    fig.update_xaxes(title_text='Y (m)', row=2, col=1)
+    fig.update_yaxes(title_text='Z (m)', row=2, col=1)
+
+    # Set equal aspect ratio for each subplot
+    fig.update_layout(
+        title='Trajectory in XY, XZ, and YZ Planes',
+        template='plotly_dark',
+        xaxis=dict(scaleanchor="y"),      # row=1, col=1
+        xaxis2=dict(scaleanchor="y2"),    # row=1, col=2
+        xaxis3=dict(scaleanchor="y3")     # row=2, col=1
+    )
+
+    return fig
+
+
+
+def plot_control_norm(results: dict, params: Config):
+    u_full = results["u_full"][:,:3]
+    # Plot the 2-Norm of the control inputs over time
+    t_full = results["t_full"]
+
+    rho_min = results["rho_min"]
+    rho_max = results["rho_max"]
+
+    control_norm = np.linalg.norm(u_full, axis=1)
+    title = f'Control Norm: {results["t_final"]} seconds'
+    fig = go.Figure(go.Scatter(x=t_full, y=control_norm, mode='lines+markers', line=dict(color='blue', width=2), name='Control Norm'))
+
+    fig.add_hline(y=rho_min, line_color='red', line_dash='dash', annotation_text='rho_min', annotation_position='top left')
+
+    fig.add_hline(y=rho_max, line_color='red', line_dash='dash', annotation_text='rho_max', annotation_position='top left')
+    fig.update_layout(title=title, xaxis_title='Time (s)', yaxis_title='Control Norm (N)', template='plotly_dark')
+    fig.update_layout(template='plotly_dark')
     return fig
 
 def scp_traj_interp(scp_trajs, params: Config):

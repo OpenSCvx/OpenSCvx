@@ -44,6 +44,10 @@ def get_augmented_dynamics(
         filtered_params = {
             f"{name}_": value for name, value in params if f"{name}_" in expected_args
         }
+
+        if "node" in expected_args:
+            filtered_params["node"] = node
+            
         x_dot = dynamics(x_true, u_true, **filtered_params)
 
         for v in violations:

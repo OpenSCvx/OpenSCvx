@@ -132,7 +132,7 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
         subprop_time = time.time() - t0
     else:
         t0 = time.time()
-        prob.solve(solver = settings.cvx.solver, enforce_dpp = True, **settings.cvx.solver_args)
+        prob.solve(solver = settings.cvx.solver, **settings.cvx.solver_args)
         subprop_time = time.time() - t0
 
     x_new_guess = (settings.sim.S_x @ prob.var_dict['x'].value.T + np.expand_dims(settings.sim.c_x, axis = 1)).T

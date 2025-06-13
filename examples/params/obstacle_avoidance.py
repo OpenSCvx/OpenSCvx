@@ -107,15 +107,12 @@ problem = TrajOptProblem(
     constraints=constraints,
     idx_time=len(x.max)-1,
     N=n,
+    licq_max=1E-8
 )
 
 problem.settings.scp.w_tr_adapt = 1.8
 
-problem.settings.dev.printing = True
-
 problem.settings.prp.dt = 0.01
-problem.settings.dis.custom_integrator = False
-
 plotting_dict = dict(
     obstacles_centers=obstacle_centers,
     obstacles_axes=axes,
