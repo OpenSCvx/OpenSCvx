@@ -118,22 +118,14 @@ Dependencies can then be installed using Conda or Pip
 
 ### Running Trajectory Optimization
 
-See `examples/` folder for several example trajectory optimization problems.
-To run a problem simply run `examples/main.py` with:
+See `examples/params/` folder for several example trajectory optimization problems.
+To run a problem simply run any of the examples directly, for example:
 
 ```sh
-python3 examples/main.py
+python3 examples/params/brachistochrone.py
 ```
-
-To change which example is run by `main` simply replace the `problem` import line:
-
-```python
-# other imports
-from examples.params.dr_vp import problem
-# rest of code
-```
-
 and adjust the plotting as needed.
+
 Check out the problem definitions inside `examples/params` to see how to define your own problems.
 
 ## ToDos
