@@ -35,8 +35,6 @@ def plot_dubins_car(results, params):
     fig.update_xaxes(scaleanchor="y", scaleratio=1)
     return fig
 
-    
-
 def full_subject_traj_time(results, params):
     x_full = results["x_full"]
     x_nodes = results["x"].guess
@@ -1456,7 +1454,6 @@ def plot_brachistochrone_velocity(results: dict,
     fig.update_layout(scene=dict(xaxis=dict(range=[0, tof]), yaxis=dict(range=[-10, 10])), template='plotly_dark')
     return fig
 
-
 def plot_scp_animation(result: dict,
                        params = None,
                        path=""):
@@ -1734,8 +1731,6 @@ def plot_xy_xz_yz(result: dict, params: Config):
 
     return fig
 
-
-
 def plot_control_norm(results: dict, params: Config):
     u_full = results["u_full"][:,:3]
     # Plot the 2-Norm of the control inputs over time
@@ -1995,6 +1990,189 @@ def plot_animation_double_integrator(result: dict,
         fig.update_layout(scene=dict(xaxis=dict(range=[0, 4000]), yaxis=dict(range=[0, 4000]), zaxis=dict(range=[-1000, 3000])))
     else:
         fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
+
+    # Overlay the title onto the plot
+    fig.update_layout(title_y=0.95, title_x=0.5)
+
+    
+
+
+
+    # Overlay the sliders and buttons onto the plot
+    fig.update_layout(updatemenus = [{"buttons":[
+                                        {
+                                            "args": [None, frame_args(50)],
+                                            "label": "Play",
+                                            "method": "animate",
+                                        },
+                                        {
+                                            "args": [[None], frame_args(0)],
+                                            "label": "Pause",
+                                            "method": "animate",
+                                    }],
+
+                                    "direction": "left",
+                                    "pad": {"r": 10, "t": 70},
+                                    "type": "buttons",
+                                    "x": 0.22,
+                                    "y": 0.37,
+                                }
+                            ],
+                            sliders=sliders
+                        )
+    
+    
+
+    # Show the legend overlayed on the plot
+    fig.update_layout(legend=dict(yanchor="top", y=0.9, xanchor="left", x=0.75))
+
+    # fig.update_layout(height=450, width = 800)
+
+    # Remove the black border around the fig
+    fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
+
+    # Rmeove the background from the legend
+    fig.update_layout(legend=dict(bgcolor='rgba(0,0,0,0)'))
+
+    fig.update_xaxes(
+        dtick=1.0,
+        showline=False
+    )
+    fig.update_yaxes(
+        scaleanchor="x",
+        scaleratio=1,
+        showline=False,
+        dtick=1.0
+    )
+
+    return fig
+
+def plot_animation_3DoF_rocket(result: dict,
+                   params: Config,
+                   path="",
+                   ) -> None:
+    tof = result["t_final"]
+    # Make title say quadrotor simulation and insert the variable tof into the title
+    # title = 'Quadrotor Simulation: Time of Flight = ' + str(tof) + 's'
+    drone_positions = result["x_full"][:, :3]
+    drone_velocities = result["x_full"][:, 3:6]
+    drone_forces = 0.01 * result["u_full"][:, :3]
+
+    step = 2
+    indices = np.array(list(range(drone_positions.shape[0]-1)[::step]) + [drone_positions.shape[0]-1])
+
+    fig = go.Figure(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='gray', width = 2)))
+    for i in range(100):
+        fig.add_trace(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='red', width = 2)))
+    
+    frames = []
+    i = 0
+
+    # Draw drone attitudes as axes
+    for i in range(0, len(indices)-1, step):
+        frame = go.Frame(name=str(i))
+
+
+        # Extract axes from rotation matrix
+        axes = 20 * np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+
+        data = []
+
+        colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFFFF']
+        labels = ['X', 'Y', 'Z', 'Force']
+
+        for k in range(4):
+            color = colors[k]
+            label = labels[k]
+
+            if labels[k] != 'Force':
+                data.append(go.Scatter3d(
+                        x=[drone_positions[indices[i], 0], drone_positions[indices[i], 0]],
+                        y=[drone_positions[indices[i], 1], drone_positions[indices[i], 1]],
+                        z=[drone_positions[indices[i], 2], drone_positions[indices[i], 2]],
+                        mode='lines+text',
+                        line=dict(color=color, width=4),
+                        showlegend=False
+                    ))
+            else:
+                data.append(go.Scatter3d(
+                        x=[drone_positions[indices[i], 0], drone_positions[indices[i], 0] - drone_forces[indices[i], 0]],
+                        y=[drone_positions[indices[i], 1], drone_positions[indices[i], 1] - drone_forces[indices[i], 1]],
+                        z=[drone_positions[indices[i], 2], drone_positions[indices[i], 2] - drone_forces[indices[i], 2]],
+                        mode='lines+text',
+                        line=dict(color=color, width=10),
+                        showlegend=False
+                    ))
+
+        data.append(go.Scatter3d(
+            x=drone_positions[:indices[i]+1,0], 
+            y=drone_positions[:indices[i]+1,1], 
+            z=drone_positions[:indices[i]+1,2], 
+            mode='markers',
+            marker=dict(
+                size=5,
+                color=np.linalg.norm(drone_velocities[:indices[i]+1], axis = 1), # set color to an array/list of desired values
+                colorscale='Viridis', # choose a colorscale
+                colorbar=dict(title='Velocity Norm (m/s)', x=0.02, y=0.55, len=0.75) # add colorbar
+            ),
+            name='Nonlinear Propagation'
+        ))
+        
+
+        frame.data = data
+        frames.append(frame)
+
+    fig.frames = frames
+
+    # Add ground plane
+    fig.add_trace(go.Surface(x=[-200, 200, 200, -200], y=[-200, -200, 200, 200], z=[[0, 0], [0, 0], [0, 0], [0, 0]], opacity=0.3, showscale=False, colorscale='Greys', showlegend = True, name='Ground Plane'))
+
+    sliders = [
+        {
+            "pad": {"b": 10, "t": 60},
+            "len": 0.8,
+            "x": 0.15,
+            "y": 0.32,
+            "steps": [
+                {
+                    "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
+                    "label": f.name,
+                    "method": "animate",
+                } for f in fig.frames
+            ]
+        }
+    ]
+
+    fig.update_layout(updatemenus = [{"buttons":[
+                                        {
+                                            "args": [None, frame_args(50)],
+                                            "label": "Play",
+                                            "method": "animate",
+                                        },
+                                        {
+                                            "args": [[None], frame_args(0)],
+                                            "label": "Pause",
+                                            "method": "animate",
+                                    }],
+
+                                    "direction": "left",
+                                    "pad": {"r": 10, "t": 70},
+                                    "type": "buttons",
+                                    "x": 0.1,
+                                    "y": 0,
+                                }
+                            ],
+                            sliders=sliders
+                        )
+
+    fig.update_layout(sliders=sliders)
+
+    fig.update_layout(template='plotly_dark') #, title=title)
+    
+    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
+    
+    # Check if covariance exists
+    fig.update_layout(scene=dict(xaxis=dict(range=[-3000, 3000]), yaxis=dict(range=[-3000, 3000]), zaxis=dict(range=[-200, 2000])))
 
     # Overlay the title onto the plot
     fig.update_layout(title_y=0.95, title_x=0.5)

@@ -15,7 +15,7 @@ from openscvx.backend.state import State, Free, Maximize, Minimize
 from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
 
-from examples.plotting import plot_scp_animation, plot_control_norm, plot_xy_xz_yz
+from examples.plotting import plot_scp_animation, plot_control_norm, plot_xy_xz_yz, plot_animation_3DoF_rocket
 from openscvx.plotting import plot_state, plot_control
 
 n = 30
@@ -106,7 +106,7 @@ problem = TrajOptProblem(
 )
 
 # Set solver parameters
-problem.settings.prp.dt = 0.01
+problem.settings.prp.dt = 0.1
 
 problem.settings.scp.w_tr_adapt = 1.04
 problem.settings.scp.w_tr = 3e0
@@ -120,7 +120,6 @@ problem.settings.scp.ep_vc = 1e-10
 problem.settings.cvx.solver = "CLARABEL"
 problem.settings.cvx.solver_args = {"enforce_dpp": True}
 
-# problem.settings.dis.dis_type = "ZOH"
 
 plotting_dict = dict(
     rho_min = rho_min,
@@ -133,8 +132,9 @@ if __name__ == "__main__":
     results = problem.post_process(results)
     results.update(plotting_dict)
 
-    plot_scp_animation(results, problem.settings).show()
-    plot_state(results, problem.settings).show()
+    plot_animation_3DoF_rocket(results, problem.settings).show()
+    # plot_scp_animation(results, problem.settings).show()
+    # plot_state(results, problem.settings).show()
     # plot_control(results, problem.settings).show()
-    plot_control_norm(results, problem.settings).show()
-    plot_xy_xz_yz(results, problem.settings).show()
+    # plot_control_norm(results, problem.settings).show()
+    # plot_xy_xz_yz(results, problem.settings).show()
