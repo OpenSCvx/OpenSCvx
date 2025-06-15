@@ -252,6 +252,33 @@ class TrajOptProblem:
     def initialize(self):
         io.intro()
 
+        # Print problem summary
+        n_nodal_convex = sum(1 for c in self.settings.sim.constraints_nodal if c.convex)
+        n_nodal_nonconvex = sum(1 for c in self.settings.sim.constraints_nodal if not c.convex)
+        n_ctcs = len(self.settings.sim.constraints_ctcs)
+        n_augmented = self.settings.sim.n_states - self.settings.sim.idx_x_true.stop
+        
+        # Calculate the content of each line
+        lines = [
+            "Problem Summary",
+            f"Dimensions: {self.settings.sim.n_states} states ({n_augmented} aug), {self.settings.sim.n_controls} controls, {self.settings.scp.n} nodes",
+            f"Constraints: {n_nodal_convex} conv, {n_nodal_nonconvex} nonconv, {n_ctcs} ctcs",
+            f"Weights: lam_cost={self.settings.scp.lam_cost:4.1f}, w_tr={self.settings.scp.w_tr:4.1f}, lam_vc={self.settings.scp.lam_vc:4.1f}",
+            f"CVX Solver: {self.settings.cvx.solver}, Discretization Solver: {self.settings.dis.solver}"
+        ]
+        
+        # Find the longest line
+        max_width = max(len(line) for line in lines)
+        box_width = max_width + 4  # Add padding for the box borders
+        
+        # Print the box with dynamic width
+        print(f"\n╭{'─' * box_width}╮")
+        print(f"│ {lines[0]:^{max_width}}   │")
+        print(f"├{'─' * box_width}┤")
+        for line in lines[1:]:
+            print(f"│ {line:<{max_width}}   │")
+        print(f"╰{'─' * box_width}╯\n")
+
         # Enable the profiler
         if self.settings.dev.profiling:
             import cProfile
@@ -307,7 +334,9 @@ class TrajOptProblem:
                     serial_dis = f.read()
                 # Load the compiled code
                 self.discretization_solver = export.deserialize(serial_dis)
+                print("✓ Loaded existing discretization solver")
             except FileNotFoundError:
+                print("Compiling discretization solver...")
                 # Extract parameter values and names in order
                 param_values = [param.value for _, param in self.params.items()]
                 
@@ -319,6 +348,7 @@ class TrajOptProblem:
                 # Serialize and Save the compiled code in a temp directory
                 with open(dis_solver_file, "wb") as f:
                     f.write(self.discretization_solver.serialize())
+                print("✓ Discretization solver compiled and saved")
 
         # Compile the discretization solver and save it
         dtau = 1.0 / (self.settings.scp.n - 1) 
@@ -332,7 +362,9 @@ class TrajOptProblem:
                 serial_prop = f.read()
             # Load the compiled code
             self.propagation_solver = export.deserialize(serial_prop)
+            print("✓ Loaded existing propagation solver")
         except FileNotFoundError:
+            print("Compiling propagation solver...")
             # Extract parameter values and names in order
             param_values = [param.value for _, param in self.params.items()]
 
@@ -354,14 +386,17 @@ class TrajOptProblem:
 
             with open(prop_solver_file, "wb") as f:
                 f.write(self.propagation_solver.serialize())
+            print("✓ Propagation solver compiled and saved")
 
         # Initialize the PTR loop
+        print("Initializing the SCvx Subproblem Solver...")
         self.cpg_solve = PTR_init(
             self.params,
             self.optimal_control_problem,
             self.discretization_solver,
             self.settings,
         )
+        print("✓ SCvx Subproblem Solver initialized")
 
         t_f_while = time.time()
         self.timing_init = t_f_while - t_0_while

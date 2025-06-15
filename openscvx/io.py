@@ -5,6 +5,7 @@ import queue
 import time
 
 from termcolor import colored
+from openscvx._version import version
 
 # Define colors for printing
 col_main = "blue"
@@ -15,7 +16,7 @@ def intro():
     # Silence syntax warnings
     warnings.filterwarnings("ignore")
     # fmt: off
-    ascii_art = '''
+    ascii_art = f'''
                              
                             ____                    _____  _____           
                            / __ \                  / ____|/ ____|          
@@ -29,6 +30,7 @@ def intro():
                                 Author: Chris Hayner and Griffin Norris
                                     Autonomous Controls Laboratory
                                        University of Washington
+                                         Version: {version}
 ---------------------------------------------------------------------------------------------------------
 '''
     # fmt: on
