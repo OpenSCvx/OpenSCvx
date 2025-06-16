@@ -35,7 +35,39 @@ class Maximize:
         return f"Maximize({self.guess})"
 
 class State(Variable):
+    """A class representing the state variables in an optimal control problem.
+
+    The State class extends Variable to handle state-specific properties like initial and final conditions,
+    as well as true and augmented state dimensions. It supports various boundary condition types:
+    - Fixed values (Fix)
+    - Free variables (Free)
+    - Minimization objectives (Minimize)
+    - Maximization objectives (Maximize)
+
+    Attributes:
+        name (str): Name identifier for the state variable
+        shape (tuple): Shape of the state vector
+        _initial (np.ndarray): Initial state values
+        initial_type (np.ndarray): Types of initial conditions for each state
+        _final (np.ndarray): Final state values
+        final_type (np.ndarray): Types of final conditions for each state
+        _true_dim (int): Number of true state dimensions
+        _true_slice (slice): Slice for accessing true states
+        _augmented_slice (slice): Slice for accessing augmented states
+
+    Example:
+        >>> state = State("position", (3,))
+        >>> state.initial = [Fix(0), Free(1), Minimize(2)]
+        >>> state.final = [Fix(10), Free(5), Maximize(8)]
+    """
+
     def __init__(self, name, shape):
+        """Initialize a State object.
+
+        Args:
+            name (str): Name identifier for the state variable
+            shape (tuple): Shape of the state vector
+        """
         super().__init__(name, shape)
         self._initial = None
         self.initial_type = None
@@ -46,15 +78,29 @@ class State(Variable):
         self._update_slices()
 
     def _update_slices(self):
+        """Update the slice objects for true and augmented states."""
         self._true_slice = slice(0, self._true_dim)
         self._augmented_slice = slice(self._true_dim, self.shape[0])
 
     @property
     def min(self):
+        """Get the minimum bounds for the state variables.
+
+        Returns:
+            np.ndarray: Array of minimum values for each state variable
+        """
         return self._min
 
     @min.setter
     def min(self, val):
+        """Set the minimum bounds for the state variables.
+
+        Args:
+            val (np.ndarray): Array of minimum values for each state variable
+
+        Raises:
+            ValueError: If the shape of val doesn't match the state shape
+        """
         val = np.asarray(val)
         if val.shape != self.shape:
             raise ValueError(f"Min shape {val.shape} does not match State shape {self.shape}")
@@ -63,10 +109,23 @@ class State(Variable):
 
     @property
     def max(self):
+        """Get the maximum bounds for the state variables.
+
+        Returns:
+            np.ndarray: Array of maximum values for each state variable
+        """
         return self._max
 
     @max.setter
     def max(self, val):
+        """Set the maximum bounds for the state variables.
+
+        Args:
+            val (np.ndarray): Array of maximum values for each state variable
+
+        Raises:
+            ValueError: If the shape of val doesn't match the state shape
+        """
         val = np.asarray(val)
         if val.shape != self.shape:
             raise ValueError(f"Max shape {val.shape} does not match State shape {self.shape}")
@@ -74,6 +133,11 @@ class State(Variable):
         self._check_bounds_against_initial_final()
 
     def _check_bounds_against_initial_final(self):
+        """Check if initial and final values respect the bounds.
+
+        Raises:
+            ValueError: If any fixed initial or final value violates the bounds
+        """
         for field_name, data, types in [('initial', self._initial, self.initial_type),
                                         ('final', self._final, self.final_type)]:
             if data is None or types is None:
@@ -90,10 +154,24 @@ class State(Variable):
 
     @property
     def initial(self):
+        """Get the initial state values.
+
+        Returns:
+            np.ndarray: Array of initial state values
+        """
         return self._initial
 
     @initial.setter
     def initial(self, arr):
+        """Set the initial state values and their types.
+
+        Args:
+            arr (np.ndarray): Array of initial values or boundary condition objects
+                (Fix, Free, Minimize, Maximize)
+
+        Raises:
+            ValueError: If the shape of arr doesn't match the state shape
+        """
         arr = np.asarray(arr, dtype=object)
         if arr.shape != self.shape:
             raise ValueError(f"Initial value shape {arr.shape} does not match State shape {self.shape}")
@@ -123,10 +201,24 @@ class State(Variable):
 
     @property
     def final(self):
+        """Get the final state values.
+
+        Returns:
+            np.ndarray: Array of final state values
+        """
         return self._final
 
     @final.setter
     def final(self, arr):
+        """Set the final state values and their types.
+
+        Args:
+            arr (np.ndarray): Array of final values or boundary condition objects
+                (Fix, Free, Minimize, Maximize)
+
+        Raises:
+            ValueError: If the shape of arr doesn't match the state shape
+        """
         arr = np.asarray(arr, dtype=object)
         if arr.shape != self.shape:
             raise ValueError(f"Final value shape {arr.shape} does not match State shape {self.shape}")
@@ -156,13 +248,34 @@ class State(Variable):
 
     @property
     def true(self):
+        """Get the true state variables (excluding augmented states).
+
+        Returns:
+            State: A new State object containing only the true state variables
+        """
         return self[self._true_slice]
 
     @property
     def augmented(self):
+        """Get the augmented state variables.
+
+        Returns:
+            State: A new State object containing only the augmented state variables
+        """
         return self[self._augmented_slice]
 
     def append(self, other=None, *, min=-np.inf, max=np.inf, guess=0.0, initial=0.0, final=0.0, augmented=False):
+        """Append another state or create a new state variable.
+
+        Args:
+            other (State, optional): Another State object to append
+            min (float, optional): Minimum bound for new state. Defaults to -np.inf
+            max (float, optional): Maximum bound for new state. Defaults to np.inf
+            guess (float, optional): Initial guess for new state. Defaults to 0.0
+            initial (float, optional): Initial value for new state. Defaults to 0.0
+            final (float, optional): Final value for new state. Defaults to 0.0
+            augmented (bool, optional): Whether the new state is augmented. Defaults to False
+        """
         if isinstance(other, State):
             super().append(other=other)
 
@@ -199,6 +312,14 @@ class State(Variable):
             self.append(temp_state, augmented=augmented)
 
     def __getitem__(self, idx):
+        """Get a subset of the state variables.
+
+        Args:
+            idx: Index or slice to select state variables
+
+        Returns:
+            State: A new State object containing the selected variables
+        """
         new_state = super().__getitem__(idx)
         new_state.__class__ = State
 
@@ -227,4 +348,9 @@ class State(Variable):
         return new_state
 
     def __repr__(self):
+        """String representation of the State object.
+
+        Returns:
+            str: A string describing the State object
+        """
         return f"State('{self.name}', shape={self.shape})"
