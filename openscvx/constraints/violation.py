@@ -9,6 +9,16 @@ from openscvx.constraints.ctcs import CTCSConstraint
 
 @dataclass
 class CTCSViolation:
+    """Class representing a continuous-time constraint satisfaction (CTCS) violation.
+    
+    This class holds the constraint function and its gradients for computing
+    constraint violations in continuous-time optimization problems.
+    
+    Attributes:
+        g (Callable): The constraint function that computes violations.
+        g_grad_x (Optional[Callable]): Gradient of g with respect to state x.
+        g_grad_u (Optional[Callable]): Gradient of g with respect to control u.
+    """
     g: Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray]
     g_grad_x: Optional[Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray]] = None
     g_grad_u: Optional[Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray]] = None

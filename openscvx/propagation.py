@@ -18,6 +18,27 @@ def prop_aug_dy(
     N: int,
     *params
 ) -> np.ndarray:
+    """Compute the augmented dynamics for propagation.
+    
+    This function computes the time-scaled dynamics for propagating the system state,
+    taking into account the discretization type (ZOH or FOH) and time dilation.
+    
+    Args:
+        tau (float): Current normalized time in [0,1].
+        x (np.ndarray): Current state vector.
+        u_current (np.ndarray): Control input at current node.
+        u_next (np.ndarray): Control input at next node.
+        tau_init (float): Initial normalized time.
+        node (int): Current node index.
+        idx_s (int): Index of time dilation variable in control vector.
+        state_dot (callable): Function computing state derivatives.
+        dis_type (str): Discretization type ("ZOH" or "FOH").
+        N (int): Number of nodes in trajectory.
+        *params: Additional parameters passed to state_dot.
+        
+    Returns:
+        np.ndarray: Time-scaled state derivatives.
+    """
     x = x[None, :]
 
     if dis_type == "ZOH":
@@ -29,6 +50,19 @@ def prop_aug_dy(
     return u[:, idx_s] * state_dot(x, u[:, :-1], node, *params).squeeze()
 
 def get_propagation_solver(state_dot, settings, param_map):
+    """Create a propagation solver function.
+    
+    This function creates a solver that propagates the system state using the
+    specified dynamics and settings.
+    
+    Args:
+        state_dot (callable): Function computing state derivatives.
+        settings: Configuration settings for propagation.
+        param_map (dict): Mapping of parameter names to values.
+        
+    Returns:
+        callable: A function that solves the propagation problem.
+    """
     def propagation_solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask, *params):
         param_map_update = dict(zip(param_map.keys(), params))
         return solve_ivp_diffrax_prop(
@@ -58,6 +92,19 @@ def get_propagation_solver(state_dot, settings, param_map):
 
 
 def s_to_t(x, u, params: Config):
+    """Convert normalized time s to real time t.
+    
+    This function converts the normalized time variable s to real time t
+    based on the discretization type and time dilation factors.
+    
+    Args:
+        x: State trajectory.
+        u: Control trajectory.
+        params (Config): Configuration settings.
+        
+    Returns:
+        list: List of real time points.
+    """
     t = [x.guess[:,params.sim.idx_t][0]]
     tau = np.linspace(0, 1, params.scp.n)
     for k in range(1, params.scp.n):
@@ -71,6 +118,20 @@ def s_to_t(x, u, params: Config):
 
 
 def t_to_tau(u, t, t_nodal, params: Config):
+    """Convert real time t to normalized time tau.
+    
+    This function converts real time t to normalized time tau and interpolates
+    the control inputs accordingly.
+    
+    Args:
+        u: Control trajectory.
+        t (np.ndarray): Real time points.
+        t_nodal (np.ndarray): Nodal time points.
+        params (Config): Configuration settings.
+        
+    Returns:
+        tuple: (tau, u_interp) where tau is normalized time and u_interp is interpolated controls.
+    """
     u_guess = u.guess
     u_lam = lambda new_t: np.array([np.interp(new_t, t_nodal, u_guess[:,i]) for i in range(u_guess.shape[1])]).T
     u = np.array([u_lam(t_i) for t_i in t])
@@ -92,6 +153,23 @@ def t_to_tau(u, t, t_nodal, params: Config):
 
 
 def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_solver):
+    """Simulate the nonlinear system dynamics over time.
+    
+    This function simulates the system dynamics using the optimal control sequence
+    and returns the resulting state trajectory.
+    
+    Args:
+        params: System parameters.
+        x: State trajectory.
+        u: Control trajectory.
+        tau_vals (np.ndarray): Normalized time points for simulation.
+        t (np.ndarray): Real time points.
+        settings: Configuration settings.
+        propagation_solver (callable): Function for propagating the system state.
+        
+    Returns:
+        np.ndarray: Simulated state trajectory.
+    """
     x_0 = settings.sim.x_prop.initial
 
     n_segments = settings.scp.n - 1

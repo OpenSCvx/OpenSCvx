@@ -19,6 +19,28 @@ def dVdt(
     dis_type: str,
     **params
 ) -> jnp.ndarray:
+    """Compute the time derivative of the augmented state vector.
+    
+    This function computes the time derivative of the augmented state vector V,
+    which includes the state, state transition matrix, and control influence matrix.
+    
+    Args:
+        tau (float): Current normalized time in [0,1].
+        V (jnp.ndarray): Augmented state vector.
+        u_cur (np.ndarray): Control input at current node.
+        u_next (np.ndarray): Control input at next node.
+        state_dot (callable): Function computing state derivatives.
+        A (callable): Function computing state Jacobian.
+        B (callable): Function computing control Jacobian.
+        n_x (int): Number of states.
+        n_u (int): Number of controls.
+        N (int): Number of nodes in trajectory.
+        dis_type (str): Discretization type ("ZOH" or "FOH").
+        **params: Additional parameters passed to state_dot, A, and B.
+        
+    Returns:
+        jnp.ndarray: Time derivative of augmented state vector.
+    """
     # Define the nodes
     nodes = jnp.arange(0, N-1)
 
@@ -73,11 +95,12 @@ def dVdt(
     dVdt = jnp.zeros_like(V)
     dVdt = dVdt.at[:, i0:i1].set(F)
     dVdt = dVdt.at[:, i1:i2].set(jnp.matmul(sdfdx, V[:, i1:i2].reshape(-1, n_x, n_x)).reshape(-1, n_x * n_x))
-    dVdt = dVdt.at[:, i2:i3].set((jnp.matmul(sdfdx, V[:, i2:i3].reshape(-1, n_x, n_u)) + dfdu * alpha).reshape(-1, n_x * n_u))
-    dVdt = dVdt.at[:, i3:i4].set((jnp.matmul(sdfdx, V[:, i3:i4].reshape(-1, n_x, n_u)) + dfdu * beta).reshape(-1, n_x * n_u))
-    dVdt = dVdt.at[:, i4:i5].set((jnp.matmul(sdfdx, V[:, i4:i5].reshape(-1, n_x)[..., None]).squeeze(-1) + z).reshape(-1, n_x))
+    dVdt = dVdt.at[:, i2:i3].set(jnp.matmul(sdfdx, V[:, i2:i3].reshape(-1, n_x, n_u)).reshape(-1, n_x * n_u))
+    dVdt = dVdt.at[:, i3:i4].set(jnp.matmul(sdfdx, V[:, i3:i4].reshape(-1, n_x, n_u)).reshape(-1, n_x * n_u))
+    dVdt = dVdt.at[:, i4:i5].set(z)
     # fmt: on
-    return dVdt.flatten()
+
+    return dVdt.reshape(-1)
 
 
 def calculate_discretization(
@@ -95,8 +118,38 @@ def calculate_discretization(
     rtol,
     atol,
     dis_type: str,
-    **kwargs  # <--- Accept any additional parameters
+    **kwargs
 ):
+    """Calculate the discretized system matrices.
+    
+    This function computes the discretized system matrices (A_bar, B_bar, C_bar)
+    and defect vector (z_bar) using numerical integration.
+    
+    Args:
+        x: State trajectory.
+        u: Control trajectory.
+        state_dot (callable): Function computing state derivatives.
+        A (callable): Function computing state Jacobian.
+        B (callable): Function computing control Jacobian.
+        n_x (int): Number of states.
+        n_u (int): Number of controls.
+        N (int): Number of nodes in trajectory.
+        custom_integrator (bool): Whether to use custom RK45 integrator.
+        debug (bool): Whether to use debug mode.
+        solver (str): Name of the solver to use.
+        rtol (float): Relative tolerance for integration.
+        atol (float): Absolute tolerance for integration.
+        dis_type (str): Discretization type ("ZOH" or "FOH").
+        **kwargs: Additional parameters passed to state_dot, A, and B.
+        
+    Returns:
+        tuple: (A_bar, B_bar, C_bar, z_bar, Vmulti) where:
+            - A_bar: Discretized state transition matrix
+            - B_bar: Discretized control influence matrix
+            - C_bar: Discretized control influence matrix for next node
+            - z_bar: Defect vector
+            - Vmulti: Full augmented state trajectory
+    """
     # Define indices for slicing the augmented state vector
     i0 = 0
     i1 = n_x
@@ -162,9 +215,20 @@ def calculate_discretization(
     return A_bar, B_bar, C_bar, z_bar, Vmulti
 
 
-
-
 def get_discretization_solver(dyn: Dynamics, settings, param_map):
+    """Create a discretization solver function.
+    
+    This function creates a solver that computes the discretized system matrices
+    using the specified dynamics and settings.
+    
+    Args:
+        dyn (Dynamics): System dynamics object.
+        settings: Configuration settings for discretization.
+        param_map (dict): Mapping of parameter names to values.
+        
+    Returns:
+        callable: A function that computes the discretized system matrices.
+    """
     return lambda x, u, *params: calculate_discretization(
         x=x,
         u=u,

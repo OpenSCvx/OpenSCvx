@@ -43,6 +43,13 @@ class NodalConstraint:
     grad_g_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
 
     def __post_init__(self):
+        """Initialize gradients and vectorization after instance creation.
+        
+        If the constraint is not convex, this method:
+        1. Sets up the constraint function
+        2. Computes gradients if not provided
+        3. Vectorizes the functions if needed
+        """
         if not self.convex:
             # single-node but still using JAX
             self.g = self.func
@@ -57,6 +64,15 @@ class NodalConstraint:
         # if convex=True assume an external solver (e.g. CVX) will handle it
 
     def __call__(self, x: jnp.ndarray, u: jnp.ndarray):
+        """Evaluate the constraint function at the given state and control.
+        
+        Args:
+            x (jnp.ndarray): The state vector.
+            u (jnp.ndarray): The control vector.
+            
+        Returns:
+            jnp.ndarray: The constraint violation values.
+        """
         return self.func(x, u)
 
 

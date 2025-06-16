@@ -6,6 +6,24 @@ from openscvx.config import Config
 
 
 def propagate_trajectory_results(params: dict, settings: Config, result: dict, propagation_solver: callable) -> dict:
+    """Propagate the optimal trajectory and compute additional results.
+    
+    This function takes the optimal control solution and propagates it through the
+    nonlinear dynamics to compute the actual state trajectory and other metrics.
+    
+    Args:
+        params (dict): System parameters.
+        settings (Config): Configuration settings.
+        result (dict): Dictionary containing the optimization results.
+        propagation_solver (callable): Function for propagating the system state.
+        
+    Returns:
+        dict: Updated result dictionary containing:
+            - t_full: Full time vector
+            - x_full: Full state trajectory
+            - u_full: Full control trajectory
+            - Original optimization results
+    """
     x = result["x"]
     u = result["u"]
 
