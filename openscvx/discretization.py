@@ -95,9 +95,9 @@ def dVdt(
     dVdt = jnp.zeros_like(V)
     dVdt = dVdt.at[:, i0:i1].set(F)
     dVdt = dVdt.at[:, i1:i2].set(jnp.matmul(sdfdx, V[:, i1:i2].reshape(-1, n_x, n_x)).reshape(-1, n_x * n_x))
-    dVdt = dVdt.at[:, i2:i3].set(jnp.matmul(sdfdx, V[:, i2:i3].reshape(-1, n_x, n_u)).reshape(-1, n_x * n_u))
-    dVdt = dVdt.at[:, i3:i4].set(jnp.matmul(sdfdx, V[:, i3:i4].reshape(-1, n_x, n_u)).reshape(-1, n_x * n_u))
-    dVdt = dVdt.at[:, i4:i5].set(z)
+    dVdt = dVdt.at[:, i2:i3].set((jnp.matmul(sdfdx, V[:, i2:i3].reshape(-1, n_x, n_u)) + dfdu * alpha).reshape(-1, n_x * n_u))
+    dVdt = dVdt.at[:, i3:i4].set((jnp.matmul(sdfdx, V[:, i3:i4].reshape(-1, n_x, n_u)) + dfdu * beta).reshape(-1, n_x * n_u))
+    dVdt = dVdt.at[:, i4:i5].set((jnp.matmul(sdfdx, V[:, i4:i5].reshape(-1, n_x)[..., None]).squeeze(-1) + z).reshape(-1, n_x))
     # fmt: on
 
     return dVdt.reshape(-1)

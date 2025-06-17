@@ -25,9 +25,9 @@ total_time = 75.0  # Total simulation time
 x = State("x", shape=(8,))
 
 # Set bounds on state
-v_max = 800 * 1E3 / 3600  # Maximum velocity in m/s (500 km/h converted to m/s)
+v_max = 800 * 1E3 / 3600  # Maximum velocity in m/s (800 km/h converted to m/s)
 #                      x       y     z      vx      vy      vz     m    t
-x.min = np.array([ -3000,   -3000,    0,  -v_max, -v_max, -v_max, 1535,   0])
+x.min = np.array([ -3000,   -3000,    0,  -v_max, -v_max, -v_max, 1534,   0])
 x.max = np.array([  3000,    3000, 3000,   v_max,  v_max,  v_max, 1905, 2E2])
 
 # Set initial, final, and guess
@@ -73,6 +73,7 @@ constraints = [
     ctcs(lambda x_, u_: jnp.linalg.norm(u_[:3]) - rho_max, idx=1),
     ctcs(lambda x_, u_: jnp.cos((180-40) * jnp.pi/180) - u_[2] / jnp.linalg.norm(u_[:3]), idx=2),
     ctcs(lambda x_, u_: jnp.linalg.norm(jnp.array([x_[0], x_[1]])) - jnp.tan((86) * jnp.pi / 180) * x_[2], idx=3),
+    nodal(lambda x_, u_: u_[:2] == 0, nodes = [-1], convex = True)
 ]
 
 # Define dynamics
@@ -106,7 +107,7 @@ problem = TrajOptProblem(
 )
 
 # Set solver parameters
-problem.settings.prp.dt = 0.1
+problem.settings.prp.dt = 0.01
 
 problem.settings.scp.w_tr_adapt = 1.04
 problem.settings.scp.w_tr = 3e0
