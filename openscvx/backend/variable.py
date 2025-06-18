@@ -16,11 +16,6 @@ class Variable(Expr):
         _max (np.ndarray): Maximum bounds for the variable
         _guess (np.ndarray): Initial guess for the variable trajectory
 
-    Example:
-        >>> var = Variable("position", (3,))
-        >>> var.min = [-1, -1, -1]
-        >>> var.max = [1, 1, 1]
-        >>> var.guess = np.zeros((10, 3))  # 10 time points, 3 dimensions
     """
 
     def __init__(self, name, shape):

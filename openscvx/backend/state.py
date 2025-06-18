@@ -93,8 +93,12 @@ class State(Variable):
 
     Example:
         >>> state = State("position", (3,))
-        >>> state.initial = [Fix(0), Free(1), Minimize(2)]
-        >>> state.final = [Fix(10), Free(5), Maximize(8)]
+        >>> state.initial = np.array([Fix(0), Free(1), 2])
+        >>> state.final = np.array([Fix(10), Free(5), Maximize(8)])
+        >>> state.guess = np.linspace([0, 1, 2], [10, 5, 8], 3)
+        >>> state.min = np.array([0, 0, 10])
+        >>> state.max = np.array([10, 10, 200])
+
     """
 
     def __init__(self, name, shape):
