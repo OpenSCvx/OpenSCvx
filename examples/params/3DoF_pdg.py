@@ -137,5 +137,5 @@ if __name__ == "__main__":
     # plot_scp_animation(results, problem.settings).show()
     # plot_state(results, problem.settings).show()
     # plot_control(results, problem.settings).show()
-    plot_control_norm(results, problem.settings).show()
-    plot_xy_xz_yz(results, problem.settings).show()
+    # plot_control_norm(results, problem.settings).show()
+    # plot_xy_xz_yz(results, problem.settings).show()
