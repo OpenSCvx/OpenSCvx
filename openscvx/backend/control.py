@@ -19,7 +19,7 @@ class Control(Variable):
         >>> control = Control("thrust", (3,))
         >>> control.min = [-1, -1, 0]
         >>> control.max = [1, 1, 10]
-        >>> control.guess = [0, 0, 5]
+        >>> control.guess = np.repeat([[0, 0, 10]], 5, axis=0)
     """
 
     def __init__(self, name, shape):

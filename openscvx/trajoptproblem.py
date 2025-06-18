@@ -253,31 +253,7 @@ class TrajOptProblem:
         io.intro()
 
         # Print problem summary
-        n_nodal_convex = sum(1 for c in self.settings.sim.constraints_nodal if c.convex)
-        n_nodal_nonconvex = sum(1 for c in self.settings.sim.constraints_nodal if not c.convex)
-        n_ctcs = len(self.settings.sim.constraints_ctcs)
-        n_augmented = self.settings.sim.n_states - self.settings.sim.idx_x_true.stop
-        
-        # Calculate the content of each line
-        lines = [
-            "Problem Summary",
-            f"Dimensions: {self.settings.sim.n_states} states ({n_augmented} aug), {self.settings.sim.n_controls} controls, {self.settings.scp.n} nodes",
-            f"Constraints: {n_nodal_convex} conv, {n_nodal_nonconvex} nonconv, {n_ctcs} ctcs",
-            f"Weights: lam_cost={self.settings.scp.lam_cost:4.1f}, w_tr={self.settings.scp.w_tr:4.1f}, lam_vc={self.settings.scp.lam_vc:4.1f}",
-            f"CVX Solver: {self.settings.cvx.solver}, Discretization Solver: {self.settings.dis.solver}"
-        ]
-        
-        # Find the longest line
-        max_width = max(len(line) for line in lines)
-        box_width = max_width + 4  # Add padding for the box borders
-        
-        # Print the box with dynamic width
-        print(f"\n╭{'─' * box_width}╮")
-        print(f"│ {lines[0]:^{max_width}}   │")
-        print(f"├{'─' * box_width}┤")
-        for line in lines[1:]:
-            print(f"│ {line:<{max_width}}   │")
-        print(f"╰{'─' * box_width}╯\n")
+        io.print_problem_summary(self.settings)
 
         # Enable the profiler
         if self.settings.dev.profiling:
@@ -444,7 +420,7 @@ class TrajOptProblem:
             time.sleep(0.1)
 
         # Print bottom footer for solver results as well as total computation time
-        io.footer(self.timing_solve)
+        io.footer()
 
         # Disable the profiler
         if self.settings.dev.profiling:
@@ -467,7 +443,9 @@ class TrajOptProblem:
         t_f_post = time.time()
 
         self.timing_post = t_f_post - t_0_post
-        print("Total Post Processing Time: ", self.timing_post)
+        
+        # Print results summary
+        io.print_results_summary(result, self.timing_post, self.timing_init, self.timing_solve)
 
         # Disable the profiler
         if self.settings.dev.profiling:

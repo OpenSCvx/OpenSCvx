@@ -2,6 +2,12 @@ import numpy as np
 
 
 class Expr:
+    """
+    Base class for symbolic expressions in optimization problems.
+    
+    Note: This class is currently not being used.
+    """
+    
     def __add__(self, other):
         return Add(self, to_expr(other))
 
