@@ -166,7 +166,7 @@ class SimConfig:
         idx_y: slice,
         idx_y_prop: slice,
         idx_s: slice,
-        save_compiled: bool = False,
+        save_compiled: bool = True,
         ctcs_node_intervals: Optional[list] = None,
         constraints_ctcs: Optional[List[Callable]] = None,
         constraints_nodal: Optional[List[Callable]] = None,
@@ -211,6 +211,7 @@ class SimConfig:
             S_u (np.ndarray, optional): Control scaling matrix. Defaults to `None`.
             inv_S_u (np.ndarray, optional): Inverse of the control scaling matrix. Defaults to `None`.
             c_u (np.ndarray, optional): Control offset vector. Defaults to `None`.
+            save_compiled (bool): If True, save and reuse compiled solver functions. Defaults to True.
         """
         # Assign all arguments to self
         self.x = x
