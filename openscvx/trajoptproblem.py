@@ -294,7 +294,16 @@ class TrajOptProblem:
             functions_to_hash.append(constraint.func)
 
         # Get unique source-based hash
-        function_hash = stable_function_hash(functions_to_hash)
+        function_hash = stable_function_hash(
+            functions_to_hash,
+            n_discretization_nodes=self.settings.scp.n,
+            dt=self.settings.prp.dt,
+            total_time=self.settings.sim.total_time,
+            state_max=self.settings.sim.x.max,
+            state_min=self.settings.sim.x.min,
+            control_max=self.settings.sim.u.max,
+            control_min=self.settings.sim.u.min
+        )
 
         solver_dir = Path(".tmp")
         solver_dir.mkdir(parents=True, exist_ok=True)
@@ -304,27 +313,36 @@ class TrajOptProblem:
 
         # Compile the solvers
         if not self.settings.dev.debug:
-            # Check if the compiled file already exists 
-            try:
-                with open(dis_solver_file, "rb") as f:
-                    serial_dis = f.read()
-                # Load the compiled code
-                self.discretization_solver = export.deserialize(serial_dis)
-                print("✓ Loaded existing discretization solver")
-            except FileNotFoundError:
-                print("Compiling discretization solver...")
-                # Extract parameter values and names in order
+            if self.settings.sim.save_compiled:
+                # Check if the compiled file already exists 
+                try:
+                    with open(dis_solver_file, "rb") as f:
+                        serial_dis = f.read()
+                    # Load the compiled code
+                    self.discretization_solver = export.deserialize(serial_dis)
+                    print("✓ Loaded existing discretization solver")
+                except FileNotFoundError:
+                    print("Compiling discretization solver...")
+                    # Extract parameter values and names in order
+                    param_values = [param.value for _, param in self.params.items()]
+                    
+                    self.discretization_solver = export.export(jax.jit(self.discretization_solver))(
+                        np.ones((self.settings.scp.n, self.settings.sim.n_states)),
+                        np.ones((self.settings.scp.n, self.settings.sim.n_controls)),
+                        *param_values
+                    )
+                    # Serialize and Save the compiled code in a temp directory
+                    with open(dis_solver_file, "wb") as f:
+                        f.write(self.discretization_solver.serialize())
+                    print("✓ Discretization solver compiled and saved")
+            else:
+                print("Compiling discretization solver (not saving/loading from disk)...")
                 param_values = [param.value for _, param in self.params.items()]
-                
                 self.discretization_solver = export.export(jax.jit(self.discretization_solver))(
                     np.ones((self.settings.scp.n, self.settings.sim.n_states)),
                     np.ones((self.settings.scp.n, self.settings.sim.n_controls)),
                     *param_values
                 )
-                # Serialize and Save the compiled code in a temp directory
-                with open(dis_solver_file, "wb") as f:
-                    f.write(self.discretization_solver.serialize())
-                print("✓ Discretization solver compiled and saved")
 
         # Compile the discretization solver and save it
         dtau = 1.0 / (self.settings.scp.n - 1) 
@@ -333,17 +351,40 @@ class TrajOptProblem:
         self.settings.prp.max_tau_len = int(dt_max / self.settings.prp.dt) + 2
 
         # Check if the compiled file already exists 
-        try:
-            with open(prop_solver_file, "rb") as f:
-                serial_prop = f.read()
-            # Load the compiled code
-            self.propagation_solver = export.deserialize(serial_prop)
-            print("✓ Loaded existing propagation solver")
-        except FileNotFoundError:
-            print("Compiling propagation solver...")
-            # Extract parameter values and names in order
-            param_values = [param.value for _, param in self.params.items()]
+        if self.settings.sim.save_compiled:
+            try:
+                with open(prop_solver_file, "rb") as f:
+                    serial_prop = f.read()
+                # Load the compiled code
+                self.propagation_solver = export.deserialize(serial_prop)
+                print("✓ Loaded existing propagation solver")
+            except FileNotFoundError:
+                print("Compiling propagation solver...")
+                # Extract parameter values and names in order
+                param_values = [param.value for _, param in self.params.items()]
 
+                propagation_solver = export.export(jax.jit(self.propagation_solver))(
+                    np.ones((self.settings.sim.n_states_prop)),                # x_0
+                    (0.0, 0.0),                                                # time span
+                    np.ones((1, self.settings.sim.n_controls)),                # controls_current
+                    np.ones((1, self.settings.sim.n_controls)),                # controls_next
+                    np.ones((1, 1)),                                           # tau_0
+                    np.ones((1, 1)).astype("int"),                             # segment index
+                    0,                                                         # idx_s_stop
+                    np.ones((self.settings.prp.max_tau_len,)),                 # save_time (tau_cur_padded)
+                    np.ones((self.settings.prp.max_tau_len,), dtype=bool),     # mask_padded (boolean mask)
+                    *param_values,                                             # additional parameters
+                )
+
+                # Serialize and Save the compiled code in a temp directory
+                self.propagation_solver = propagation_solver
+
+                with open(prop_solver_file, "wb") as f:
+                    f.write(self.propagation_solver.serialize())
+                print("✓ Propagation solver compiled and saved")
+        else:
+            print("Compiling propagation solver (not saving/loading from disk)...")
+            param_values = [param.value for _, param in self.params.items()]
             propagation_solver = export.export(jax.jit(self.propagation_solver))(
                 np.ones((self.settings.sim.n_states_prop)),                # x_0
                 (0.0, 0.0),                                                # time span
@@ -356,13 +397,7 @@ class TrajOptProblem:
                 np.ones((self.settings.prp.max_tau_len,), dtype=bool),     # mask_padded (boolean mask)
                 *param_values,                                             # additional parameters
             )
-
-            # Serialize and Save the compiled code in a temp directory
             self.propagation_solver = propagation_solver
-
-            with open(prop_solver_file, "wb") as f:
-                f.write(self.propagation_solver.serialize())
-            print("✓ Propagation solver compiled and saved")
 
         # Initialize the PTR loop
         print("Initializing the SCvx Subproblem Solver...")
