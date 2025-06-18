@@ -17,6 +17,7 @@ def make_constraint(
     nodes=(0, 10),
     grad_x: float = None,
     grad_u: float = None,
+    scaling: float = 1.0,
 ) -> CTCSConstraint:
     """Helper to create a CTCSConstraint whose func always returns `value`,
     and whose grad_f_x / grad_f_u return `grad_x` / `grad_u` if provided."""
@@ -27,6 +28,7 @@ def make_constraint(
         idx=idx,
         grad_f_x=(lambda x, u: jnp.array(grad_x)) if grad_x is not None else None,
         grad_f_u=(lambda x, u: jnp.array(grad_u)) if grad_u is not None else None,
+        scaling=scaling,
     )
 
 
@@ -130,3 +132,10 @@ def test_get_g_funcs_grouping_and_grad_flags():
     # c3 has no grads so both should be None
     assert v2.g_grad_x is None
     assert v2.g_grad_u is None
+
+
+def test_ctcsconstraint_scaling():
+    c = make_constraint(2.0, scaling=5.0)
+    # func returns 2.0, penalty is identity, scaling is 5.0, so output should be 10.0
+    result = c(jnp.zeros(1), jnp.zeros(1), node=5)
+    assert float(result) == pytest.approx(10.0)

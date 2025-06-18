@@ -39,6 +39,8 @@ class CTCSConstraint:
         grad_f_u (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
             User-supplied gradient of `func` w.r.t. input `u`, signature (x, u) -> jacobian.
             If None, computed via `jax.jacfwd(func, argnums=1)` during state augmentation.
+        scaling (float):
+            Scaling factor to apply to the penalized sum.
     """
     func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]  # takes (x_expr, u_expr, *param_exprs)
     penalty: Callable[[jnp.ndarray], jnp.ndarray]
@@ -46,6 +48,7 @@ class CTCSConstraint:
     idx: Optional[int] = None
     grad_f_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
     grad_f_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
+    scaling: float = 1.0
 
     def __post_init__(self):
         """
@@ -92,7 +95,7 @@ class CTCSConstraint:
         return cond(
             jnp.all((self.nodes[0] <= node) & (node < self.nodes[1]))
             if self.nodes is not None else True,
-            lambda _: jnp.sum(self.penalty(self.func(x_expr, u_expr, **filtered_params))),
+            lambda _: self.scaling * jnp.sum(self.penalty(self.func(x_expr, u_expr, **filtered_params))),
             lambda _: 0.0,
             operand=None,
         )
@@ -106,6 +109,7 @@ def ctcs(
     idx: Optional[int] = None,
     grad_f_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
     grad_f_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
+    scaling: float = 1.0,
 ) -> Union[Callable, CTCSConstraint]:
     """
     Decorator to build a CTCSConstraint from a raw constraint function.
@@ -149,6 +153,8 @@ def ctcs(
         grad_f_u (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
             User-supplied gradient of `func` w.r.t input `u`.
             If None, computed via `jax.jacfwd(func, argnums=1)` during state augmentation.
+        scaling (float):
+            Scaling factor to apply to the penalized sum.
 
     Returns:
         Union[Callable, CTCSConstraint]
@@ -188,6 +194,7 @@ def ctcs(
             idx=idx,
             grad_f_x=grad_f_x,
             grad_f_u=grad_f_u,
+            scaling=scaling,
         )
         return constraint
 

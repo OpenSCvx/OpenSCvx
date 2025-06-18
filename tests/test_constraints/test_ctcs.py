@@ -125,3 +125,12 @@ def test_grad_functions_wrapped_and_callable():
 
     assert wrapped_fx.item() == pytest.approx(grad_x(x, u).item())
     assert wrapped_fu.item() == pytest.approx(grad_u(x, u).item())
+
+
+def test_scaling_argument_applies_correctly():
+    @ctcs(nodes=(0, 5), penalty="squared_relu", scaling=3.0)
+    def f(x, u):
+        return jnp.array([2.0])
+    # squared relu of 2.0 is 4.0, times scaling 3.0 is 12.0
+    result = f(jnp.zeros(1), jnp.zeros(1), node=2)
+    assert float(result) == pytest.approx(12.0)

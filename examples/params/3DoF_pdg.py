@@ -69,8 +69,8 @@ rho_max = n_eng * T2 * np.cos(theta.value) # Maximum thrust-to-weight ratio
 constraints = [
     ctcs(lambda x_, u_: x_ - x.true.max, idx=0),
     ctcs(lambda x_, u_: x.true.min - x_, idx=0),
-    ctcs(lambda x_, u_: rho_min - jnp.linalg.norm(u_[:3]), idx=1),
-    ctcs(lambda x_, u_: jnp.linalg.norm(u_[:3]) - rho_max, idx=1),
+    ctcs(lambda x_, u_: rho_min - jnp.linalg.norm(u_[:3]), idx=1, scaling=1E-5),
+    ctcs(lambda x_, u_: jnp.linalg.norm(u_[:3]) - rho_max, idx=1, scaling=1E-5),
     ctcs(lambda x_, u_: jnp.cos((180-40) * jnp.pi/180) - u_[2] / jnp.linalg.norm(u_[:3]), idx=2),
     ctcs(lambda x_, u_: jnp.linalg.norm(jnp.array([x_[0], x_[1]])) - jnp.tan((86) * jnp.pi / 180) * x_[2], idx=3),
     nodal(lambda x_, u_: u_[:2] == 0, nodes = [-1], convex = True)

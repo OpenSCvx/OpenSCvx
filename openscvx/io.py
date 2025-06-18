@@ -82,12 +82,12 @@ def print_results_summary(result, timing_post, timing_init, timing_solve):
     # Handle CTCS violation - display as 1D array
     if hasattr(ctcs_violation, 'size'):
         if ctcs_violation.size == 1:
-            ctcs_violation_str = f"[{ctcs_violation.item():.6f}]"
+            ctcs_violation_str = f"[{ctcs_violation.item():.2e}]"
         else:
             # Display as 1D array
-            ctcs_violation_str = f"[{', '.join([f'{v:.6f}' for v in ctcs_violation])}]"
+            ctcs_violation_str = f"[{', '.join([f'{v:.2e}' for v in ctcs_violation])}]"
     else:
-        ctcs_violation_str = f"[{ctcs_violation:.6f}]"
+        ctcs_violation_str = f"[{ctcs_violation:.2e}]"
     
     # Calculate total computation time
     total_time = (timing_init or 0.0) + (timing_solve or 0.0) + timing_post
