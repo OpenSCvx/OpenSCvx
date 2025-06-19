@@ -19,16 +19,16 @@ from examples.plotting import plot_scp_animation, plot_control_norm, plot_xy_xz_
 from openscvx.plotting import plot_state, plot_control
 
 n = 30
-total_time = 75.0  # Total simulation time
+total_time = 95.0  # Total simulation time
 
 # Define State and Control symbolic variables
 x = State("x", shape=(8,))
 
 # Set bounds on state
-v_max = 800 * 1E3 / 3600  # Maximum velocity in m/s (800 km/h converted to m/s)
+v_max = 500 * 1E3 / 3600  # Maximum velocity in m/s (800 km/h converted to m/s)
 #                      x       y     z      vx      vy      vz     m    t
-x.min = np.array([ -3000,   -3000,    0,  -v_max, -v_max, -v_max, 1534,   0])
-x.max = np.array([  3000,    3000, 3000,   v_max,  v_max,  v_max, 1905, 2E2])
+x.min = np.array([ -3000,   -3000,    0,  -v_max, -v_max, -v_max, 1505,   0])
+x.max = np.array([  3000,    3000, 3000,   v_max,  v_max,  v_max, 1905, 1E2])
 
 # Set initial, final, and guess
 x.initial = np.array([2000, 0, 1500,  80,  30,  -75,           1905,                  0])
@@ -69,11 +69,11 @@ rho_max = n_eng * T2 * np.cos(theta.value) # Maximum thrust-to-weight ratio
 constraints = [
     ctcs(lambda x_, u_: x_ - x.true.max, idx=0),
     ctcs(lambda x_, u_: x.true.min - x_, idx=0),
-    ctcs(lambda x_, u_: rho_min - jnp.linalg.norm(u_[:3]), idx=1, scaling=1E-5),
-    ctcs(lambda x_, u_: jnp.linalg.norm(u_[:3]) - rho_max, idx=1, scaling=1E-5),
+    ctcs(lambda x_, u_: rho_min - jnp.linalg.norm(u_[:3]), idx=1, scaling=1E-4),
+    ctcs(lambda x_, u_: jnp.linalg.norm(u_[:3]) - rho_max, idx=1, scaling=1E-4),
     ctcs(lambda x_, u_: jnp.cos((180-40) * jnp.pi/180) - u_[2] / jnp.linalg.norm(u_[:3]), idx=2),
     ctcs(lambda x_, u_: jnp.linalg.norm(jnp.array([x_[0], x_[1]])) - jnp.tan((86) * jnp.pi / 180) * x_[2], idx=3),
-    nodal(lambda x_, u_: u_[:2] == 0, nodes = [-1], convex = True)
+    # nodal(lambda x_, u_: u_[:2] == 0, nodes = [-1], convex = True)
 ]
 
 # Define dynamics
@@ -103,20 +103,37 @@ problem = TrajOptProblem(
     idx_time=7,  # Index of time variable in state vector
     constraints=constraints,
     N=n,
-    licq_max=1e-4,
+    licq_max=1e-6,
 )
+
+# Apply custom scaling to the mass term (assume mass is at index 6 in the state vector)
+problem.settings.sim.scaling_x_overrides = [
+    # (1800, 1505, 6),
+    # (200, 0, 7)
+]
+
+# problem.settings.sim.scaling_u_overrides = [
+#     # Example: (upper_bound, lower_bound, idx)
+#     (n_eng * T_bar, -n_eng * T_bar, 0),  # Custom scaling for control 0
+#     (n_eng * T_bar, -n_eng * T_bar, 1),  # Custom scaling for control 1
+#     (n_eng * T_bar, -n_eng * T_bar, 2),  # Custom scaling for control 2
+# ]
+
+
 
 # Set solver parameters
 problem.settings.prp.dt = 0.01
 
+problem.settings.sim.save_compiled = False
+
 problem.settings.scp.w_tr_adapt = 1.04
-problem.settings.scp.w_tr = 3e0
-problem.settings.scp.lam_cost = 1e2
-problem.settings.scp.lam_vc = 1e0
-problem.settings.scp.ep_tr = 1e-6
-problem.settings.scp.ep_vc = 1e-10
-# problem.settings.scp.uniform_time_grid = True
-# problem.settings.scp.k_max = 30
+problem.settings.scp.w_tr = 2e0
+problem.settings.scp.lam_cost = 2.5e-1
+problem.settings.scp.lam_vc = 1.2e0
+# problem.settings.scp.ep_tr = 5e-3
+# problem.settings.scp.ep_vc = 1e-10
+
+# problem.settings.dis.solver = "Dopri8"
 
 problem.settings.cvx.solver = "CLARABEL"
 problem.settings.cvx.solver_args = {"enforce_dpp": True}
@@ -133,9 +150,9 @@ if __name__ == "__main__":
     results = problem.post_process(results)
     results.update(plotting_dict)
 
-    plot_animation_3DoF_rocket(results, problem.settings).show()
+    # plot_animation_3DoF_rocket(results, problem.settings).show()
     # plot_scp_animation(results, problem.settings).show()
     # plot_state(results, problem.settings).show()
     # plot_control(results, problem.settings).show()
-    # plot_control_norm(results, problem.settings).show()
-    # plot_xy_xz_yz(results, problem.settings).show()
+    plot_control_norm(results, problem.settings).show()
+    plot_xy_xz_yz(results, problem.settings).show()
