@@ -185,17 +185,6 @@ class TrajOptProblem:
         if scp is None:
             scp = ScpConfig(
                 n=N,
-                k_max=200,
-                w_tr=1e1,  # Weight on the Trust Reigon
-                lam_cost=1e1,  # Weight on the Nonlinear Cost
-                lam_vc=1e2,  # Weight on the Virtual Control Objective
-                lam_vb=0e0,  # Weight on the Virtual Buffer Objective (only for penalized nodal constraints)
-                ep_tr=1e-4,  # Trust Region Tolerance
-                ep_vb=1e-4,  # Virtual Control Tolerance
-                ep_vc=1e-8,  # Virtual Control Tolerance for CTCS
-                cost_drop=4,  # SCP iteration to relax minimal final time objective
-                cost_relax=0.5,  # Minimal Time Relaxation Factor
-                w_tr_adapt=1.2,  # Trust Region Adaptation Factor
                 w_tr_max_scaling_factor=1e2,  # Maximum Trust Region Weight
             )
         else:
