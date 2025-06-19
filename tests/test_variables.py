@@ -4,6 +4,7 @@ import pytest
 
 from openscvx.backend.state import State, Free, Minimize, Fix
 from openscvx.backend.control import Control
+from openscvx.config import SimConfig, get_affine_scaling_matrices
 
 @pytest.mark.parametrize("shape", [(3,), (2, 4), (5, 5, 5)])
 def test_state_creation(shape):
@@ -291,3 +292,101 @@ def test_append_non_augmented_control(shapes):
         np.full((m, n_main), 0.5),
         np.full((m, n_new), 1.5)
     ], axis=1))
+
+class DummyState:
+    def __init__(self, min_val, max_val):
+        self.min = np.array(min_val)
+        self.max = np.array(max_val)
+
+class DummyControl:
+    def __init__(self, min_val, max_val):
+        self.min = np.array(min_val)
+        self.max = np.array(max_val)
+
+def test_scaling_overrides():
+    # Dummy bounds
+    state_min = [0, -1, -2]
+    state_max = [10, 1, 2]
+    control_min = [-2, -3]
+    control_max = [2, 3]
+
+    x = DummyState(state_min, state_max)
+    x_prop = DummyState(state_min, state_max)
+    u = DummyControl(control_min, control_max)
+
+    # No overrides: should use min/max for all
+    sim = SimConfig(
+        x=x,
+        x_prop=x_prop,
+        u=u,
+        total_time=1.0,
+        idx_x_true=slice(0,3),
+        idx_x_true_prop=slice(0,3),
+        idx_u_true=slice(0,2),
+        idx_t=slice(0,1),
+        idx_y=slice(0,0),
+        idx_y_prop=slice(0,0),
+        idx_s=slice(0,0),
+    )
+    S_x_expected, c_x_expected = get_affine_scaling_matrices(3, np.array(state_min), np.array(state_max))
+    S_u_expected, c_u_expected = get_affine_scaling_matrices(2, np.array(control_min), np.array(control_max))
+    np.testing.assert_allclose(sim.S_x, S_x_expected)
+    np.testing.assert_allclose(sim.c_x, c_x_expected)
+    np.testing.assert_allclose(sim.S_u, S_u_expected)
+    np.testing.assert_allclose(sim.c_u, c_u_expected)
+
+    # With custom scaling overrides for state 0 and control 1
+    scaling_x_overrides = [
+        (5, -5, 0),                # Custom scale for state 0
+        ([2, 3], [-2, -3], [1, 2]) # Custom scale for states 1 and 2
+    ]
+    scaling_u_overrides = [
+        (10, -10, 0),              # Custom scale for control 0
+        (30, -30, 1)               # Custom scale for control 1
+    ]
+    sim2 = SimConfig(
+        x=x,
+        x_prop=x_prop,
+        u=u,
+        total_time=1.0,
+        idx_x_true=slice(0,3),
+        idx_x_true_prop=slice(0,3),
+        idx_u_true=slice(0,2),
+        idx_t=slice(0,1),
+        idx_y=slice(0,0),
+        idx_y_prop=slice(0,0),
+        idx_s=slice(0,0),
+        scaling_x_overrides=scaling_x_overrides,
+        scaling_u_overrides=scaling_u_overrides,
+    )
+    # Expected: all states/controls use custom scaling
+    S_x_expected2, c_x_expected2 = get_affine_scaling_matrices(3, np.array([-5, -2, -3]), np.array([5, 2, 3]))
+    S_u_expected2, c_u_expected2 = get_affine_scaling_matrices(2, np.array([-10, -30]), np.array([10, 30]))
+    np.testing.assert_allclose(sim2.S_x, S_x_expected2)
+    np.testing.assert_allclose(sim2.c_x, c_x_expected2)
+    np.testing.assert_allclose(sim2.S_u, S_u_expected2)
+    np.testing.assert_allclose(sim2.c_u, c_u_expected2)
+
+    # Partial override: only state 1, rest use min/max
+    scaling_x_overrides_partial = [
+        (100, -100, 1)
+    ]
+    sim3 = SimConfig(
+        x=x,
+        x_prop=x_prop,
+        u=u,
+        total_time=1.0,
+        idx_x_true=slice(0,3),
+        idx_x_true_prop=slice(0,3),
+        idx_u_true=slice(0,2),
+        idx_t=slice(0,1),
+        idx_y=slice(0,0),
+        idx_y_prop=slice(0,0),
+        idx_s=slice(0,0),
+        scaling_x_overrides=scaling_x_overrides_partial,
+    )
+    lower_x = np.array([0, -100, -2])
+    upper_x = np.array([10, 100, 2])
+    S_x_expected3, c_x_expected3 = get_affine_scaling_matrices(3, lower_x, upper_x)
+    np.testing.assert_allclose(sim3.S_x, S_x_expected3)
+    np.testing.assert_allclose(sim3.c_x, c_x_expected3)
