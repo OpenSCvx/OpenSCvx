@@ -80,7 +80,10 @@ def OptimalControlProblem(settings: Config):
             else:
                 nodes = constraint.nodes
 
-            if constraint.convex:
+            if constraint.convex and constraint.vectorized:
+                constr += [constraint(x_nonscaled, u_nonscaled)]
+                
+            elif constraint.convex:
                 constr += [constraint(x_nonscaled[node], u_nonscaled[node]) for node in nodes]
 
             elif not constraint.convex:
