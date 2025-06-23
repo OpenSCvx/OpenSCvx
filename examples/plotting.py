@@ -3,6 +3,9 @@ import random
 import plotly.graph_objects as go
 import numpy as np
 import pickle
+import pyqtgraph as pg
+import pyqtgraph.opengl as gl
+from PyQt5 import QtWidgets
 
 from openscvx.utils import qdcm, get_kp_pose
 from openscvx.config import Config
@@ -41,36 +44,47 @@ def plot_dubins_car_disjoint(results, params):
 
     x = results["x_full"][:,0]
     y = results["x_full"][:,1]
+    # Use the forward velocity from the control input
+    if "u_full" in results:
+        velocity = results["u_full"][:, 0]
+    else:
+        velocity = np.zeros_like(x)
 
-    # Plot the trajectory
-    fig.add_trace(go.Scatter(x=x, y=y, mode='lines', line=dict(color='blue', width=2), name='Trajectory'))
+    # Plot the trajectory colored by velocity
+    fig.add_trace(go.Scatter(
+        x=x, y=y,
+        mode='lines+markers',
+        line=dict(color='rgba(0,0,0,0)'),  # Hide default line
+        marker=dict(
+            color=velocity,
+            colorscale='Viridis',
+            size=6,
+            colorbar=dict(title='Velocity'),
+            showscale=True
+        ),
+        name='Trajectory (velocity)'
+    ))
 
     # Plot waypoints wp1 and wp2 as circles and their centers
     if "wp1_center" in results and "wp1_radius" in results:
         wp1_center = results["wp1_center"]
         wp1_radius = results["wp1_radius"]
-        # Draw the circle
         theta = np.linspace(0, 2 * np.pi, 100)
         circle_x = wp1_center[0] + wp1_radius * np.cos(theta)
         circle_y = wp1_center[1] + wp1_radius * np.sin(theta)
         fig.add_trace(go.Scatter(x=circle_x, y=circle_y, mode='lines', line=dict(color='green', width=2, dash='dash'), name='Waypoint 1 Area'))
-        # Draw the center
         fig.add_trace(go.Scatter(x=[wp1_center[0]], y=[wp1_center[1]], mode='markers', marker=dict(color='green', size=12, symbol='x'), name='Waypoint 1 Center'))
 
     if "wp2_center" in results and "wp2_radius" in results:
         wp2_center = results["wp2_center"]
         wp2_radius = results["wp2_radius"]
-        # Draw the circle
         theta = np.linspace(0, 2 * np.pi, 100)
         circle_x = wp2_center[0] + wp2_radius * np.cos(theta)
         circle_y = wp2_center[1] + wp2_radius * np.sin(theta)
         fig.add_trace(go.Scatter(x=circle_x, y=circle_y, mode='lines', line=dict(color='orange', width=2, dash='dash'), name='Waypoint 2 Area'))
-        # Draw the center
         fig.add_trace(go.Scatter(x=[wp2_center[0]], y=[wp2_center[1]], mode='markers', marker=dict(color='orange', size=12, symbol='x'), name='Waypoint 2 Center'))
 
     fig.update_layout(title='Dubins Car Trajectory with Waypoints', title_x=0.5, template='plotly_dark')
-
-    # Set axis to be equal
     fig.update_xaxes(scaleanchor="y", scaleratio=1)
     return fig
 
@@ -2268,3 +2282,237 @@ def plot_animation_3DoF_rocket(result: dict,
     )
 
     return fig
+
+def plot_animation_pyqtgraph(result, params, step=2):
+    import sys
+    from scipy.spatial.transform import Rotation as R
+    from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QWidget, QLabel
+    from PyQt5.QtCore import Qt
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
+
+    # Main window and layout
+    main_widget = QWidget()
+    main_layout = QVBoxLayout(main_widget)
+    w = gl.GLViewWidget()
+    w.setWindowTitle('Quadrotor Simulation (pyqtgraph)')
+    w.setGeometry(0, 110, 1280, 720)
+    w.setCameraPosition(distance=150, elevation=20, azimuth=45)
+    main_layout.addWidget(w)
+
+    # Controls
+    controls_layout = QHBoxLayout()
+    play_btn = QPushButton('Play')
+    pause_btn = QPushButton('Pause')
+    slider = QSlider(Qt.Horizontal)
+    slider.setMinimum(0)
+    slider.setSingleStep(1)
+    controls_layout.addWidget(play_btn)
+    controls_layout.addWidget(pause_btn)
+    controls_layout.addWidget(QLabel('Time:'))
+    controls_layout.addWidget(slider)
+    main_layout.addLayout(controls_layout)
+    main_widget.show()
+
+    drone_positions = result["x_full"][:, :3]
+    drone_velocities = result["x_full"][:, 3:6]
+    drone_attitudes = result["x_full"][:, 6:10] if result["x_full"].shape[1] >= 10 else None
+    velocity_norm = np.linalg.norm(drone_velocities, axis=1)
+    n_points = drone_positions.shape[0]
+    indices = np.array(list(range(n_points-1)[::step]) + [n_points-1])
+    slider.setMaximum(len(indices)-1)
+
+    cmap = pg.colormap.get('viridis')
+    vmin, vmax = velocity_norm.min(), velocity_norm.max()
+    normed_vel = (velocity_norm - vmin) / (vmax - vmin + 1e-8)
+    colors = cmap.map(normed_vel, mode='float')
+
+    # Thicker trajectory line
+    traj_line = gl.GLLinePlotItem(pos=np.zeros((0, 3)), color=np.ones((0, 4)), width=5, antialias=True)
+    w.addItem(traj_line)
+    drone_dot = gl.GLScatterPlotItem(pos=np.zeros((1, 3)), color=(1, 1, 1, 1), size=10)
+    w.addItem(drone_dot)
+
+    axis_items = [gl.GLLinePlotItem(width=3) for _ in range(3)]
+    for item in axis_items:
+        w.addItem(item)
+    axis_colors = [(1,0,0,1), (0,1,0,1), (0,0,1,1)]
+
+    # Add a nice ground grid
+    grid_size = 200
+    grid_spacing = 20
+    grid_lines = []
+    for x in range(-grid_size, grid_size+1, grid_spacing):
+        pts = np.array([[x, -grid_size, 0], [x, grid_size, 0]])
+        line = gl.GLLinePlotItem(pos=pts, color=(0.7,0.7,0.7,0.5), width=1, antialias=True)
+        w.addItem(line)
+        grid_lines.append(line)
+    for y in range(-grid_size, grid_size+1, grid_spacing):
+        pts = np.array([[-grid_size, y, 0], [grid_size, y, 0]])
+        line = gl.GLLinePlotItem(pos=pts, color=(0.7,0.7,0.7,0.5), width=1, antialias=True)
+        w.addItem(line)
+        grid_lines.append(line)
+
+    obstacle_items = []
+    if "obstacles_centers" in result and "obstacles_radii" in result and "obstacles_axes" in result:
+        for center, axes, radius in zip(result['obstacles_centers'], result['obstacles_axes'], result['obstacles_radii']):
+            # Create a sphere mesh and transform it to an ellipsoid
+            sphere_mesh = gl.MeshData.sphere(rows=20, cols=40)
+            verts = sphere_mesh.vertexes()
+            verts = verts * radius  # scale to ellipsoid radii
+            verts = (axes @ verts.T).T  # rotate
+            verts = verts + center  # translate
+            sphere_mesh.setVertexes(verts)
+            obstacle = gl.GLMeshItem(meshdata=sphere_mesh, smooth=True, color=(1,0,0,0.3), shader='shaded', drawEdges=False, glOptions='translucent')
+            w.addItem(obstacle)
+            obstacle_items.append(obstacle)
+
+    gate_items = []
+    if "vertices" in result:
+        for vertices in result["vertices"]:
+            gate = gl.GLLinePlotItem(pos=np.array(vertices + [vertices[0]]), color=(0,0,1,1), width=5, antialias=True)
+            w.addItem(gate)
+            gate_items.append(gate)
+
+    subject_lines = []
+    subject_dots = []
+    if "init_poses" in result or "moving_subject" in result:
+        if "init_poses" in result:
+            subs_positions, _, _, _ = full_subject_traj_time(result, params)
+        else:
+            subs_positions, _, _, _ = full_subject_traj_time(result, params)
+        for sub_traj in subs_positions:
+            line = gl.GLLinePlotItem(pos=np.zeros((0,3)), color=(1,0,0,1), width=3)
+            dot = gl.GLScatterPlotItem(pos=np.zeros((1,3)), color=(1,0,0,1), size=10)
+            w.addItem(line)
+            w.addItem(dot)
+            subject_lines.append(line)
+            subject_dots.append(dot)
+
+    range_spheres = []
+    if "min_range" in result and "max_range" in result and "init_poses" in result:
+        n = 20
+        u = np.linspace(0, 2 * np.pi, n)
+        v = np.linspace(0, np.pi, n)
+        x = np.outer(np.cos(u), np.sin(v))
+        y = np.outer(np.sin(u), np.sin(v))
+        z = np.outer(np.ones(np.size(u)), np.cos(v))
+        for sub_traj in subs_positions:
+            min_sphere = gl.GLMeshItem(meshdata=gl.MeshData.sphere(rows=10, cols=20, radius=result["min_range"]), color=(1,0,0,0.2), smooth=True, shader='shaded', drawEdges=False)
+            max_sphere = gl.GLMeshItem(meshdata=gl.MeshData.sphere(rows=10, cols=20, radius=result["max_range"]), color=(0,0,1,0.2), smooth=True, shader='shaded', drawEdges=False)
+            w.addItem(min_sphere)
+            w.addItem(max_sphere)
+            range_spheres.append((min_sphere, max_sphere))
+
+    # Viewcone as a transparent surface
+    viewcone_mesh = None
+    cone_meshdata = None
+    if drone_attitudes is not None and "alpha_x" in result and "alpha_y" in result and "R_sb" in result:
+        n_cone = 40
+        theta = np.linspace(0, 2*np.pi, n_cone)
+        alpha_x = result["alpha_x"]
+        alpha_y = result["alpha_y"]
+        A = np.diag([1 / np.tan(np.pi / alpha_y), 1 / np.tan(np.pi / alpha_x)])
+        # Make a circle in the sensor frame, scale Z for a larger cone
+        cone_length = 30.0  # Make the cone longer
+        circle = np.stack([np.cos(theta), np.sin(theta)])
+        z = np.linalg.norm(A @ circle, axis=0)
+        X = circle[0] / z
+        Y = circle[1] / z
+        Z = np.ones_like(X)
+        base_points = np.stack([X, Y, Z], axis=1) * cone_length
+        apex = np.array([[0, 0, 0]])
+        vertices = np.vstack([apex, base_points])
+        faces = []
+        for i in range(1, n_cone):
+            faces.append([0, i, i+1])
+        faces.append([0, n_cone, 1])
+        faces = np.array(faces)
+        cone_meshdata = gl.MeshData(vertexes=vertices, faces=faces)
+        viewcone_mesh = gl.GLMeshItem(meshdata=cone_meshdata, smooth=True, color=(1,0,0,0.3), shader='shaded', drawEdges=False, glOptions='translucent')
+        w.addItem(viewcone_mesh)
+
+    ptr = [0]
+    playing = [False]
+
+    def update():
+        i = ptr[0]
+        if i >= len(indices):
+            timer.stop()
+            playing[0] = False
+            play_btn.setEnabled(True)
+            pause_btn.setEnabled(False)
+            return
+        slider.blockSignals(True)
+        slider.setValue(i)
+        slider.blockSignals(False)
+        idx = indices[:i+1]
+        pos = drone_positions[idx]
+        col = colors[idx]
+        traj_line.setData(pos=pos, color=col)
+        drone_dot.setData(pos=pos[-1:], color=(1, 1, 1, 1))
+        if drone_attitudes is not None:
+            att = drone_attitudes[indices[i]]
+            r = R.from_quat([att[1], att[2], att[3], att[0]])
+            rotmat = r.as_matrix()
+            axes = 20 * np.eye(3)
+            axes_rot = rotmat @ axes
+            for k in range(3):
+                axis_pts = np.stack([drone_positions[indices[i]], drone_positions[indices[i]] + axes_rot[:,k]])
+                axis_items[k].setData(pos=axis_pts, color=axis_colors[k])
+        if "init_poses" in result or "moving_subject" in result:
+            for j, sub_traj in enumerate(subs_positions):
+                subject_lines[j].setData(pos=sub_traj[:indices[i]+1], color=(1,0,0,1))
+                subject_dots[j].setData(pos=sub_traj[indices[i]:indices[i]+1], color=(1,0,0,1))
+                if j < len(range_spheres):
+                    min_sphere, max_sphere = range_spheres[j]
+                    min_sphere.resetTransform()
+                    max_sphere.resetTransform()
+                    min_sphere.translate(*sub_traj[indices[i]])
+                    max_sphere.translate(*sub_traj[indices[i]])
+        # Update viewcone mesh
+        if viewcone_mesh is not None and drone_attitudes is not None:
+            att = drone_attitudes[indices[i]]
+            r = R.from_quat([att[1], att[2], att[3], att[0]])
+            rotmat = r.as_matrix()
+            R_sb = result["R_sb"]
+            # Transform cone vertices
+            verts = cone_meshdata.vertexes()
+            verts_tf = (rotmat @ R_sb.T @ verts.T).T + drone_positions[indices[i]]
+            viewcone_mesh.setMeshData(vertexes=verts_tf, faces=cone_meshdata.faces())
+        ptr[0] += 1
+
+    def set_frame(i):
+        ptr[0] = i
+        update()
+
+    timer = pg.QtCore.QTimer()
+    timer.timeout.connect(update)
+    timer.setInterval(30)
+
+    def play():
+        if not playing[0]:
+            playing[0] = True
+            play_btn.setEnabled(False)
+            pause_btn.setEnabled(True)
+            timer.start()
+
+    def pause():
+        playing[0] = False
+        play_btn.setEnabled(True)
+        pause_btn.setEnabled(False)
+        timer.stop()
+
+    play_btn.clicked.connect(play)
+    pause_btn.clicked.connect(pause)
+    slider.valueChanged.connect(set_frame)
+    pause_btn.setEnabled(False)
+
+    main_widget.setWindowTitle('Quadrotor Simulation (pyqtgraph)')
+    main_widget.resize(1280, 800)
+
+    update()  # Draw initial frame
+
+    if not hasattr(QtWidgets.QApplication.instance(), 'exec_'):
+        app.exec()
+    else:
+        QtWidgets.QApplication.instance().exec_()
