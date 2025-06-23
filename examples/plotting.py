@@ -35,6 +35,45 @@ def plot_dubins_car(results, params):
     fig.update_xaxes(scaleanchor="y", scaleratio=1)
     return fig
 
+def plot_dubins_car_disjoint(results, params):
+    # Plot the trajectory of the Dubins car, but show wp1 and wp2 as circles with centers and radii
+    fig = go.Figure()
+
+    x = results["x_full"][:,0]
+    y = results["x_full"][:,1]
+
+    # Plot the trajectory
+    fig.add_trace(go.Scatter(x=x, y=y, mode='lines', line=dict(color='blue', width=2), name='Trajectory'))
+
+    # Plot waypoints wp1 and wp2 as circles and their centers
+    if "wp1_center" in results and "wp1_radius" in results:
+        wp1_center = results["wp1_center"]
+        wp1_radius = results["wp1_radius"]
+        # Draw the circle
+        theta = np.linspace(0, 2 * np.pi, 100)
+        circle_x = wp1_center[0] + wp1_radius * np.cos(theta)
+        circle_y = wp1_center[1] + wp1_radius * np.sin(theta)
+        fig.add_trace(go.Scatter(x=circle_x, y=circle_y, mode='lines', line=dict(color='green', width=2, dash='dash'), name='Waypoint 1 Area'))
+        # Draw the center
+        fig.add_trace(go.Scatter(x=[wp1_center[0]], y=[wp1_center[1]], mode='markers', marker=dict(color='green', size=12, symbol='x'), name='Waypoint 1 Center'))
+
+    if "wp2_center" in results and "wp2_radius" in results:
+        wp2_center = results["wp2_center"]
+        wp2_radius = results["wp2_radius"]
+        # Draw the circle
+        theta = np.linspace(0, 2 * np.pi, 100)
+        circle_x = wp2_center[0] + wp2_radius * np.cos(theta)
+        circle_y = wp2_center[1] + wp2_radius * np.sin(theta)
+        fig.add_trace(go.Scatter(x=circle_x, y=circle_y, mode='lines', line=dict(color='orange', width=2, dash='dash'), name='Waypoint 2 Area'))
+        # Draw the center
+        fig.add_trace(go.Scatter(x=[wp2_center[0]], y=[wp2_center[1]], mode='markers', marker=dict(color='orange', size=12, symbol='x'), name='Waypoint 2 Center'))
+
+    fig.update_layout(title='Dubins Car Trajectory with Waypoints', title_x=0.5, template='plotly_dark')
+
+    # Set axis to be equal
+    fig.update_xaxes(scaleanchor="y", scaleratio=1)
+    return fig
+
 def full_subject_traj_time(results, params):
     x_full = results["x_full"]
     x_nodes = results["x"].guess
