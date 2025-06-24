@@ -3,9 +3,9 @@ import random
 import plotly.graph_objects as go
 import numpy as np
 import pickle
-import pyqtgraph as pg
-import pyqtgraph.opengl as gl
-from PyQt5 import QtWidgets
+# import pyqtgraph as pg
+# import pyqtgraph.opengl as gl
+# from PyQt5 import QtWidgets
 
 from openscvx.utils import qdcm, get_kp_pose
 from openscvx.config import Config
