@@ -16,7 +16,7 @@ from openscvx.backend.state import State, Free, Minimize
 from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
 
-from examples.plotting import plot_animation
+from examples.plotting import plot_animation, plot_animation_pyqtgraph
 
 n = 6
 total_time = 4.0  # Total time for the simulation
@@ -132,3 +132,4 @@ if __name__ == "__main__":
     results.update(plotting_dict)
 
     plot_animation(results, problem.settings).show()
+    # plot_animation_pyqtgraph(results, problem.settings)
