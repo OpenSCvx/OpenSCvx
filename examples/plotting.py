@@ -2296,7 +2296,43 @@ def plot_animation_pyqtgraph(result, params, step=2):
     w = gl.GLViewWidget()
     w.setWindowTitle('Quadrotor Simulation (pyqtgraph)')
     w.setGeometry(0, 110, 1280, 720)
-    w.setCameraPosition(distance=150, elevation=20, azimuth=45)
+    
+    # Extract data
+    drone_positions = result["x_full"][:, :3]
+    drone_velocities = result["x_full"][:, 3:6]
+    drone_attitudes = result["x_full"][:, 6:10] if result["x_full"].shape[1] >= 10 else None
+    velocity_norm = np.linalg.norm(drone_velocities, axis=1)
+    n_points = drone_positions.shape[0]
+    indices = np.array(list(range(n_points-1)[::step]) + [n_points-1])
+    
+    # Auto-calculate plotting bounds
+    pos_min = drone_positions.min(axis=0)
+    pos_max = drone_positions.max(axis=0)
+    pos_range = pos_max - pos_min
+    
+    # Add padding to bounds (20% of range)
+    padding = pos_range * 0.2
+    bounds_min = pos_min - padding
+    bounds_max = pos_max + padding
+    
+    # Ensure minimum bounds for small trajectories
+    min_bounds_size = 10.0
+    for i in range(3):
+        if bounds_max[i] - bounds_min[i] < min_bounds_size:
+            center = (bounds_max[i] + bounds_min[i]) / 2
+            bounds_min[i] = center - min_bounds_size / 2
+            bounds_max[i] = center + min_bounds_size / 2
+    
+    # Auto-calculate camera distance based on bounds
+    max_range = max(bounds_max - bounds_min)
+    camera_distance = max_range * 1.5  # 1.5x the maximum range
+    
+    # Auto-calculate vehicle axes length based on trajectory size
+    axes_length = max(pos_range) * 0.1  # 10% of trajectory range
+    axes_length = max(axes_length, 2.0)  # Minimum 2 units
+    axes_length = min(axes_length, 20.0)  # Maximum 20 units
+    
+    w.setCameraPosition(distance=camera_distance, elevation=20, azimuth=45)
     main_layout.addWidget(w)
 
     # Controls
@@ -2313,12 +2349,6 @@ def plot_animation_pyqtgraph(result, params, step=2):
     main_layout.addLayout(controls_layout)
     main_widget.show()
 
-    drone_positions = result["x_full"][:, :3]
-    drone_velocities = result["x_full"][:, 3:6]
-    drone_attitudes = result["x_full"][:, 6:10] if result["x_full"].shape[1] >= 10 else None
-    velocity_norm = np.linalg.norm(drone_velocities, axis=1)
-    n_points = drone_positions.shape[0]
-    indices = np.array(list(range(n_points-1)[::step]) + [n_points-1])
     slider.setMaximum(len(indices)-1)
 
     cmap = pg.colormap.get('viridis')
@@ -2337,17 +2367,17 @@ def plot_animation_pyqtgraph(result, params, step=2):
         w.addItem(item)
     axis_colors = [(1,0,0,1), (0,1,0,1), (0,0,1,1)]
 
-    # Add a nice ground grid
-    grid_size = 200
-    grid_spacing = 20
+    # Add a nice ground grid - auto-scale based on bounds
+    grid_size = max(bounds_max[:2] - bounds_min[:2]) * 0.3  # 30% of XY range (reduced from 60%)
+    grid_spacing = grid_size / 8  # 8 grid lines (reduced from 10 for tighter spacing)
     grid_lines = []
-    for x in range(-grid_size, grid_size+1, grid_spacing):
-        pts = np.array([[x, -grid_size, 0], [x, grid_size, 0]])
+    for x in np.arange(bounds_min[0] - grid_size/2, bounds_max[0] + grid_size/2, grid_spacing):
+        pts = np.array([[x, bounds_min[1] - grid_size/2, bounds_min[2]], [x, bounds_max[1] + grid_size/2, bounds_min[2]]])
         line = gl.GLLinePlotItem(pos=pts, color=(0.7,0.7,0.7,0.5), width=1, antialias=True)
         w.addItem(line)
         grid_lines.append(line)
-    for y in range(-grid_size, grid_size+1, grid_spacing):
-        pts = np.array([[-grid_size, y, 0], [grid_size, y, 0]])
+    for y in np.arange(bounds_min[1] - grid_size/2, bounds_max[1] + grid_size/2, grid_spacing):
+        pts = np.array([[bounds_min[0] - grid_size/2, y, bounds_min[2]], [bounds_max[0] + grid_size/2, y, bounds_min[2]]])
         line = gl.GLLinePlotItem(pos=pts, color=(0.7,0.7,0.7,0.5), width=1, antialias=True)
         w.addItem(line)
         grid_lines.append(line)
@@ -2358,11 +2388,12 @@ def plot_animation_pyqtgraph(result, params, step=2):
             # Create a sphere mesh and transform it to an ellipsoid
             sphere_mesh = gl.MeshData.sphere(rows=20, cols=40)
             verts = sphere_mesh.vertexes()
-            verts = verts * radius  # scale to ellipsoid radii
+            # Scale by 1/radius to match the original plot_animation function
+            verts = verts * np.array([1/radius[0], 1/radius[1], 1/radius[2]])
             verts = (axes @ verts.T).T  # rotate
             verts = verts + center  # translate
             sphere_mesh.setVertexes(verts)
-            obstacle = gl.GLMeshItem(meshdata=sphere_mesh, smooth=True, color=(1,0,0,0.3), shader='shaded', drawEdges=False, glOptions='translucent')
+            obstacle = gl.GLMeshItem(meshdata=sphere_mesh, smooth=True, color=(1,0,0,0.6), shader='shaded', drawEdges=False, glOptions='translucent')
             w.addItem(obstacle)
             obstacle_items.append(obstacle)
 
@@ -2397,8 +2428,8 @@ def plot_animation_pyqtgraph(result, params, step=2):
         y = np.outer(np.sin(u), np.sin(v))
         z = np.outer(np.ones(np.size(u)), np.cos(v))
         for sub_traj in subs_positions:
-            min_sphere = gl.GLMeshItem(meshdata=gl.MeshData.sphere(rows=10, cols=20, radius=result["min_range"]), color=(1,0,0,0.2), smooth=True, shader='shaded', drawEdges=False)
-            max_sphere = gl.GLMeshItem(meshdata=gl.MeshData.sphere(rows=10, cols=20, radius=result["max_range"]), color=(0,0,1,0.2), smooth=True, shader='shaded', drawEdges=False)
+            min_sphere = gl.GLMeshItem(meshdata=gl.MeshData.sphere(rows=10, cols=20, radius=result["min_range"]), color=(1,0,0,0.4), smooth=True, shader='shaded', drawEdges=False, glOptions='translucent')
+            max_sphere = gl.GLMeshItem(meshdata=gl.MeshData.sphere(rows=10, cols=20, radius=result["max_range"]), color=(0,0,1,0.4), smooth=True, shader='shaded', drawEdges=False, glOptions='translucent')
             w.addItem(min_sphere)
             w.addItem(max_sphere)
             range_spheres.append((min_sphere, max_sphere))
@@ -2413,7 +2444,9 @@ def plot_animation_pyqtgraph(result, params, step=2):
         alpha_y = result["alpha_y"]
         A = np.diag([1 / np.tan(np.pi / alpha_y), 1 / np.tan(np.pi / alpha_x)])
         # Make a circle in the sensor frame, scale Z for a larger cone
-        cone_length = 30.0  # Make the cone longer
+        cone_length = max(pos_range) * 0.3  # 30% of trajectory range
+        cone_length = max(cone_length, 10.0)  # Minimum 10 units
+        cone_length = min(cone_length, 50.0)  # Maximum 50 units
         circle = np.stack([np.cos(theta), np.sin(theta)])
         z = np.linalg.norm(A @ circle, axis=0)
         X = circle[0] / z
@@ -2428,8 +2461,9 @@ def plot_animation_pyqtgraph(result, params, step=2):
         faces.append([0, n_cone, 1])
         faces = np.array(faces)
         cone_meshdata = gl.MeshData(vertexes=vertices, faces=faces)
-        viewcone_mesh = gl.GLMeshItem(meshdata=cone_meshdata, smooth=True, color=(1,0,0,0.3), shader='shaded', drawEdges=False, glOptions='translucent')
-        w.addItem(viewcone_mesh)
+        # Draw cone last for correct depth compositing
+        viewcone_mesh = gl.GLMeshItem(meshdata=cone_meshdata, smooth=True, color=(1,1,0,0.5), shader='shaded', drawEdges=False, glOptions='additive')
+        # Do not add yet, will add after all other objects
 
     ptr = [0]
     playing = [False]
@@ -2454,7 +2488,7 @@ def plot_animation_pyqtgraph(result, params, step=2):
             att = drone_attitudes[indices[i]]
             r = R.from_quat([att[1], att[2], att[3], att[0]])
             rotmat = r.as_matrix()
-            axes = 20 * np.eye(3)
+            axes = axes_length * np.eye(3)
             axes_rot = rotmat @ axes
             for k in range(3):
                 axis_pts = np.stack([drone_positions[indices[i]], drone_positions[indices[i]] + axes_rot[:,k]])
@@ -2479,6 +2513,10 @@ def plot_animation_pyqtgraph(result, params, step=2):
             verts = cone_meshdata.vertexes()
             verts_tf = (rotmat @ R_sb.T @ verts.T).T + drone_positions[indices[i]]
             viewcone_mesh.setMeshData(vertexes=verts_tf, faces=cone_meshdata.faces())
+            # Remove and re-add cone to ensure it is drawn last
+            if viewcone_mesh in w.items:
+                w.removeItem(viewcone_mesh)
+            w.addItem(viewcone_mesh)
         ptr[0] += 1
 
     def set_frame(i):
@@ -2516,3 +2554,1040 @@ def plot_animation_pyqtgraph(result, params, step=2):
         app.exec()
     else:
         QtWidgets.QApplication.instance().exec_()
+
+def plot_animation_vispy(result, params, step=2):
+    """
+    VisPy-based 3D animation of quadrotor simulation.
+    Provides the same functionality as plot_animation_pyqtgraph but uses VisPy backend.
+    """
+    import sys
+    import numpy as np
+    from scipy.spatial.transform import Rotation as R
+    from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QWidget, QLabel, QApplication
+    from PyQt5.QtCore import Qt, QTimer
+    import vispy
+    from vispy import scene
+    from vispy.scene import visuals
+    from vispy.color import ColorArray
+    from vispy.geometry import create_sphere
+    
+    # Initialize Qt application
+    app = QApplication.instance() or QApplication(sys.argv)
+    
+    # Main window and layout
+    main_widget = QWidget()
+    main_layout = QVBoxLayout(main_widget)
+    
+    # Create canvas and embed it properly
+    canvas = scene.SceneCanvas(keys='interactive', size=(1280, 720))
+    view = canvas.central_widget.add_view()
+    view.camera = 'turntable'
+    view.camera.fov = 45
+    view.camera.distance = 150
+    view.camera.elevation = 20
+    view.camera.azimuth = 45
+    
+    # Embed VisPy canvas in Qt widget
+    canvas_widget = canvas.native
+    main_layout.addWidget(canvas_widget)
+    
+    # Controls
+    controls_layout = QHBoxLayout()
+    play_btn = QPushButton('Play')
+    pause_btn = QPushButton('Pause')
+    slider = QSlider(Qt.Horizontal)
+    slider.setMinimum(0)
+    slider.setSingleStep(1)
+    controls_layout.addWidget(play_btn)
+    controls_layout.addWidget(pause_btn)
+    controls_layout.addWidget(QLabel('Time:'))
+    controls_layout.addWidget(slider)
+    main_layout.addLayout(controls_layout)
+    main_widget.show()
+    
+    # Extract data and convert JAX arrays to NumPy arrays
+    drone_positions = np.array(result["x_full"][:, :3])
+    drone_velocities = np.array(result["x_full"][:, 3:6])
+    drone_attitudes = np.array(result["x_full"][:, 6:10]) if result["x_full"].shape[1] >= 10 else None
+    velocity_norm = np.linalg.norm(drone_velocities, axis=1)
+    n_points = drone_positions.shape[0]
+    indices = np.array(list(range(n_points-1)[::step]) + [n_points-1])
+    slider.setMaximum(len(indices)-1)
+    
+    # Color mapping for velocity
+    vmin, vmax = velocity_norm.min(), velocity_norm.max()
+    normed_vel = (velocity_norm - vmin) / (vmax - vmin + 1e-8)
+    colors = vispy.color.get_colormap('viridis').map(normed_vel)
+    
+    # Create trajectory line - initialize with first point
+    traj_line = visuals.Line(pos=drone_positions[:1], color=colors[:1], width=5, connect='strip')
+    view.add(traj_line)
+    
+    # Create drone position marker
+    drone_dot = visuals.Markers(pos=drone_positions[:1], face_color='white', size=10)
+    view.add(drone_dot)
+    
+    # Create coordinate axes
+    axis_lines = []
+    axis_colors = ['red', 'green', 'blue']
+    for color in axis_colors:
+        axis_line = visuals.Line(pos=np.zeros((2, 3)), color=color, width=3)
+        view.add(axis_line)
+        axis_lines.append(axis_line)
+    
+    # Create ground grid
+    grid_size = 200
+    grid_spacing = 20
+    grid_lines = []
+    for x in range(-grid_size, grid_size+1, grid_spacing):
+        pts = np.array([[x, -grid_size, 0], [x, grid_size, 0]])
+        line = visuals.Line(pos=pts, color=(0.7, 0.7, 0.7, 0.5), width=1)
+        view.add(line)
+        grid_lines.append(line)
+    for y in range(-grid_size, grid_size+1, grid_spacing):
+        pts = np.array([[-grid_size, y, 0], [grid_size, y, 0]])
+        line = visuals.Line(pos=pts, color=(0.7, 0.7, 0.7, 0.5), width=1)
+        view.add(line)
+        grid_lines.append(line)
+    
+    # Create obstacles
+    obstacle_meshes = []
+    if "obstacles_centers" in result and "obstacles_radii" in result and "obstacles_axes" in result:
+        for center, axes, radius in zip(result['obstacles_centers'], result['obstacles_axes'], result['obstacles_radii']):
+            # Convert to NumPy arrays
+            center = np.array(center)
+            axes = np.array(axes)
+            radius = np.array(radius)
+            
+            # Create sphere mesh and transform to ellipsoid
+            sphere_mesh = create_sphere(radius=1.0, rows=20, cols=40)
+            sphere_verts = sphere_mesh.get_vertices()
+            sphere_faces = sphere_mesh.get_faces()
+            sphere_verts = sphere_verts * radius  # scale to ellipsoid radii
+            sphere_verts = (axes @ sphere_verts.T).T  # rotate
+            sphere_verts = sphere_verts + center  # translate
+            
+            obstacle = visuals.Mesh(vertices=sphere_verts, faces=sphere_faces, 
+                                  color=(1, 0, 0, 0.3), shading='smooth')
+            view.add(obstacle)
+            obstacle_meshes.append(obstacle)
+    
+    # Create gates
+    gate_lines = []
+    if "vertices" in result:
+        for vertices in result["vertices"]:
+            gate_pts = np.array(vertices + [vertices[0]])
+            gate = visuals.Line(pos=gate_pts, color=(0, 0, 1, 1), width=5)
+            view.add(gate)
+            gate_lines.append(gate)
+    
+    # Create subject trajectories
+    subject_lines = []
+    subject_dots = []
+    subs_positions = []
+    if "init_poses" in result or "moving_subject" in result:
+        if "init_poses" in result:
+            subs_positions, _, _, _ = full_subject_traj_time(result, params)
+        else:
+            subs_positions, _, _, _ = full_subject_traj_time(result, params)
+        
+        # Convert subject positions to NumPy arrays
+        subs_positions = [np.array(sub_pos) for sub_pos in subs_positions]
+        
+        for sub_traj in subs_positions:
+            line = visuals.Line(pos=sub_traj[:1], color=(1, 0, 0, 1), width=3)
+            dot = visuals.Markers(pos=sub_traj[:1], face_color=(1, 0, 0, 1), size=10)
+            view.add(line)
+            view.add(dot)
+            subject_lines.append(line)
+            subject_dots.append(dot)
+    
+    # Create range spheres
+    range_spheres = []
+    if "min_range" in result and "max_range" in result and "init_poses" in result:
+        for sub_traj in subs_positions:
+            # Min range sphere
+            min_mesh = create_sphere(radius=result["min_range"], rows=10, cols=20)
+            min_sphere = visuals.Mesh(vertices=min_mesh.get_vertices(), faces=min_mesh.get_faces(), 
+                                    color=(1, 0, 0, 0.2), shading='smooth')
+            view.add(min_sphere)
+            
+            # Max range sphere
+            max_mesh = create_sphere(radius=result["max_range"], rows=10, cols=20)
+            max_sphere = visuals.Mesh(vertices=max_mesh.get_vertices(), faces=max_mesh.get_faces(), 
+                                    color=(0, 0, 1, 0.2), shading='smooth')
+            view.add(max_sphere)
+            
+            range_spheres.append((min_sphere, max_sphere))
+    
+    # Create viewcone
+    viewcone_mesh = None
+    if drone_attitudes is not None and "alpha_x" in result and "alpha_y" in result and "R_sb" in result:
+        n_cone = 40
+        theta = np.linspace(0, 2*np.pi, n_cone)
+        alpha_x = result["alpha_x"]
+        alpha_y = result["alpha_y"]
+        A = np.diag([1 / np.tan(np.pi / alpha_y), 1 / np.tan(np.pi / alpha_x)])
+        
+        # Create cone geometry
+        cone_length = 30.0
+        circle = np.stack([np.cos(theta), np.sin(theta)])
+        z = np.linalg.norm(A @ circle, axis=0)
+        X = circle[0] / z
+        Y = circle[1] / z
+        Z = np.ones_like(X)
+        base_points = np.stack([X, Y, Z], axis=1) * cone_length
+        apex = np.array([[0, 0, 0]])
+        vertices = np.vstack([apex, base_points])
+        
+        # Create faces for cone
+        faces = []
+        for i in range(1, n_cone):
+            faces.append([0, i, i+1])
+        faces.append([0, n_cone, 1])
+        faces = np.array(faces)
+        
+        viewcone_mesh = visuals.Mesh(vertices=vertices, faces=faces, 
+                                   color=(1, 0, 0, 0.3), shading='smooth')
+        view.add(viewcone_mesh)
+    
+    # Animation state
+    ptr = [0]
+    playing = [False]
+    
+    def update():
+        i = ptr[0]
+        if i >= len(indices):
+            timer.stop()
+            playing[0] = False
+            play_btn.setEnabled(True)
+            pause_btn.setEnabled(False)
+            return
+        
+        slider.blockSignals(True)
+        slider.setValue(i)
+        slider.blockSignals(False)
+        
+        idx = indices[:i+1]
+        pos = drone_positions[idx]
+        col = colors[idx]
+        
+        # Update trajectory
+        traj_line.set_data(pos=pos, color=col)
+        drone_dot.set_data(pos=pos[-1:], face_color='white')
+        
+        # Update coordinate axes
+        if drone_attitudes is not None:
+            att = drone_attitudes[indices[i]]
+            r = R.from_quat([att[1], att[2], att[3], att[0]])
+            rotmat = r.as_matrix()
+            axes = 20 * np.eye(3)
+            axes_rot = rotmat @ axes
+            
+            for k in range(3):
+                axis_pts = np.stack([drone_positions[indices[i]], 
+                                   drone_positions[indices[i]] + axes_rot[:, k]])
+                axis_lines[k].set_data(pos=axis_pts)
+        
+        # Update subject trajectories
+        if len(subs_positions) > 0:
+            for j, sub_traj in enumerate(subs_positions):
+                subject_lines[j].set_data(pos=sub_traj[:indices[i]+1])
+                subject_dots[j].set_data(pos=sub_traj[indices[i]:indices[i]+1])
+                
+                # Update range spheres
+                if j < len(range_spheres):
+                    min_sphere, max_sphere = range_spheres[j]
+                    min_sphere.transform = vispy.visuals.transforms.STTransform(translate=sub_traj[indices[i]])
+                    max_sphere.transform = vispy.visuals.transforms.STTransform(translate=sub_traj[indices[i]])
+        
+        # Update viewcone
+        if viewcone_mesh is not None and drone_attitudes is not None:
+            att = drone_attitudes[indices[i]]
+            r = R.from_quat([att[1], att[2], att[3], att[0]])
+            rotmat = r.as_matrix()
+            R_sb = np.array(result["R_sb"])
+            
+            # Transform cone vertices
+            cone_mesh = create_sphere(radius=1.0, rows=10, cols=20)
+            verts = cone_mesh.get_vertices() * 30.0  # Scale to cone size
+            verts = (rotmat @ R_sb.T @ verts.T).T + drone_positions[indices[i]]
+            viewcone_mesh.set_data(vertices=verts, faces=cone_mesh.get_faces())
+        
+        ptr[0] += 1
+        canvas.update()
+    
+    def set_frame(i):
+        ptr[0] = i
+        update()
+    
+    timer = QTimer()
+    timer.timeout.connect(update)
+    timer.setInterval(30)
+    
+    def play():
+        if not playing[0]:
+            playing[0] = True
+            play_btn.setEnabled(False)
+            pause_btn.setEnabled(True)
+            timer.start()
+    
+    def pause():
+        playing[0] = False
+        play_btn.setEnabled(True)
+        pause_btn.setEnabled(False)
+        timer.stop()
+    
+    play_btn.clicked.connect(play)
+    pause_btn.clicked.connect(pause)
+    slider.valueChanged.connect(set_frame)
+    pause_btn.setEnabled(False)
+    
+    main_widget.setWindowTitle('Quadrotor Simulation (VisPy)')
+    main_widget.resize(1280, 800)
+    
+    # Draw initial frame
+    update()
+    
+    # Start Qt event loop
+    if not hasattr(QApplication.instance(), 'exec_'):
+        app.exec()
+    else:
+        QApplication.instance().exec_()
+
+def plot_scp_animation_pyqtgraph(result, params, step=2):
+    """
+    PyQtGraph version of plot_scp_animation showing SCP iterations and multiple shooting trajectories.
+    """
+    import sys
+    from scipy.spatial.transform import Rotation as R
+    from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QWidget, QLabel
+    from PyQt5.QtCore import Qt
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
+
+    # Main window and layout
+    main_widget = QWidget()
+    main_layout = QVBoxLayout(main_widget)
+    w = gl.GLViewWidget()
+    w.setWindowTitle('SCP Animation (pyqtgraph)')
+    w.setGeometry(0, 110, 1280, 720)
+    
+    # Extract data
+    tof = result["t_final"]
+    drone_positions = result["x_full"][:, :3]
+    drone_velocities = result["x_full"][:, 3:6]
+    drone_attitudes = result["x_full"][:, 6:10] if result["x_full"].shape[1] >= 10 else None
+    scp_interp_trajs = scp_traj_interp(result["x_history"], params)
+    scp_ctcs_trajs = result["x_history"]
+    scp_multi_shoot = result["discretization_history"]
+    
+    if "moving_subject" in result or "init_poses" in result:
+        subs_positions, _, _, _ = full_subject_traj_time(result, params)
+    
+    # Auto-calculate plotting bounds
+    pos_min = drone_positions.min(axis=0)
+    pos_max = drone_positions.max(axis=0)
+    pos_range = pos_max - pos_min
+    
+    # Add padding to bounds (20% of range)
+    padding = pos_range * 0.2
+    bounds_min = pos_min - padding
+    bounds_max = pos_max + padding
+    
+    # Ensure minimum bounds for small trajectories
+    min_bounds_size = 10.0
+    for i in range(3):
+        if bounds_max[i] - bounds_min[i] < min_bounds_size:
+            center = (bounds_max[i] + bounds_min[i]) / 2
+            bounds_min[i] = center - min_bounds_size / 2
+            bounds_max[i] = center + min_bounds_size / 2
+    
+    # Auto-calculate camera distance based on bounds
+    max_range = max(bounds_max - bounds_min)
+    camera_distance = max_range * 1.5  # 1.5x the maximum range
+    
+    w.setCameraPosition(distance=camera_distance, elevation=20, azimuth=45)
+    main_layout.addWidget(w)
+
+    # Controls
+    controls_layout = QHBoxLayout()
+    play_btn = QPushButton('Play')
+    pause_btn = QPushButton('Pause')
+    slider = QSlider(Qt.Horizontal)
+    slider.setMinimum(0)
+    slider.setSingleStep(1)
+    controls_layout.addWidget(play_btn)
+    controls_layout.addWidget(pause_btn)
+    controls_layout.addWidget(QLabel('SCP Iteration:'))
+    controls_layout.addWidget(slider)
+    main_layout.addLayout(controls_layout)
+    main_widget.show()
+
+    # Set slider range based on number of SCP iterations
+    n_iterations = len(scp_ctcs_trajs)
+    slider.setMaximum(n_iterations - 1)
+
+    # Final trajectory (nonlinear propagation)
+    final_traj_line = gl.GLLinePlotItem(pos=drone_positions, color=(0,1,0,1), width=5, antialias=True)
+    w.addItem(final_traj_line)
+
+    # Add a nice ground grid - auto-scale based on bounds
+    grid_size = max(bounds_max[:2] - bounds_min[:2]) * 0.3  # 30% of XY range
+    grid_spacing = grid_size / 8  # 8 grid lines
+    grid_lines = []
+    for x in np.arange(bounds_min[0] - grid_size/2, bounds_max[0] + grid_size/2, grid_spacing):
+        pts = np.array([[x, bounds_min[1] - grid_size/2, bounds_min[2]], [x, bounds_max[1] + grid_size/2, bounds_min[2]]])
+        line = gl.GLLinePlotItem(pos=pts, color=(0.7,0.7,0.7,0.5), width=1, antialias=True)
+        w.addItem(line)
+        grid_lines.append(line)
+    for y in np.arange(bounds_min[1] - grid_size/2, bounds_max[1] + grid_size/2, grid_spacing):
+        pts = np.array([[bounds_min[0] - grid_size/2, y, bounds_min[2]], [bounds_max[0] + grid_size/2, y, bounds_min[2]]])
+        line = gl.GLLinePlotItem(pos=pts, color=(0.7,0.7,0.7,0.5), width=1, antialias=True)
+        w.addItem(line)
+        grid_lines.append(line)
+
+    # Create obstacles
+    obstacle_items = []
+    if "obstacles_centers" in result and "obstacles_radii" in result and "obstacles_axes" in result:
+        for center, axes, radius in zip(result['obstacles_centers'], result['obstacles_axes'], result['obstacles_radii']):
+            # Create a sphere mesh and transform it to an ellipsoid
+            sphere_mesh = gl.MeshData.sphere(rows=20, cols=40)
+            verts = sphere_mesh.vertexes()
+            # Scale by 1/radius to match the original plot_animation function
+            verts = verts * np.array([1/radius[0], 1/radius[1], 1/radius[2]])
+            verts = (axes @ verts.T).T  # rotate
+            verts = verts + center  # translate
+            sphere_mesh.setVertexes(verts)
+            obstacle = gl.GLMeshItem(meshdata=sphere_mesh, smooth=True, color=(1,0,0,0.6), shader='shaded', drawEdges=False, glOptions='translucent')
+            w.addItem(obstacle)
+            obstacle_items.append(obstacle)
+
+    # Create gates
+    gate_items = []
+    if "vertices" in result:
+        for vertices in result["vertices"]:
+            gate = gl.GLLinePlotItem(pos=np.array(vertices + [vertices[0]]), color=(0,0,1,1), width=5, antialias=True)
+            w.addItem(gate)
+            gate_items.append(gate)
+
+    # Create subject trajectories
+    subject_lines = []
+    subject_dots = []
+    if "init_poses" in result or "moving_subject" in result:
+        for sub_traj in subs_positions:
+            line = gl.GLLinePlotItem(pos=sub_traj, color=(1,0,0,1), width=3)
+            dot = gl.GLScatterPlotItem(pos=sub_traj[-1:], color=(1,0,0,1), size=10)
+            w.addItem(line)
+            w.addItem(dot)
+            subject_lines.append(line)
+            subject_dots.append(dot)
+
+    # SCP iteration trajectories
+    scp_traj_lines = []
+    multishot_traj_lines = []
+    scp_axes_items = []  # Store axes for each SCP iteration
+    
+    # Extract the number of states and controls from the parameters
+    n_x = params.sim.n_states
+    n_u = params.sim.n_controls
+
+    # Define indices for slicing the augmented state vector
+    i0 = 0
+    i1 = n_x
+    i2 = i1 + n_x * n_x
+    i3 = i2 + n_x * n_u
+    i4 = i3 + n_x * n_u
+    i5 = i4 + n_x
+
+    # Auto-calculate vehicle axes length based on trajectory size
+    axes_length = max(pos_range) * 0.1  # 10% of trajectory range
+    axes_length = max(axes_length, 2.0)  # Minimum 2 units
+    axes_length = min(axes_length, 20.0)  # Maximum 20 units
+
+    # Create trajectory lines for each SCP iteration
+    for traj_iter, scp_traj in enumerate(scp_ctcs_trajs):
+        # SCP trajectory line - only show actual data points, not connecting lines
+        scp_positions = scp_traj[:, 0:3]
+        scp_line = gl.GLScatterPlotItem(pos=scp_positions, color=(0.5,0.5,0.5,0.7), size=3)
+        w.addItem(scp_line)
+        scp_traj_lines.append(scp_line)
+        
+        # Create axes for this SCP iteration
+        if drone_attitudes is not None:
+            iteration_axes = []
+            for i in range(scp_traj.shape[0]):
+                att = scp_traj[i, 6:10]  # Extract attitude from SCP trajectory
+                r = R.from_quat([att[1], att[2], att[3], att[0]])
+                rotmat = r.as_matrix()
+                axes = axes_length * np.eye(3)
+                axes_rot = rotmat @ axes
+                
+                # Create axis lines for this position
+                pos_axes = []
+                axis_colors = [(1,0,0,1), (0,1,0,1), (0,0,1,1)]  # Red, Green, Blue
+                for k in range(3):
+                    axis_pts = np.stack([scp_positions[i], scp_positions[i] + axes_rot[:,k]])
+                    axis_line = gl.GLLinePlotItem(pos=axis_pts, color=axis_colors[k], width=2)
+                    w.addItem(axis_line)
+                    pos_axes.append(axis_line)
+                iteration_axes.append(pos_axes)
+            scp_axes_items.append(iteration_axes)
+        else:
+            scp_axes_items.append([])
+        
+        # Multiple shooting trajectories - only show actual data points
+        if traj_iter < len(scp_multi_shoot):
+            pos_traj = []
+            for i_multi in range(scp_multi_shoot[traj_iter].shape[1]):
+                pos_traj.append(scp_multi_shoot[traj_iter][:,i_multi].reshape(-1, i5)[:,0:3])
+            pos_traj = np.array(pos_traj)
+            
+            iteration_multishot_lines = []
+            for j in range(pos_traj.shape[1]):
+                multishot_line = gl.GLScatterPlotItem(pos=pos_traj[:,j], color=(0.3,0.7,1.0,0.8), size=4)
+                w.addItem(multishot_line)
+                iteration_multishot_lines.append(multishot_line)
+            multishot_traj_lines.append(iteration_multishot_lines)
+
+    # Animation state
+    ptr = [0]
+    playing = [False]
+
+    def update():
+        i = ptr[0]
+        if i >= n_iterations:
+            timer.stop()
+            playing[0] = False
+            play_btn.setEnabled(True)
+            pause_btn.setEnabled(False)
+            return
+        
+        slider.blockSignals(True)
+        slider.setValue(i)
+        slider.blockSignals(False)
+        
+        # Show only the current SCP iteration and all previous ones
+        for j, scp_line in enumerate(scp_traj_lines):
+            if j <= i:
+                scp_line.setVisible(True)
+                scp_line.setData(color=(0.5,0.5,0.5,0.7))
+            else:
+                scp_line.setVisible(False)
+        
+        # Show/hide axes for each iteration
+        for j, iteration_axes in enumerate(scp_axes_items):
+            if j == i:  # Only show axes for current iteration
+                for pos_axes in iteration_axes:
+                    for axis_line in pos_axes:
+                        axis_line.setVisible(True)
+            else:
+                for pos_axes in iteration_axes:
+                    for axis_line in pos_axes:
+                        axis_line.setVisible(False)
+        
+        # Show multiple shooting trajectories for current iteration
+        for j, iteration_lines in enumerate(multishot_traj_lines):
+            if j == i:
+                for line in iteration_lines:
+                    line.setVisible(True)
+                    line.setData(color=(0.3,0.7,1.0,0.8))
+            else:
+                for line in iteration_lines:
+                    line.setVisible(False)
+        
+        ptr[0] += 1
+
+    def set_frame(i):
+        ptr[0] = i
+        update()
+
+    timer = pg.QtCore.QTimer()
+    timer.timeout.connect(update)
+    timer.setInterval(1000)  # Slower for SCP iterations
+
+    def play():
+        if not playing[0]:
+            playing[0] = True
+            play_btn.setEnabled(False)
+            pause_btn.setEnabled(True)
+            timer.start()
+
+    def pause():
+        playing[0] = False
+        play_btn.setEnabled(True)
+        pause_btn.setEnabled(False)
+        timer.stop()
+
+    play_btn.clicked.connect(play)
+    pause_btn.clicked.connect(pause)
+    slider.valueChanged.connect(set_frame)
+    pause_btn.setEnabled(False)
+
+    main_widget.setWindowTitle(f'SCP Animation: {tof} seconds (pyqtgraph)')
+    main_widget.resize(1280, 800)
+
+    # Initialize display
+    set_frame(0)
+
+    if not hasattr(QtWidgets.QApplication.instance(), 'exec_'):
+        app.exec()
+    else:
+        QtWidgets.QApplication.instance().exec_()
+
+def plot_animation_vispy(result, params, step=2):
+    """
+    VisPy-based 3D animation of quadrotor simulation.
+    Provides the same functionality as plot_animation_pyqtgraph but uses VisPy backend.
+    """
+    import sys
+    import numpy as np
+    from scipy.spatial.transform import Rotation as R
+    from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QWidget, QLabel, QApplication
+    from PyQt5.QtCore import Qt, QTimer
+    import vispy
+    from vispy import scene
+    from vispy.scene import visuals
+    from vispy.color import ColorArray
+    from vispy.geometry import create_sphere
+    
+    # Initialize Qt application
+    app = QApplication.instance() or QApplication(sys.argv)
+    
+    # Main window and layout
+    main_widget = QWidget()
+    main_layout = QVBoxLayout(main_widget)
+    
+    # Create canvas and embed it properly
+    canvas = scene.SceneCanvas(keys='interactive', size=(1280, 720))
+    view = canvas.central_widget.add_view()
+    view.camera = 'turntable'
+    view.camera.fov = 45
+    view.camera.distance = 150
+    view.camera.elevation = 20
+    view.camera.azimuth = 45
+    
+    # Embed VisPy canvas in Qt widget
+    canvas_widget = canvas.native
+    main_layout.addWidget(canvas_widget)
+    
+    # Controls
+    controls_layout = QHBoxLayout()
+    play_btn = QPushButton('Play')
+    pause_btn = QPushButton('Pause')
+    slider = QSlider(Qt.Horizontal)
+    slider.setMinimum(0)
+    slider.setSingleStep(1)
+    controls_layout.addWidget(play_btn)
+    controls_layout.addWidget(pause_btn)
+    controls_layout.addWidget(QLabel('Time:'))
+    controls_layout.addWidget(slider)
+    main_layout.addLayout(controls_layout)
+    main_widget.show()
+    
+    # Extract data and convert JAX arrays to NumPy arrays
+    drone_positions = np.array(result["x_full"][:, :3])
+    drone_velocities = np.array(result["x_full"][:, 3:6])
+    drone_attitudes = np.array(result["x_full"][:, 6:10]) if result["x_full"].shape[1] >= 10 else None
+    velocity_norm = np.linalg.norm(drone_velocities, axis=1)
+    n_points = drone_positions.shape[0]
+    indices = np.array(list(range(n_points-1)[::step]) + [n_points-1])
+    slider.setMaximum(len(indices)-1)
+    
+    # Color mapping for velocity
+    vmin, vmax = velocity_norm.min(), velocity_norm.max()
+    normed_vel = (velocity_norm - vmin) / (vmax - vmin + 1e-8)
+    colors = vispy.color.get_colormap('viridis').map(normed_vel)
+    
+    # Create trajectory line - initialize with first point
+    traj_line = visuals.Line(pos=drone_positions[:1], color=colors[:1], width=5, connect='strip')
+    view.add(traj_line)
+    
+    # Create drone position marker
+    drone_dot = visuals.Markers(pos=drone_positions[:1], face_color='white', size=10)
+    view.add(drone_dot)
+    
+    # Create coordinate axes
+    axis_lines = []
+    axis_colors = ['red', 'green', 'blue']
+    for color in axis_colors:
+        axis_line = visuals.Line(pos=np.zeros((2, 3)), color=color, width=3)
+        view.add(axis_line)
+        axis_lines.append(axis_line)
+    
+    # Create ground grid
+    grid_size = 200
+    grid_spacing = 20
+    grid_lines = []
+    for x in range(-grid_size, grid_size+1, grid_spacing):
+        pts = np.array([[x, -grid_size, 0], [x, grid_size, 0]])
+        line = visuals.Line(pos=pts, color=(0.7, 0.7, 0.7, 0.5), width=1)
+        view.add(line)
+        grid_lines.append(line)
+    for y in range(-grid_size, grid_size+1, grid_spacing):
+        pts = np.array([[-grid_size, y, 0], [grid_size, y, 0]])
+        line = visuals.Line(pos=pts, color=(0.7, 0.7, 0.7, 0.5), width=1)
+        view.add(line)
+        grid_lines.append(line)
+    
+    # Create obstacles
+    obstacle_meshes = []
+    if "obstacles_centers" in result and "obstacles_radii" in result and "obstacles_axes" in result:
+        for center, axes, radius in zip(result['obstacles_centers'], result['obstacles_axes'], result['obstacles_radii']):
+            # Convert to NumPy arrays
+            center = np.array(center)
+            axes = np.array(axes)
+            radius = np.array(radius)
+            
+            # Create sphere mesh and transform to ellipsoid
+            sphere_mesh = create_sphere(radius=1.0, rows=20, cols=40)
+            sphere_verts = sphere_mesh.get_vertices()
+            sphere_faces = sphere_mesh.get_faces()
+            sphere_verts = sphere_verts * radius  # scale to ellipsoid radii
+            sphere_verts = (axes @ sphere_verts.T).T  # rotate
+            sphere_verts = sphere_verts + center  # translate
+            
+            obstacle = visuals.Mesh(vertices=sphere_verts, faces=sphere_faces, 
+                                  color=(1, 0, 0, 0.3), shading='smooth')
+            view.add(obstacle)
+            obstacle_meshes.append(obstacle)
+    
+    # Create gates
+    gate_lines = []
+    if "vertices" in result:
+        for vertices in result["vertices"]:
+            gate_pts = np.array(vertices + [vertices[0]])
+            gate = visuals.Line(pos=gate_pts, color=(0, 0, 1, 1), width=5)
+            view.add(gate)
+            gate_lines.append(gate)
+    
+    # Create subject trajectories
+    subject_lines = []
+    subject_dots = []
+    subs_positions = []
+    if "init_poses" in result or "moving_subject" in result:
+        if "init_poses" in result:
+            subs_positions, _, _, _ = full_subject_traj_time(result, params)
+        else:
+            subs_positions, _, _, _ = full_subject_traj_time(result, params)
+        
+        # Convert subject positions to NumPy arrays
+        subs_positions = [np.array(sub_pos) for sub_pos in subs_positions]
+        
+        for sub_traj in subs_positions:
+            line = visuals.Line(pos=sub_traj[:1], color=(1, 0, 0, 1), width=3)
+            dot = visuals.Markers(pos=sub_traj[:1], face_color=(1, 0, 0, 1), size=10)
+            view.add(line)
+            view.add(dot)
+            subject_lines.append(line)
+            subject_dots.append(dot)
+    
+    # Create range spheres
+    range_spheres = []
+    if "min_range" in result and "max_range" in result and "init_poses" in result:
+        for sub_traj in subs_positions:
+            # Min range sphere
+            min_mesh = create_sphere(radius=result["min_range"], rows=10, cols=20)
+            min_sphere = visuals.Mesh(vertices=min_mesh.get_vertices(), faces=min_mesh.get_faces(), 
+                                    color=(1, 0, 0, 0.2), shading='smooth')
+            view.add(min_sphere)
+            
+            # Max range sphere
+            max_mesh = create_sphere(radius=result["max_range"], rows=10, cols=20)
+            max_sphere = visuals.Mesh(vertices=max_mesh.get_vertices(), faces=max_mesh.get_faces(), 
+                                    color=(0, 0, 1, 0.2), shading='smooth')
+            view.add(max_sphere)
+            
+            range_spheres.append((min_sphere, max_sphere))
+    
+    # Create viewcone
+    viewcone_mesh = None
+    if drone_attitudes is not None and "alpha_x" in result and "alpha_y" in result and "R_sb" in result:
+        n_cone = 40
+        theta = np.linspace(0, 2*np.pi, n_cone)
+        alpha_x = result["alpha_x"]
+        alpha_y = result["alpha_y"]
+        A = np.diag([1 / np.tan(np.pi / alpha_y), 1 / np.tan(np.pi / alpha_x)])
+        
+        # Create cone geometry
+        cone_length = 30.0
+        circle = np.stack([np.cos(theta), np.sin(theta)])
+        z = np.linalg.norm(A @ circle, axis=0)
+        X = circle[0] / z
+        Y = circle[1] / z
+        Z = np.ones_like(X)
+        base_points = np.stack([X, Y, Z], axis=1) * cone_length
+        apex = np.array([[0, 0, 0]])
+        vertices = np.vstack([apex, base_points])
+        
+        # Create faces for cone
+        faces = []
+        for i in range(1, n_cone):
+            faces.append([0, i, i+1])
+        faces.append([0, n_cone, 1])
+        faces = np.array(faces)
+        
+        viewcone_mesh = visuals.Mesh(vertices=vertices, faces=faces, 
+                                   color=(1, 0, 0, 0.3), shading='smooth')
+        view.add(viewcone_mesh)
+    
+    # Animation state
+    ptr = [0]
+    playing = [False]
+    
+    def update():
+        i = ptr[0]
+        if i >= len(indices):
+            timer.stop()
+            playing[0] = False
+            play_btn.setEnabled(True)
+            pause_btn.setEnabled(False)
+            return
+        
+        slider.blockSignals(True)
+        slider.setValue(i)
+        slider.blockSignals(False)
+        
+        idx = indices[:i+1]
+        pos = drone_positions[idx]
+        col = colors[idx]
+        
+        # Update trajectory
+        traj_line.set_data(pos=pos, color=col)
+        drone_dot.set_data(pos=pos[-1:], face_color='white')
+        
+        # Update coordinate axes
+        if drone_attitudes is not None:
+            att = drone_attitudes[indices[i]]
+            r = R.from_quat([att[1], att[2], att[3], att[0]])
+            rotmat = r.as_matrix()
+            axes = 20 * np.eye(3)
+            axes_rot = rotmat @ axes
+            
+            for k in range(3):
+                axis_pts = np.stack([drone_positions[indices[i]], 
+                                   drone_positions[indices[i]] + axes_rot[:, k]])
+                axis_lines[k].set_data(pos=axis_pts)
+        
+        # Update subject trajectories
+        if len(subs_positions) > 0:
+            for j, sub_traj in enumerate(subs_positions):
+                subject_lines[j].set_data(pos=sub_traj[:indices[i]+1])
+                subject_dots[j].set_data(pos=sub_traj[indices[i]:indices[i]+1])
+                
+                # Update range spheres
+                if j < len(range_spheres):
+                    min_sphere, max_sphere = range_spheres[j]
+                    min_sphere.transform = vispy.visuals.transforms.STTransform(translate=sub_traj[indices[i]])
+                    max_sphere.transform = vispy.visuals.transforms.STTransform(translate=sub_traj[indices[i]])
+        
+        # Update viewcone
+        if viewcone_mesh is not None and drone_attitudes is not None:
+            att = drone_attitudes[indices[i]]
+            r = R.from_quat([att[1], att[2], att[3], att[0]])
+            rotmat = r.as_matrix()
+            R_sb = np.array(result["R_sb"])
+            
+            # Transform cone vertices
+            cone_mesh = create_sphere(radius=1.0, rows=10, cols=20)
+            verts = cone_mesh.get_vertices() * 30.0  # Scale to cone size
+            verts = (rotmat @ R_sb.T @ verts.T).T + drone_positions[indices[i]]
+            viewcone_mesh.set_data(vertices=verts, faces=cone_mesh.get_faces())
+        
+        ptr[0] += 1
+        canvas.update()
+    
+    def set_frame(i):
+        ptr[0] = i
+        update()
+    
+    timer = QTimer()
+    timer.timeout.connect(update)
+    timer.setInterval(30)
+    
+    def play():
+        if not playing[0]:
+            playing[0] = True
+            play_btn.setEnabled(False)
+            pause_btn.setEnabled(True)
+            timer.start()
+    
+    def pause():
+        playing[0] = False
+        play_btn.setEnabled(True)
+        pause_btn.setEnabled(False)
+        timer.stop()
+    
+    play_btn.clicked.connect(play)
+    pause_btn.clicked.connect(pause)
+    slider.valueChanged.connect(set_frame)
+    pause_btn.setEnabled(False)
+    
+    main_widget.setWindowTitle('Quadrotor Simulation (VisPy)')
+    main_widget.resize(1280, 800)
+    
+    # Draw initial frame
+    update()
+    
+    # Start Qt event loop
+    if not hasattr(QApplication.instance(), 'exec_'):
+        app.exec()
+    else:
+        QApplication.instance().exec_()
+
+def plot_camera_animation_pyqtgraph(result, params, step=2):
+    """
+    PyQtGraph version of plot_camera_animation: animates subject projections in the camera frame (2D).
+    """
+    import sys
+    import numpy as np
+    from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QWidget, QLabel
+    from PyQt5.QtCore import Qt
+    import pyqtgraph as pg
+    app = pg.QtWidgets.QApplication.instance() or pg.QtWidgets.QApplication(sys.argv)
+
+    # Get subject projections in the camera frame
+    _, subs_positions_sen, _, subs_positions_sen_node = full_subject_traj_time(result, params)
+    n_frames = len(subs_positions_sen[0])
+    indices = np.arange(0, n_frames, step)
+    if indices[-1] != n_frames-1:
+        indices = np.append(indices, n_frames-1)
+
+    # Camera viewcone boundary (red curve)
+    if "alpha_x" in result and "alpha_y" in result:
+        A = np.diag([1 / np.tan(np.pi / result["alpha_x"]), 1 / np.tan(np.pi / result["alpha_y"])])
+    else:
+        raise ValueError("`alpha_x` and `alpha_y` not found in result dictionary.")
+    n_cone = 400
+    theta = np.linspace(0, 2*np.pi, n_cone)
+    circle = np.stack([np.cos(theta), np.sin(theta)])
+    
+    # Use the correct norm type from the result
+    if "norm_type" in result:
+        if result["norm_type"] == np.inf or result["norm_type"] == 'inf':
+            z = np.linalg.norm(A @ circle, axis=0, ord=np.inf)
+        else:
+            z = np.linalg.norm(A @ circle, axis=0, ord=result["norm_type"])
+    else:
+        # Default to 2-norm if norm_type not specified
+        z = np.linalg.norm(A @ circle, axis=0)
+    
+    X = circle[0] / z
+    Y = circle[1] / z
+    # Repeat first point to close the curve
+    X = np.append(X, X[0])
+    Y = np.append(Y, Y[0])
+
+    # Main window and layout
+    main_widget = QWidget()
+    main_layout = QVBoxLayout(main_widget)
+    plot_widget = pg.PlotWidget()
+    plot_widget.setAspectLocked(True)
+    plot_widget.setRange(xRange=[-1.1, 1.1], yRange=[-1.1, 1.1])
+    plot_widget.showGrid(x=False, y=False)  # Remove grid lines
+    main_layout.addWidget(plot_widget)
+
+    # Controls
+    controls_layout = QHBoxLayout()
+    play_btn = QPushButton('Play')
+    pause_btn = QPushButton('Pause')
+    slider = QSlider(Qt.Horizontal)
+    slider.setMinimum(0)
+    slider.setMaximum(len(indices)-1)
+    slider.setSingleStep(1)
+    controls_layout.addWidget(play_btn)
+    controls_layout.addWidget(pause_btn)
+    controls_layout.addWidget(QLabel('Frame:'))
+    controls_layout.addWidget(slider)
+    main_layout.addLayout(controls_layout)
+    main_widget.show()
+
+    # Plot the camera viewcone boundary with thicker red line
+    viewcone_curve = plot_widget.plot(X, Y, pen=pg.mkPen('r', width=5))
+
+    # Prepare subject curves
+    subject_curves = []
+    subject_dots = []
+    colors = [pg.intColor(i, hues=len(subs_positions_sen)) for i in range(len(subs_positions_sen))]
+    for color in colors:
+        curve = plot_widget.plot([], [], pen=pg.mkPen(color, width=2))
+        dot = plot_widget.plot([], [], pen=None, symbol='o', symbolBrush=color, symbolSize=6)  # Even smaller dots
+        subject_curves.append(curve)
+        subject_dots.append(dot)
+
+    # Prepare nodal points - remove outline and make smaller
+    subject_node_dots = []
+    for color in colors:
+        node_dot = plot_widget.plot([], [], pen=None, symbol='o', symbolBrush=color, symbolSize=8)  # Smaller nodal points
+        subject_node_dots.append(node_dot)
+
+    ptr = [0]
+    playing = [False]
+
+    def update():
+        i = ptr[0]
+        if i >= len(indices):
+            timer.stop()
+            playing[0] = False
+            play_btn.setEnabled(True)
+            pause_btn.setEnabled(False)
+            return
+        slider.blockSignals(True)
+        slider.setValue(i)
+        slider.blockSignals(False)
+        frame_idx = indices[i]
+        for j, sub_traj in enumerate(subs_positions_sen):
+            # Project trajectory up to current frame
+            traj = np.array(sub_traj[:frame_idx+1])
+            x = traj[:,0] / traj[:,2]
+            y = traj[:,1] / traj[:,2]
+            subject_curves[j].setData(x, y)
+            # Current dot
+            subject_dots[j].setData([x[-1]], [y[-1]])
+            # Nodal points (if available)
+            if subs_positions_sen_node:
+                node_traj = np.array(subs_positions_sen_node[j])
+                node_idx = int((frame_idx // (len(sub_traj) / len(node_traj))) + 1)
+                node_traj = node_traj[:node_idx]
+                if len(node_traj) > 0:
+                    node_x = node_traj[:,0] / node_traj[:,2]
+                    node_y = node_traj[:,1] / node_traj[:,2]
+                    subject_node_dots[j].setData(node_x, node_y)
+                else:
+                    subject_node_dots[j].setData([], [])
+        ptr[0] += 1
+
+    def set_frame(i):
+        ptr[0] = i
+        update()
+
+    timer = pg.QtCore.QTimer()
+    timer.timeout.connect(update)
+    timer.setInterval(50)
+
+    def play():
+        if not playing[0]:
+            playing[0] = True
+            play_btn.setEnabled(False)
+            pause_btn.setEnabled(True)
+            timer.start()
+
+    def pause():
+        playing[0] = False
+        play_btn.setEnabled(True)
+        pause_btn.setEnabled(False)
+        timer.stop()
+
+    play_btn.clicked.connect(play)
+    pause_btn.clicked.connect(pause)
+    slider.valueChanged.connect(set_frame)
+    pause_btn.setEnabled(False)
+
+    main_widget.setWindowTitle('Camera Animation (pyqtgraph)')
+    main_widget.resize(800, 800)
+
+    update()  # Draw initial frame
+
+    if not hasattr(pg.QtWidgets.QApplication.instance(), 'exec_'):
+        app.exec()
+    else:
+        pg.QtWidgets.QApplication.instance().exec_()
