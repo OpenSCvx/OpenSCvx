@@ -36,23 +36,18 @@ to install OpenSCVx in your python environment.
 <details>
 <summary>Nightly</summary>
 
-Install Development / Nightly Version</summary>
-
-If you want the pre-release version, you can install the latest `nightly` build with:
+For the latest development version (nightly), clone the repository and install in editable mode:
 
 ```sh
-python3 -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --pre --upgrade openscvx
+# Clone the repo
+ git clone https://github.com/haynec/OpenSCvx.git
+ cd OpenSCvx
+
+# Install in editable/development mode
+ pip install -e .
 ```
 
-This command will also upgrade an existing `nightly` install to the latest version.
-
-Or if you want a specific pre-release version this can be installed with
-
-```sh
-python3 -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx==1.2.3.dev45
-```
-
-where `1.2.3.dev45 => <major>.<minor>.<patch>.dev<XY>` corresponds to your exact version
+This will install the latest code from the main branch and allow you to make local changes.
 
 </details>
 
