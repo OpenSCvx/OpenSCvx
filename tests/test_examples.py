@@ -4,17 +4,17 @@ import platform
 
 import jax
 
-from examples.params.cinema_vp import problem as cinema_vp_problem
-from examples.params.cinema_vp import plotting_dict as cinema_vp_plotting_dict
-from examples.params.dr_vp import problem as dr_vp_problem
-from examples.params.dr_vp import plotting_dict as dr_vp_plotting_dict
-from examples.params.obstacle_avoidance import problem as obstacle_avoidance_problem
-from examples.params.obstacle_avoidance import (
+from examples.drone.cinema_vp import problem as cinema_vp_problem
+from examples.drone.cinema_vp import plotting_dict as cinema_vp_plotting_dict
+from examples.drone.dr_vp import problem as dr_vp_problem
+from examples.drone.dr_vp import plotting_dict as dr_vp_plotting_dict
+from examples.drone.obstacle_avoidance import problem as obstacle_avoidance_problem
+from examples.drone.obstacle_avoidance import (
     plotting_dict as obstacle_avoidance_plotting_dict,
 )
-from examples.params.dr_vp_nodal import problem as dr_vp_polytope_problem
-from examples.params.dr_vp_nodal import plotting_dict as dr_vp_polytope_plotting_dict
-from examples.params.brachistochrone import problem as brachistochrone_problem
+from examples.drone.dr_vp_nodal import problem as dr_vp_polytope_problem
+from examples.drone.dr_vp_nodal import plotting_dict as dr_vp_polytope_plotting_dict
+from examples.abstract.brachistochrone import problem as brachistochrone_problem
 from examples.plotting import plot_camera_animation, plot_animation, plot_scp_animation
 
 # Import pyqtgraph testing helpers
