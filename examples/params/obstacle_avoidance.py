@@ -16,14 +16,14 @@ from openscvx.backend.state import State, Free, Minimize
 from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
 
-from examples.plotting import plot_animation, plot_animation_pyqtgraph
+from examples.plotting import plot_animation, plot_scp_animation, plot_scp_animation_pyqtgraph, plot_animation_pyqtgraph
 
 n = 6
 total_time = 4.0  # Total time for the simulation
 
 x = State("x", shape=(14,))  # State variable with 14 dimensions
 
-x.max = np.array([200., 10, 20, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100])
+x.max = np.array([200., 10, 20, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 10])
 x.min = np.array(
     [-200., -100, 0, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0]
 )
@@ -76,11 +76,16 @@ A_obs = []
 radius = []
 axes = []
 
-obstacle_centers = [
-    np.array([-5.1, 0.1, 2]),
-    np.array([0.1, 0.1, 2]),
-    np.array([5.1, 0.1, 2]),
-]
+# Convert obstacle centers to Parameters for real-time updates
+obs_center_1 = Parameter("obs_center_1", shape=(3,))
+obs_center_2 = Parameter("obs_center_2", shape=(3,))
+obs_center_3 = Parameter("obs_center_3", shape=(3,))
+
+obs_center_1.value = np.array([-5.1, 0.1, 2])
+obs_center_2.value = np.array([0.1, 0.1, 2])
+obs_center_3.value = np.array([5.1, 0.1, 2])
+
+obstacle_centers = [obs_center_1, obs_center_2, obs_center_3]
 
 np.random.seed(0)
 for _ in obstacle_centers:
@@ -90,13 +95,12 @@ for _ in obstacle_centers:
     radius.append(rad)
     A_obs.append(ax @ np.diag(rad**2) @ ax.T)
 
-
 constraints = []
-for center, A in zip(obstacle_centers, A_obs):
-    constraints.append(ctcs(lambda x_, u_: g_obs(center, A, x_)))
+constraints.append(ctcs(lambda x_, u_, obs_center_1_: g_obs(obs_center_1_, A_obs[0], x_)))
+constraints.append(ctcs(lambda x_, u_, obs_center_2_: g_obs(obs_center_2_, A_obs[1], x_)))
+constraints.append(ctcs(lambda x_, u_, obs_center_3_: g_obs(obs_center_3_, A_obs[2], x_)))
 constraints.append(ctcs(lambda x_, u_: x_ - x.true.max))
 constraints.append(ctcs(lambda x_, u_: x.true.min - x_))
-
 
 x.guess = np.linspace(x.initial, x.final, n)
 
@@ -104,6 +108,7 @@ problem = TrajOptProblem(
     dynamics=dynamics,
     x=x,
     u=u,
+    params=Parameter.get_all(),
     constraints=constraints,
     idx_time=len(x.max)-1,
     N=n,
@@ -131,5 +136,5 @@ if __name__ == "__main__":
 
     results.update(plotting_dict)
 
-    plot_animation(results, problem.settings).show()
-    # plot_animation_pyqtgraph(results, problem.settings)
+    # plot_scp_animation_pyqtgraph(results, problem.settings)
+    plot_animation(results, problem.settings)

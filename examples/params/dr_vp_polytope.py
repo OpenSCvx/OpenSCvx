@@ -19,7 +19,7 @@ from openscvx.backend.state import State, Free, Minimize
 from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
 
-from examples.plotting import plot_animation
+from examples.plotting import plot_animation_pyqtgraph
 
 
 n = 33  # Number of Nodes

@@ -23,7 +23,7 @@ total_time = 24.0  # Total time for the simulation
 
 x = State("x", shape=(14,))  # State variable with 14 dimensions
 
-x.max = np.array([ 200.0,  100, 50,  100,  100,  100,  1,  1,  1,  1,  10,  10,  10, 100]) 
+x.max = np.array([ 200.0,  100, 200,  100,  100,  100,  1,  1,  1,  1,  10,  10,  10, 100]) 
 x.min = np.array([-200.0, -100, 15, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10,   0])  # Lower Bound on the states
 
 x.initial = np.array([10.0, 0, 20, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0])
@@ -43,7 +43,16 @@ J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
 
 ### Gate Parameters ###
 n_gates = 10
-gate_centers = [
+
+# Create cvxpy.Parameters for gate centers, A_gate, and A_gate_c (A @ center)
+gate_center_params = []
+A_gate_c_params = []
+for i in range(n_gates):
+    gate_center_params.append(cp.Parameter(3, name=f"gate_center_{i}"))
+    A_gate_c_params.append(cp.Parameter(3, name=f"A_gate_c_{i}"))
+
+# Initialize gate centers
+initial_gate_centers = [
     np.array([59.436, 0.000, 20.0000]),
     np.array([92.964, -23.750, 25.5240]),
     np.array([92.964, -29.274, 20.0000]),
@@ -56,18 +65,28 @@ gate_centers = [
     np.array([22.250, -42.672, 20.0000]),
 ]
 
+# Set initial values for gate center parameters and A_gate_c_params
 radii = np.array([2.5, 1e-4, 2.5])
-A_gate = rot @ np.diag(1 / radii) @ rot.T
-A_gate_cen = []
-for center in gate_centers:
-    center[0] = center[0] + 2.5
-    center[2] = center[2] + 2.5
-    A_gate_cen.append(A_gate @ center)
+A_gate_param = cp.Parameter((3, 3), name="A_gate")
+A_gate_param.value = rot @ np.diag(1 / radii) @ rot.T
+
+# Create modified centers (matching original behavior exactly)
+modified_centers = []
+for center in initial_gate_centers:
+    modified_center = center.copy()
+    modified_center[0] = modified_center[0] + 2.5
+    modified_center[2] = modified_center[2] + 2.5
+    modified_centers.append(modified_center)
+
+for i, modified_center in enumerate(modified_centers):
+    gate_center_params[i].value = modified_center  # Use modified centers for parameters
+    A_gate_c_params[i].value = A_gate_param.value @ modified_center
+
 nodes_per_gate = 2
 gate_nodes = np.arange(nodes_per_gate, n, nodes_per_gate)
 vertices = []
-for center in gate_centers:
-    vertices.append(gen_vertices(center, radii))
+for modified_center in modified_centers:  # Use modified centers for vertices
+    vertices.append(gen_vertices(modified_center, radii))
 ### End Gate Parameters ###
 
 
@@ -76,14 +95,14 @@ constraints = [
     ctcs(lambda x_, u_: (x.true.min - x_)),
 ]
 
-for node, cen in zip(gate_nodes, A_gate_cen):
+for node, A_c in zip(gate_nodes, A_gate_c_params):
     constraints.append(
         nodal(
-            lambda x_, u_, A=A_gate, c=cen: cp.norm(A @ x_[:3] - c, "inf") <= 1,
+            lambda x_, u_, A=A_gate_param, Ac=A_c: cp.norm(A @ x_[:3] - Ac, "inf") <= 1,
             nodes=[node],
             convex=True,
         )
-    )  # use local variables inside the lambda function
+    )
 
 
 @dynamics
@@ -113,7 +132,7 @@ x_bar = np.linspace(x.initial, x.final, n)
 i = 0
 origins = [x.initial[:3]]
 ends = []
-for center in gate_centers:
+for center in modified_centers:  # Use modified centers for initial guess
     origins.append(center)
     ends.append(center)
 ends.append(x.final[:3])
@@ -135,6 +154,7 @@ problem = TrajOptProblem(
     constraints=constraints,
     idx_time=len(x.max)-1,
     N=n,
+    # licq_max=1E-8
 )
 
 problem.settings.prp.dt = 0.01
@@ -145,12 +165,12 @@ problem.settings.scp.lam_vc = 1e1  # 1e1,  # Weight on the Virtual Control Objec
 problem.settings.scp.ep_tr = 1e-3  # Trust Region Tolerance
 problem.settings.scp.ep_vb = 1e-4  # Virtual Control Tolerance
 problem.settings.scp.ep_vc = 1e-8  # Virtual Control Tolerance for CTCS
-problem.settings.scp.cost_drop = 10  # SCP iteration to relax minimal final time objective
-problem.settings.scp.cost_relax = 0.8  # Minimal Time Relaxation Factor
+# problem.settings.scp.cost_drop = 10  # SCP iteration to relax minimal final time objective
+# problem.settings.scp.cost_relax = 0.8  # Minimal Time Relaxation Factor
 problem.settings.scp.w_tr_adapt = 1.4  # Trust Region Adaptation Factor
 problem.settings.scp.w_tr_max_scaling_factor = 1e2  # Maximum Trust Region Weight
 
-plotting_dict = dict(vertices=vertices)
+plotting_dict = dict(vertices=vertices, gate_center_params=gate_center_params, A_gate_param=A_gate_param, A_gate_c_params=A_gate_c_params)
 
 if __name__ == "__main__":
     problem.initialize()
