@@ -15,7 +15,7 @@ from openscvx.backend.state import State, Free, Maximize, Minimize
 from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
 
-from examples.plotting import plot_scp_animation, plot_control_norm, plot_xy_xz_yz, plot_animation_3DoF_rocket
+from examples.plotting import plot_scp_animation, plot_control_norm, plot_xy_xz_yz, plot_animation_3DoF_rocket, plot_animation
 from openscvx.plotting import plot_state, plot_control
 
 n = 30
@@ -156,3 +156,6 @@ if __name__ == "__main__":
     # plot_control(results, problem.settings).show()
     plot_control_norm(results, problem.settings).show()
     plot_xy_xz_yz(results, problem.settings).show()
+
+    # If installed with extras, you can use the following to plot with pyqtgraph
+    # plot_animation_pyqtgraph(results, problem.settings)
