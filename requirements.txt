@@ -9,3 +9,9 @@ termcolor
 diffrax
 absl-py
 flatbuffers
+# GUI plotting dependencies (optional)
+pyqtgraph
+PyQt5
+scipy
+PyOpenGL
+PyOpenGL_accelerate

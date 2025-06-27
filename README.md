@@ -36,23 +36,18 @@ to install OpenSCVx in your python environment.
 <details>
 <summary>Nightly</summary>
 
-Install Development / Nightly Version</summary>
-
-If you want the pre-release version, you can install the latest `nightly` build with:
+For the latest development version (nightly), clone the repository and install in editable mode:
 
 ```sh
-python3 -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --pre --upgrade openscvx
+# Clone the repo
+ git clone https://github.com/haynec/OpenSCvx.git
+ cd OpenSCvx
+
+# Install in editable/development mode
+ pip install -e .
 ```
 
-This command will also upgrade an existing `nightly` install to the latest version.
-
-Or if you want a specific pre-release version this can be installed with
-
-```sh
-python3 -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx==1.2.3.dev45
-```
-
-where `1.2.3.dev45 => <major>.<minor>.<patch>.dev<XY>` corresponds to your exact version
+This will install the code as a package and allow you to make local changes.
 
 </details>
 
@@ -68,6 +63,35 @@ The main packages are:
 - `plotly` - is used for all visualizations
 
 These will be installed automatically, but can be installed via conda or pip if you are building from source.
+
+#### GUI Dependencies (Optional)
+
+For interactive 3D plotting and real-time visualization, additional packages are required:
+
+- `pyqtgraph` - is used for interactive 3D plotting and real-time visualization
+- `PyQt5` - provides the Qt5 GUI framework for pyqtgraph
+- `scipy` - is used for spatial transformations in plotting functions
+- `PyOpenGL` - provides OpenGL bindings for Python, required for 3D plotting
+- `PyOpenGL_accelerate` - (optional) speeds up PyOpenGL
+
+
+For local development:
+
+```sh
+pip install -e ".[gui]"
+```
+
+Or with conda:
+
+```sh
+conda env update -f environment.yml
+```
+
+The GUI features include:
+- Interactive 3D trajectory visualization with `plot_animation_pyqtgraph()`
+- SCP iteration animation with `plot_scp_animation_pyqtgraph()`
+- Camera view animation with `plot_camera_animation_pyqtgraph()`
+- Real-time optimization visualization in examples like `drone_racing_realtime.py`
 
 ### Local Development
 

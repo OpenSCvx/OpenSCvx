@@ -3,9 +3,10 @@ import jax.numpy as jnp
 
 from openscvx.propagation import s_to_t, t_to_tau, simulate_nonlinear_time
 from openscvx.config import Config
+from openscvx.results import OptimizationResults
 
 
-def propagate_trajectory_results(params: dict, settings: Config, result: dict, propagation_solver: callable) -> dict:
+def propagate_trajectory_results(params: dict, settings: Config, result: OptimizationResults, propagation_solver: callable) -> OptimizationResults:
     """Propagate the optimal trajectory and compute additional results.
     
     This function takes the optimal control solution and propagates it through the
@@ -14,18 +15,19 @@ def propagate_trajectory_results(params: dict, settings: Config, result: dict, p
     Args:
         params (dict): System parameters.
         settings (Config): Configuration settings.
-        result (dict): Dictionary containing the optimization results.
+        result (OptimizationResults): Optimization results object.
         propagation_solver (callable): Function for propagating the system state.
         
     Returns:
-        dict: Updated result dictionary containing:
+        OptimizationResults: Updated results object containing:
             - t_full: Full time vector
             - x_full: Full state trajectory
             - u_full: Full control trajectory
-            - Original optimization results
+            - cost: Computed cost
+            - ctcs_violation: CTCS constraint violation
     """
-    x = result["x"]
-    u = result["u"]
+    x = result.x
+    u = result.u
 
     t = np.array(s_to_t(x, u, settings)).squeeze()
 
@@ -65,13 +67,11 @@ def propagate_trajectory_results(params: dict, settings: Config, result: dict, p
     # Calculate CTCS constraint violation
     ctcs_violation = x_full[-1, settings.sim.idx_y_prop]
 
-    more_result = dict(
-        t_full=t_full, 
-        x_full=x_full, 
-        u_full=u_full,
-        cost=cost,
-        ctcs_violation=ctcs_violation
-    )
+    # Update the results object with post-processing data
+    result.t_full = t_full
+    result.x_full = x_full
+    result.u_full = u_full
+    result.cost = cost
+    result.ctcs_violation = ctcs_violation
 
-    result.update(more_result)
     return result

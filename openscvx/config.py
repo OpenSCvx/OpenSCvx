@@ -112,7 +112,7 @@ class PropagationConfig:
     def __init__(
         self,
         inter_sample: int = 30,
-        dt: float = 0.1,
+        dt: float = 0.01,
         solver: str = "Dopri8",
         max_tau_len: int = 1000,
         args: Optional[Dict] = None,

@@ -74,11 +74,16 @@ A_obs = []
 radius = []
 axes = []
 
-obstacle_centers = [
-    np.array([-5.1, 0.1, 2]),
-    np.array([0.1, 0.1, 2]),
-    np.array([5.1, 0.1, 2]),
-]
+# Define obstacle centers as Parameters
+obs_center_1 = Parameter("obs_center_1", shape=(3,))
+obs_center_2 = Parameter("obs_center_2", shape=(3,))
+obs_center_3 = Parameter("obs_center_3", shape=(3,))
+
+obs_center_1.value = np.array([-5.1, 0.1, 2])
+obs_center_2.value = np.array([0.1, 0.1, 2])
+obs_center_3.value = np.array([5.1, 0.1, 2])
+
+obstacle_centers = [obs_center_1, obs_center_2, obs_center_3]
 
 np.random.seed(0)
 for _ in obstacle_centers:
@@ -88,14 +93,12 @@ for _ in obstacle_centers:
     radius.append(rad)
     A_obs.append(ax @ np.diag(rad**2) @ ax.T)
 
-
 constraints = []
-for center, A_obs_s in zip(obstacle_centers, A_obs):
-    # constraints.append(ctcs(lambda x, u: g_obs(center, A, x)))
-    constraints.append(nodal(lambda x_, u_, c=center, A=A_obs_s: g_obs(x_, u_, c, A), convex=False))
+constraints.append(nodal(lambda x_, u_, obs_center_1_=obs_center_1, A=A_obs[0]: g_obs(x_, u_, obs_center_1_.value, A), convex=False))
+constraints.append(nodal(lambda x_, u_, obs_center_2_=obs_center_2, A=A_obs[1]: g_obs(x_, u_, obs_center_2_.value, A), convex=False))
+constraints.append(nodal(lambda x_, u_, obs_center_3_=obs_center_3, A=A_obs[2]: g_obs(x_, u_, obs_center_3_.value, A), convex=False))
 constraints.append(ctcs(lambda x_, u_: x_ - x.true.max))
 constraints.append(ctcs(lambda x_, u_: x.true.min - x_))
-
 
 x.guess = np.linspace(x.initial, x.final, n)
 
@@ -103,11 +106,13 @@ problem = TrajOptProblem(
     dynamics=dynamics,
     x=x,
     u=u,
+    params=Parameter.get_all(),
     constraints=constraints,
     idx_time=len(x.max)-1,
     N=n,
 )
 
+problem.settings.prp.dt = 0.01
 problem.settings.scp.lam_vb = 1E0
 problem.settings.scp.cost_drop = 4  # SCP iteration to relax minimal final time objective
 problem.settings.scp.cost_relax = 0.5  # Minimal Time Relaxation Factor

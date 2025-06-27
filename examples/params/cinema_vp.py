@@ -17,7 +17,7 @@ from openscvx.backend.state import State, Free, Minimize
 from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
 
-from examples.plotting import plot_animation
+from examples.plotting import plot_animation_pyqtgraph, plot_animation
 
 n = 12  # Number of Nodes
 total_time = 40.0  # Total time for the simulation
@@ -138,7 +138,6 @@ problem = TrajOptProblem(
     licq_max=1e-8,
 )
 
-problem.settings.prp.dt = 0.1
 
 problem.settings.scp.w_tr = 4e0  # Weight on the Trust Reigon
 problem.settings.scp.lam_cost = 1e-2  # Weight on the Minimal Fuel Objective

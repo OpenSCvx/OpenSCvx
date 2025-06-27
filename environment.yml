@@ -8,6 +8,10 @@ dependencies:
   - numpy
   - termcolor
   - plotly
+  - scipy
+  - pyqtgraph
+  - pyqt
+  - pyopengl
   - pip:
       - jax
       - cvxpy

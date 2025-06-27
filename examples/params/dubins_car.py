@@ -17,7 +17,7 @@ from openscvx.backend.control import Control
 from examples.plotting import plot_dubins_car
 
 n = 8
-total_time = 2.0  # Total simulation time
+total_time = 1.2  # Total simulation time
 
 # Define State and Control symbolic variables
 x = State("x", shape=(4,))
@@ -26,7 +26,7 @@ u = Control("u", shape=(2,))
 
 # Set bounds on state
 x.min = np.array([-5., -5., -2 * jnp.pi,  0])
-x.max = np.array([ 5.,  5.,  2 * jnp.pi, 50])
+x.max = np.array([ 5.,  5.,  2 * jnp.pi, 20])
 
 # Set initial, final, and guess for state trajectory using symbolic boundary expressions
 x.initial = np.array([0, -2, 0, 0])
@@ -46,7 +46,7 @@ obs_radius = Parameter("obs_radius", shape=())
 
 
 obs_radius.value = 1.0
-obs_center.value = np.array([-0.01, 0.0])  # Center of the obstacle
+obs_center.value = np.array([-2.01, 0.0])  # Center of the obstacle
 
 # Define constraints using symbolic x, u, and parameters
 constraints = [
@@ -75,15 +75,24 @@ problem = TrajOptProblem(
     constraints=constraints,
     N=n,
     licq_max=1e-8,
+    time_dilation_factor_min=0.02
 )
 
 # Set solver parameters
 problem.settings.prp.dt = 0.01
-problem.settings.scp.w_tr_adapt = 1.3
+# problem.settings.scp.w_tr_adapt = 1.3
 problem.settings.scp.w_tr = 1e0
-problem.settings.scp.lam_cost = 1e-1
-problem.settings.scp.lam_vc = 6e2
+problem.settings.scp.lam_cost = 4e1
+problem.settings.scp.lam_vc = 1e3
 problem.settings.scp.uniform_time_grid = True
+
+# Enable CLI printing for optimization iterations
+problem.settings.dev.printing = True
+
+problem.settings.cvx.cvxpygen = True
+problem.settings.cvx.solver = "qocogen"
+problem.settings.cvx.solver_args = {}
+# problem.settings.cvx.cvxpygen_override = True
 
 
 plotting_dict = dict(

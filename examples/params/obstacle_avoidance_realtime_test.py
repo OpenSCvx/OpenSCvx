@@ -16,7 +16,7 @@ from openscvx.backend.state import State, Free, Minimize
 from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
 
-from examples.plotting import plot_animation, plot_scp_animation, plot_scp_animation_pyqtgraph, plot_animation_pyqtgraph
+from examples.plotting import plot_animation, plot_animation_pyqtgraph
 
 n = 6
 total_time = 4.0  # Total time for the simulation
@@ -112,15 +112,14 @@ problem = TrajOptProblem(
     constraints=constraints,
     idx_time=len(x.max)-1,
     N=n,
-    licq_max=1E-8
+    licq_max=1E-8,
+    time_dilation_factor_min=0.15
 )
 
-problem.settings.scp.w_tr_adapt = 1.8
-problem.settings.scp.w_tr = 1e1
-problem.settings.scp.lam_cost = 1e1  # Weight on the Nonlinear Cost
+problem.settings.scp.w_tr_adapt = 1
+problem.settings.scp.w_tr = 4e0
+problem.settings.scp.lam_cost = 4e1  # Weight on the Nonlinear Cost
 problem.settings.scp.lam_vc = 1e2  # Weight on the Virtual Control Objective
-problem.settings.scp.cost_drop = 4  # SCP iteration to relax minimal final time objective
-problem.settings.scp.cost_relax = 0.5  # Minimal Time Relaxation Factor
 
 problem.settings.prp.dt = 0.01
 plotting_dict = dict(
@@ -136,5 +135,5 @@ if __name__ == "__main__":
 
     results.update(plotting_dict)
 
-    # plot_scp_animation_pyqtgraph(results, problem.settings)
-    plot_animation(results, problem.settings)
+    plot_animation(results, problem.settings).show()
+    # plot_animation_pyqtgraph(results, problem.settings)

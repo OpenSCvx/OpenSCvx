@@ -15,7 +15,7 @@ from openscvx.backend.state import State, Free, Maximize, Minimize
 from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
 
-from examples.plotting import plot_scp_animation, plot_control_norm, plot_xy_xz_yz, plot_animation_3DoF_rocket
+from examples.plotting import plot_scp_animation, plot_control_norm, plot_xy_xz_yz, plot_animation_3DoF_rocket, plot_animation
 from openscvx.plotting import plot_state, plot_control
 
 n = 30
@@ -73,7 +73,7 @@ constraints = [
     ctcs(lambda x_, u_: jnp.linalg.norm(u_[:3]) - rho_max, idx=1, scaling=1E-4),
     ctcs(lambda x_, u_: jnp.cos((180-40) * jnp.pi/180) - u_[2] / jnp.linalg.norm(u_[:3]), idx=2),
     ctcs(lambda x_, u_: jnp.linalg.norm(jnp.array([x_[0], x_[1]])) - jnp.tan((86) * jnp.pi / 180) * x_[2], idx=3),
-    # nodal(lambda x_, u_: u_[:2] == 0, nodes = [-1], convex = True)
+    # nodal(lambda x_, u_: u_[:2] == 0, nodes = [-1], convex = True)22
 ]
 
 # Define dynamics
@@ -156,3 +156,6 @@ if __name__ == "__main__":
     # plot_control(results, problem.settings).show()
     plot_control_norm(results, problem.settings).show()
     plot_xy_xz_yz(results, problem.settings).show()
+
+    # If installed with extras, you can use the following to plot with pyqtgraph
+    # plot_animation_pyqtgraph(results, problem.settings)

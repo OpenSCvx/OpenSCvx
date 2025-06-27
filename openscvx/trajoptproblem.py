@@ -29,7 +29,7 @@ from openscvx.discretization import get_discretization_solver
 from openscvx.propagation import get_propagation_solver
 from openscvx.constraints.ctcs import CTCSConstraint
 from openscvx.constraints.nodal import NodalConstraint
-from openscvx.ptr import PTR_init, PTR_main
+from openscvx.ptr import PTR_init, PTR_subproblem, format_result
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.ocp import OptimalControlProblem
 from openscvx import io
@@ -37,6 +37,7 @@ from openscvx.utils import stable_function_hash
 from openscvx.backend.state import State, Free
 from openscvx.backend.control import Control
 from openscvx.backend.parameter import Parameter
+from openscvx.results import OptimizationResults
 
 
 
@@ -238,6 +239,15 @@ class TrajOptProblem:
         self.timing_solve = None
         self.timing_post = None
 
+        # SCP state variables
+        self.scp_k = 0
+        self.scp_J_tr = 1e2
+        self.scp_J_vb = 1e2
+        self.scp_J_vc = 1e2
+        self.scp_trajs = []
+        self.scp_controls = []
+        self.scp_V_multi_shoot_traj = []
+
     def initialize(self):
         io.intro()
 
@@ -398,16 +408,111 @@ class TrajOptProblem:
         )
         print("✓ SCvx Subproblem Solver initialized")
 
+        # Reset SCP state
+        self.scp_k = 1
+        self.scp_J_tr = 1e2
+        self.scp_J_vb = 1e2
+        self.scp_J_vc = 1e2
+        self.scp_trajs = [self.settings.sim.x.guess]
+        self.scp_controls = [self.settings.sim.u.guess]
+        self.scp_V_multi_shoot_traj = []
+
         t_f_while = time.time()
         self.timing_init = t_f_while - t_0_while
         print("Total Initialization Time: ", self.timing_init)
+
+        # Robust priming call for propagation_solver.call (no debug prints)
+        try:
+            x_0 = np.ones(self.settings.sim.x_prop.initial.shape, dtype=self.settings.sim.x_prop.initial.dtype)
+            tau_grid = (0.0, 1.0)
+            controls_current = np.ones((1, self.settings.sim.u.shape[0]), dtype=self.settings.sim.u.guess.dtype)
+            controls_next = np.ones((1, self.settings.sim.u.shape[0]), dtype=self.settings.sim.u.guess.dtype)
+            tau_init = np.array([[0.0]], dtype=np.float64)
+            node = np.array([[0]], dtype=np.int64)
+            idx_s_stop = self.settings.sim.idx_s.stop
+            save_time = np.ones((self.settings.prp.max_tau_len,), dtype=np.float64)
+            mask_padded = np.ones((self.settings.prp.max_tau_len,), dtype=bool)
+            param_values = [np.ones_like(param.value) if hasattr(param.value, 'shape') else float(param.value) for _, param in self.params.items()]
+            self.propagation_solver.call(
+                x_0, tau_grid, controls_current, controls_next, tau_init, node, idx_s_stop, save_time, mask_padded, *param_values
+            )
+        except Exception as e:
+            print(f"[Initialization] Priming propagation_solver.call failed: {e}")
 
         if self.settings.dev.profiling:
             pr.disable()
             # Save results so it can be viusualized with snakeviz
             pr.dump_stats("profiling_initialize.prof")
 
-    def solve(self):
+    def step(self):
+        """Performs a single SCP iteration.
+        
+        This method is designed for real-time plotting and interactive optimization.
+        It performs one complete SCP iteration including subproblem solving,
+        state updates, and progress emission for real-time visualization.
+        
+        Returns:
+            dict: Dictionary containing convergence status and current state
+        """
+        x = self.settings.sim.x
+        u = self.settings.sim.u
+
+        # Run the subproblem
+        x_sol, u_sol, cost, J_total, J_vb_vec, J_vc_vec, J_tr_vec, prob_stat, V_multi_shoot, subprop_time, dis_time = PTR_subproblem(
+            self.params.items(),
+            self.cpg_solve,
+            x,
+            u,
+            self.discretization_solver,
+            self.optimal_control_problem,
+            self.settings,
+        )
+
+        # Update state
+        self.scp_V_multi_shoot_traj.append(V_multi_shoot)
+        x.guess = x_sol
+        u.guess = u_sol
+        self.scp_trajs.append(x.guess)
+        self.scp_controls.append(u.guess)
+
+        self.scp_J_tr = np.sum(np.array(J_tr_vec))
+        self.scp_J_vb = np.sum(np.array(J_vb_vec))
+        self.scp_J_vc = np.sum(np.array(J_vc_vec))
+
+        # Update weights
+        self.settings.scp.w_tr = min(self.settings.scp.w_tr * self.settings.scp.w_tr_adapt, self.settings.scp.w_tr_max)
+        if self.scp_k > self.settings.scp.cost_drop:
+            self.settings.scp.lam_cost = self.settings.scp.lam_cost * self.settings.scp.cost_relax
+
+        # Emit data
+        self.emitter_function(
+            {
+                "iter": self.scp_k,
+                "dis_time": dis_time * 1000.0,
+                "subprop_time": subprop_time * 1000.0,
+                "J_total": J_total,
+                "J_tr": self.scp_J_tr,
+                "J_vb": self.scp_J_vb,
+                "J_vc": self.scp_J_vc,
+                "cost": cost[-1],
+                "prob_stat": prob_stat,
+            }
+        )
+
+        # Increment counter
+        self.scp_k += 1
+
+        # Create a result dictionary for this step
+        return {
+            "converged": (self.scp_J_tr < self.settings.scp.ep_tr) and \
+                         (self.scp_J_vb < self.settings.scp.ep_vb) and \
+                         (self.scp_J_vc < self.settings.scp.ep_vc),
+            "u": u,
+            "x": x,
+            "V_multi_shoot": V_multi_shoot
+        }
+
+    def solve(self, max_iters: Optional[int] = None, continuous: bool = False) -> OptimizationResults:
         # Ensure parameter sizes and normalization are correct
         self.settings.scp.__post_init__()
         self.settings.sim.__post_init__()
@@ -427,15 +532,13 @@ class TrajOptProblem:
         t_0_while = time.time()
         # Print top header for solver results
         io.header()
-
-        result = PTR_main(
-            self.params,
-            self.settings,
-            self.optimal_control_problem,
-            self.discretization_solver,
-            self.cpg_solve,
-            self.emitter_function,
-        )
+        
+        k_max = max_iters if max_iters is not None else self.settings.scp.k_max
+        
+        while self.scp_k <= k_max:
+            result = self.step()
+            if result["converged"] and not continuous:
+                break
 
         t_f_while = time.time()
         self.timing_solve = t_f_while - t_0_while
@@ -452,9 +555,9 @@ class TrajOptProblem:
             # Save results so it can be viusualized with snakeviz
             pr.dump_stats("profiling_solve.prof")
 
-        return result
+        return format_result(self, self.scp_k <= k_max)
 
-    def post_process(self, result):
+    def post_process(self, result: OptimizationResults) -> OptimizationResults:
         # Enable the profiler
         if self.settings.dev.profiling:
             import cProfile
