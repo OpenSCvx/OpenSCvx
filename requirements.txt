@@ -13,3 +13,5 @@ flatbuffers
 pyqtgraph
 PyQt5
 scipy
+PyOpenGL
+PyOpenGL_accelerate
