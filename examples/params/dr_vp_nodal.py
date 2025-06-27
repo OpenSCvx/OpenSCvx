@@ -214,6 +214,6 @@ if __name__ == "__main__":
     results = problem.solve()
     results = problem.post_process(results)
 
-    results.update(plotting_dict)
+    results.update_plotting_data(**plotting_dict)
 
     plot_animation(results, problem.settings).show()

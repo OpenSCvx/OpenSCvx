@@ -6,12 +6,13 @@ import pickle
 
 from openscvx.utils import qdcm, get_kp_pose
 from openscvx.config import Config
+from openscvx.results import OptimizationResults
 
-def full_subject_traj_time(results, params):
-    x_full = results["x_full"]
-    x_nodes = results["x"]
+def full_subject_traj_time(results: OptimizationResults, params: Config):
+    x_full = results.x_full
+    x_nodes = results.x
     t_nodes = x_nodes[:,params.sim.idx_t]
-    t_full = results['t_full']
+    t_full = results.t_full
     subs_traj = []
     subs_traj_node = []
     subs_traj_sen = []
@@ -19,11 +20,12 @@ def full_subject_traj_time(results, params):
     
     # if hasattr(params.dyn, 'get_kp_pose'):
     if "moving_subject" in results and "init_poses" in results:
-        init_poses = results["init_poses"]
+        init_poses = results.plotting_data["init_poses"]
         subs_traj.append(get_kp_pose(t_full, init_poses))
         subs_traj_node.append(get_kp_pose(t_nodes, init_poses))
     elif "init_poses" in results:
-        for pose in results["init_poses"]:
+        init_poses = results.plotting_data["init_poses"]
+        for pose in init_poses:
             # repeat the pose for all time steps
             pose_full = np.repeat(pose[:,np.newaxis], x_full.shape[0], axis=1).T
             subs_traj.append(pose_full)
@@ -34,7 +36,7 @@ def full_subject_traj_time(results, params):
         raise ValueError("No valid method to get keypoint poses.")
 
     if "R_sb" in results:
-        R_sb = results["R_sb"]
+        R_sb = results.plotting_data["R_sb"]
         for sub_traj in subs_traj:
             sub_traj_sen = []
             for i in range(x_full.shape[0]):
@@ -50,7 +52,7 @@ def full_subject_traj_time(results, params):
             subs_traj_sen_node.append(np.array(sub_traj_sen_node).squeeze())
         return subs_traj, subs_traj_sen, subs_traj_node, subs_traj_sen_node
     else:
-        raise ValueError("`R_sb` not found in results dictionary. Cannot compute sensor frame.")
+        raise ValueError("`R_sb` not found in results. Cannot compute sensor frame.")
 
 def save_gate_parameters(gates, params: Config):
     gate_centers = []
@@ -75,26 +77,26 @@ def frame_args(duration):
             "transition": {"duration": duration, "easing": "linear"},
             }
 
-def plot_constraint_violation(result, params: Config):
+def plot_constraint_violation(result: OptimizationResults, params: Config):
     fig = make_subplots(rows=2, cols=3, subplot_titles=(r'$\text{Obstacle Violation}$', r'$\text{Sub VP Violation}$', r'$\text{Sub Min Violation}$', r'$\text{Sub Max Violation}$', r'$\text{Sub Direc Violation}$', r'$\text{State Bound Violation}$', r'$\text{Total Violation}$'))
     fig.update_layout(template='plotly_dark', title=r'$\text{Constraint Violation}$')
 
     if "obs_vio" in result:
-        obs_vio = result["obs_vio"]
+        obs_vio = result.plotting_data["obs_vio"]
         for i in range(obs_vio.shape[0]):
             color = f'rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})'
             fig.add_trace(go.Scatter(y=obs_vio[i], mode='lines', showlegend=False, line=dict(color=color, width = 2)), row=1, col=1)
         i = 0
     else:
-        print("'obs_vio' not found in result dictionary.")
+        print("'obs_vio' not found in result.")
 
     # Make names of each state in the state vector
     state_names = ['x', 'y', 'z', 'vx', 'vy', 'vz', 'q0', 'q1', 'q2', 'q3', 'wx', 'wy', 'wz', 'ctcs']
 
     if "sub_vp_vio" in result and "sub_min_vio" in result and "sub_max_vio" in result:
-        sub_vp_vio = result["sub_vp_vio"]
-        sub_min_vio = result["sub_min_vio"]
-        sub_max_vio = result["sub_max_vio"]
+        sub_vp_vio = result.plotting_data["sub_vp_vio"]
+        sub_min_vio = result.plotting_data["sub_min_vio"]
+        sub_max_vio = result.plotting_data["sub_max_vio"]
         for i in range(sub_vp_vio.shape[0]):
             color = f'rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})'
             fig.add_trace(go.Scatter(y=sub_vp_vio[i], mode='lines', showlegend=True, name = 'LoS ' + str(i) + ' Error', line=dict(color=color, width = 2)), row=1, col=2)
@@ -106,28 +108,28 @@ def plot_constraint_violation(result, params: Config):
                 fig.add_trace(go.Scatter(y=[], mode='lines', showlegend=False, line=dict(color=color, width = 2)), row=2, col=1)
         i = 0
     else:
-        print("'sub_vp_vio', 'sub_min_vio', or 'sub_max_vio' not found in result dictionary.")
+        print("'sub_vp_vio', 'sub_min_vio', or 'sub_max_vio' not found in result.")
     
     if "sub_direc_vio" in result:
-        sub_direc_vio = result["sub_direc_vio"]
+        sub_direc_vio = result.plotting_data["sub_direc_vio"]
         # fig.add_trace(go.Scatter(y=sub_direc_vio, mode='lines', showlegend=False, line=dict(color='red', width = 2)), row=2, col=2)
     else:
-        print("'sub_direc_vio' not found in result dictionary.")
+        print("'sub_direc_vio' not found in result.")
 
     if "state_bound_vio" in result:
-        state_bound_vio = result["state_bound_vio"]
+        state_bound_vio = result.plotting_data["state_bound_vio"]
         for i in range(state_bound_vio.shape[0]):
             color = f'rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})'
             fig.add_trace(go.Scatter(y=state_bound_vio[:,i], mode='lines', showlegend=True, name = state_names[i] + ' Error', line=dict(color=color, width = 2)), row=2, col=3)
     else:
-        print("'state_bound_vio' not found in result dictionary.")
+        print("'state_bound_vio' not found in result.")
 
     fig.show()
 
-def plot_initial_guess(result, params: Config):
-    x_positions = result["x"][0:3]
-    x_attitude = result["x"][6:10]
-    subs_positions = result["sub_positions"]
+def plot_initial_guess(result: OptimizationResults, params: Config):
+    x_positions = result.x.guess[:, 0:3].T
+    x_attitude = result.x.guess[:, 6:10].T
+    subs_positions = result.plotting_data["sub_positions"]
 
     fig = go.Figure(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='gray', width = 2)))
 
@@ -172,17 +174,17 @@ def plot_initial_guess(result, params: Config):
         fig.add_trace(go.Scatter3d(x=sub_positions[:,0], y=sub_positions[:,1], z=sub_positions[:,2], mode='lines+markers', line=dict(color='red', width = 5), name='Subject'))
     fig.show()
 
-def plot_scp_animation(result: dict,
+def plot_scp_animation(result: OptimizationResults,
                        params = None,
                        path=""):
-    tof = result["t_final"]
+    tof = result.t_final
     title = f'SCP Simulation: {tof} seconds'
-    drone_positions = result["x_full"][:, :3]
-    drone_attitudes = result["x_full"][:, 6:10]
-    drone_forces = result["u_full"][:, :3]
-    scp_interp_trajs = scp_traj_interp(result["x_history"], params)
-    scp_ctcs_trajs = result["x_history"]
-    scp_multi_shoot = result["discretization"]
+    drone_positions = result.x_full[:, :3]
+    drone_attitudes = result.x_full[:, 6:10]
+    drone_forces = result.u_full[:, :3]
+    scp_interp_trajs = scp_traj_interp(result.x_history, params)
+    scp_ctcs_trajs = result.x_history
+    scp_multi_shoot = result.discretization_history
     # obstacles = result_ctcs["obstacles"]
     # gates = result_ctcs["gates"]
     if "moving_subject" in result or "init_poses" in result:
@@ -289,14 +291,14 @@ def plot_scp_animation(result: dict,
             fig.add_trace(go.Surface(x=points[:, 0].reshape(n,n), y=points[:, 1].reshape(n,n), z=points[:, 2].reshape(n,n), opacity = 0.5, showscale=False))
 
     if "vertices" in result:
-        for vertices in result["vertices"]:
+        for vertices in result.plotting_data["vertices"]:
             # Plot a line through the vertices of the gate
             fig.add_trace(go.Scatter3d(x=[vertices[0][0], vertices[1][0], vertices[2][0], vertices[3][0], vertices[0][0]], y=[vertices[0][1], vertices[1][1], vertices[2][1], vertices[3][1], vertices[0][1]], z=[vertices[0][2], vertices[1][2], vertices[2][2], vertices[3][2], vertices[0][2]], mode='lines', showlegend=False, line=dict(color='blue', width=10)))
             
     # Add the subject positions
-    if "n_subs" in result and result["n_subs"] != 0:     
+    if "n_subs" in result and result.plotting_data["n_subs"] != 0:     
         if "moving_subject" in result:
-            if result["moving_subject"]:
+            if result.plotting_data["moving_subject"]:
                 for sub_positions in subs_positions:
                     fig.add_trace(go.Scatter3d(x=sub_positions[:,0], y=sub_positions[:,1], z=sub_positions[:,2], mode='lines', line=dict(color='red', width = 5), showlegend=False))
         else:
@@ -419,10 +421,10 @@ def scp_traj_interp(scp_trajs, params: Config):
         scp_prop_trajs.append(np.array(states))
     return scp_prop_trajs
 
-def plot_state(result, params: Config):
-    x_full = result["x_full"]
-    t_full = result["t_full"]
-    dis_history = result['discretization_history']
+def plot_state(result: OptimizationResults, params: Config):
+    x_full = result.x_full
+    t_full = result.t_full
+    dis_history = result.discretization_history
 
     n_x = params.sim.n_states
 
@@ -442,9 +444,9 @@ def plot_state(result, params: Config):
 
     return fig
 
-def plot_control(result, params: Config):
-    u_full = result["u_full"]
-    t_full = result["t_full"]
+def plot_control(result: OptimizationResults, params: Config):
+    u_full = result.u_full
+    t_full = result.t_full
 
     u = params.sim.u
     x = params.sim.x
@@ -464,12 +466,12 @@ def plot_control(result, params: Config):
 
     return fig
 
-def plot_losses(result, params: Config):
+def plot_losses(result: OptimizationResults, params: Config):
     # Plot J_tr, J_vb, J_vc, J_vc_ctcs
-    J_tr = result["J_tr_history"]
-    J_vb = result["J_vb_history"]
-    J_vc = result["J_vc_history"]
-    J_vc_ctcs = result["J_vc_ctcs_vec"]
+    J_tr = result.J_tr_history
+    J_vb = result.J_vb_history
+    J_vc = result.J_vc_history
+    J_vc_ctcs = result.plotting_data["J_vc_ctcs_vec"]
 
     fig = make_subplots(rows=2, cols=2, subplot_titles=('J_tr', 'J_vb', 'J_vc', 'J_vc_ctcs'))
     fig.update_layout(title_text="Losses", template='plotly_dark')

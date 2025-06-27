@@ -3,26 +3,27 @@ import random
 import plotly.graph_objects as go
 import numpy as np
 import pickle
-# import pyqtgraph as pg
-# import pyqtgraph.opengl as gl
-# from PyQt5 import QtWidgets
+import pyqtgraph as pg
+import pyqtgraph.opengl as gl
+from PyQt5 import QtWidgets
 
 from openscvx.utils import qdcm, get_kp_pose
 from openscvx.config import Config
+from openscvx.results import OptimizationResults
 
 
-def plot_dubins_car(results, params):
+def plot_dubins_car(results: OptimizationResults, params: Config):
     # Plot the trajectory of the Dubins car in 3d as an animaiton
     fig = go.Figure()
 
-    x = results["x_full"][:,0]
-    y = results["x_full"][:,1]
+    x = results.x_full[:,0]
+    y = results.x_full[:,1]
 
-    theta = results["x_full"][2]
-    t_full = results["t_full"]
+    theta = results.x_full[:, 2]
+    t_full = results.t_full
 
-    obs_center = results["obs_center"]
-    obs_radius = results["obs_radius"]
+    obs_center = results.plotting_data["obs_center"]
+    obs_radius = results.plotting_data["obs_radius"]
 
     # Create a 2D scatter plot
     fig.add_trace(go.Scatter(x=x, y=y, mode='lines', line=dict(color='blue', width=2), name='Trajectory'))
@@ -38,15 +39,15 @@ def plot_dubins_car(results, params):
     fig.update_xaxes(scaleanchor="y", scaleratio=1)
     return fig
 
-def plot_dubins_car_disjoint(results, params):
+def plot_dubins_car_disjoint(results: OptimizationResults, params: Config):
     # Plot the trajectory of the Dubins car, but show wp1 and wp2 as circles with centers and radii
     fig = go.Figure()
 
-    x = results["x_full"][:,0]
-    y = results["x_full"][:,1]
+    x = results.x_full[:,0]
+    y = results.x_full[:,1]
     # Use the forward velocity from the control input
     if "u_full" in results:
-        velocity = results["u_full"][:, 0]
+        velocity = results.u_full[:, 0]
     else:
         velocity = np.zeros_like(x)
 
@@ -67,8 +68,8 @@ def plot_dubins_car_disjoint(results, params):
 
     # Plot waypoints wp1 and wp2 as circles and their centers
     if "wp1_center" in results and "wp1_radius" in results:
-        wp1_center = results["wp1_center"]
-        wp1_radius = results["wp1_radius"]
+        wp1_center = results.plotting_data["wp1_center"]
+        wp1_radius = results.plotting_data["wp1_radius"]
         theta = np.linspace(0, 2 * np.pi, 100)
         circle_x = wp1_center[0] + wp1_radius * np.cos(theta)
         circle_y = wp1_center[1] + wp1_radius * np.sin(theta)
@@ -76,8 +77,8 @@ def plot_dubins_car_disjoint(results, params):
         fig.add_trace(go.Scatter(x=[wp1_center[0]], y=[wp1_center[1]], mode='markers', marker=dict(color='green', size=12, symbol='x'), name='Waypoint 1 Center'))
 
     if "wp2_center" in results and "wp2_radius" in results:
-        wp2_center = results["wp2_center"]
-        wp2_radius = results["wp2_radius"]
+        wp2_center = results.plotting_data["wp2_center"]
+        wp2_radius = results.plotting_data["wp2_radius"]
         theta = np.linspace(0, 2 * np.pi, 100)
         circle_x = wp2_center[0] + wp2_radius * np.cos(theta)
         circle_y = wp2_center[1] + wp2_radius * np.sin(theta)
@@ -88,11 +89,11 @@ def plot_dubins_car_disjoint(results, params):
     fig.update_xaxes(scaleanchor="y", scaleratio=1)
     return fig
 
-def full_subject_traj_time(results, params):
-    x_full = results["x_full"]
-    x_nodes = results["x"].guess
+def full_subject_traj_time(results: OptimizationResults, params: Config):
+    x_full = results.x_full
+    x_nodes = results.x.guess
     t_nodes = x_nodes[:,params.sim.idx_t]
-    t_full = results['t_full']
+    t_full = results.t_full
     subs_traj = []
     subs_traj_node = []
     subs_traj_sen = []
@@ -100,12 +101,13 @@ def full_subject_traj_time(results, params):
     
     # if hasattr(params.dyn, 'get_kp_pose'):
     if "moving_subject" in results and "init_poses" in results:
-        init_poses = results["init_poses"]
+        init_poses = results.plotting_data["init_poses"]
         subs_traj.append(get_kp_pose(t_full, init_poses))
         subs_traj_node.append(get_kp_pose(t_nodes, init_poses))
         subs_traj_node[0] = subs_traj_node[0].squeeze()
     elif "init_poses" in results:
-        for pose in results["init_poses"]:
+        init_poses = results.plotting_data["init_poses"]
+        for pose in init_poses:
             # repeat the pose for all time steps
             pose_full = np.repeat(pose[:,np.newaxis], x_full.shape[0], axis=1).T
             subs_traj.append(pose_full)
@@ -116,7 +118,7 @@ def full_subject_traj_time(results, params):
         raise ValueError("No valid method to get keypoint poses.")
 
     if "R_sb" in results:
-        R_sb = results["R_sb"]
+        R_sb = results.plotting_data["R_sb"]
         for sub_traj in subs_traj:
             sub_traj_sen = []
             for i in range(x_full.shape[0]):
@@ -132,7 +134,7 @@ def full_subject_traj_time(results, params):
             subs_traj_sen_node.append(np.array(sub_traj_sen_node).squeeze())
         return subs_traj, subs_traj_sen, subs_traj_node, subs_traj_sen_node
     else:
-        raise ValueError("`R_sb` not found in results dictionary. Cannot compute sensor frame.")
+        raise ValueError("`R_sb` not found in results. Cannot compute sensor frame.")
 
 def frame_args(duration):
     return {
@@ -142,13 +144,13 @@ def frame_args(duration):
             "transition": {"duration": duration, "easing": "linear"},
             }
 
-def plot_camera_view(result: dict, params: Config) -> None:
+def plot_camera_view(result: OptimizationResults, params: Config) -> None:
     title = r'$\text{Camera View}$'
     _, sub_positions_sen, _, sub_positions_sen_node = full_subject_traj_time(result, params)
     fig = go.Figure()
 
     # Create a cone plot
-    A = np.diag([1 / np.tan(np.pi / result['alpha_y']), 1 / np.tan(np.pi / result['alpha_x'])])  # Conic Matrix
+    A = np.diag([1 / np.tan(np.pi / result.plotting_data['alpha_y']), 1 / np.tan(np.pi / result.plotting_data['alpha_x'])])  # Conic Matrix
 
     # Meshgrid
     if "moving_subject" in result:
@@ -166,10 +168,10 @@ def plot_camera_view(result: dict, params: Config) -> None:
     z = []
     for x_val in x:
         for y_val in y:
-            if result['norm_type'] == 'inf':
+            if result.plotting_data['norm_type'] == 'inf':
                 z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord = np.inf))
             else:
-                z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord = result['norm_type']))
+                z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord = result.plotting_data['norm_type']))
     z = np.array(z)
 
     # Extract the points from the meshgrid
@@ -1478,33 +1480,37 @@ def plot_animation(result: dict,
 
     return fig
 
-def plot_brachistochrone_position(result: dict,
+def plot_brachistochrone_position(result: OptimizationResults,
                                    params = None):
-    tof = result["t_final"]
+    # Plot the position of the brachistochrone problem
+    fig = go.Figure()
 
-    x_full = result["x_full"]
-    title = f'Brachistochrone Simulation: {tof} seconds'
+    x = result.x_full[:,0]
+    y = result.x_full[:,1]
+    t_full = result.t_full
 
-    # Make a 2D Scatter Plot
-    fig = go.Figure(go.Scatter(x=x_full[:, 0], y=x_full[:, 1], mode='lines+markers', line=dict(color='blue', width=2), name='Trajectory'))
+    fig.add_trace(go.Scatter(x=x, y=y, mode='lines', line=dict(color='blue', width=2), name='Position'))
+    fig.add_trace(go.Scatter(x=[x[0]], y=[y[0]], mode='markers', marker=dict(color='green', size=10), name='Start'))
+    fig.add_trace(go.Scatter(x=[x[-1]], y=[y[-1]], mode='markers', marker=dict(color='red', size=10), name='End'))
 
-    fig.update_layout(title=title, xaxis_title='x (m)', yaxis_title='y (m)', template='plotly_dark')
-    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=1, y=1, z=1)))
-    fig.update_layout(scene=dict(xaxis=dict(range=[-10, 10]), yaxis=dict(range=[-10, 10])), template='plotly_dark')
+    fig.update_layout(title='Brachistochrone Position', title_x=0.5, template='plotly_dark')
+    fig.update_xaxes(scaleanchor="y", scaleratio=1)
     return fig
-    
-def plot_brachistochrone_velocity(results: dict,
-                                  params = None):
-    tof = results["t_final"]
-    x_full = results["x_full"]
-    t_full = results["t_full"]
-    title = f'Brachistochrone Simulation: {tof} seconds'
 
-    # Make a 2D Scatter Plot
-    fig = go.Figure(go.Scatter(x=t_full, y=x_full[:, 2], mode='lines+markers', line=dict(color='blue', width=2), name='Trajectory'))
-    fig.update_layout(title=title, xaxis_title='Time (s)', yaxis_title='Velocity (m/s)', template='plotly_dark')
-    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=1, y=1, z=1))) 
-    fig.update_layout(scene=dict(xaxis=dict(range=[0, tof]), yaxis=dict(range=[-10, 10])), template='plotly_dark')
+def plot_brachistochrone_velocity(results: OptimizationResults,
+                                  params = None):
+    # Plot the velocity of the brachistochrone problem
+    fig = go.Figure()
+
+    tof = results.t_final
+    x_full = results.x_full
+    t_full = results.t_full
+
+    v = x_full[:,3]  # velocity is the 4th state
+
+    fig.add_trace(go.Scatter(x=t_full, y=v, mode='lines', line=dict(color='blue', width=2), name='Velocity'))
+
+    fig.update_layout(title=f'Brachistochrone Velocity: {tof} seconds', title_x=0.5, template='plotly_dark')
     return fig
 
 def plot_scp_animation(result: dict,
@@ -1784,23 +1790,25 @@ def plot_xy_xz_yz(result: dict, params: Config):
 
     return fig
 
-def plot_control_norm(results: dict, params: Config):
-    u_full = results["u_full"][:,:3]
-    # Plot the 2-Norm of the control inputs over time
-    t_full = results["t_full"]
+def plot_control_norm(results: OptimizationResults, params: Config):
+    # Plot the control norm over time
+    fig = go.Figure()
 
-    rho_min = results["rho_min"]
-    rho_max = results["rho_max"]
+    u_full = results.u_full[:,:3]
+    t_full = results.t_full
 
-    control_norm = np.linalg.norm(u_full, axis=1)
-    title = f'Control Norm: {results["t_final"]} seconds'
-    fig = go.Figure(go.Scatter(x=t_full, y=control_norm, mode='lines+markers', line=dict(color='blue', width=2), name='Control Norm'))
+    # Compute the norm of the control vector
+    u_norm = np.linalg.norm(u_full, axis=1)
 
-    fig.add_hline(y=rho_min, line_color='red', line_dash='dash', annotation_text='rho_min', annotation_position='top left')
+    rho_min = results.plotting_data["rho_min"]
+    rho_max = results.plotting_data["rho_max"]
 
-    fig.add_hline(y=rho_max, line_color='red', line_dash='dash', annotation_text='rho_max', annotation_position='top left')
-    fig.update_layout(title=title, xaxis_title='Time (s)', yaxis_title='Control Norm (N)', template='plotly_dark')
-    fig.update_layout(template='plotly_dark')
+    fig.add_trace(go.Scatter(x=t_full, y=u_norm, mode='lines', line=dict(color='blue', width=2), name='Control Norm'))
+    fig.add_hline(y=rho_min, line=dict(color='red', width=2, dash='dash'), name='Min Thrust')
+    fig.add_hline(y=rho_max, line=dict(color='red', width=2, dash='dash'), name='Max Thrust')
+
+    title = f'Control Norm: {results.t_final} seconds'
+    fig.update_layout(title=title, xaxis_title='Time (s)', yaxis_title='Control Norm', template='plotly_dark')
     return fig
 
 def scp_traj_interp(scp_trajs, params: Config):

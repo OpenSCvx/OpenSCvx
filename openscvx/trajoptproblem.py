@@ -37,6 +37,7 @@ from openscvx.utils import stable_function_hash
 from openscvx.backend.state import State, Free
 from openscvx.backend.control import Control
 from openscvx.backend.parameter import Parameter
+from openscvx.results import OptimizationResults
 
 
 
@@ -402,12 +403,30 @@ class TrajOptProblem:
         self.timing_init = t_f_while - t_0_while
         print("Total Initialization Time: ", self.timing_init)
 
+        # Robust priming call for propagation_solver.call (no debug prints)
+        try:
+            x_0 = np.ones(self.settings.sim.x_prop.initial.shape, dtype=self.settings.sim.x_prop.initial.dtype)
+            tau_grid = (0.0, 1.0)
+            controls_current = np.ones((1, self.settings.sim.u.shape[0]), dtype=self.settings.sim.u.guess.dtype)
+            controls_next = np.ones((1, self.settings.sim.u.shape[0]), dtype=self.settings.sim.u.guess.dtype)
+            tau_init = np.array([[0.0]], dtype=np.float64)
+            node = np.array([[0]], dtype=np.int64)
+            idx_s_stop = self.settings.sim.idx_s.stop
+            save_time = np.ones((self.settings.prp.max_tau_len,), dtype=np.float64)
+            mask_padded = np.ones((self.settings.prp.max_tau_len,), dtype=bool)
+            param_values = [np.ones_like(param.value) if hasattr(param.value, 'shape') else float(param.value) for _, param in self.params.items()]
+            self.propagation_solver.call(
+                x_0, tau_grid, controls_current, controls_next, tau_init, node, idx_s_stop, save_time, mask_padded, *param_values
+            )
+        except Exception as e:
+            print(f"[Initialization] Priming propagation_solver.call failed: {e}")
+
         if self.settings.dev.profiling:
             pr.disable()
             # Save results so it can be viusualized with snakeviz
             pr.dump_stats("profiling_initialize.prof")
 
-    def solve(self):
+    def solve(self) -> OptimizationResults:
         # Ensure parameter sizes and normalization are correct
         self.settings.scp.__post_init__()
         self.settings.sim.__post_init__()
@@ -454,7 +473,7 @@ class TrajOptProblem:
 
         return result
 
-    def post_process(self, result):
+    def post_process(self, result: OptimizationResults) -> OptimizationResults:
         # Enable the profiler
         if self.settings.dev.profiling:
             import cProfile

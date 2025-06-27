@@ -6,6 +6,7 @@ import time
 
 from openscvx.backend.parameter import Parameter
 from openscvx.config import Config
+from openscvx.results import OptimizationResults
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -29,7 +30,7 @@ def PTR_init(params, ocp: cp.Problem, discretization_solver: callable, settings:
 
     return cpg_solve
 
-def PTR_main(params, settings: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emitter_function) -> dict:
+def PTR_main(params, settings: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emitter_function) -> OptimizationResults:
     J_vb = 1E2
     J_vc = 1E2
     J_tr = 1E2
@@ -84,17 +85,17 @@ def PTR_main(params, settings: Config, prob: cp.Problem, aug_dy: callable, cpg_s
 
         k += 1
 
-    result = dict(
-        converged = k <= settings.scp.k_max,
-        t_final = x.guess[:,settings.sim.idx_t][-1],
-        u = u,
-        x = x,
-        x_history = scp_trajs,
-        u_history = scp_controls,
-        discretization_history = V_multi_shoot_traj,
-        J_tr_history = J_tr_vec,
-        J_vb_history = J_vb_vec,
-        J_vc_history = J_vc_vec,
+    result = OptimizationResults(
+        converged=k <= settings.scp.k_max,
+        t_final=x.guess[:,settings.sim.idx_t][-1],
+        u=u,
+        x=x,
+        x_history=scp_trajs,
+        u_history=scp_controls,
+        discretization_history=V_multi_shoot_traj,
+        J_tr_history=J_tr_vec,
+        J_vb_history=J_vb_vec,
+        J_vc_history=J_vc_vec,
     )
     return result
 
