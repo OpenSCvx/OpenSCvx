@@ -10,10 +10,10 @@ from pyqtgraph.Qt import QtGui
 
 # --- Import your problem setup ---
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from examples.dubins_car.dubins_car import (
+from dubins_car.dubins_car import (
     x, u, obs_center, obs_radius, problem, plotting_dict
 )
-from examples.plotting import plot_dubins_car
+from plotting import plot_dubins_car
 
 # --- Shared state for plotting ---
 running = {'stop': False}

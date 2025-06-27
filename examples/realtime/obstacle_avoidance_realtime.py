@@ -17,7 +17,7 @@ except ImportError:
     HAS_OPENGL = False
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from examples.drone.obstacle_avoidance_realtime_test import (
+from drone.obstacle_avoidance_realtime_test import (
     x, u, obs_center_1, obs_center_2, obs_center_3, problem, plotting_dict
 )
 from openscvx.utils import generate_orthogonal_unit_vectors
