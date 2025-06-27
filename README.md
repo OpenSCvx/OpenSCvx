@@ -76,6 +76,8 @@ For interactive 3D plotting and real-time visualization, additional packages are
 - `pyqtgraph` - is used for interactive 3D plotting and real-time visualization
 - `PyQt5` - provides the Qt5 GUI framework for pyqtgraph
 - `scipy` - is used for spatial transformations in plotting functions
+- `PyOpenGL` - provides OpenGL bindings for Python, required for 3D plotting
+- `PyOpenGL_accelerate` - (optional) speeds up PyOpenGL
 
 To install with GUI support:
 
@@ -87,6 +89,12 @@ Or for local development:
 
 ```sh
 pip install -e ".[gui]"
+```
+
+Or with conda:
+
+```sh
+conda env update -f environment.yml
 ```
 
 The GUI features include:
