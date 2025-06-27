@@ -6,6 +6,8 @@ import time
 
 from termcolor import colored
 from openscvx._version import version
+import jax
+from openscvx.results import OptimizationResults
 
 # Define colors for printing
 col_main = "blue"
@@ -20,9 +22,13 @@ def print_summary_box(lines, title="Summary"):
         lines (list): List of strings to display in the box
         title (str): Title for the box (default: "Summary")
     """
-    # Find the longest line
-    max_width = max(len(line) for line in lines)
-    box_width = max_width + 4  # Add padding for the box borders
+    # Find the longest line (excluding the title which will be handled separately)
+    content_lines = lines[1:] if len(lines) > 1 else []
+    max_content_width = max(len(line) for line in content_lines) if content_lines else 0
+    title_width = len(title)
+    
+    # Box width should accommodate both title and content
+    box_width = max(max_content_width, title_width) + 4  # Add padding for the box borders
     
     # Center with respect to the 89-character horizontal lines in io.py
     total_width = 89
@@ -34,10 +40,10 @@ def print_summary_box(lines, title="Summary"):
     
     # Print the box with dynamic width and centering
     print(f"\n{' ' * indent}╭{'─' * box_width}╮")
-    print(f"{' ' * indent}│ {title:^{max_width}}   │")
+    print(f"{' ' * indent}│ {title:^{box_width-2}} │")
     print(f"{' ' * indent}├{'─' * box_width}┤")
-    for line in lines[1:]:
-        print(f"{' ' * indent}│ {line:<{max_width}}   │")
+    for line in content_lines:
+        print(f"{' ' * indent}│ {line:<{box_width-2}} │")
     print(f"{' ' * indent}╰{'─' * box_width}╯\n")
 
 def print_problem_summary(settings):
@@ -52,22 +58,40 @@ def print_problem_summary(settings):
     n_ctcs = len(settings.sim.constraints_ctcs)
     n_augmented = settings.sim.n_states - settings.sim.idx_x_true.stop
     
+    # Get JAX backend information
+    jax_backend = jax.devices()[0].platform.upper()
+    jax_version = jax.__version__
+    
+    # Build weights string conditionally
+    weights_parts = [
+        f"λ_cost={settings.scp.lam_cost:4.1f}",
+        f"λ_tr={settings.scp.w_tr:4.1f}",
+        f"λ_vc={settings.scp.lam_vc:4.1f}"
+    ]
+    
+    # Add λ_vb only if there are nodal nonconvex constraints
+    if n_nodal_nonconvex > 0:
+        weights_parts.append(f"λ_vb={settings.scp.lam_vb:4.1f}")
+    
+    weights_str = ", ".join(weights_parts)
+    
     lines = [
         "Problem Summary",
         f"Dimensions: {settings.sim.n_states} states ({n_augmented} aug), {settings.sim.n_controls} controls, {settings.scp.n} nodes",
         f"Constraints: {n_nodal_convex} conv, {n_nodal_nonconvex} nonconv, {n_ctcs} ctcs",
-        f"Weights: λ_cost={settings.scp.lam_cost:4.1f}, λ_tr={settings.scp.w_tr:4.1f}, λ_vc={settings.scp.lam_vc:4.1f}",
-        f"CVX Solver: {settings.cvx.solver}, Discretization Solver: {settings.dis.solver}"
+        f"Weights: {weights_str}",
+        f"CVX Solver: {settings.cvx.solver}, Discretization Solver: {settings.dis.solver}",
+        f"JAX Backend: {jax_backend} (v{jax_version})"
     ]
     
     print_summary_box(lines, "Problem Summary")
 
-def print_results_summary(result, timing_post, timing_init, timing_solve):
+def print_results_summary(result: OptimizationResults, timing_post, timing_init, timing_solve):
     """
     Print the results summary box.
     
     Args:
-        result (dict): Dictionary containing optimization results
+        result (OptimizationResults): Optimization results object
         timing_post (float): Post-processing time
         timing_init (float): Initialization time
         timing_solve (float): Solve time
