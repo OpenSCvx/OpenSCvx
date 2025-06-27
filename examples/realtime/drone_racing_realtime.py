@@ -19,7 +19,7 @@ grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 # Import the drone racing problem and parameters
-from params.drone_racing import problem, gate_center_params, A_gate_param, A_gate_c_params, initial_gate_centers, gen_vertices
+from examples.drone.drone_racing import problem, gate_center_params, A_gate_param, A_gate_c_params, initial_gate_centers, gen_vertices
 
 problem.initialize()
 
