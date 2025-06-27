@@ -69,6 +69,32 @@ The main packages are:
 
 These will be installed automatically, but can be installed via conda or pip if you are building from source.
 
+#### GUI Dependencies (Optional)
+
+For interactive 3D plotting and real-time visualization, additional packages are required:
+
+- `pyqtgraph` - is used for interactive 3D plotting and real-time visualization
+- `PyQt5` - provides the Qt5 GUI framework for pyqtgraph
+- `scipy` - is used for spatial transformations in plotting functions
+
+To install with GUI support:
+
+```sh
+pip install openscvx[gui]
+```
+
+Or for local development:
+
+```sh
+pip install -e ".[gui]"
+```
+
+The GUI features include:
+- Interactive 3D trajectory visualization with `plot_animation_pyqtgraph()`
+- SCP iteration animation with `plot_scp_animation_pyqtgraph()`
+- Camera view animation with `plot_camera_animation_pyqtgraph()`
+- Real-time optimization visualization in examples like `drone_racing_realtime.py`
+
 ### Local Development
 
 This git repository can be installed using https
