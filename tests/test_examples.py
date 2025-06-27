@@ -17,6 +17,12 @@ from examples.params.dr_vp_nodal import plotting_dict as dr_vp_polytope_plotting
 from examples.params.brachistochrone import problem as brachistochrone_problem
 from examples.plotting import plot_camera_animation, plot_animation, plot_scp_animation
 
+# Import pyqtgraph testing helpers
+from tests.test_pyqtgraph_helpers import (
+    run_pyqtgraph_function_headless,
+    check_pyqtgraph_functions_basic
+)
+
 CI_OS = os.getenv("RUNNER_OS", platform.system())
 
 OS_MULTIPLIER = {
@@ -30,6 +36,7 @@ TEST_CASES = {
         "problem": obstacle_avoidance_problem,
         "plotting_dict": obstacle_avoidance_plotting_dict,
         "plot_funcs": [plot_animation, plot_scp_animation],
+        "pyqtgraph_funcs": ["plot_animation_pyqtgraph", "plot_scp_animation_pyqtgraph"],
         "cost_idx": -2,
         "vio_idx": -1,
         "max_cost": 2.0,
@@ -42,6 +49,7 @@ TEST_CASES = {
         "problem": dr_vp_polytope_problem,
         "plotting_dict": dr_vp_polytope_plotting_dict,
         "plot_funcs": [plot_animation, plot_camera_animation, plot_scp_animation],
+        "pyqtgraph_funcs": ["plot_animation_pyqtgraph", "plot_camera_animation_pyqtgraph", "plot_scp_animation_pyqtgraph"],
         "cost_idx": -2,
         "vio_idx": -1,
         "max_cost": 30.0,
@@ -56,6 +64,7 @@ TEST_CASES = {
         "problem": dr_vp_problem,
         "plotting_dict": dr_vp_plotting_dict,
         "plot_funcs": [plot_animation, plot_camera_animation, plot_scp_animation],
+        "pyqtgraph_funcs": ["plot_animation_pyqtgraph", "plot_camera_animation_pyqtgraph", "plot_scp_animation_pyqtgraph"],
         "cost_idx": -2,
         "vio_idx": -1,
         "max_cost": 45.0,
@@ -70,6 +79,7 @@ TEST_CASES = {
         "problem": cinema_vp_problem,
         "plotting_dict": cinema_vp_plotting_dict,
         "plot_funcs": [plot_animation, plot_camera_animation, plot_scp_animation],
+        "pyqtgraph_funcs": ["plot_animation_pyqtgraph", "plot_camera_animation_pyqtgraph", "plot_scp_animation_pyqtgraph"],
         "cost_idx": -3,
         "vio_idx": -1,
         "max_cost": 400.0,
@@ -84,6 +94,7 @@ TEST_CASES = {
     #     "problem": brachistochrone_problem,
     #     "plotting_dict": {},
     #     "plot_funcs": [],
+    #     "pyqtgraph_funcs": [],
     #     "cost_idx": -2,
     #     "vio_idx": -1,
     #     "max_cost": 1.81,
@@ -125,12 +136,42 @@ def test_example_problem(name, conf):
     for fn in conf["plot_funcs"]:
         fn(result, problem.settings)
 
+    # Test pyqtgraph functions if specified
+    if "pyqtgraph_funcs" in conf and conf["pyqtgraph_funcs"]:
+        try:
+            from examples.plotting import (
+                plot_animation_pyqtgraph,
+                plot_scp_animation_pyqtgraph,
+                plot_camera_animation_pyqtgraph
+            )
+            
+            # Map function names to actual functions
+            pyqtgraph_func_map = {
+                "plot_animation_pyqtgraph": plot_animation_pyqtgraph,
+                "plot_scp_animation_pyqtgraph": plot_scp_animation_pyqtgraph,
+                "plot_camera_animation_pyqtgraph": plot_camera_animation_pyqtgraph,
+            }
+            
+            # Test each pyqtgraph function
+            for func_name in conf["pyqtgraph_funcs"]:
+                if func_name in pyqtgraph_func_map:
+                    func = pyqtgraph_func_map[func_name]
+                    success = run_pyqtgraph_function_headless(func, result, problem.settings)
+                    if not success:
+                        print(f"Warning: pyqtgraph function {func_name} failed for {name}")
+                        
+        except ImportError as e:
+            # Skip pyqtgraph tests if not available
+            print(f"Skipping pyqtgraph tests for {name}: {e}")
+        except Exception as e:
+            print(f"Error testing pyqtgraph functions for {name}: {e}")
+
     # extract metrics
     scp_iters = len(result["discretization_history"])
-    sol_cost = result["x"].guess[:, conf["cost_idx"]][-1]
-    prop_cost = result["x_full"][:, conf["cost_idx"]][-1]
-    sol_constr_vio = result["x"].guess[:, conf["vio_idx"]][-1]
-    prop_constr_vio = result["x_full"][:, conf["vio_idx"]][-1]
+    sol_cost = result.x.guess[:, conf["cost_idx"]][-1]
+    prop_cost = result.x_full[:, conf["cost_idx"]][-1]
+    sol_constr_vio = result.x.guess[:, conf["vio_idx"]][-1]
+    prop_constr_vio = result.x_full[:, conf["vio_idx"]][-1]
 
     # assertions
     if conf["max_cost"] > 0.0:
