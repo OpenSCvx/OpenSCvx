@@ -47,7 +47,7 @@ For the latest development version (nightly), clone the repository and install i
  pip install -e .
 ```
 
-This will install the latest code from the main branch and allow you to make local changes.
+This will install the code as a package and allow you to make local changes.
 
 </details>
 
@@ -74,13 +74,8 @@ For interactive 3D plotting and real-time visualization, additional packages are
 - `PyOpenGL` - provides OpenGL bindings for Python, required for 3D plotting
 - `PyOpenGL_accelerate` - (optional) speeds up PyOpenGL
 
-To install with GUI support:
 
-```sh
-pip install openscvx[gui]
-```
-
-Or for local development:
+For local development:
 
 ```sh
 pip install -e ".[gui]"
