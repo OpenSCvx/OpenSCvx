@@ -31,8 +31,11 @@ import numpy as np
 import jax.numpy as jnp
 
 from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.constraints import boundary, ctcs
+from openscvx.dynamics import dynamics
+from openscvx.constraints import ctcs
 from openscvx.utils import qdcm, SSMP, SSM, generate_orthogonal_unit_vectors
+from openscvx.backend.state import State, Free, Minimize
+from openscvx.backend.control import Control
 ```
 
 ### Problem Definition
@@ -44,36 +47,40 @@ total_time = 4.0  # Initial ToF Guess for the simulation
 ```
 
 ### State Definition
-It is neccesary to define minimum and maximum elementwise bounds for the state, which will both be used for scaling purposes as well as strict constraints. Out of convience, we will also include time, $t$, in the state vector. 
+Create a State object and configure its properties:
 
 ```python
-#                       rx,   ry, rz,   vx,   vy,   vz, qw, qx, qy, qz,  wx,  wy,  wz,   t
-max_state = np.array([200., 10, 20, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100])
-min_state = np.array(
-    [-200., -100, 0, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0]
-)
+# Create state variable
+x = State("x", shape=(14,))
 
+# Set bounds
+x.max = np.array([200.0, 100, 50, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100])
+x.min = np.array([-200.0, -100, 15, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0])
+
+# Set initial conditions (some states are free, others are fixed)
+x.initial = np.array([10.0, 0, 20, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0])
+
+# Set final conditions (most states are free, time is minimized)
+x.final = np.array([10.0, 0, 20, Free(0), Free(0), Free(0), Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), Minimize(total_time)])
+
+# Set initial guess for SCP
+x.guess = np.linspace(x.initial, x.final, n)
 ```
 
-It is also neccesary for the user to characterize the boundary conditions. By default all boundary conditions are assumed to be fixed, meaning ```initial_state.type = "Fixed"``` and ```final_state.type = "Fixed"```. Here since we only care that the drone reaches point B, we will set the other states to be free, ```final_state.type[3:13] = "Free"```. Lastly, since we said this is a minimum time problem, we will set the time at the final state to be a minimization variable, ```final_state.type[13] = "Minimize"```.
-
-```python
-
-initial_state = boundary(jnp.array([10.0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]))
-initial_state.type[6:13] = "Free"
-
-final_state = boundary(jnp.array([-10.0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, total_time]))
-final_state.type[3:13] = "Free"
-final_state.type[13] = "Minimize"
-```
 ### Control Definition
-As control variables by defintion do not have dynamics, we only need to define bounds as well as an initial guess.
+Create a Control object and configure its properties:
 
 ```python
-initial_control = np.array([0.0, 0, 50, 0, 0, 0])  # Initial guess for the control
+# Create control variable
+u = Control("u", shape=(6,))
 
-max_control = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])
-min_control = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])
+# Set bounds
+u.max = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])
+u.min = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])
+
+# Set initial guess for SCP
+initial_control = np.array([0.0, 0, 10, 0, 0, 0])
+u.guess = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
 ```
 
 ### Dynamics
@@ -143,19 +150,18 @@ Finally, now that we have all the pieces we need, we can express the dynamics of
     The time state derivative is handled under the hood as opposed to being explicitly defined in the dynamics function. This is done to allow for more flexibility in the problem formulation. The time state derivative is handled by the ```TrajOptProblem``` class and is not exposed to the user.
 
 ```python
-
-
-def dynamics(x, u):
+@dynamics
+def dynamics(x_, u_):
     m = 1.0  # Mass of the drone
     g_const = -9.18
     J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
     # Unpack the state and control vectors
-    v = x[3:6]
-    q = x[6:10]
-    w = x[10:13]
+    v = x_[3:6]
+    q = x_[6:10]
+    w = x_[10:13]
 
-    f = u[:3]
-    tau = u[3:]
+    f = u_[:3]
+    tau = u_[3:]
 
     q_norm = jnp.linalg.norm(q)
     q = q / q_norm
@@ -167,7 +173,6 @@ def dynamics(x, u):
     w_dot = jnp.diag(1 / J_b) @ (tau - SSM(w) @ jnp.diag(J_b) @ w)
     t_dot = 1
     return jnp.hstack([r_dot, v_dot, q_dot, w_dot, t_dot])
-
 ```
 
 
@@ -222,7 +227,7 @@ for _ in obstacle_centers:
 
 ```
 
-Now lets go ahead and instatiate all of the constraints. Since we wish to enforce the the drone collision free for *all time*, not only at node points, we will use the ```ctcs``` decorator to create a constraint function. We will also enforce our minimum and maximum state constraints using the same decorator. Control minimum and maximum constraints are handled under the hood by ```OCP.py```.
+Now lets go ahead and instantiate all of the constraints. Since we wish to enforce the the drone collision free for *all time*, not only at node points, we will use the ```ctcs``` decorator to create a constraint function. We will also enforce our minimum and maximum state constraints using the same decorator. Control minimum and maximum constraints are handled under the hood by ```OCP.py```.
 
 !!! note
     In the min-max constraints we exclude the last state which is the augmented state $y$, which models the integral of constraint violation as this state will be handled differently under the hood on ```OCP.py``` with the Linear Constraint Qualification (LICQ) constraint.
@@ -230,13 +235,13 @@ Now lets go ahead and instatiate all of the constraints. Since we wish to enforc
 ```python
 constraints = []
 for center, A in zip(obstacle_centers, A_obs):
-    constraints.append(ctcs(lambda x, u: g_obs(center, A, x)))     # Obstacle Avoidance Contraint
-constraints.append(ctcs(lambda x, u: x[:-1] - max_state))          # Max State Constraint
-constraints.append(ctcs(lambda x, u: min_state - x[:-1]))          # Min State Constraint
+    constraints.append(ctcs(lambda x_, u_: g_obs(center, A, x_)))     # Obstacle Avoidance Constraint
+constraints.append(ctcs(lambda x_, u_: x_[:-1] - x.max))          # Max State Constraint
+constraints.append(ctcs(lambda x_, u_: x.min - x_[:-1]))          # Min State Constraint
 ```
 
 ### Initial Guess
-We will use a very simply linear guess for the state and a constant guess for the control.
+The initial guesses for both state and control trajectories are already set in the State and Control objects above. The state guess uses linear interpolation between initial and final conditions, while the control guess uses a constant value.
 
 !!! tip
     The Penalized Trust Region method is very nice in that the initial guess is not required to be dynamically feasible nor satisfy constraints. However, it is a good idea to have a guess that is close to the solution to reduce the number of iterations as well as keep things numerically stable. A good place to start is a linear interpolation between the initial and final state and a constant guess for control.
@@ -246,26 +251,21 @@ We will use a very simply linear guess for the state and a constant guess for th
 
 
 u_bar = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
-x_bar = np.linspace(initial_state.value, final_state.value, n)
+x_bar = np.linspace(x.initial, x.final, n)
 
 ```
-### Problem Instatiation
-Finally now that we have all the pieces we need, we can go ahead and instantiate the ```TrajOptProblem``` class. The class takes in the dynamics, constraints, number of discretization nodes, initial guess for ToF, initial guess for state and control, initial and final state, minimum and maximum state and control bounds. 
-```python
+### Problem Instantiation
+Finally now that we have all the pieces we need, we can go ahead and instantiate the ```TrajOptProblem``` class. The class takes in the dynamics, constraints, State and Control objects, and number of discretization nodes.
 
+```python
 problem = TrajOptProblem(
     dynamics=dynamics,
     constraints=constraints,
+    x=x,
+    u=u,
+    idx_time=13,  # Index of time variable in state vector
     N=n,
-    time_init=total_time,
-    x_guess=x_bar,
-    u_guess=u_bar,
-    initial_state=initial_state,  # Initial State
-    final_state=final_state,
-    x_max=max_state,
-    x_min=min_state,
-    u_max=max_control,  # Upper Bound on the controls
-    u_min=min_control,  # Lower Bound on the controls
+    licq_max=1e-8,
 )
 ```
 
@@ -273,14 +273,13 @@ problem = TrajOptProblem(
 Since we want this thing to run fast lets go ahead and select some fine tuning parameters. 
 
 ```python
-problem.params.scp.w_tr_adapt = 1.8          # Weight for the trust region adaptation
-problem.params.dis.custom_integrator = True  # Use the custom RK45 integrator
-
+problem.settings.scp.w_tr_adapt = 1.8          # Weight for the trust region adaptation
+problem.settings.dis.custom_integrator = True  # Use the custom RK45 integrator
 ```
 
 Lets also set some simulation parameters
 ```python
-problem.params.prp.dt = 0.01 # Time step of the nonlinear propagation
+problem.settings.prp.dt = 0.01 # Time step of the nonlinear propagation
 ```
 
 
@@ -306,11 +305,12 @@ To run the simulation, follow these steps:
    
 2. Solve the Problem:
    ```python
-   problem.solve()
+   results = problem.solve()
    ```
+
 3. Postprocess the solution for verification and plotting:
    ```python
-   results = problem.post_process()
+   results = problem.post_process(results)
    results.update(plotting_dict)
    ```
 
@@ -372,8 +372,11 @@ import cvxpy as cp
 import jax.numpy as jnp
 
 from openscvx.trajoptproblem import TrajOptProblem
+from openscvx.dynamics import dynamics
 from openscvx.utils import qdcm, SSMP, SSM, rot, gen_vertices
-from openscvx.constraints import boundary, ctcs, nodal
+from openscvx.constraints import ctcs, nodal
+from openscvx.backend.state import State, Free, Minimize
+from openscvx.backend.control import Control
 ```
 
 ### Problem Definition
@@ -408,13 +411,19 @@ final_state.type[3:13] = "Free"
 final_state.type[13] = "Minimize"
 ```
 ### Control Definition
-As control variables by defintion do not have dynamics, we only need to define bounds as well as an initial guess.
+Create a Control object and configure its properties:
 
 ```python
-initial_control = np.array([0.0, 0, 10, 0, 0, 0])  # Initial guess for the control
+# Create control variable
+u = Control("u", shape=(6,))
 
-max_control = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])
-min_control = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])
+# Set bounds
+u.max = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])
+u.min = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])
+
+# Set initial guess for SCP
+initial_control = np.array([0.0, 0, 10, 0, 0, 0])
+u.guess = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
 ```
 ### Problem Parameters
 We will need to define a few parameters to describe the gates, sensor and keypoints for the problem.
@@ -507,17 +516,17 @@ def g_vp(p_s_I, x):
     p_s_s = R_sb @ qdcm(x[6:10]).T @ (p_s_I - x[0:3])
     return jnp.linalg.norm(A_cone @ p_s_s, ord=norm_type) - (c.T @ p_s_s)
 ```
-We can then instatiate the LoS and min-max constraints using the ```ctcs```decorator as follows. 
+We can then instantiate the LoS and min-max constraints using the ```ctcs```decorator as follows. 
 
 !!! note
     In the min-max constraints we exclude the last state which is the augmented state $y$, which models the integral of constraint violation as this state will be handled differently under the hood on ```OCP.py``` with the Linear Constraint Qualification (LICQ) constraint. 
 
 ```python
 constraints = []
-constraints.append(ctcs(lambda x, u: x[:-1] - max_state))
-constraints.append(ctcs(lambda x, u: min_state - x[:-1]))
+constraints.append(ctcs(lambda x_, u_: x_[:-1] - x.max))
+constraints.append(ctcs(lambda x_, u_: x.min - x_[:-1]))
 for pose in init_poses:
-    constraints.append(ctcs(lambda x, u, p=pose: g_vp(p, x)))
+    constraints.append(ctcs(lambda x_, u_, p=pose: g_vp(p, x_)))
 ```
 
 #### Discrete Constraints
@@ -537,17 +546,19 @@ for node, cen in zip(gate_nodes, A_gate_cen):
 Unlike before, just a linear interpolation isn't going to quite cut it for this problem. We will need to use a more sophisticated method to generate the initial guess. We can start with a linear interpolation in position between the start to each gate in sequence and then to the final state. 
 
 ```python
-u_bar = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
-x_bar = np.linspace(initial_state.value, final_state.value, n)
+# Set up the initial guess for control
+u.guess = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
 
+# Set up the initial guess for state
+x_bar = np.linspace(x.initial, x.final, n)
 
 i = 0
-origins = [initial_state.value[:3]]
+origins = [x.initial[:3]]
 ends = []
 for center in gate_centers:
     origins.append(center)
     ends.append(center)
-ends.append(final_state.value[:3])
+ends.append(x.final[:3])
 gate_idx = 0
 for _ in range(n_gates + 1):
     for k in range(n // (n_gates + 1)):
@@ -556,43 +567,23 @@ for _ in range(n_gates + 1):
         )
         i += 1
     gate_idx += 1
-```
-Then to make the algorithms life a little easier, we can enforce that at each node the drone is looking at the mean position of all the keypoints. 
 
-```python
-b = R_sb @ np.array([0, 1, 0])
-for k in range(n):
-    kp = []
-    for pose in init_poses:
-        kp.append(pose)
-    kp = np.mean(kp, axis=0)
-    a = kp - x_bar[k, :3]
-    # Determine the direction cosine matrix that aligns the z-axis of the sensor frame with the relative position vector
-    q_xyz = np.cross(b, a)
-    q_w = np.sqrt(la.norm(a) ** 2 + la.norm(b) ** 2) + np.dot(a, b)
-    q_no_norm = np.hstack((q_w, q_xyz))
-    q = q_no_norm / la.norm(q_no_norm)
-    x_bar[k, 6:10] = q
+# Set the state guess
+x.guess = x_bar
 ```
 
-### Problem Instatiation
+### Problem Instantiation
 Finally now that we have all the pieces we need, we can go ahead and instantiate the ```TrajOptProblem``` class. The class takes in the dynamics, constraints, number of discretization nodes, initial guess for ToF, initial guess for state and control, initial and final state, minimum and maximum state and control bounds. 
 ```python
 
 problem = TrajOptProblem(
     dynamics=dynamics,
     constraints=constraints,
-    idx_time=len(max_state)-1,
+    x=x,
+    u=u,
+    idx_time=13,  # Index of time variable in state vector
     N=n,
-    time_init=total_time,
-    x_guess=x_bar,
-    u_guess=u_bar,
-    initial_state=initial_state,  # Initial State
-    final_state=final_state,
-    x_max=max_state,
-    x_min=min_state,
-    u_max=max_control,  # Upper Bound on the controls
-    u_min=min_control,  # Lower Bound on the controls
+    licq_max=1e-8,
 )
 ```
 
@@ -603,26 +594,26 @@ We can define the PTR weights and other parameters as follows.
     Tuning is probably one of the hardest things to do when working with these type of algorithms. There are some approaches to automate this process (which will soon be included in OpenSCvx once they are published). A good place to start is to set ```lam_cost = 0```, ```lam_vc = 1E1``` and ```w_tr = 1E0```. Then you can slowly increase the cost weight and decrease the trust region weight until you find a good balance.
 
 ```python
-problem.params.scp.w_tr = 2e0                     # Weight on the Trust Reigon
-problem.params.scp.lam_cost = 1e-1                # Weight on the Cost
-problem.params.scp.lam_vc = 1e1                   # Weight on the Virtual Control
-problem.params.scp.ep_tr = 1e-3                   # Trust Region Tolerance
-problem.params.scp.ep_vc = 1e-8                   # Virtual Control Tolerance
-problem.params.scp.cost_drop = 10                 # SCP iteration to relax cost weight
-problem.params.scp.cost_relax = 0.8               # Minimal Time Relaxation Factor
-problem.params.scp.w_tr_adapt = 1.4               # Trust Region Adaptation Factor
-problem.params.scp.w_tr_max_scaling_factor = 1e2  # Maximum Trust Region Weight
+problem.settings.scp.w_tr = 2e0                     # Weight on the Trust Reigon
+problem.settings.scp.lam_cost = 1e-1                # Weight on the Cost
+problem.settings.scp.lam_vc = 1e1                   # Weight on the Virtual Control
+problem.settings.scp.ep_tr = 1e-3                   # Trust Region Tolerance
+problem.settings.scp.ep_vc = 1e-8                   # Virtual Control Tolerance
+problem.settings.scp.cost_drop = 10                 # SCP iteration to relax cost weight
+problem.settings.scp.cost_relax = 0.8               # Minimal Time Relaxation Factor
+problem.settings.scp.w_tr_adapt = 1.4               # Trust Region Adaptation Factor
+problem.settings.scp.w_tr_max_scaling_factor = 1e2  # Maximum Trust Region Weight
 ```
 
 We can also use the custom RK45 integrator to speed things up a bit. 
 
 ```python
-problem.params.dis.custom_integrator = True       # Use the custom RK45 integrator
+problem.settings.dis.custom_integrator = True       # Use the custom RK45 integrator
 ```
 
 Lets also set some propagation parameters
 ```python
-problem.params.prp.dt = 0.01 # Time step of the nonlinear propagation
+problem.settings.prp.dt = 0.01 # Time step of the nonlinear propagation
 ```
 
 
@@ -647,10 +638,11 @@ To run the simulation, follow these steps:
    
 2. Solve the Problem:
    ```python
-   problem.solve()
+   results = problem.solve()
    ```
+
 3. Postprocess the solution for verification and plotting:
    ```python
-   results = problem.post_process()
+   results = problem.post_process(results)
    results.update(plotting_dict)
    ```

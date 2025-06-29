@@ -47,7 +47,6 @@ theme:
     - search.share
     - search.suggest
     - toc.follow
-    # - toc.integrate
   palette:
     - media: "(prefers-color-scheme)"
       toggle:
@@ -77,10 +76,8 @@ theme:
 # Plugins
 plugins:
   - meta
-  - optimize
   - search:
       separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
-  - typeset
   - mkdocstrings:
       handlers:
         python:
@@ -88,9 +85,11 @@ plugins:
             show_signature: true
             heading_level: 4
             show_signature_annotations: true
-            show_docstring: true
+            extra:
+              show_docstring: true
             docstring_style: google
-            
+            filters: ["!^__"]
+
 # Hooks
 hooks:
   - material/overrides/hooks/shortcodes.py
@@ -158,7 +157,14 @@ nav:
     - Usage:
       - 'Usage/basic_problem_setup.md'
       - 'Usage/advanced_problem_setup.md'
-      - 'Usage/api.md'
+      - API:
+          - State: 'Usage/api_state.md'
+          - Control: 'Usage/api_control.md'
+          - Variable: 'Usage/api_variable.md'
+          - Dynamics: 'Usage/api_dynamics.md'
+          - Constraints: 'Usage/api_constraints.md'
+          - Integrators: 'Usage/api_integrators.md'
+          - TrajOptProblem: 'Usage/api_trajoptproblem.md'
       - 'Usage/tutorials.md'
     - Foundations:
       - 'Overview/scvx.md'

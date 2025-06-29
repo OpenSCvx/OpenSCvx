@@ -2,29 +2,14 @@
 !!! Warning
     This page is still under development :construction:.
 
-## Dynamics
+<!-- ## Dynamics -->
 
 ::: openscvx.dynamics.Dynamics
     options:
       show_source: false
       show_root_heading: true
-      show_anchors: true
-
-::: openscvx.dynamics.dynamics
-    options:
-      show_source: false
-      show_root_heading: true
-      show_anchors: true
 
 ## Constraints
-
-### BoundaryConstraint
-
-::: openscvx.constraints.boundary.BoundaryConstraint
-    options:
-      show_source: false
-      show_root_heading: true
-      show_anchors: true
 
 ### CTCSConstraint
 
@@ -32,13 +17,6 @@
     options:
       show_source: false
       show_root_heading: true
-      show_anchors: true
-
-::: openscvx.constraints.ctcs.ctcs
-    options:
-      show_source: false
-      show_root_heading: true
-      show_anchors: true
 
 ### NodalConstraint
 
@@ -46,13 +24,6 @@
     options:
       show_source: false
       show_root_heading: true
-      show_anchors: true
-
-::: openscvx.constraints.nodal.nodal
-    options:
-      show_source: false
-      show_root_heading: true
-      show_anchors: true
 
 ## Integrators
 
@@ -62,13 +33,11 @@
     options:
       show_source: false
       show_root_heading: true
-      show_anchors: true
 
 ::: openscvx.integrators.rk45_step
     options:
       show_source: false
       show_root_heading: true
-      show_anchors: true
 
 ### Diffrax Integrators
 
@@ -76,13 +45,11 @@
     options:
       show_source: false
       show_root_heading: true
-      show_anchors: true
 
 ::: openscvx.integrators.solve_ivp_diffrax_prop
     options:
       show_source: false
       show_root_heading: true
-      show_anchors: true
 
 ## TrajOptProblem
 
@@ -90,7 +57,6 @@
     options:
       show_source: false
       show_root_heading: true
-      show_anchors: true
 
 
 ### ScpConfig
@@ -99,7 +65,6 @@
     options:
       show_source: false
       show_root_heading: true
-      show_anchors: true
 
 ### DiscretizationConfig
 
@@ -107,7 +72,6 @@
     options:
       show_source: false
       show_root_heading: true
-      show_anchors: true
 
 ### PropagationConfig
 
@@ -115,7 +79,6 @@
     options:
       show_source: false
       show_root_heading: true
-      show_anchors: true
 
 ### SimConfig
 
@@ -123,7 +86,6 @@
     options:
       show_source: false
       show_root_heading: true
-      show_anchors: true
 
 ### ConvexSolverConfig
 
@@ -131,7 +93,6 @@
     options:
       show_source: false
       show_root_heading: true
-      show_anchors: true
 
 ### DevConfig
 
@@ -139,4 +100,3 @@
     options:
       show_source: false
       show_root_heading: true
-      show_anchors: true
