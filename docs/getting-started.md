@@ -24,85 +24,162 @@ We provide a simple interface to define the dynamics and constraints of your pro
 - JAX Automatic Differentiation for Jacobians
 
 ## Installation
-=== "Stable"
-    
-    0. If you haven't already please make a virtual environment for your project.
-    ```sh
-    conda env create -n openscvx python=3.13
-    ```
-    
-    1. Install the stable version of OpenSCvx.
-    ``` sh
-    pip install openscvx
-    ```
 
-=== "Nightly"
-    
-    0. If you haven't already please make a virtual environment for your project.
-    ```sh
-    conda env create -n openscvx python=3.13
-    ```
+<details>
+<summary>Stable</summary>
 
-    1. Install the nightly version of OpenSCvx to get the latest features.
-    ``` sh
-    pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx
-    ```
-=== "Source"
+To grab the latest stable release simply run
 
-    <details>
-    <summary>Via Conda (Recommended) </summary>
+```sh
+pip install openscvx
+```
 
-    1. Clone the repo 
-    ```sh
-    git clone https://github.com/haynec/OpenSCvx.git
-    ```
+to install OpenSCVx in your python environment.
+</details>
 
-    2. Install environment packages (this will take about a minute or two):
-    ```sh
-    conda env create -f environment.yml
-    ```
+<details>
+<summary>Nightly</summary>
 
-    3. Activate the environment:
-    ```sh
-    conda activate openscvx
-    ```
+For the latest development version (nightly), clone the repository and install in editable mode:
 
-    </details>
+```sh
+# Clone the repo
+git clone https://github.com/haynec/OpenSCvx.git
+cd OpenSCvx
 
-    <details>
+# Install in editable/development mode
+pip install -e .
+```
 
-    <summary>Via Pip</summary>
+This will install the code as a package and allow you to make local changes.
+</details>
 
-    0. Prerequisites 
-    ```
-    Python >= 3.9
-    ```
+### Dependencies
 
-    1. Clone the repo
-    ```sh 
-    git clone https://github.com/haynec/OpenSCvx.git
-    ```
+The main packages are:
 
-    2. Install environment packages:
-    ```sh
-    pip install -r requirements.txt
-    ```
-    </details>
+- `cvxpy` - is used to formulate and solve the convex subproblems
+- `jax` - is used for determining the Jacobians using automatic differentiation, vectorization, and ahead-of-time (AOT) compilation of the dynamics and their Jacobians 
+- `numpy` - is used for numerical operations
+- `diffrax` - is used for the numerical integration of the dynamics
+- `termcolor` - is used for pretty command line output
+- `plotly` - is used for all visualizations
 
+These will be installed automatically, but can be installed via conda or pip if you are building from source.
+
+#### GUI Dependencies (Optional)
+
+For interactive 3D plotting and real-time visualization, additional packages are required:
+
+- `pyqtgraph` - is used for interactive 3D plotting and real-time visualization
+- `PyQt5` - provides the Qt5 GUI framework for pyqtgraph
+- `scipy` - is used for spatial transformations in plotting functions
+- `PyOpenGL` - provides OpenGL bindings for Python, required for 3D plotting
+- `PyOpenGL_accelerate` - (optional) speeds up PyOpenGL
+
+For local development:
+
+```sh
+pip install -e ".[gui]"
+```
+
+Or with conda:
+
+```sh
+conda env update -f environment.yml
+```
+
+The GUI features include:
+- Interactive 3D trajectory visualization with `plot_animation_pyqtgraph()`
+- SCP iteration animation with `plot_scp_animation_pyqtgraph()`
+- Camera view animation with `plot_camera_animation_pyqtgraph()`
+- Real-time optimization visualization in examples like `drone_racing_realtime.py`
+
+#### CVXPYGen Dependencies (Optional)
+
+For code generation and faster solver performance, CVXPYGen can be installed:
+
+- `cvxpygen` - enables code generation for faster solver performance
+- `qocogen` - custom solver backend for CVXPYGen (included with cvxpygen extras)
+
+To install with CVXPYGen support:
+
+```sh
+pip install openscvx[cvxpygen]
+```
+
+Or for both GUI and CVXPYGen:
+
+```sh
+pip install openscvx[gui,cvxpygen]
+```
+
+CVXPYGen features include:
+- Automatic C++ code generation for optimization problems
+- Faster solver performance through compiled code
+- Support for custom solver backends like QOCOGen
+
+### Local Development
+
+This git repository can be installed using https
+
+```sh
+git clone https://github.com/haynec/OpenSCvx.git
+```
+
+or ssh
+
+```sh
+git clone git@github.com/haynec/OpenSCvx.git
+```
+
+Dependencies can then be installed using Conda or Pip
+
+<details>
+<summary>Via Conda</summary>
+
+1. Clone the repo using https or ssh
+2. Install environment packages (this will take about a minute or two):
+   ```sh
+   conda env create -f environment.yml
+   ```
+3. Activate the environment:
+   ```sh
+   conda activate openscvx
+   ```
+</details>
+
+<details>
+<summary>Via pip</summary>
+
+1. Prerequisites
+   Python >= 3.9
+2. Clone the repo using https or ssh
+3. Create virtual environment (called `venv` here) and source it
+   ```sh
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+4. Install environment packages:
+   ```sh
+   pip install -r requirements.txt
+   ```
+   
+   Or install with optional dependencies:
+   ```sh
+   pip install -e ".[gui,cvxpygen]"
+   ```
+</details>
 
 ## Examples
-See `examples/` folder for several example trajectory optimization problems. To run a problem simply run `examples/main.py` with:
 
-```bash
-python3 -m examples.main
-```
-To change which example is run by `main` simply replace the `params` import line:
+See `examples/params/` folder for several example trajectory optimization problems.
+To run a problem simply run any of the examples directly, for example:
 
-```python
-# other imports
-from examples.params.dr_vp import problem
-# rest of code
+```sh
+python3 examples/params/brachistochrone.py
 ```
+and adjust the plotting as needed.
 
 Check out the problem definitions inside `examples/params` to see how to define your own problems.
 
