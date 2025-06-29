@@ -2,7 +2,8 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Callable
 
-from openscvx.constraints.boundary import BoundaryConstraint
+from openscvx.backend.state import State
+from openscvx.backend.control import Control
 
 
 def get_affine_scaling_matrices(n, minimum, maximum):
@@ -77,8 +78,9 @@ class ConvexSolverConfig:
     def __init__(
         self,
         solver: str = "QOCO",
-        solver_args: dict = {"abstol": 1e-6, "reltol": 1e-9},
+        solver_args: dict = {"abstol": 1e-6, "reltol": 1e-9, "enforce_dpp": True},
         cvxpygen: bool = False,
+        cvxpygen_override: bool = False,
     ):
         """
         Configuration class for convex solver settings.
@@ -102,6 +104,7 @@ class ConvexSolverConfig:
         self.solver = solver
         self.solver_args = solver_args if solver_args is not None else {"abstol": 1e-6, "reltol": 1e-9}
         self.cvxpygen = cvxpygen
+        self.cvxpygen_override = cvxpygen_override
 
 
 @dataclass
@@ -109,7 +112,7 @@ class PropagationConfig:
     def __init__(
         self,
         inter_sample: int = 30,
-        dt: float = 0.1,
+        dt: float = 0.01,
         solver: str = "Dopri8",
         max_tau_len: int = 1000,
         args: Optional[Dict] = None,
@@ -152,15 +155,9 @@ class SimConfig:
     
     def __init__(
         self,
-        x_bar: np.ndarray,
-        u_bar: np.ndarray,
-        initial_state: 'BoundaryConstraint',
-        initial_state_prop: 'BoundaryConstraint',
-        final_state: np.ndarray,
-        max_state: np.ndarray,
-        min_state: np.ndarray,
-        max_control: np.ndarray,
-        min_control: np.ndarray,
+        x: State,
+        x_prop: State,
+        u: Control,
         total_time: float,
         idx_x_true: slice,
         idx_x_true_prop: slice,
@@ -169,19 +166,15 @@ class SimConfig:
         idx_y: slice,
         idx_y_prop: slice,
         idx_s: slice,
-        save_compiled: bool = False,
+        save_compiled: bool = True,
         ctcs_node_intervals: Optional[list] = None,
         constraints_ctcs: Optional[List[Callable]] = None,
         constraints_nodal: Optional[List[Callable]] = None,
         n_states: Optional[int] = None,
         n_states_prop: Optional[int] = None,
         n_controls: Optional[int] = None,
-        S_x: Optional[np.ndarray] = None,
-        inv_S_x: Optional[np.ndarray] = None,
-        c_x: Optional[np.ndarray] = None,
-        S_u: Optional[np.ndarray] = None,
-        inv_S_u: Optional[np.ndarray] = None,
-        c_u: Optional[np.ndarray] = None,
+        scaling_x_overrides: Optional[list] = None,
+        scaling_u_overrides: Optional[list] = None,
     ):
         """
         Configuration class for simulation settings.
@@ -192,39 +185,34 @@ class SimConfig:
         These are the arguments most commonly used day-to-day.
 
         Args:
-            x_bar (np.ndarray): The nominal state trajectory.
-            u_bar (np.ndarray): The nominal control trajectory.
-            initial_state (np.ndarray): The initial state of the system.
-            final_state (np.ndarray): The final state of the system.
-            max_state (np.ndarray): The maximum allowable state values.
-            min_state (np.ndarray): The minimum allowable state values.
-            max_control (np.ndarray): The maximum allowable control values.
-            min_control (np.ndarray): The minimum allowable control values.
+            x (State): State object, must have .min and .max attributes for bounds.
+            x_prop (State): Propagation state object, must have .min and .max attributes for bounds.
+            u (Control): Control object, must have .min and .max attributes for bounds.
             total_time (float): The total simulation time.
+            idx_x_true (slice): Slice for true state indices.
+            idx_x_true_prop (slice): Slice for true propagation state indices.
+            idx_u_true (slice): Slice for true control indices.
+            idx_t (slice): Slice for time index.
+            idx_y (slice): Slice for constraint violation indices.
+            idx_y_prop (slice): Slice for propagation constraint violation indices.
+            idx_s (slice): Slice for time dilation index.
+            save_compiled (bool): If True, save and reuse compiled solver functions. Defaults to True.
+            ctcs_node_intervals (list, optional): Node intervals for CTCS constraints.
+            constraints_ctcs (list, optional): List of CTCS constraints.
+            constraints_nodal (list, optional): List of nodal constraints.
+            n_states (int, optional): The number of state variables. Defaults to `None` (inferred from x.max).
+            n_states_prop (int, optional): The number of propagation state variables. Defaults to `None` (inferred from x_prop.max).
+            n_controls (int, optional): The number of control variables. Defaults to `None` (inferred from u.max).
+            scaling_x_overrides (list, optional): List of (upper_bound, lower_bound, idx) for custom state scaling. Each can be scalar or array, idx can be int, list, or slice.
+            scaling_u_overrides (list, optional): List of (upper_bound, lower_bound, idx) for custom control scaling. Each can be scalar or array, idx can be int, list, or slice.
 
-        Other arguments:
-        These arguments are less frequently used, and for most purposes you shouldn't need to understand these. All of these are optional.
-
-        Args:
-            n_states (int, optional): The number of state variables. Defaults to `None`.
-            n_controls (int, optional): The number of control variables. Defaults to `None`.
-            S_x (np.ndarray, optional): State scaling matrix. Defaults to `None`.
-            inv_S_x (np.ndarray, optional): Inverse of the state scaling matrix. Defaults to `None`.
-            c_x (np.ndarray, optional): State offset vector. Defaults to `None`.
-            S_u (np.ndarray, optional): Control scaling matrix. Defaults to `None`.
-            inv_S_u (np.ndarray, optional): Inverse of the control scaling matrix. Defaults to `None`.
-            c_u (np.ndarray, optional): Control offset vector. Defaults to `None`.
+        Note:
+            You can specify custom scaling for specific states/controls using scaling_x_overrides and scaling_u_overrides. Any indices not covered by overrides will use the default min/max bounds.
         """
         # Assign all arguments to self
-        self.x_bar = x_bar
-        self.u_bar = u_bar
-        self.initial_state = initial_state
-        self.initial_state_prop = initial_state_prop
-        self.final_state = final_state
-        self.max_state = max_state
-        self.min_state = min_state
-        self.max_control = max_control
-        self.min_control = min_control
+        self.x = x
+        self.x_prop = x_prop
+        self.u = u
         self.total_time = total_time
         self.idx_x_true = idx_x_true
         self.idx_x_true_prop = idx_x_true_prop
@@ -240,51 +228,58 @@ class SimConfig:
         self.n_states = n_states
         self.n_states_prop = n_states_prop
         self.n_controls = n_controls
-        self.S_x = S_x
-        self.inv_S_x = inv_S_x
-        self.c_x = c_x
-        self.S_u = S_u
-        self.inv_S_u = inv_S_u
-        self.c_u = c_u
+        self.scaling_x_overrides = scaling_x_overrides
+        self.scaling_u_overrides = scaling_u_overrides
 
         # Then call post init logic
         self.__post_init__()
 
     def __post_init__(self):
-        # Keep your validation and default logic here exactly the same as before
-        self.n_states = len(self.max_state)
-        self.n_controls = len(self.max_control)
+        self.n_states = len(self.x.max)
+        self.n_controls = len(self.u.max)
 
-        assert (
-            len(self.initial_state.value) == self.n_states - (self.idx_y.stop - self.idx_y.start)
-        ), f"Initial state must have {self.n_states - (self.idx_y.stop - self.idx_y.start)} elements"
-        assert (
-            len(self.final_state.value) == self.n_states - (self.idx_y.stop - self.idx_y.start)
-        ), f"Final state must have {self.n_states - (self.idx_y.stop - self.idx_y.start)} elements"
-        assert (
-            self.max_state.shape[0] == self.n_states
-        ), f"Max state must have {self.n_states} elements"
-        assert (
-            self.min_state.shape[0] == self.n_states
-        ), f"Min state must have {self.n_states} elements"
-        assert (
-            self.max_control.shape[0] == self.n_controls
-        ), f"Max control must have {self.n_controls} elements"
-        assert (
-            self.min_control.shape[0] == self.n_controls
-        ), f"Min control must have {self.n_controls} elements"
+        # Helper to apply overrides
+        def apply_overrides(size, overrides, min_arr, max_arr):
+            upper = np.array(max_arr, dtype=float)
+            lower = np.array(min_arr, dtype=float)
+            if overrides is not None:
+                for ub, lb, idx in overrides:
+                    if isinstance(idx, int):
+                        idxs = [idx]
+                    elif isinstance(idx, slice):
+                        idxs = list(range(*idx.indices(size)))
+                    else:
+                        idxs = list(idx)
+                    if np.isscalar(ub):
+                        ub_vals = [ub] * len(idxs)
+                    else:
+                        ub_vals = ub
+                    if np.isscalar(lb):
+                        lb_vals = [lb] * len(idxs)
+                    else:
+                        lb_vals = lb
+                    for i, uval, lval in zip(idxs, ub_vals, lb_vals):
+                        upper[i] = uval
+                        lower[i] = lval
+            return upper, lower
 
-        if self.S_x is None or self.c_x is None:
-            self.S_x, self.c_x = get_affine_scaling_matrices(
-                self.n_states, self.min_state, self.max_state
-            )
-            self.inv_S_x = np.diag(1 / np.diag(self.S_x))
+        # State scaling
+        min_x = np.array(self.x.min)
+        max_x = np.array(self.x.max)
+        upper_x, lower_x = apply_overrides(self.n_states, self.scaling_x_overrides, min_x, max_x)
+        S_x, c_x = get_affine_scaling_matrices(self.n_states, lower_x, upper_x)
+        self.S_x = S_x
+        self.c_x = c_x
+        self.inv_S_x = np.diag(1 / np.diag(self.S_x))
 
-        if self.S_u is None or self.c_u is None:
-            self.S_u, self.c_u = get_affine_scaling_matrices(
-                self.n_controls, self.min_control, self.max_control
-            )
-            self.inv_S_u = np.diag(1 / np.diag(self.S_u))
+        # Control scaling
+        min_u = np.array(self.u.min)
+        max_u = np.array(self.u.max)
+        upper_u, lower_u = apply_overrides(self.n_controls, self.scaling_u_overrides, min_u, max_u)
+        S_u, c_u = get_affine_scaling_matrices(self.n_controls, lower_u, upper_u)
+        self.S_u = S_u
+        self.c_u = c_u
+        self.inv_S_u = np.diag(1 / np.diag(self.S_u))
 
 
 

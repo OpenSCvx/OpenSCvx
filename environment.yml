@@ -3,17 +3,25 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python
+  - python>=3.9
   - pip
+  - cvxpy
+  - qoco
   - numpy
-  - termcolor
+  - jax
   - plotly
+  - termcolor
+  - diffrax
+  - absl-py
+  - flatbuffers
   - pip:
-      - jax
-      - cvxpy
-      - cvxpygen
-      - qoco
-      - qocogen
-      - diffrax
-      - absl-py
-      - flatbuffers
+    # GUI plotting dependencies (optional) - uncomment to enable
+    # - pyqtgraph
+    # - PyQt5
+    # - scipy
+    # - PyOpenGL
+    # - PyOpenGL_accelerate
+
+    # CVXPYGen code generation (optional) - uncomment to enable
+    # - cvxpygen
+    # - qocogen

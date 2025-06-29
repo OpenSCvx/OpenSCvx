@@ -1,7 +1,5 @@
 cvxpy
-cvxpygen
 qoco
-qocogen
 numpy
 jax
 plotly
@@ -9,3 +7,14 @@ termcolor
 diffrax
 absl-py
 flatbuffers
+
+# GUI plotting dependencies (optional)
+# pyqtgraph
+# PyQt5
+# scipy
+# PyOpenGL
+# PyOpenGL_accelerate
+
+# CVXPYGen code generation (optional) - install with: pip install openscvx[cvxpygen]
+# cvxpygen
+# qocogen

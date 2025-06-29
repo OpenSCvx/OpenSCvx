@@ -1,6 +1,7 @@
 import numpy as np
 import jax.numpy as jnp
 import jax
+from jax import export
 import pytest
 from openscvx.discretization import get_discretization_solver, dVdt
 
@@ -11,7 +12,7 @@ from openscvx.discretization import get_discretization_solver, dVdt
 class Dummy: pass
 
 @pytest.fixture
-def params():
+def settings():
     p = Dummy()
     p.sim = Dummy();  p.sim.n_states = 2;  p.sim.n_controls = 1
     p.scp = Dummy();  p.scp.n = 5
@@ -51,29 +52,29 @@ def dynamics():
 
 # --- tests ---------------------------------------------------------
 
-def test_discretization_shapes(params, dynamics):
+def test_discretization_shapes(settings, dynamics):
     # build solver
-    solver = get_discretization_solver(dynamics, params)
+    solver = get_discretization_solver(dynamics, settings, {})
 
     # dummy x,u
-    x = jnp.ones((params.scp.n, params.sim.n_states))
-    u = jnp.ones((params.scp.n, params.sim.n_controls + 1))  # +1 slack
+    x = jnp.ones((settings.scp.n, settings.sim.n_states))
+    u = jnp.ones((settings.scp.n, settings.sim.n_controls + 1))  # +1 slack
 
     A_bar, B_bar, C_bar, z_bar, Vmulti = solver(x, u)
 
     # expected shapes
-    N = params.scp.n
-    n_x, n_u = params.sim.n_states, params.sim.n_controls
+    N = settings.scp.n
+    n_x, n_u = settings.sim.n_states, settings.sim.n_controls
     assert A_bar.shape == ((N-1), n_x*n_x)
     assert B_bar.shape == ((N-1), n_x*n_u)
     assert C_bar.shape == ((N-1), n_x*n_u)
     assert z_bar.shape == ((N-1), n_x)
     # assert Vmulti.shape == (N, (n_x + n_x*n_x + 2*n_x*n_u + n_x))
 
-def test_jit_dVdt_compiles(params):
+def test_jit_dVdt_compiles(settings):
     # prepare trivial inputs
-    n_x, n_u = params.sim.n_states, params.sim.n_controls
-    N = params.scp.n
+    n_x, n_u = settings.sim.n_states, settings.sim.n_controls
+    N = settings.scp.n
     aug_dim = n_x + n_x*n_x + 2*n_x*n_u + n_x
 
     tau    = jnp.array(0.3)
@@ -81,9 +82,9 @@ def test_jit_dVdt_compiles(params):
     u_cur  = jnp.ones((N-1, n_u+1))
     u_next = jnp.ones((N-1, n_u+1))
 
-    # bind out the Python callables & params
+    # bind out the Python callables & settings
     def wrapped(tau_, V_):
-        return dVdt(tau_, V_, u_cur, u_next, state_dot, A, B, n_x, n_u, N, params.dis.dis_type)
+        return dVdt(tau_, V_, u_cur, u_next, state_dot, A, B, n_x, n_u, N, settings.dis.dis_type)
 
     # now JIT only over (tau_, V_)
     jitted = jax.jit(wrapped)
@@ -92,22 +93,20 @@ def test_jit_dVdt_compiles(params):
     lowered.compile()
 
 @pytest.mark.parametrize("integrator", ["custom_integrator", "diffrax"])
-def test_jit_discretization_solver_compiles(params, dynamics, integrator):
+def test_jit_discretization_solver_compiles(settings, dynamics, integrator):
     # flip between the two modes
     if integrator == "custom_integrator":
-        params.dis.custom_integrator = True
+        settings.dis.custom_integrator = True
     elif integrator == "diffrax":
-        params.dis.custom_integrator = False
+        settings.dis.custom_integrator = False
 
     # build the solver (captures only hashable primitives)
-    solver = get_discretization_solver(dynamics, params)
+    solver = get_discretization_solver(dynamics, settings, {})
 
     # dummy x,u (including slack column)
-    x = jnp.ones((params.scp.n, params.sim.n_states))
-    u = jnp.ones((params.scp.n, params.sim.n_controls + 1))
+    x = jnp.ones((settings.scp.n, settings.sim.n_states))
+    u = jnp.ones((settings.scp.n, settings.sim.n_controls + 1))
 
     # jit & lower & compile
     jitted = jax.jit(solver)
-    lowered = jitted.lower(x, u)
-    # will raise if there’s any hash or trace error
-    lowered.compile()
+    exported = export.export(jitted)(x,u)

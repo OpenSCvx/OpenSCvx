@@ -2,27 +2,53 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import hashlib
+import ast
 import types
 import inspect
+import textwrap
 
-
-def stable_function_hash(funcs):
+def stable_function_hash(funcs, n_discretization_nodes=None, dt=None, total_time=None, state_max=None, state_min=None, control_max=None, control_min=None):
     hasher = hashlib.sha256()
 
     for func in funcs:
         try:
-            if isinstance(func, types.FunctionType):
-                # Use the code object and constants for stability
-                hasher.update(func.__code__.co_code)
-                hasher.update(str(func.__code__.co_consts).encode())
-                hasher.update(str(func.__code__.co_varnames).encode())
-                hasher.update(func.__name__.encode())
-            else:
-                # Fallback to inspect (less stable)
-                src = inspect.getsource(func)
-                hasher.update(src.encode())
+            src = inspect.getsource(func)
+            src = textwrap.dedent(src)  # <<< Fix: remove extra indent
+            parsed = ast.parse(src)
+
+            # Remove docstrings from the AST
+            for node in ast.walk(parsed):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and ast.get_docstring(node):
+                    if isinstance(node.body[0], ast.Expr):
+                        node.body = node.body[1:]
+
+            normalized = ast.dump(parsed, annotate_fields=True, include_attributes=False)
+            hasher.update(normalized.encode())
+
         except Exception as e:
             raise ValueError(f"Could not hash function {func}: {e}")
+
+    # Add additional parameters to the hash
+    if n_discretization_nodes is not None:
+        hasher.update(f"n_nodes:{n_discretization_nodes}".encode())
+    
+    if dt is not None:
+        hasher.update(f"dt:{dt}".encode())
+    
+    if total_time is not None:
+        hasher.update(f"total_time:{total_time}".encode())
+    
+    if state_max is not None:
+        hasher.update(f"state_max:{state_max.tobytes()}".encode())
+    
+    if state_min is not None:
+        hasher.update(f"state_min:{state_min.tobytes()}".encode())
+    
+    if control_max is not None:
+        hasher.update(f"control_max:{control_max.tobytes()}".encode())
+    
+    if control_min is not None:
+        hasher.update(f"control_min:{control_min.tobytes()}".encode())
 
     return hasher.hexdigest()
 

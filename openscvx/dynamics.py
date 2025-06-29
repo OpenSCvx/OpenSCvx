@@ -77,8 +77,8 @@ def dynamics(
     """
 
     def decorator(f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
-        # wrap so name, doc, signature stay on f
-        wrapped = functools.wraps(f)(f)
+        # Had to unwrap to ensure arguments are visible downstream. Originally wrapped so name, doc, signature stay on f
+        wrapped = f 
         return Dynamics(
             f=wrapped,
             A=A,

@@ -36,23 +36,18 @@ to install OpenSCVx in your python environment.
 <details>
 <summary>Nightly</summary>
 
-Install Development / Nightly Version</summary>
-
-If you want the pre-release version, you can install the latest `nightly` build with:
+For the latest development version (nightly), clone the repository and install in editable mode:
 
 ```sh
-python3 -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ --pre --upgrade openscvx
+# Clone the repo
+ git clone https://github.com/haynec/OpenSCvx.git
+ cd OpenSCvx
+
+# Install in editable/development mode
+ pip install -e .
 ```
 
-This command will also upgrade an existing `nightly` install to the latest version.
-
-Or if you want a specific pre-release version this can be installed with
-
-```sh
-python3 -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx==1.2.3.dev45
-```
-
-where `1.2.3.dev45 => <major>.<minor>.<patch>.dev<XY>` corresponds to your exact version
+This will install the code as a package and allow you to make local changes.
 
 </details>
 
@@ -68,6 +63,59 @@ The main packages are:
 - `plotly` - is used for all visualizations
 
 These will be installed automatically, but can be installed via conda or pip if you are building from source.
+
+#### GUI Dependencies (Optional)
+
+For interactive 3D plotting and real-time visualization, additional packages are required:
+
+- `pyqtgraph` - is used for interactive 3D plotting and real-time visualization
+- `PyQt5` - provides the Qt5 GUI framework for pyqtgraph
+- `scipy` - is used for spatial transformations in plotting functions
+- `PyOpenGL` - provides OpenGL bindings for Python, required for 3D plotting
+- `PyOpenGL_accelerate` - (optional) speeds up PyOpenGL
+
+
+For local development:
+
+```sh
+pip install -e ".[gui]"
+```
+
+Or with conda:
+
+```sh
+conda env update -f environment.yml
+```
+
+The GUI features include:
+- Interactive 3D trajectory visualization with `plot_animation_pyqtgraph()`
+- SCP iteration animation with `plot_scp_animation_pyqtgraph()`
+- Camera view animation with `plot_camera_animation_pyqtgraph()`
+- Real-time optimization visualization in examples like `drone_racing_realtime.py`
+
+#### CVXPYGen Dependencies (Optional)
+
+For code generation and faster solver performance, CVXPYGen can be installed:
+
+- `cvxpygen` - enables code generation for faster solver performance
+- `qocogen` - custom solver backend for CVXPYGen (included with cvxpygen extras)
+
+To install with CVXPYGen support:
+
+```sh
+pip install openscvx[cvxpygen]
+```
+
+Or for both GUI and CVXPYGen:
+
+```sh
+pip install openscvx[gui,cvxpygen]
+```
+
+CVXPYGen features include:
+- Automatic C++ code generation for optimization problems
+- Faster solver performance through compiled code
+- Support for custom solver backends like QOCOGen
 
 ### Local Development
 
@@ -114,26 +162,23 @@ Dependencies can then be installed using Conda or Pip
    ```sh
    pip install -r requirements.txt
    ```
+   
+   Or install with optional dependencies:
+   ```sh
+   pip install -e ".[gui,cvxpygen]"
+   ```
 </details>
 
 ### Running Trajectory Optimization
 
-See `examples/` folder for several example trajectory optimization problems.
-To run a problem simply run `examples/main.py` with:
+See `examples/params/` folder for several example trajectory optimization problems.
+To run a problem simply run any of the examples directly, for example:
 
 ```sh
-python3 examples/main.py
+python3 examples/params/brachistochrone.py
 ```
-
-To change which example is run by `main` simply replace the `problem` import line:
-
-```python
-# other imports
-from examples.params.dr_vp import problem
-# rest of code
-```
-
 and adjust the plotting as needed.
+
 Check out the problem definitions inside `examples/params` to see how to define your own problems.
 
 ## ToDos

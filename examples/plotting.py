@@ -4,29 +4,42 @@ import plotly.graph_objects as go
 import numpy as np
 import pickle
 
+# Optional pyqtgraph imports
+try:
+    import pyqtgraph as pg
+    import pyqtgraph.opengl as gl
+    from PyQt5 import QtWidgets
+    PYQTPHOT_AVAILABLE = True
+except ImportError:
+    PYQTPHOT_AVAILABLE = False
+    pg = None
+    gl = None
+    QtWidgets = None
+
 from openscvx.utils import qdcm, get_kp_pose
 from openscvx.config import Config
+from openscvx.results import OptimizationResults
 
 
-def plot_dubins_car(results, params):
+def plot_dubins_car(results: OptimizationResults, params: Config):
     # Plot the trajectory of the Dubins car in 3d as an animaiton
     fig = go.Figure()
 
-    x = results["x_full"][:,0]
-    y = results["x_full"][:,1]
+    x = results.x_full[:,0]
+    y = results.x_full[:,1]
 
-    theta = results["x_full"][2]
-    t_full = results["t_full"]
+    theta = results.x_full[:, 2]
+    t_full = results.t_full
 
-    obs_center = results["obs_center"]
-    obs_radius = results["obs_radius"]
+    obs_center = results.plotting_data["obs_center"]
+    obs_radius = results.plotting_data["obs_radius"]
 
     # Create a 2D scatter plot
     fig.add_trace(go.Scatter(x=x, y=y, mode='lines', line=dict(color='blue', width=2), name='Trajectory'))
 
     # Plot the circular obstacle
-    fig.add_trace(go.Scatter(x=obs_center[0] + obs_radius * np.cos(np.linspace(0, 2 * np.pi, 100)),
-                             y=obs_center[1] + obs_radius * np.sin(np.linspace(0, 2 * np.pi, 100)),
+    fig.add_trace(go.Scatter(x=obs_center.value[0] + obs_radius.value * np.cos(np.linspace(0, 2 * np.pi, 100)),
+                             y=obs_center.value[1] + obs_radius.value * np.sin(np.linspace(0, 2 * np.pi, 100)),
                              mode='lines', line=dict(color='red', width=2), name='Obstacle'))
     
     fig.update_layout(title='Dubins Car Trajectory', title_x=0.5, template='plotly_dark')
@@ -35,13 +48,61 @@ def plot_dubins_car(results, params):
     fig.update_xaxes(scaleanchor="y", scaleratio=1)
     return fig
 
-    
+def plot_dubins_car_disjoint(results: OptimizationResults, params: Config):
+    # Plot the trajectory of the Dubins car, but show wp1 and wp2 as circles with centers and radii
+    fig = go.Figure()
 
-def full_subject_traj_time(results, params):
-    x_full = results["x_full"]
-    x_nodes = results["x"]
+    x = results.x_full[:,0]
+    y = results.x_full[:,1]
+    # Use the forward velocity from the control input
+    if "u_full" in results:
+        velocity = results.u_full[:, 0]
+    else:
+        velocity = np.zeros_like(x)
+
+    # Plot the trajectory colored by velocity
+    fig.add_trace(go.Scatter(
+        x=x, y=y,
+        mode='lines+markers',
+        line=dict(color='rgba(0,0,0,0)'),  # Hide default line
+        marker=dict(
+            color=velocity,
+            colorscale='Viridis',
+            size=6,
+            colorbar=dict(title='Velocity'),
+            showscale=True
+        ),
+        name='Trajectory (velocity)'
+    ))
+
+    # Plot waypoints wp1 and wp2 as circles and their centers
+    if "wp1_center" in results and "wp1_radius" in results:
+        wp1_center = results.plotting_data["wp1_center"]
+        wp1_radius = results.plotting_data["wp1_radius"]
+        theta = np.linspace(0, 2 * np.pi, 100)
+        circle_x = wp1_center[0] + wp1_radius * np.cos(theta)
+        circle_y = wp1_center[1] + wp1_radius * np.sin(theta)
+        fig.add_trace(go.Scatter(x=circle_x, y=circle_y, mode='lines', line=dict(color='green', width=2, dash='dash'), name='Waypoint 1 Area'))
+        fig.add_trace(go.Scatter(x=[wp1_center[0]], y=[wp1_center[1]], mode='markers', marker=dict(color='green', size=12, symbol='x'), name='Waypoint 1 Center'))
+
+    if "wp2_center" in results and "wp2_radius" in results:
+        wp2_center = results.plotting_data["wp2_center"]
+        wp2_radius = results.plotting_data["wp2_radius"]
+        theta = np.linspace(0, 2 * np.pi, 100)
+        circle_x = wp2_center[0] + wp2_radius * np.cos(theta)
+        circle_y = wp2_center[1] + wp2_radius * np.sin(theta)
+        fig.add_trace(go.Scatter(x=circle_x, y=circle_y, mode='lines', line=dict(color='orange', width=2, dash='dash'), name='Waypoint 2 Area'))
+        fig.add_trace(go.Scatter(x=[wp2_center[0]], y=[wp2_center[1]], mode='markers', marker=dict(color='orange', size=12, symbol='x'), name='Waypoint 2 Center'))
+
+    fig.update_layout(title='Dubins Car Trajectory with Waypoints', title_x=0.5, template='plotly_dark')
+    fig.update_xaxes(scaleanchor="y", scaleratio=1)
+    return fig
+
+def full_subject_traj_time(results: OptimizationResults, params: Config):
+    x_full = results.x_full
+    x_nodes = results.x.guess
     t_nodes = x_nodes[:,params.sim.idx_t]
-    t_full = results['t_full']
+    t_full = results.t_full
     subs_traj = []
     subs_traj_node = []
     subs_traj_sen = []
@@ -49,12 +110,13 @@ def full_subject_traj_time(results, params):
     
     # if hasattr(params.dyn, 'get_kp_pose'):
     if "moving_subject" in results and "init_poses" in results:
-        init_poses = results["init_poses"]
+        init_poses = results.plotting_data["init_poses"]
         subs_traj.append(get_kp_pose(t_full, init_poses))
         subs_traj_node.append(get_kp_pose(t_nodes, init_poses))
         subs_traj_node[0] = subs_traj_node[0].squeeze()
     elif "init_poses" in results:
-        for pose in results["init_poses"]:
+        init_poses = results.plotting_data["init_poses"]
+        for pose in init_poses:
             # repeat the pose for all time steps
             pose_full = np.repeat(pose[:,np.newaxis], x_full.shape[0], axis=1).T
             subs_traj.append(pose_full)
@@ -65,7 +127,7 @@ def full_subject_traj_time(results, params):
         raise ValueError("No valid method to get keypoint poses.")
 
     if "R_sb" in results:
-        R_sb = results["R_sb"]
+        R_sb = results.plotting_data["R_sb"]
         for sub_traj in subs_traj:
             sub_traj_sen = []
             for i in range(x_full.shape[0]):
@@ -81,7 +143,7 @@ def full_subject_traj_time(results, params):
             subs_traj_sen_node.append(np.array(sub_traj_sen_node).squeeze())
         return subs_traj, subs_traj_sen, subs_traj_node, subs_traj_sen_node
     else:
-        raise ValueError("`R_sb` not found in results dictionary. Cannot compute sensor frame.")
+        raise ValueError("`R_sb` not found in results. Cannot compute sensor frame.")
 
 def frame_args(duration):
     return {
@@ -91,13 +153,13 @@ def frame_args(duration):
             "transition": {"duration": duration, "easing": "linear"},
             }
 
-def plot_camera_view(result: dict, params: Config) -> None:
+def plot_camera_view(result: OptimizationResults, params: Config) -> None:
     title = r'$\text{Camera View}$'
     _, sub_positions_sen, _, sub_positions_sen_node = full_subject_traj_time(result, params)
     fig = go.Figure()
 
     # Create a cone plot
-    A = np.diag([1 / np.tan(np.pi / result['alpha_y']), 1 / np.tan(np.pi / result['alpha_x'])])  # Conic Matrix
+    A = np.diag([1 / np.tan(np.pi / result.plotting_data['alpha_y']), 1 / np.tan(np.pi / result.plotting_data['alpha_x'])])  # Conic Matrix
 
     # Meshgrid
     if "moving_subject" in result:
@@ -115,10 +177,10 @@ def plot_camera_view(result: dict, params: Config) -> None:
     z = []
     for x_val in x:
         for y_val in y:
-            if result['norm_type'] == 'inf':
+            if result.plotting_data['norm_type'] == 'inf':
                 z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord = np.inf))
             else:
-                z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord = result['norm_type']))
+                z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord = result.plotting_data['norm_type']))
     z = np.array(z)
 
     # Extract the points from the meshgrid
@@ -1100,9 +1162,9 @@ def plot_animation(result: dict,
     tof = result["t_final"]
     # Make title say quadrotor simulation and insert the variable tof into the title
     # title = 'Quadrotor Simulation: Time of Flight = ' + str(tof) + 's'
-    drone_positions = result["x_full"][:, :3]
-    drone_velocities = result["x_full"][:, 3:6]
-    drone_attitudes = result["x_full"][:, 6:10]
+    drone_positions = result.x_full[:, :3]
+    drone_velocities = result.x_full[:, 3:6]
+    drone_attitudes = result.x_full[:, 6:10]
     if "moving_subject" in result or "init_poses" in result:
         subs_positions, _, _, _ = full_subject_traj_time(result, params)
 
@@ -1309,7 +1371,7 @@ def plot_animation(result: dict,
                 # Rotate and translate points
                 points = np.array([x.flatten(), y.flatten(), z.flatten()])
                 points = axes @ points
-                points = points.T + center
+                points = points.T + center.value
 
                 fig.add_trace(go.Surface(x=points[:, 0].reshape(n,n), y=points[:, 1].reshape(n,n), z=points[:, 2].reshape(n,n), opacity = 0.5, showscale=False))
 
@@ -1427,44 +1489,47 @@ def plot_animation(result: dict,
 
     return fig
 
-def plot_brachistochrone_position(result: dict,
+def plot_brachistochrone_position(result: OptimizationResults,
                                    params = None):
-    tof = result["t_final"]
+    # Plot the position of the brachistochrone problem
+    fig = go.Figure()
 
-    x_full = result["x_full"]
-    title = f'Brachistochrone Simulation: {tof} seconds'
+    x = result.x_full[:,0]
+    y = result.x_full[:,1]
+    t_full = result.t_full
 
-    # Make a 2D Scatter Plot
-    fig = go.Figure(go.Scatter(x=x_full[:, 0], y=x_full[:, 1], mode='lines+markers', line=dict(color='blue', width=2), name='Trajectory'))
+    fig.add_trace(go.Scatter(x=x, y=y, mode='lines', line=dict(color='blue', width=2), name='Position'))
+    fig.add_trace(go.Scatter(x=[x[0]], y=[y[0]], mode='markers', marker=dict(color='green', size=10), name='Start'))
+    fig.add_trace(go.Scatter(x=[x[-1]], y=[y[-1]], mode='markers', marker=dict(color='red', size=10), name='End'))
 
-    fig.update_layout(title=title, xaxis_title='x (m)', yaxis_title='y (m)', template='plotly_dark')
-    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=1, y=1, z=1)))
-    fig.update_layout(scene=dict(xaxis=dict(range=[-10, 10]), yaxis=dict(range=[-10, 10])), template='plotly_dark')
+    fig.update_layout(title='Brachistochrone Position', title_x=0.5, template='plotly_dark')
+    fig.update_xaxes(scaleanchor="y", scaleratio=1)
     return fig
-    
-def plot_brachistochrone_velocity(results: dict,
+
+def plot_brachistochrone_velocity(results: OptimizationResults,
                                   params = None):
-    tof = results["t_final"]
-    x_full = results["x_full"]
-    t_full = results["t_full"]
-    title = f'Brachistochrone Simulation: {tof} seconds'
+    # Plot the velocity of the brachistochrone problem
+    fig = go.Figure()
 
-    # Make a 2D Scatter Plot
-    fig = go.Figure(go.Scatter(x=t_full, y=x_full[:, 2], mode='lines+markers', line=dict(color='blue', width=2), name='Trajectory'))
-    fig.update_layout(title=title, xaxis_title='Time (s)', yaxis_title='Velocity (m/s)', template='plotly_dark')
-    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=1, y=1, z=1))) 
-    fig.update_layout(scene=dict(xaxis=dict(range=[0, tof]), yaxis=dict(range=[-10, 10])), template='plotly_dark')
+    tof = results.t_final
+    x_full = results.x_full
+    t_full = results.t_full
+
+    v = x_full[:,3]  # velocity is the 4th state
+
+    fig.add_trace(go.Scatter(x=t_full, y=v, mode='lines', line=dict(color='blue', width=2), name='Velocity'))
+
+    fig.update_layout(title=f'Brachistochrone Velocity: {tof} seconds', title_x=0.5, template='plotly_dark')
     return fig
-
 
 def plot_scp_animation(result: dict,
                        params = None,
                        path=""):
     tof = result["t_final"]
     title = f'SCP Simulation: {tof} seconds'
-    drone_positions = result["x_full"][:, :3]
-    drone_attitudes = result["x_full"][:, 6:10]
-    drone_forces = result["u_full"][:, :3]
+    drone_positions = result.x_full[:, :3]
+    drone_attitudes = result.x_full[:, 6:10]
+    drone_forces = result.u_full[:, :3]
     scp_interp_trajs = scp_traj_interp(result["x_history"], params)
     scp_ctcs_trajs = result["x_history"]
     scp_multi_shoot = result["discretization_history"]
@@ -1483,7 +1548,7 @@ def plot_scp_animation(result: dict,
     fig.update_layout(template='plotly_dark', title=title)
 
     fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
-    fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
+    # fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
 
     # Extract the number of states and controls from the parameters
     n_x = params.sim.n_states
@@ -1569,7 +1634,7 @@ def plot_scp_animation(result: dict,
             # Rotate and translate points
             points = np.array([x.flatten(), y.flatten(), z.flatten()])
             points = axes @ points
-            points = points.T + center
+            points = points.T + center.value
 
             fig.add_trace(go.Surface(x=points[:, 0].reshape(n,n), y=points[:, 1].reshape(n,n), z=points[:, 2].reshape(n,n), opacity = 0.5, showscale=False))
 
@@ -1590,10 +1655,9 @@ def plot_scp_animation(result: dict,
                 fig.add_trace(go.Scatter3d(x=sub_positions[:,0], y=sub_positions[:,1], z=sub_positions[:,2], mode='markers', marker=dict(size=10, color='red'), showlegend=False))
 
 
-    fig.add_trace(go.Surface(x=[-200, 200, 200, -200], y=[-200, -200, 200, 200], z=[[0, 0], [0, 0], [0, 0], [0, 0]], opacity=0.3, showscale=False, colorscale='Greys', showlegend = True, name='Ground Plane'))
-
+    fig.add_trace(go.Surface(x=[-2000, 2000, 2000, -2000], y=[-2000, -2000, 2000, 2000], z=[[0, 0], [0, 0], [0, 0], [0, 0]], opacity=0.3, showscale=False, colorscale='Greys', showlegend = True, name='Ground Plane'))
     fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
-    fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
+    # fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
 
     sliders = [
         {
@@ -1635,7 +1699,7 @@ def plot_scp_animation(result: dict,
     fig.update_layout(sliders=sliders)
 
     fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
-    fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
+    # fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
 
     # Overlay the title onto the plot
     fig.update_layout(title_y=0.95, title_x=0.5)
@@ -1691,6 +1755,69 @@ def plot_scp_animation(result: dict,
     if not "moving_subject" in result:
         fig.update_layout(scene_camera=dict(up=dict(x=0, y=0, z=90), center=dict(x=1, y=0.3, z=1), eye=dict(x=-1, y=2, z=1)))
 
+    return fig
+
+def plot_xy_xz_yz(result: dict, params: Config):
+
+    x_full = result["x_full"]
+    t_full = result["t_full"]
+
+    fig = make_subplots(rows=2, cols=2, 
+                        subplot_titles=('XY Plane', 'XZ Plane', 'YZ Plane'),
+                        specs=[[{}, {}],
+                               [{}, None]])
+
+    # Add trajectory traces
+    fig.add_trace(go.Scatter(x=x_full[:, 0], y=x_full[:, 1], mode='lines',
+                             line=dict(color='blue', width=2), name='Trajectory XY Plane'),
+                  row=1, col=1)
+    
+    fig.add_trace(go.Scatter(x=x_full[:, 0], y=x_full[:, 2], mode='lines',
+                             line=dict(color='blue', width=2), name='Trajectory XZ Plane'),
+                  row=1, col=2)
+    
+    fig.add_trace(go.Scatter(x=x_full[:, 1], y=x_full[:, 2], mode='lines',
+                             line=dict(color='blue', width=2), name='Trajectory YZ Plane'),
+                  row=2, col=1)
+
+    # Set axis titles
+    fig.update_xaxes(title_text='X (m)', row=1, col=1)
+    fig.update_yaxes(title_text='Y (m)', row=1, col=1)
+    fig.update_xaxes(title_text='X (m)', row=1, col=2)
+    fig.update_yaxes(title_text='Z (m)', row=1, col=2)
+    fig.update_xaxes(title_text='Y (m)', row=2, col=1)
+    fig.update_yaxes(title_text='Z (m)', row=2, col=1)
+
+    # Set equal aspect ratio for each subplot
+    fig.update_layout(
+        title='Trajectory in XY, XZ, and YZ Planes',
+        template='plotly_dark',
+        xaxis=dict(scaleanchor="y"),      # row=1, col=1
+        xaxis2=dict(scaleanchor="y2"),    # row=1, col=2
+        xaxis3=dict(scaleanchor="y3")     # row=2, col=1
+    )
+
+    return fig
+
+def plot_control_norm(results: OptimizationResults, params: Config):
+    # Plot the control norm over time
+    fig = go.Figure()
+
+    u_full = results.u_full[:,:3]
+    t_full = results.t_full
+
+    # Compute the norm of the control vector
+    u_norm = np.linalg.norm(u_full, axis=1)
+
+    rho_min = results.plotting_data["rho_min"]
+    rho_max = results.plotting_data["rho_max"]
+
+    fig.add_trace(go.Scatter(x=t_full, y=u_norm, mode='lines', line=dict(color='blue', width=2), name='Control Norm'))
+    fig.add_hline(y=rho_min, line=dict(color='red', width=2, dash='dash'), name='Min Thrust')
+    fig.add_hline(y=rho_max, line=dict(color='red', width=2, dash='dash'), name='Max Thrust')
+
+    title = f'Control Norm: {results.t_final} seconds'
+    fig.update_layout(title=title, xaxis_title='Time (s)', yaxis_title='Control Norm', template='plotly_dark')
     return fig
 
 def scp_traj_interp(scp_trajs, params: Config):
@@ -1989,3 +2116,1220 @@ def plot_animation_double_integrator(result: dict,
     )
 
     return fig
+
+def plot_animation_3DoF_rocket(result: dict,
+                   params: Config,
+                   path="",
+                   ) -> None:
+    tof = result["t_final"]
+    # Make title say quadrotor simulation and insert the variable tof into the title
+    # title = 'Quadrotor Simulation: Time of Flight = ' + str(tof) + 's'
+    drone_positions = result["x_full"][:, :3]
+    drone_velocities = result["x_full"][:, 3:6]
+    drone_forces = 0.01 * result["u_full"][:, :3]
+
+    step = 2
+    indices = np.array(list(range(drone_positions.shape[0]-1)[::step]) + [drone_positions.shape[0]-1])
+
+    fig = go.Figure(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='gray', width = 2)))
+    for i in range(100):
+        fig.add_trace(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='red', width = 2)))
+    
+    frames = []
+    i = 0
+
+    # Draw drone attitudes as axes
+    for i in range(0, len(indices)-1, step):
+        frame = go.Frame(name=str(i))
+
+
+        # Extract axes from rotation matrix
+        axes = 20 * np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+
+        data = []
+
+        colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFFFF']
+        labels = ['X', 'Y', 'Z', 'Force']
+
+        for k in range(4):
+            color = colors[k]
+            label = labels[k]
+
+            if labels[k] != 'Force':
+                data.append(go.Scatter3d(
+                        x=[drone_positions[indices[i], 0], drone_positions[indices[i], 0]],
+                        y=[drone_positions[indices[i], 1], drone_positions[indices[i], 1]],
+                        z=[drone_positions[indices[i], 2], drone_positions[indices[i], 2]],
+                        mode='lines+text',
+                        line=dict(color=color, width=4),
+                        showlegend=False
+                    ))
+            else:
+                data.append(go.Scatter3d(
+                        x=[drone_positions[indices[i], 0], drone_positions[indices[i], 0] - drone_forces[indices[i], 0]],
+                        y=[drone_positions[indices[i], 1], drone_positions[indices[i], 1] - drone_forces[indices[i], 1]],
+                        z=[drone_positions[indices[i], 2], drone_positions[indices[i], 2] - drone_forces[indices[i], 2]],
+                        mode='lines+text',
+                        line=dict(color=color, width=10),
+                        showlegend=False
+                    ))
+
+        data.append(go.Scatter3d(
+            x=drone_positions[:indices[i]+1,0], 
+            y=drone_positions[:indices[i]+1,1], 
+            z=drone_positions[:indices[i]+1,2], 
+            mode='markers',
+            marker=dict(
+                size=5,
+                color=np.linalg.norm(drone_velocities[:indices[i]+1], axis = 1), # set color to an array/list of desired values
+                colorscale='Viridis', # choose a colorscale
+                colorbar=dict(title='Velocity Norm (m/s)', x=0.02, y=0.55, len=0.75) # add colorbar
+            ),
+            name='Nonlinear Propagation'
+        ))
+        
+
+        frame.data = data
+        frames.append(frame)
+
+    fig.frames = frames
+
+    # Add ground plane
+    fig.add_trace(go.Surface(x=[-200, 200, 200, -200], y=[-200, -200, 200, 200], z=[[0, 0], [0, 0], [0, 0], [0, 0]], opacity=0.3, showscale=False, colorscale='Greys', showlegend = True, name='Ground Plane'))
+
+    sliders = [
+        {
+            "pad": {"b": 10, "t": 60},
+            "len": 0.8,
+            "x": 0.15,
+            "y": 0.32,
+            "steps": [
+                {
+                    "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
+                    "label": f.name,
+                    "method": "animate",
+                } for f in fig.frames
+            ]
+        }
+    ]
+
+    fig.update_layout(updatemenus = [{"buttons":[
+                                        {
+                                            "args": [None, frame_args(50)],
+                                            "label": "Play",
+                                            "method": "animate",
+                                        },
+                                        {
+                                            "args": [[None], frame_args(0)],
+                                            "label": "Pause",
+                                            "method": "animate",
+                                    }],
+
+                                    "direction": "left",
+                                    "pad": {"r": 10, "t": 70},
+                                    "type": "buttons",
+                                    "x": 0.1,
+                                    "y": 0,
+                                }
+                            ],
+                            sliders=sliders
+                        )
+
+    fig.update_layout(sliders=sliders)
+
+    fig.update_layout(template='plotly_dark') #, title=title)
+    
+    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
+    
+    # Check if covariance exists
+    fig.update_layout(scene=dict(xaxis=dict(range=[-3000, 3000]), yaxis=dict(range=[-3000, 3000]), zaxis=dict(range=[-200, 2000])))
+
+    # Overlay the title onto the plot
+    fig.update_layout(title_y=0.95, title_x=0.5)
+
+    
+
+
+
+    # Overlay the sliders and buttons onto the plot
+    fig.update_layout(updatemenus = [{"buttons":[
+                                        {
+                                            "args": [None, frame_args(50)],
+                                            "label": "Play",
+                                            "method": "animate",
+                                        },
+                                        {
+                                            "args": [[None], frame_args(0)],
+                                            "label": "Pause",
+                                            "method": "animate",
+                                    }],
+
+                                    "direction": "left",
+                                    "pad": {"r": 10, "t": 70},
+                                    "type": "buttons",
+                                    "x": 0.22,
+                                    "y": 0.37,
+                                }
+                            ],
+                            sliders=sliders
+                        )
+    
+    
+
+    # Show the legend overlayed on the plot
+    fig.update_layout(legend=dict(yanchor="top", y=0.9, xanchor="left", x=0.75))
+
+    # fig.update_layout(height=450, width = 800)
+
+    # Remove the black border around the fig
+    fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
+
+    # Rmeove the background from the legend
+    fig.update_layout(legend=dict(bgcolor='rgba(0,0,0,0)'))
+
+    fig.update_xaxes(
+        dtick=1.0,
+        showline=False
+    )
+    fig.update_yaxes(
+        scaleanchor="x",
+        scaleratio=1,
+        showline=False,
+        dtick=1.0
+    )
+
+    return fig
+
+def plot_animation_pyqtgraph(result, params, step=2):
+    if not PYQTPHOT_AVAILABLE:
+        raise ImportError(
+            "pyqtgraph is required for this function but not installed. "
+            "Install it with: pip install openscvx[gui] or pip install pyqtgraph PyQt5"
+        )
+    
+    import sys
+    from scipy.spatial.transform import Rotation as R
+    from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QWidget, QLabel
+    from PyQt5.QtCore import Qt
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
+
+    # Main window and layout
+    main_widget = QWidget()
+    main_layout = QVBoxLayout(main_widget)
+    w = gl.GLViewWidget()
+    w.setWindowTitle('Quadrotor Simulation (pyqtgraph)')
+    w.setGeometry(0, 110, 1280, 720)
+    
+    # Extract data
+    drone_positions = result["x_full"][:, :3]
+    drone_velocities = result["x_full"][:, 3:6]
+    drone_attitudes = result["x_full"][:, 6:10] if result["x_full"].shape[1] >= 10 else None
+    velocity_norm = np.linalg.norm(drone_velocities, axis=1)
+    n_points = drone_positions.shape[0]
+    indices = np.array(list(range(n_points-1)[::step]) + [n_points-1])
+    
+    # Auto-calculate plotting bounds
+    pos_min = drone_positions.min(axis=0)
+    pos_max = drone_positions.max(axis=0)
+    pos_range = pos_max - pos_min
+    
+    # Add padding to bounds (20% of range)
+    padding = pos_range * 0.2
+    bounds_min = pos_min - padding
+    bounds_max = pos_max + padding
+    
+    # Ensure minimum bounds for small trajectories
+    min_bounds_size = 10.0
+    for i in range(3):
+        if bounds_max[i] - bounds_min[i] < min_bounds_size:
+            center = (bounds_max[i] + bounds_min[i]) / 2
+            bounds_min[i] = center - min_bounds_size / 2
+            bounds_max[i] = center + min_bounds_size / 2
+    
+    # Auto-calculate camera distance based on bounds
+    max_range = max(bounds_max - bounds_min)
+    camera_distance = max_range * 1.5  # 1.5x the maximum range
+    
+    # Auto-calculate vehicle axes length based on trajectory size
+    axes_length = max(pos_range) * 0.1  # 10% of trajectory range
+    axes_length = max(axes_length, 2.0)  # Minimum 2 units
+    axes_length = min(axes_length, 20.0)  # Maximum 20 units
+    
+    w.setCameraPosition(distance=camera_distance, elevation=20, azimuth=45)
+    main_layout.addWidget(w)
+
+    # Controls
+    controls_layout = QHBoxLayout()
+    play_btn = QPushButton('Play')
+    pause_btn = QPushButton('Pause')
+    slider = QSlider(Qt.Horizontal)
+    slider.setMinimum(0)
+    slider.setSingleStep(1)
+    controls_layout.addWidget(play_btn)
+    controls_layout.addWidget(pause_btn)
+    controls_layout.addWidget(QLabel('Time:'))
+    controls_layout.addWidget(slider)
+    main_layout.addLayout(controls_layout)
+    main_widget.show()
+
+    slider.setMaximum(len(indices)-1)
+
+    cmap = pg.colormap.get('viridis')
+    vmin, vmax = velocity_norm.min(), velocity_norm.max()
+    normed_vel = (velocity_norm - vmin) / (vmax - vmin + 1e-8)
+    colors = cmap.map(normed_vel, mode='float')
+
+    # Thicker trajectory line
+    traj_line = gl.GLLinePlotItem(pos=np.zeros((0, 3)), color=np.ones((0, 4)), width=5, antialias=True)
+    w.addItem(traj_line)
+    drone_dot = gl.GLScatterPlotItem(pos=np.zeros((1, 3)), color=(1, 1, 1, 1), size=10)
+    w.addItem(drone_dot)
+
+    axis_items = [gl.GLLinePlotItem(width=3) for _ in range(3)]
+    for item in axis_items:
+        w.addItem(item)
+    axis_colors = [(1,0,0,1), (0,1,0,1), (0,0,1,1)]
+
+    # Add a nice ground grid - auto-scale based on bounds
+    grid_size = max(bounds_max[:2] - bounds_min[:2]) * 0.3  # 30% of XY range (reduced from 60%)
+    grid_spacing = grid_size / 8  # 8 grid lines (reduced from 10 for tighter spacing)
+    grid_lines = []
+    for x in np.arange(bounds_min[0] - grid_size/2, bounds_max[0] + grid_size/2, grid_spacing):
+        pts = np.array([[x, bounds_min[1] - grid_size/2, bounds_min[2]], [x, bounds_max[1] + grid_size/2, bounds_min[2]]])
+        line = gl.GLLinePlotItem(pos=pts, color=(0.7,0.7,0.7,0.5), width=1, antialias=True)
+        w.addItem(line)
+        grid_lines.append(line)
+    for y in np.arange(bounds_min[1] - grid_size/2, bounds_max[1] + grid_size/2, grid_spacing):
+        pts = np.array([[bounds_min[0] - grid_size/2, y, bounds_min[2]], [bounds_max[0] + grid_size/2, y, bounds_min[2]]])
+        line = gl.GLLinePlotItem(pos=pts, color=(0.7,0.7,0.7,0.5), width=1, antialias=True)
+        w.addItem(line)
+        grid_lines.append(line)
+
+    obstacle_items = []
+    if "obstacles_centers" in result and "obstacles_radii" in result and "obstacles_axes" in result:
+        for center, axes, radius in zip(result['obstacles_centers'], result['obstacles_axes'], result['obstacles_radii']):
+            # Create a sphere mesh and transform it to an ellipsoid
+            sphere_mesh = gl.MeshData.sphere(rows=20, cols=40)
+            verts = sphere_mesh.vertexes()
+            # Scale by 1/radius to match the original plot_animation function
+            verts = verts * np.array([1/radius[0], 1/radius[1], 1/radius[2]])
+            verts = (axes @ verts.T).T  # rotate
+            verts = verts + center.value  # translate
+            sphere_mesh.setVertexes(verts)
+            obstacle = gl.GLMeshItem(meshdata=sphere_mesh, smooth=True, color=(1,0,0,0.6), shader='shaded', drawEdges=False, glOptions='translucent')
+            w.addItem(obstacle)
+            obstacle_items.append(obstacle)
+
+    gate_items = []
+    if "vertices" in result:
+        for vertices in result["vertices"]:
+            gate = gl.GLLinePlotItem(pos=np.array(vertices + [vertices[0]]), color=(0,0,1,1), width=5, antialias=True)
+            w.addItem(gate)
+            gate_items.append(gate)
+
+    subject_lines = []
+    subject_dots = []
+    if "init_poses" in result or "moving_subject" in result:
+        if "init_poses" in result:
+            subs_positions, _, _, _ = full_subject_traj_time(result, params)
+        else:
+            subs_positions, _, _, _ = full_subject_traj_time(result, params)
+        for sub_traj in subs_positions:
+            line = gl.GLLinePlotItem(pos=np.zeros((0,3)), color=(1,0,0,1), width=3)
+            dot = gl.GLScatterPlotItem(pos=np.zeros((1,3)), color=(1,0,0,1), size=10)
+            w.addItem(line)
+            w.addItem(dot)
+            subject_lines.append(line)
+            subject_dots.append(dot)
+
+    range_spheres = []
+    if "min_range" in result and "max_range" in result and "init_poses" in result:
+        n = 20
+        u = np.linspace(0, 2 * np.pi, n)
+        v = np.linspace(0, np.pi, n)
+        x = np.outer(np.cos(u), np.sin(v))
+        y = np.outer(np.sin(u), np.sin(v))
+        z = np.outer(np.ones(np.size(u)), np.cos(v))
+        for sub_traj in subs_positions:
+            min_sphere = gl.GLMeshItem(meshdata=gl.MeshData.sphere(rows=10, cols=20, radius=result["min_range"]), color=(1,0,0,0.4), smooth=True, shader='shaded', drawEdges=False, glOptions='translucent')
+            max_sphere = gl.GLMeshItem(meshdata=gl.MeshData.sphere(rows=10, cols=20, radius=result["max_range"]), color=(0,0,1,0.4), smooth=True, shader='shaded', drawEdges=False, glOptions='translucent')
+            w.addItem(min_sphere)
+            w.addItem(max_sphere)
+            range_spheres.append((min_sphere, max_sphere))
+
+    # Viewcone as a transparent surface
+    viewcone_mesh = None
+    cone_meshdata = None
+    if drone_attitudes is not None and "alpha_x" in result and "alpha_y" in result and "R_sb" in result:
+        n_cone = 40
+        theta = np.linspace(0, 2*np.pi, n_cone)
+        alpha_x = result["alpha_x"]
+        alpha_y = result["alpha_y"]
+        A = np.diag([1 / np.tan(np.pi / alpha_x), 1 / np.tan(np.pi / alpha_y)])
+        # Make a circle in the sensor frame, scale Z for a larger cone
+        cone_length = max(pos_range) * 0.3  # 30% of trajectory range
+        cone_length = max(cone_length, 10.0)  # Minimum 10 units
+        cone_length = min(cone_length, 50.0)  # Maximum 50 units
+        circle = np.stack([np.cos(theta), np.sin(theta)])
+        
+        # Use norm_type from results to plot the cone correctly
+        if "norm_type" in result:
+            if result["norm_type"] == np.inf or result["norm_type"] == 'inf':
+                z = np.linalg.norm(A @ circle, axis=0, ord=np.inf)
+            else:
+                z = np.linalg.norm(A @ circle, axis=0, ord=result["norm_type"])
+        else:
+            # Default to 2-norm if norm_type not specified
+            z = np.linalg.norm(A @ circle, axis=0, ord=2)
+            
+        X = circle[0] / z
+        Y = circle[1] / z
+        Z = np.ones_like(X)
+        base_points = np.stack([X, Y, Z], axis=1) * cone_length
+        apex = np.array([[0, 0, 0]])
+        vertices = np.vstack([apex, base_points])
+        faces = []
+        for i in range(1, n_cone):
+            faces.append([0, i, i+1])
+        faces.append([0, n_cone, 1])
+        faces = np.array(faces)
+        cone_meshdata = gl.MeshData(vertexes=vertices, faces=faces)
+        # Draw cone last for correct depth compositing
+        viewcone_mesh = gl.GLMeshItem(meshdata=cone_meshdata, smooth=True, color=(1,1,0,0.5), shader='shaded', drawEdges=False, glOptions='additive')
+        # Do not add yet, will add after all other objects
+
+    ptr = [0]
+    playing = [False]
+
+    def update():
+        i = ptr[0]
+        if i >= len(indices):
+            timer.stop()
+            playing[0] = False
+            play_btn.setEnabled(True)
+            pause_btn.setEnabled(False)
+            return
+        slider.blockSignals(True)
+        slider.setValue(i)
+        slider.blockSignals(False)
+        idx = indices[:i+1]
+        pos = drone_positions[idx]
+        col = colors[idx]
+        traj_line.setData(pos=pos, color=col)
+        drone_dot.setData(pos=pos[-1:], color=(1, 1, 1, 1))
+        if drone_attitudes is not None:
+            att = drone_attitudes[indices[i]]
+            r = R.from_quat([att[1], att[2], att[3], att[0]])
+            rotmat = r.as_matrix()
+            axes = axes_length * np.eye(3)
+            axes_rot = rotmat @ axes
+            for k in range(3):
+                axis_pts = np.stack([drone_positions[indices[i]], drone_positions[indices[i]] + axes_rot[:,k]])
+                axis_items[k].setData(pos=axis_pts, color=axis_colors[k])
+        if "init_poses" in result or "moving_subject" in result:
+            for j, sub_traj in enumerate(subs_positions):
+                subject_lines[j].setData(pos=sub_traj[:indices[i]+1], color=(1,0,0,1))
+                subject_dots[j].setData(pos=sub_traj[indices[i]:indices[i]+1], color=(1,0,0,1))
+                if j < len(range_spheres):
+                    min_sphere, max_sphere = range_spheres[j]
+                    min_sphere.resetTransform()
+                    max_sphere.resetTransform()
+                    min_sphere.translate(*sub_traj[indices[i]])
+                    max_sphere.translate(*sub_traj[indices[i]])
+        # Update viewcone mesh
+        if viewcone_mesh is not None and drone_attitudes is not None:
+            att = drone_attitudes[indices[i]]
+            r = R.from_quat([att[1], att[2], att[3], att[0]])
+            rotmat = r.as_matrix()
+            R_sb = result["R_sb"]
+            # Transform cone vertices
+            verts = cone_meshdata.vertexes()
+            verts_tf = (rotmat @ R_sb.T @ verts.T).T + drone_positions[indices[i]]
+            viewcone_mesh.setMeshData(vertexes=verts_tf, faces=cone_meshdata.faces())
+            # Remove and re-add cone to ensure it is drawn last
+            if viewcone_mesh in w.items:
+                w.removeItem(viewcone_mesh)
+            w.addItem(viewcone_mesh)
+        ptr[0] += 1
+
+    def set_frame(i):
+        ptr[0] = i
+        update()
+
+    timer = pg.QtCore.QTimer()
+    timer.timeout.connect(update)
+    timer.setInterval(30)
+
+    def play():
+        if not playing[0]:
+            playing[0] = True
+            play_btn.setEnabled(False)
+            pause_btn.setEnabled(True)
+            timer.start()
+
+    def pause():
+        playing[0] = False
+        play_btn.setEnabled(True)
+        pause_btn.setEnabled(False)
+        timer.stop()
+
+    play_btn.clicked.connect(play)
+    pause_btn.clicked.connect(pause)
+    slider.valueChanged.connect(set_frame)
+    pause_btn.setEnabled(False)
+
+    main_widget.setWindowTitle('Quadrotor Simulation (pyqtgraph)')
+    main_widget.resize(1280, 800)
+
+    update()  # Draw initial frame
+
+    if not hasattr(QtWidgets.QApplication.instance(), 'exec_'):
+        app.exec()
+    else:
+        QtWidgets.QApplication.instance().exec_()
+
+def plot_animation_vispy(result, params, step=2):
+    """
+    VisPy-based 3D animation of quadrotor simulation.
+    Provides the same functionality as plot_animation_pyqtgraph but uses VisPy backend.
+    """
+    import sys
+    import numpy as np
+    from scipy.spatial.transform import Rotation as R
+    from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QWidget, QLabel, QApplication
+    from PyQt5.QtCore import Qt, QTimer
+    import vispy
+    from vispy import scene
+    from vispy.scene import visuals
+    from vispy.color import ColorArray
+    from vispy.geometry import create_sphere
+    
+    # Initialize Qt application
+    app = QApplication.instance() or QApplication(sys.argv)
+    
+    # Main window and layout
+    main_widget = QWidget()
+    main_layout = QVBoxLayout(main_widget)
+    
+    # Create canvas and embed it properly
+    canvas = scene.SceneCanvas(keys='interactive', size=(1280, 720))
+    view = canvas.central_widget.add_view()
+    view.camera = 'turntable'
+    view.camera.fov = 45
+    view.camera.distance = 150
+    view.camera.elevation = 20
+    view.camera.azimuth = 45
+    
+    # Embed VisPy canvas in Qt widget
+    canvas_widget = canvas.native
+    main_layout.addWidget(canvas_widget)
+    
+    # Controls
+    controls_layout = QHBoxLayout()
+    play_btn = QPushButton('Play')
+    pause_btn = QPushButton('Pause')
+    slider = QSlider(Qt.Horizontal)
+    slider.setMinimum(0)
+    slider.setSingleStep(1)
+    controls_layout.addWidget(play_btn)
+    controls_layout.addWidget(pause_btn)
+    controls_layout.addWidget(QLabel('Time:'))
+    controls_layout.addWidget(slider)
+    main_layout.addLayout(controls_layout)
+    main_widget.show()
+    
+    # Extract data and convert JAX arrays to NumPy arrays
+    drone_positions = np.array(result["x_full"][:, :3])
+    drone_velocities = np.array(result["x_full"][:, 3:6])
+    drone_attitudes = np.array(result["x_full"][:, 6:10]) if result["x_full"].shape[1] >= 10 else None
+    velocity_norm = np.linalg.norm(drone_velocities, axis=1)
+    n_points = drone_positions.shape[0]
+    indices = np.array(list(range(n_points-1)[::step]) + [n_points-1])
+    slider.setMaximum(len(indices)-1)
+    
+    # Color mapping for velocity
+    vmin, vmax = velocity_norm.min(), velocity_norm.max()
+    normed_vel = (velocity_norm - vmin) / (vmax - vmin + 1e-8)
+    colors = vispy.color.get_colormap('viridis').map(normed_vel)
+    
+    # Create trajectory line - initialize with first point
+    traj_line = visuals.Line(pos=drone_positions[:1], color=colors[:1], width=5, connect='strip')
+    view.add(traj_line)
+    
+    # Create drone position marker
+    drone_dot = visuals.Markers(pos=drone_positions[:1], face_color='white', size=10)
+    view.add(drone_dot)
+    
+    # Create coordinate axes
+    axis_lines = []
+    axis_colors = ['red', 'green', 'blue']
+    for color in axis_colors:
+        axis_line = visuals.Line(pos=np.zeros((2, 3)), color=color, width=3)
+        view.add(axis_line)
+        axis_lines.append(axis_line)
+    
+    # Create ground grid
+    grid_size = 200
+    grid_spacing = 20
+    grid_lines = []
+    for x in range(-grid_size, grid_size+1, grid_spacing):
+        pts = np.array([[x, -grid_size, 0], [x, grid_size, 0]])
+        line = visuals.Line(pos=pts, color=(0.7, 0.7, 0.7, 0.5), width=1)
+        view.add(line)
+        grid_lines.append(line)
+    for y in range(-grid_size, grid_size+1, grid_spacing):
+        pts = np.array([[-grid_size, y, 0], [grid_size, y, 0]])
+        line = visuals.Line(pos=pts, color=(0.7, 0.7, 0.7, 0.5), width=1)
+        view.add(line)
+        grid_lines.append(line)
+    
+    # Create obstacles
+    obstacle_meshes = []
+    if "obstacles_centers" in result and "obstacles_radii" in result and "obstacles_axes" in result:
+        for center, axes, radius in zip(result['obstacles_centers'], result['obstacles_axes'], result['obstacles_radii']):
+            # Convert to NumPy arrays
+            center = np.array(center)
+            axes = np.array(axes)
+            radius = np.array(radius)
+            
+            # Create sphere mesh and transform to ellipsoid
+            sphere_mesh = create_sphere(radius=1.0, rows=20, cols=40)
+            sphere_verts = sphere_mesh.get_vertices()
+            sphere_faces = sphere_mesh.get_faces()
+            sphere_verts = sphere_verts * radius  # scale to ellipsoid radii
+            sphere_verts = (axes @ sphere_verts.T).T  # rotate
+            sphere_verts = sphere_verts + center  # translate
+            
+            obstacle = visuals.Mesh(vertices=sphere_verts, faces=sphere_faces, 
+                                  color=(1, 0, 0, 0.3), shading='smooth')
+            view.add(obstacle)
+            obstacle_meshes.append(obstacle)
+    
+    # Create gates
+    gate_lines = []
+    if "vertices" in result:
+        for vertices in result["vertices"]:
+            gate_pts = np.array(vertices + [vertices[0]])
+            gate = visuals.Line(pos=gate_pts, color=(0, 0, 1, 1), width=5)
+            view.add(gate)
+            gate_lines.append(gate)
+    
+    # Create subject trajectories
+    subject_lines = []
+    subject_dots = []
+    subs_positions = []
+    if "init_poses" in result or "moving_subject" in result:
+        if "init_poses" in result:
+            subs_positions, _, _, _ = full_subject_traj_time(result, params)
+        else:
+            subs_positions, _, _, _ = full_subject_traj_time(result, params)
+        
+        # Convert subject positions to NumPy arrays
+        subs_positions = [np.array(sub_pos) for sub_pos in subs_positions]
+        
+        for sub_traj in subs_positions:
+            line = visuals.Line(pos=sub_traj[:1], color=(1, 0, 0, 1), width=3)
+            dot = visuals.Markers(pos=sub_traj[:1], face_color=(1, 0, 0, 1), size=10)
+            view.add(line)
+            view.add(dot)
+            subject_lines.append(line)
+            subject_dots.append(dot)
+    
+    # Create range spheres
+    range_spheres = []
+    if "min_range" in result and "max_range" in result and "init_poses" in result:
+        for sub_traj in subs_positions:
+            # Min range sphere
+            min_mesh = create_sphere(radius=result["min_range"], rows=10, cols=20)
+            min_sphere = visuals.Mesh(vertices=min_mesh.get_vertices(), faces=min_mesh.get_faces(), 
+                                    color=(1, 0, 0, 0.2), shading='smooth')
+            view.add(min_sphere)
+            
+            # Max range sphere
+            max_mesh = create_sphere(radius=result["max_range"], rows=10, cols=20)
+            max_sphere = visuals.Mesh(vertices=max_mesh.get_vertices(), faces=max_mesh.get_faces(), 
+                                    color=(0, 0, 1, 0.2), shading='smooth')
+            view.add(max_sphere)
+            
+            range_spheres.append((min_sphere, max_sphere))
+    
+    # Create viewcone
+    viewcone_mesh = None
+    if drone_attitudes is not None and "alpha_x" in result and "alpha_y" in result and "R_sb" in result:
+        n_cone = 40
+        theta = np.linspace(0, 2*np.pi, n_cone)
+        alpha_x = result["alpha_x"]
+        alpha_y = result["alpha_y"]
+        A = np.diag([1 / np.tan(np.pi / alpha_y), 1 / np.tan(np.pi / alpha_x)])
+        
+        # Create cone geometry
+        cone_length = 30.0
+        circle = np.stack([np.cos(theta), np.sin(theta)])
+        z = np.linalg.norm(A @ circle, axis=0)
+        X = circle[0] / z
+        Y = circle[1] / z
+        Z = np.ones_like(X)
+        base_points = np.stack([X, Y, Z], axis=1) * cone_length
+        apex = np.array([[0, 0, 0]])
+        vertices = np.vstack([apex, base_points])
+        
+        # Create faces for cone
+        faces = []
+        for i in range(1, n_cone):
+            faces.append([0, i, i+1])
+        faces.append([0, n_cone, 1])
+        faces = np.array(faces)
+        
+        viewcone_mesh = visuals.Mesh(vertices=vertices, faces=faces, 
+                                   color=(1, 0, 0, 0.3), shading='smooth')
+        view.add(viewcone_mesh)
+    
+    # Animation state
+    ptr = [0]
+    playing = [False]
+    
+    def update():
+        i = ptr[0]
+        if i >= len(indices):
+            timer.stop()
+            playing[0] = False
+            play_btn.setEnabled(True)
+            pause_btn.setEnabled(False)
+            return
+        
+        slider.blockSignals(True)
+        slider.setValue(i)
+        slider.blockSignals(False)
+        
+        idx = indices[:i+1]
+        pos = drone_positions[idx]
+        col = colors[idx]
+        
+        # Update trajectory
+        traj_line.set_data(pos=pos, color=col)
+        drone_dot.set_data(pos=pos[-1:], face_color='white')
+        
+        # Update coordinate axes
+        if drone_attitudes is not None:
+            att = drone_attitudes[indices[i]]
+            r = R.from_quat([att[1], att[2], att[3], att[0]])
+            rotmat = r.as_matrix()
+            axes = 20 * np.eye(3)
+            axes_rot = rotmat @ axes
+            
+            for k in range(3):
+                axis_pts = np.stack([drone_positions[indices[i]], 
+                                   drone_positions[indices[i]] + axes_rot[:, k]])
+                axis_lines[k].set_data(pos=axis_pts)
+        
+        # Update subject trajectories
+        if len(subs_positions) > 0:
+            for j, sub_traj in enumerate(subs_positions):
+                subject_lines[j].set_data(pos=sub_traj[:indices[i]+1])
+                subject_dots[j].set_data(pos=sub_traj[indices[i]:indices[i]+1])
+                
+                # Update range spheres
+                if j < len(range_spheres):
+                    min_sphere, max_sphere = range_spheres[j]
+                    min_sphere.transform = vispy.visuals.transforms.STTransform(translate=sub_traj[indices[i]])
+                    max_sphere.transform = vispy.visuals.transforms.STTransform(translate=sub_traj[indices[i]])
+        
+        # Update viewcone
+        if viewcone_mesh is not None and drone_attitudes is not None:
+            att = drone_attitudes[indices[i]]
+            r = R.from_quat([att[1], att[2], att[3], att[0]])
+            rotmat = r.as_matrix()
+            R_sb = np.array(result["R_sb"])
+            
+            # Transform cone vertices
+            cone_mesh = create_sphere(radius=1.0, rows=10, cols=20)
+            verts = cone_mesh.get_vertices() * 30.0  # Scale to cone size
+            verts = (rotmat @ R_sb.T @ verts.T).T + drone_positions[indices[i]]
+            viewcone_mesh.set_data(vertices=verts, faces=cone_mesh.get_faces())
+        
+        ptr[0] += 1
+        canvas.update()
+    
+    def set_frame(i):
+        ptr[0] = i
+        update()
+    
+    timer = QTimer()
+    timer.timeout.connect(update)
+    timer.setInterval(30)
+    
+    def play():
+        if not playing[0]:
+            playing[0] = True
+            play_btn.setEnabled(False)
+            pause_btn.setEnabled(True)
+            timer.start()
+    
+    def pause():
+        playing[0] = False
+        play_btn.setEnabled(True)
+        pause_btn.setEnabled(False)
+        timer.stop()
+    
+    play_btn.clicked.connect(play)
+    pause_btn.clicked.connect(pause)
+    slider.valueChanged.connect(set_frame)
+    pause_btn.setEnabled(False)
+    
+    main_widget.setWindowTitle('Quadrotor Simulation (VisPy)')
+    main_widget.resize(1280, 800)
+    
+    # Draw initial frame
+    update()
+    
+    # Start Qt event loop
+    if not hasattr(QApplication.instance(), 'exec_'):
+        app.exec()
+    else:
+        QApplication.instance().exec_()
+
+def plot_scp_animation_pyqtgraph(result, params, step=2):
+    if not PYQTPHOT_AVAILABLE:
+        raise ImportError(
+            "pyqtgraph is required for this function but not installed. "
+            "Install it with: pip install openscvx[gui] or pip install pyqtgraph PyQt5"
+        )
+    
+    import sys
+    from scipy.spatial.transform import Rotation as R
+    from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QWidget, QLabel
+    from PyQt5.QtCore import Qt
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
+
+    # Main window and layout
+    main_widget = QWidget()
+    main_layout = QVBoxLayout(main_widget)
+    w = gl.GLViewWidget()
+    w.setWindowTitle('SCP Animation (pyqtgraph)')
+    w.setGeometry(0, 110, 1280, 720)
+    
+    # Extract data
+    tof = result["t_final"]
+    drone_positions = result["x_full"][:, :3]
+    drone_velocities = result["x_full"][:, 3:6]
+    drone_attitudes = result["x_full"][:, 6:10] if result["x_full"].shape[1] >= 10 else None
+    scp_interp_trajs = scp_traj_interp(result["x_history"], params)
+    scp_ctcs_trajs = result["x_history"]
+    scp_multi_shoot = result["discretization_history"]
+    
+    if "moving_subject" in result or "init_poses" in result:
+        subs_positions, _, _, _ = full_subject_traj_time(result, params)
+    
+    # Auto-calculate plotting bounds
+    pos_min = drone_positions.min(axis=0)
+    pos_max = drone_positions.max(axis=0)
+    pos_range = pos_max - pos_min
+    
+    # Add padding to bounds (20% of range)
+    padding = pos_range * 0.2
+    bounds_min = pos_min - padding
+    bounds_max = pos_max + padding
+    
+    # Ensure minimum bounds for small trajectories
+    min_bounds_size = 10.0
+    for i in range(3):
+        if bounds_max[i] - bounds_min[i] < min_bounds_size:
+            center = (bounds_max[i] + bounds_min[i]) / 2
+            bounds_min[i] = center - min_bounds_size / 2
+            bounds_max[i] = center + min_bounds_size / 2
+    
+    # Auto-calculate camera distance based on bounds
+    max_range = max(bounds_max - bounds_min)
+    camera_distance = max_range * 1.5  # 1.5x the maximum range
+    
+    w.setCameraPosition(distance=camera_distance, elevation=20, azimuth=45)
+    main_layout.addWidget(w)
+
+    # Controls
+    controls_layout = QHBoxLayout()
+    play_btn = QPushButton('Play')
+    pause_btn = QPushButton('Pause')
+    slider = QSlider(Qt.Horizontal)
+    slider.setMinimum(0)
+    slider.setSingleStep(1)
+    controls_layout.addWidget(play_btn)
+    controls_layout.addWidget(pause_btn)
+    controls_layout.addWidget(QLabel('SCP Iteration:'))
+    controls_layout.addWidget(slider)
+    main_layout.addLayout(controls_layout)
+    main_widget.show()
+
+    # Set slider range based on number of SCP iterations
+    n_iterations = len(scp_ctcs_trajs)
+    slider.setMaximum(n_iterations - 1)
+
+    # Final trajectory (nonlinear propagation)
+    final_traj_line = gl.GLLinePlotItem(pos=drone_positions, color=(0,1,0,1), width=5, antialias=True)
+    w.addItem(final_traj_line)
+
+    # Add a nice ground grid - auto-scale based on bounds
+    grid_size = max(bounds_max[:2] - bounds_min[:2]) * 0.3  # 30% of XY range
+    grid_spacing = grid_size / 8  # 8 grid lines
+    grid_lines = []
+    for x in np.arange(bounds_min[0] - grid_size/2, bounds_max[0] + grid_size/2, grid_spacing):
+        pts = np.array([[x, bounds_min[1] - grid_size/2, bounds_min[2]], [x, bounds_max[1] + grid_size/2, bounds_min[2]]])
+        line = gl.GLLinePlotItem(pos=pts, color=(0.7,0.7,0.7,0.5), width=1, antialias=True)
+        w.addItem(line)
+        grid_lines.append(line)
+    for y in np.arange(bounds_min[1] - grid_size/2, bounds_max[1] + grid_size/2, grid_spacing):
+        pts = np.array([[bounds_min[0] - grid_size/2, y, bounds_min[2]], [bounds_max[0] + grid_size/2, y, bounds_min[2]]])
+        line = gl.GLLinePlotItem(pos=pts, color=(0.7,0.7,0.7,0.5), width=1, antialias=True)
+        w.addItem(line)
+        grid_lines.append(line)
+
+    # Create obstacles
+    obstacle_items = []
+    if "obstacles_centers" in result and "obstacles_radii" in result and "obstacles_axes" in result:
+        for center, axes, radius in zip(result['obstacles_centers'], result['obstacles_axes'], result['obstacles_radii']):
+            # Create a sphere mesh and transform it to an ellipsoid
+            sphere_mesh = gl.MeshData.sphere(rows=20, cols=40)
+            verts = sphere_mesh.vertexes()
+            # Scale by 1/radius to match the original plot_animation function
+            verts = verts * np.array([1/radius[0], 1/radius[1], 1/radius[2]])
+            verts = (axes @ verts.T).T  # rotate
+            verts = verts + center.value  # translate
+            sphere_mesh.setVertexes(verts)
+            obstacle = gl.GLMeshItem(meshdata=sphere_mesh, smooth=True, color=(1,0,0,0.6), shader='shaded', drawEdges=False, glOptions='translucent')
+            w.addItem(obstacle)
+            obstacle_items.append(obstacle)
+
+    # Create gates
+    gate_items = []
+    if "vertices" in result:
+        for vertices in result["vertices"]:
+            gate = gl.GLLinePlotItem(pos=np.array(vertices + [vertices[0]]), color=(0,0,1,1), width=5, antialias=True)
+            w.addItem(gate)
+            gate_items.append(gate)
+
+    # Create subject trajectories
+    subject_lines = []
+    subject_dots = []
+    if "init_poses" in result or "moving_subject" in result:
+        for sub_traj in subs_positions:
+            line = gl.GLLinePlotItem(pos=sub_traj, color=(1,0,0,1), width=3)
+            dot = gl.GLScatterPlotItem(pos=sub_traj[-1:], color=(1,0,0,1), size=10)
+            w.addItem(line)
+            w.addItem(dot)
+            subject_lines.append(line)
+            subject_dots.append(dot)
+
+    # SCP iteration trajectories
+    scp_traj_lines = []
+    multishot_traj_lines = []
+    scp_axes_items = []  # Store axes for each SCP iteration
+    
+    # Extract the number of states and controls from the parameters
+    n_x = params.sim.n_states
+    n_u = params.sim.n_controls
+
+    # Define indices for slicing the augmented state vector
+    i0 = 0
+    i1 = n_x
+    i2 = i1 + n_x * n_x
+    i3 = i2 + n_x * n_u
+    i4 = i3 + n_x * n_u
+    i5 = i4 + n_x
+
+    # Auto-calculate vehicle axes length based on trajectory size
+    axes_length = max(pos_range) * 0.1  # 10% of trajectory range
+    axes_length = max(axes_length, 2.0)  # Minimum 2 units
+    axes_length = min(axes_length, 20.0)  # Maximum 20 units
+
+    # Create trajectory lines for each SCP iteration
+    for traj_iter, scp_traj in enumerate(scp_ctcs_trajs):
+        # SCP trajectory line - only show actual data points, not connecting lines
+        scp_positions = scp_traj[:, 0:3]
+        scp_line = gl.GLScatterPlotItem(pos=scp_positions, color=(0.5,0.5,0.5,0.7), size=3)
+        w.addItem(scp_line)
+        scp_traj_lines.append(scp_line)
+        
+        # Create axes for this SCP iteration
+        if drone_attitudes is not None:
+            iteration_axes = []
+            for i in range(scp_traj.shape[0]):
+                att = scp_traj[i, 6:10]  # Extract attitude from SCP trajectory
+                r = R.from_quat([att[1], att[2], att[3], att[0]])
+                rotmat = r.as_matrix()
+                axes = axes_length * np.eye(3)
+                axes_rot = rotmat @ axes
+                
+                # Create axis lines for this position
+                pos_axes = []
+                axis_colors = [(1,0,0,1), (0,1,0,1), (0,0,1,1)]  # Red, Green, Blue
+                for k in range(3):
+                    axis_pts = np.stack([scp_positions[i], scp_positions[i] + axes_rot[:,k]])
+                    axis_line = gl.GLLinePlotItem(pos=axis_pts, color=axis_colors[k], width=2)
+                    w.addItem(axis_line)
+                    pos_axes.append(axis_line)
+                iteration_axes.append(pos_axes)
+            scp_axes_items.append(iteration_axes)
+        else:
+            scp_axes_items.append([])
+        
+        # Multiple shooting trajectories - only show actual data points
+        if traj_iter < len(scp_multi_shoot):
+            pos_traj = []
+            for i_multi in range(scp_multi_shoot[traj_iter].shape[1]):
+                pos_traj.append(scp_multi_shoot[traj_iter][:,i_multi].reshape(-1, i5)[:,0:3])
+            pos_traj = np.array(pos_traj)
+            
+            iteration_multishot_lines = []
+            for j in range(pos_traj.shape[1]):
+                multishot_line = gl.GLScatterPlotItem(pos=pos_traj[:,j], color=(0.3,0.7,1.0,0.8), size=4)
+                w.addItem(multishot_line)
+                iteration_multishot_lines.append(multishot_line)
+            multishot_traj_lines.append(iteration_multishot_lines)
+
+    # Animation state
+    ptr = [0]
+    playing = [False]
+
+    def update():
+        i = ptr[0]
+        if i >= n_iterations:
+            timer.stop()
+            playing[0] = False
+            play_btn.setEnabled(True)
+            pause_btn.setEnabled(False)
+            return
+        
+        slider.blockSignals(True)
+        slider.setValue(i)
+        slider.blockSignals(False)
+        
+        # Show only the current SCP iteration and all previous ones
+        for j, scp_line in enumerate(scp_traj_lines):
+            if j <= i:
+                scp_line.setVisible(True)
+                scp_line.setData(color=(0.5,0.5,0.5,0.7))
+            else:
+                scp_line.setVisible(False)
+        
+        # Show/hide axes for each iteration
+        for j, iteration_axes in enumerate(scp_axes_items):
+            if j == i:  # Only show axes for current iteration
+                for pos_axes in iteration_axes:
+                    for axis_line in pos_axes:
+                        axis_line.setVisible(True)
+            else:
+                for pos_axes in iteration_axes:
+                    for axis_line in pos_axes:
+                        axis_line.setVisible(False)
+        
+        # Show multiple shooting trajectories for current iteration
+        for j, iteration_lines in enumerate(multishot_traj_lines):
+            if j == i:
+                for line in iteration_lines:
+                    line.setVisible(True)
+                    line.setData(color=(0.3,0.7,1.0,0.8))
+            else:
+                for line in iteration_lines:
+                    line.setVisible(False)
+        
+        ptr[0] += 1
+
+    def set_frame(i):
+        ptr[0] = i
+        update()
+
+    timer = pg.QtCore.QTimer()
+    timer.timeout.connect(update)
+    timer.setInterval(1000)  # Slower for SCP iterations
+
+    def play():
+        if not playing[0]:
+            playing[0] = True
+            play_btn.setEnabled(False)
+            pause_btn.setEnabled(True)
+            timer.start()
+
+    def pause():
+        playing[0] = False
+        play_btn.setEnabled(True)
+        pause_btn.setEnabled(False)
+        timer.stop()
+
+    play_btn.clicked.connect(play)
+    pause_btn.clicked.connect(pause)
+    slider.valueChanged.connect(set_frame)
+    pause_btn.setEnabled(False)
+
+    main_widget.setWindowTitle(f'SCP Animation: {tof} seconds (pyqtgraph)')
+    main_widget.resize(1280, 800)
+
+    # Initialize display
+    set_frame(0)
+
+    if not hasattr(QtWidgets.QApplication.instance(), 'exec_'):
+        app.exec()
+    else:
+        QtWidgets.QApplication.instance().exec_()
+
+def plot_camera_animation_pyqtgraph(result, params, step=2):
+    if not PYQTPHOT_AVAILABLE:
+        raise ImportError(
+            "pyqtgraph is required for this function but not installed. "
+            "Install it with: pip install openscvx[gui] or pip install pyqtgraph PyQt5"
+        )
+    
+    """
+    PyQtGraph version of plot_camera_animation: animates subject projections in the camera frame (2D).
+    """
+    import sys
+    import numpy as np
+    from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QWidget, QLabel
+    from PyQt5.QtCore import Qt
+    import pyqtgraph as pg
+    app = pg.QtWidgets.QApplication.instance() or pg.QtWidgets.QApplication(sys.argv)
+
+    # Get subject projections in the camera frame
+    _, subs_positions_sen, _, subs_positions_sen_node = full_subject_traj_time(result, params)
+    n_frames = len(subs_positions_sen[0])
+    indices = np.arange(0, n_frames, step)
+    if indices[-1] != n_frames-1:
+        indices = np.append(indices, n_frames-1)
+
+    # Camera viewcone boundary (red curve)
+    if "alpha_x" in result and "alpha_y" in result:
+        A = np.diag([1 / np.tan(np.pi / result["alpha_x"]), 1 / np.tan(np.pi / result["alpha_y"])])
+    else:
+        raise ValueError("`alpha_x` and `alpha_y` not found in result dictionary.")
+    n_cone = 400
+    theta = np.linspace(0, 2*np.pi, n_cone)
+    circle = np.stack([np.cos(theta), np.sin(theta)])
+    
+    # Use the correct norm type from the result
+    if "norm_type" in result:
+        if result["norm_type"] == np.inf or result["norm_type"] == 'inf':
+            z = np.linalg.norm(A @ circle, axis=0, ord=np.inf)
+        else:
+            z = np.linalg.norm(A @ circle, axis=0, ord=result["norm_type"])
+    else:
+        # Default to 2-norm if norm_type not specified
+        z = np.linalg.norm(A @ circle, axis=0)
+    
+    X = circle[0] / z
+    Y = circle[1] / z
+    # Repeat first point to close the curve
+    X = np.append(X, X[0])
+    Y = np.append(Y, Y[0])
+
+    # Main window and layout
+    main_widget = QWidget()
+    main_layout = QVBoxLayout(main_widget)
+    plot_widget = pg.PlotWidget()
+    plot_widget.setAspectLocked(True)
+    plot_widget.setRange(xRange=[-1.1, 1.1], yRange=[-1.1, 1.1])
+    plot_widget.showGrid(x=False, y=False)  # Remove grid lines
+    main_layout.addWidget(plot_widget)
+
+    # Controls
+    controls_layout = QHBoxLayout()
+    play_btn = QPushButton('Play')
+    pause_btn = QPushButton('Pause')
+    slider = QSlider(Qt.Horizontal)
+    slider.setMinimum(0)
+    slider.setMaximum(len(indices)-1)
+    slider.setSingleStep(1)
+    controls_layout.addWidget(play_btn)
+    controls_layout.addWidget(pause_btn)
+    controls_layout.addWidget(QLabel('Frame:'))
+    controls_layout.addWidget(slider)
+    main_layout.addLayout(controls_layout)
+    main_widget.show()
+
+    # Plot the camera viewcone boundary with thicker red line
+    viewcone_curve = plot_widget.plot(X, Y, pen=pg.mkPen('r', width=5))
+
+    # Prepare subject curves
+    subject_curves = []
+    subject_dots = []
+    colors = [pg.intColor(i, hues=len(subs_positions_sen)) for i in range(len(subs_positions_sen))]
+    for color in colors:
+        curve = plot_widget.plot([], [], pen=pg.mkPen(color, width=2))
+        dot = plot_widget.plot([], [], pen=None, symbol='o', symbolBrush=color, symbolSize=6)  # Even smaller dots
+        subject_curves.append(curve)
+        subject_dots.append(dot)
+
+    # Prepare nodal points - remove outline and make smaller
+    subject_node_dots = []
+    for color in colors:
+        node_dot = plot_widget.plot([], [], pen=None, symbol='o', symbolBrush=color, symbolSize=8)  # Smaller nodal points
+        subject_node_dots.append(node_dot)
+
+    ptr = [0]
+    playing = [False]
+
+    def update():
+        i = ptr[0]
+        if i >= len(indices):
+            timer.stop()
+            playing[0] = False
+            play_btn.setEnabled(True)
+            pause_btn.setEnabled(False)
+            return
+        slider.blockSignals(True)
+        slider.setValue(i)
+        slider.blockSignals(False)
+        frame_idx = indices[i]
+        for j, sub_traj in enumerate(subs_positions_sen):
+            # Project trajectory up to current frame
+            traj = np.array(sub_traj[:frame_idx+1])
+            x = traj[:,0] / traj[:,2]
+            y = traj[:,1] / traj[:,2]
+            subject_curves[j].setData(x, y)
+            # Current dot
+            subject_dots[j].setData([x[-1]], [y[-1]])
+            # Nodal points (if available)
+            if subs_positions_sen_node:
+                node_traj = np.array(subs_positions_sen_node[j])
+                node_idx = int((frame_idx // (len(sub_traj) / len(node_traj))) + 1)
+                node_traj = node_traj[:node_idx]
+                if len(node_traj) > 0:
+                    node_x = node_traj[:,0] / node_traj[:,2]
+                    node_y = node_traj[:,1] / node_traj[:,2]
+                    subject_node_dots[j].setData(node_x, node_y)
+                else:
+                    subject_node_dots[j].setData([], [])
+        ptr[0] += 1
+
+    def set_frame(i):
+        ptr[0] = i
+        update()
+
+    timer = pg.QtCore.QTimer()
+    timer.timeout.connect(update)
+    timer.setInterval(50)
+
+    def play():
+        if not playing[0]:
+            playing[0] = True
+            play_btn.setEnabled(False)
+            pause_btn.setEnabled(True)
+            timer.start()
+
+    def pause():
+        playing[0] = False
+        play_btn.setEnabled(True)
+        pause_btn.setEnabled(False)
+        timer.stop()
+
+    play_btn.clicked.connect(play)
+    pause_btn.clicked.connect(pause)
+    slider.valueChanged.connect(set_frame)
+    pause_btn.setEnabled(False)
+
+    main_widget.setWindowTitle('Camera Animation (pyqtgraph)')
+    main_widget.resize(800, 800)
+
+    update()  # Draw initial frame
+
+    if not hasattr(pg.QtWidgets.QApplication.instance(), 'exec_'):
+        app.exec()
+    else:
+        pg.QtWidgets.QApplication.instance().exec_()

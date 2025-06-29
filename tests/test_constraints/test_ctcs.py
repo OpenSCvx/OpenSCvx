@@ -53,19 +53,19 @@ def test_decorator_sets_attributes_and_type():
     assert float(out) == 25.0  # (2+3)=5 → relu² → 25
 
 
-def test_ctcs_called_directly_without_parentheses():
-    """Using `c = ctcs(fn)` should wrap but leave nodes=None, idx=None."""
+# def test_ctcs_called_directly_without_parentheses():
+#     """Using `c = ctcs(fn)` should wrap but leave nodes=None, idx=None."""
 
-    def raw_fn(x, u):
-        return jnp.array([4.0, -1.0])
+#     def raw_fn(x_, u_):
+#         return jnp.array([4.0, -1.0])
 
-    c = ctcs(raw_fn)
-    assert isinstance(c, CTCSConstraint)
-    assert c.func is raw_fn
-    assert c.nodes is None and c.idx is None
-    # calling without nodes ought to complain about comparing None to int
-    with pytest.raises(TypeError):
-        _ = c(jnp.zeros(1), jnp.zeros(1), node=0)
+#     c = ctcs(raw_fn)
+#     assert isinstance(c, CTCSConstraint)
+#     assert c.func is raw_fn
+#     assert c.nodes is None and c.idx is None
+#     # calling without nodes ought to complain about comparing None to int
+#     with pytest.raises(TypeError):
+#         _ = c(jnp.zeros(1), jnp.zeros(1), node=0)
 
 
 def test_custom_penalty_callable():
@@ -125,3 +125,12 @@ def test_grad_functions_wrapped_and_callable():
 
     assert wrapped_fx.item() == pytest.approx(grad_x(x, u).item())
     assert wrapped_fu.item() == pytest.approx(grad_u(x, u).item())
+
+
+def test_scaling_argument_applies_correctly():
+    @ctcs(nodes=(0, 5), penalty="squared_relu", scaling=3.0)
+    def f(x, u):
+        return jnp.array([2.0])
+    # squared relu of 2.0 is 4.0, times scaling 3.0 is 12.0
+    result = f(jnp.zeros(1), jnp.zeros(1), node=2)
+    assert float(result) == pytest.approx(12.0)

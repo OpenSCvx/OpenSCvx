@@ -6,12 +6,13 @@ import pickle
 
 from openscvx.utils import qdcm, get_kp_pose
 from openscvx.config import Config
+from openscvx.results import OptimizationResults
 
-def full_subject_traj_time(results, params):
-    x_full = results["x_full"]
-    x_nodes = results["x"]
+def full_subject_traj_time(results: OptimizationResults, params: Config):
+    x_full = results.x_full
+    x_nodes = results.x
     t_nodes = x_nodes[:,params.sim.idx_t]
-    t_full = results['t_full']
+    t_full = results.t_full
     subs_traj = []
     subs_traj_node = []
     subs_traj_sen = []
@@ -19,11 +20,12 @@ def full_subject_traj_time(results, params):
     
     # if hasattr(params.dyn, 'get_kp_pose'):
     if "moving_subject" in results and "init_poses" in results:
-        init_poses = results["init_poses"]
+        init_poses = results.plotting_data["init_poses"]
         subs_traj.append(get_kp_pose(t_full, init_poses))
         subs_traj_node.append(get_kp_pose(t_nodes, init_poses))
     elif "init_poses" in results:
-        for pose in results["init_poses"]:
+        init_poses = results.plotting_data["init_poses"]
+        for pose in init_poses:
             # repeat the pose for all time steps
             pose_full = np.repeat(pose[:,np.newaxis], x_full.shape[0], axis=1).T
             subs_traj.append(pose_full)
@@ -34,7 +36,7 @@ def full_subject_traj_time(results, params):
         raise ValueError("No valid method to get keypoint poses.")
 
     if "R_sb" in results:
-        R_sb = results["R_sb"]
+        R_sb = results.plotting_data["R_sb"]
         for sub_traj in subs_traj:
             sub_traj_sen = []
             for i in range(x_full.shape[0]):
@@ -50,7 +52,7 @@ def full_subject_traj_time(results, params):
             subs_traj_sen_node.append(np.array(sub_traj_sen_node).squeeze())
         return subs_traj, subs_traj_sen, subs_traj_node, subs_traj_sen_node
     else:
-        raise ValueError("`R_sb` not found in results dictionary. Cannot compute sensor frame.")
+        raise ValueError("`R_sb` not found in results. Cannot compute sensor frame.")
 
 def save_gate_parameters(gates, params: Config):
     gate_centers = []
@@ -75,26 +77,26 @@ def frame_args(duration):
             "transition": {"duration": duration, "easing": "linear"},
             }
 
-def plot_constraint_violation(result, params: Config):
+def plot_constraint_violation(result: OptimizationResults, params: Config):
     fig = make_subplots(rows=2, cols=3, subplot_titles=(r'$\text{Obstacle Violation}$', r'$\text{Sub VP Violation}$', r'$\text{Sub Min Violation}$', r'$\text{Sub Max Violation}$', r'$\text{Sub Direc Violation}$', r'$\text{State Bound Violation}$', r'$\text{Total Violation}$'))
     fig.update_layout(template='plotly_dark', title=r'$\text{Constraint Violation}$')
 
     if "obs_vio" in result:
-        obs_vio = result["obs_vio"]
+        obs_vio = result.plotting_data["obs_vio"]
         for i in range(obs_vio.shape[0]):
             color = f'rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})'
             fig.add_trace(go.Scatter(y=obs_vio[i], mode='lines', showlegend=False, line=dict(color=color, width = 2)), row=1, col=1)
         i = 0
     else:
-        print("'obs_vio' not found in result dictionary.")
+        print("'obs_vio' not found in result.")
 
     # Make names of each state in the state vector
     state_names = ['x', 'y', 'z', 'vx', 'vy', 'vz', 'q0', 'q1', 'q2', 'q3', 'wx', 'wy', 'wz', 'ctcs']
 
     if "sub_vp_vio" in result and "sub_min_vio" in result and "sub_max_vio" in result:
-        sub_vp_vio = result["sub_vp_vio"]
-        sub_min_vio = result["sub_min_vio"]
-        sub_max_vio = result["sub_max_vio"]
+        sub_vp_vio = result.plotting_data["sub_vp_vio"]
+        sub_min_vio = result.plotting_data["sub_min_vio"]
+        sub_max_vio = result.plotting_data["sub_max_vio"]
         for i in range(sub_vp_vio.shape[0]):
             color = f'rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})'
             fig.add_trace(go.Scatter(y=sub_vp_vio[i], mode='lines', showlegend=True, name = 'LoS ' + str(i) + ' Error', line=dict(color=color, width = 2)), row=1, col=2)
@@ -106,28 +108,28 @@ def plot_constraint_violation(result, params: Config):
                 fig.add_trace(go.Scatter(y=[], mode='lines', showlegend=False, line=dict(color=color, width = 2)), row=2, col=1)
         i = 0
     else:
-        print("'sub_vp_vio', 'sub_min_vio', or 'sub_max_vio' not found in result dictionary.")
+        print("'sub_vp_vio', 'sub_min_vio', or 'sub_max_vio' not found in result.")
     
     if "sub_direc_vio" in result:
-        sub_direc_vio = result["sub_direc_vio"]
+        sub_direc_vio = result.plotting_data["sub_direc_vio"]
         # fig.add_trace(go.Scatter(y=sub_direc_vio, mode='lines', showlegend=False, line=dict(color='red', width = 2)), row=2, col=2)
     else:
-        print("'sub_direc_vio' not found in result dictionary.")
+        print("'sub_direc_vio' not found in result.")
 
     if "state_bound_vio" in result:
-        state_bound_vio = result["state_bound_vio"]
+        state_bound_vio = result.plotting_data["state_bound_vio"]
         for i in range(state_bound_vio.shape[0]):
             color = f'rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})'
             fig.add_trace(go.Scatter(y=state_bound_vio[:,i], mode='lines', showlegend=True, name = state_names[i] + ' Error', line=dict(color=color, width = 2)), row=2, col=3)
     else:
-        print("'state_bound_vio' not found in result dictionary.")
+        print("'state_bound_vio' not found in result.")
 
     fig.show()
 
-def plot_initial_guess(result, params: Config):
-    x_positions = result["x"][0:3]
-    x_attitude = result["x"][6:10]
-    subs_positions = result["sub_positions"]
+def plot_initial_guess(result: OptimizationResults, params: Config):
+    x_positions = result.x.guess[:, 0:3].T
+    x_attitude = result.x.guess[:, 6:10].T
+    subs_positions = result.plotting_data["sub_positions"]
 
     fig = go.Figure(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='gray', width = 2)))
 
@@ -172,17 +174,17 @@ def plot_initial_guess(result, params: Config):
         fig.add_trace(go.Scatter3d(x=sub_positions[:,0], y=sub_positions[:,1], z=sub_positions[:,2], mode='lines+markers', line=dict(color='red', width = 5), name='Subject'))
     fig.show()
 
-def plot_scp_animation(result: dict,
+def plot_scp_animation(result: OptimizationResults,
                        params = None,
                        path=""):
-    tof = result["t_final"]
+    tof = result.t_final
     title = f'SCP Simulation: {tof} seconds'
-    drone_positions = result["x_full"][:, :3]
-    drone_attitudes = result["x_full"][:, 6:10]
-    drone_forces = result["u_full"][:, :3]
-    scp_interp_trajs = scp_traj_interp(result["x_history"], params)
-    scp_ctcs_trajs = result["x_history"]
-    scp_multi_shoot = result["discretization"]
+    drone_positions = result.x_full[:, :3]
+    drone_attitudes = result.x_full[:, 6:10]
+    drone_forces = result.u_full[:, :3]
+    scp_interp_trajs = scp_traj_interp(result.x_history, params)
+    scp_ctcs_trajs = result.x_history
+    scp_multi_shoot = result.discretization_history
     # obstacles = result_ctcs["obstacles"]
     # gates = result_ctcs["gates"]
     if "moving_subject" in result or "init_poses" in result:
@@ -289,14 +291,14 @@ def plot_scp_animation(result: dict,
             fig.add_trace(go.Surface(x=points[:, 0].reshape(n,n), y=points[:, 1].reshape(n,n), z=points[:, 2].reshape(n,n), opacity = 0.5, showscale=False))
 
     if "vertices" in result:
-        for vertices in result["vertices"]:
+        for vertices in result.plotting_data["vertices"]:
             # Plot a line through the vertices of the gate
             fig.add_trace(go.Scatter3d(x=[vertices[0][0], vertices[1][0], vertices[2][0], vertices[3][0], vertices[0][0]], y=[vertices[0][1], vertices[1][1], vertices[2][1], vertices[3][1], vertices[0][1]], z=[vertices[0][2], vertices[1][2], vertices[2][2], vertices[3][2], vertices[0][2]], mode='lines', showlegend=False, line=dict(color='blue', width=10)))
             
     # Add the subject positions
-    if "n_subs" in result and result["n_subs"] != 0:     
+    if "n_subs" in result and result.plotting_data["n_subs"] != 0:     
         if "moving_subject" in result:
-            if result["moving_subject"]:
+            if result.plotting_data["moving_subject"]:
                 for sub_positions in subs_positions:
                     fig.add_trace(go.Scatter3d(x=sub_positions[:,0], y=sub_positions[:,1], z=sub_positions[:,2], mode='lines', line=dict(color='red', width = 5), showlegend=False))
         else:
@@ -419,202 +421,57 @@ def scp_traj_interp(scp_trajs, params: Config):
         scp_prop_trajs.append(np.array(states))
     return scp_prop_trajs
 
-def plot_state(result, params: Config):
-    scp_trajs = scp_traj_interp(result["x_history"], params)
-    x_full = result["x_full"]
+def plot_state(result: OptimizationResults, params: Config):
+    x_full = result.x_full
+    t_full = result.t_full
+    dis_history = result.discretization_history
+
+    n_x = params.sim.n_states
 
     fig = make_subplots(rows=2, cols=7, subplot_titles=('X Position', 'Y Position', 'Z Position', 'X Velocity', 'Y Velocity', 'Z Velocity', 'CTCS Augmentation', 'Q1', 'Q2', 'Q3', 'Q4', 'X Angular Rate', 'Y Angular Rate', 'Z Angular Rate'))
     fig.update_layout(title_text="State Trajectories", template='plotly_dark')
 
-    # Plot the position
-    x_min = params.sim.min_state[0]
-    x_max = params.sim.max_state[0]
-    for traj in scp_trajs:
-        fig.add_trace(go.Scatter(y=traj[:,0], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=1, col=1)
-    fig.add_trace(go.Scatter(y=x_full[:,0], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=1, col=1)
-    fig.add_hline(y=x_min, line=dict(color='red', width=2), row = 1, col = 1)
-    fig.add_hline(y=x_max, line=dict(color='red', width=2), row = 1, col = 1)
-    fig.update_yaxes(range=[x_min, x_max], row=1, col=1)
+    # Plot the State
+    # for traj in dis_history:
+    for i in range(n_x):
+        x_min = params.sim.x.min[i]
+        x_max = params.sim.x.max[i]
+        # fig.add_trace(go.Scatter(y=traj[i], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=(i // 7) + 1, col=(i % 7) + 1)
+        fig.add_trace(go.Scatter(x=t_full, y=x_full[:,i], mode='lines', showlegend=True, line=dict(color='green', width = 2)), row=(i // 7) + 1, col=(i % 7) + 1)
+        fig.add_trace(go.Scatter(x=params.sim.x.guess[:,7], y=params.sim.x.guess[:,i], mode='lines', showlegend=True, line=dict(color='blue', width = 0.5)), row=(i // 7) + 1, col=(i % 7) + 1)
+        fig.add_hline(y=x_min, line=dict(color='red', width=2), row = (i // 7) + 1, col = (i % 7) + 1)
+        fig.add_hline(y=x_max, line=dict(color='red', width=2), row = (i // 7) + 1, col = (i % 7) + 1)
 
-    y_min = params.sim.min_state[1]
-    y_max = params.sim.max_state[1]
-    for traj in scp_trajs:
-        fig.add_trace(go.Scatter(y=traj[:,1], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=1, col=2)
-    fig.add_trace(go.Scatter(y=x_full[:,1], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=1, col=2)
-    fig.add_hline(y=y_min, line=dict(color='red', width=2), row = 1, col = 2)
-    fig.add_hline(y=y_max, line=dict(color='red', width=2), row = 1, col = 2)
+    return fig
 
-    z_min = params.sim.min_state[2]
-    z_max = params.sim.max_state[2]
-    for traj in scp_trajs:
-        fig.add_trace(go.Scatter(y=traj[:,2], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=1, col=3)
-    fig.add_trace(go.Scatter(y=x_full[:,2], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=1, col=3)
-    fig.add_hline(y=z_min, line=dict(color='red', width=2), row = 1, col = 3)
-    fig.add_hline(y=z_max, line=dict(color='red', width=2), row = 1, col = 3)
+def plot_control(result: OptimizationResults, params: Config):
+    u_full = result.u_full
+    t_full = result.t_full
 
-    # Plot the velocity
-    vx_min = params.sim.min_state[3]
-    vx_max = params.sim.max_state[3]
-    for traj in scp_trajs:
-        fig.add_trace(go.Scatter(y=traj[:,3], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=1, col=4)
-    fig.add_trace(go.Scatter(y=x_full[:,3], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=1, col=4)
-    fig.add_hline(y=vx_min, line=dict(color='red', width=2), row = 1, col = 4)
-    fig.add_hline(y=vx_max, line=dict(color='red', width=2), row = 1, col = 4)
+    u = params.sim.u
+    x = params.sim.x
 
-    vy_min = params.sim.min_state[4]
-    vy_max = params.sim.max_state[4]
-    for traj in scp_trajs:
-        fig.add_trace(go.Scatter(y=traj[:,4], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=1, col=5)
-    fig.add_trace(go.Scatter(y=x_full[:,4], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=1, col=5)
-    fig.add_hline(y=vy_min, line=dict(color='red', width=2), row = 1, col = 5)
-    fig.add_hline(y=vy_max, line=dict(color='red', width=2), row = 1, col = 5)
-
-    vz_min = params.sim.min_state[5]
-    vz_max = params.sim.max_state[5]
-    for traj in scp_trajs:
-        fig.add_trace(go.Scatter(y=traj[:,5], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=1, col=6)
-    fig.add_trace(go.Scatter(y=x_full[:,5], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=1, col=6)
-    fig.add_hline(y=vz_min, line=dict(color='red', width=2), row = 1, col = 6)
-    fig.add_hline(y=vz_max, line=dict(color='red', width=2), row = 1, col = 6)
-
-    # # Plot the norm of the quaternion
-    # for traj in scp_trajs:
-    #     fig.add_trace(go.Scatter(y=la.norm(traj[1:,6:10], axis = 1), mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=1, col=7)
-    # fig.add_trace(go.Scatter(y=la.norm(x_full[1:,6:10], axis = 1), mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=1, col=7)
-    for traj in scp_trajs:
-        fig.add_trace(go.Scatter(y=traj[:,-1], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=1, col=7)
-    fig.add_trace(go.Scatter(y=x_full[:,-1], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=1, col=7)
-    # fig.add_hline(y=vz_min, line=dict(color='red', width=2), row = 1, col = 6)
-    # fig.add_hline(y=vz_max, line=dict(color='red', width=2), row = 1, col = 6)
-
-    # Plot the attitude
-    q1_min = params.sim.min_state[6]
-    q1_max = params.sim.max_state[6]
-    for traj in scp_trajs:
-        fig.add_trace(go.Scatter(y=traj[:,6], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=2, col=1)
-    fig.add_trace(go.Scatter(y=x_full[:,6], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=2, col=1)
-    fig.add_hline(y=q1_min, line=dict(color='red', width=2), row = 2, col = 1)
-    fig.add_hline(y=q1_max, line=dict(color='red', width=2), row = 2, col = 1)
-
-    q2_min = params.sim.min_state[7]
-    q2_max = params.sim.max_state[7]
-    for traj in scp_trajs:
-        fig.add_trace(go.Scatter(y=traj[:,7], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=2, col=2)
-    fig.add_trace(go.Scatter(y=x_full[:,7], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=2, col=2)
-    fig.add_hline(y=q2_min, line=dict(color='red', width=2), row = 2, col = 2)
-    fig.add_hline(y=q2_max, line=dict(color='red', width=2), row = 2, col = 2)
-
-    q3_min = params.sim.min_state[8]
-    q3_max = params.sim.max_state[8]
-    for traj in scp_trajs:
-        fig.add_trace(go.Scatter(y=traj[:,8], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=2, col=3)
-    fig.add_trace(go.Scatter(y=x_full[:,8], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=2, col=3)
-    fig.add_hline(y=q3_min, line=dict(color='red', width=2), row = 2, col = 3)
-    fig.add_hline(y=q3_max, line=dict(color='red', width=2), row = 2, col = 3)
-
-    q4_min = params.sim.min_state[9]
-    q4_max = params.sim.max_state[9]
-    for traj in scp_trajs:
-        fig.add_trace(go.Scatter(y=traj[:,9], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=2, col=4)
-    fig.add_trace(go.Scatter(y=x_full[:,9], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=2, col=4)
-    fig.add_hline(y=q4_min, line=dict(color='red', width=2), row = 2, col = 4)
-    fig.add_hline(y=q4_max, line=dict(color='red', width=2), row = 2, col = 4)
-
-    # Plot the angular rate
-    wx_min = params.sim.min_state[10]
-    wx_max = params.sim.max_state[10]
-    for traj in scp_trajs:
-        fig.add_trace(go.Scatter(y=traj[:,10], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=2, col=5)
-    fig.add_trace(go.Scatter(y=x_full[:,10], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=2, col=5)
-    fig.add_hline(y=wx_min, line=dict(color='red', width=2), row = 2, col = 5)
-    fig.add_hline(y=wx_max, line=dict(color='red', width=2), row = 2, col = 5)
-
-    wy_min = params.sim.min_state[11]
-    wy_max = params.sim.max_state[11]
-    for traj in scp_trajs:
-        fig.add_trace(go.Scatter(y=traj[:,11], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=2, col=6)
-    fig.add_trace(go.Scatter(y=x_full[:,11], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=2, col=6)
-    fig.add_hline(y=wy_min, line=dict(color='red', width=2), row = 2, col = 6)
-    fig.add_hline(y=wy_max, line=dict(color='red', width=2), row = 2, col = 6)
-
-    wz_min = params.sim.min_state[12]
-    wz_max = params.sim.max_state[12]
-    for traj in scp_trajs:
-        fig.add_trace(go.Scatter(y=traj[:,12], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=2, col=7)
-    fig.add_trace(go.Scatter(y=x_full[:,12], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=2, col=7)
-    fig.add_hline(y=wz_min, line=dict(color='red', width=2), row = 2, col = 7)
-    fig.add_hline(y=wz_max, line=dict(color='red', width=2), row = 2, col = 7)
-    fig.show()
-
-def plot_control(result, params: Config):
-    scp_controls = result["u_history"]
-    u = result["u"]
-
-    fx_min = params.sim.min_control[0]
-    fx_max = params.sim.max_control[0]
-
-    fy_min = params.sim.min_control[1]
-    fy_max = params.sim.max_control[1]
-
-    fz_min = params.sim.min_control[2]
-    fz_max = params.sim.max_control[2]
-
-    tau_x_min = params.sim.max_control[3]
-    tau_x_max = params.sim.min_control[3]
-
-    tau_y_min = params.sim.max_control[4]
-    tau_y_max = params.sim.min_control[4]
-
-    tau_z_min = params.sim.max_control[5]
-    tau_z_max = params.sim.min_control[5]
+    n_u = params.sim.n_controls
 
     fig = make_subplots(rows=2, cols=3, subplot_titles=('X Force', 'Y Force', 'Z Force', 'X Torque', 'Y Torque', 'Z Torque'))
     fig.update_layout(title_text="Control Trajectories", template='plotly_dark')
 
-    for traj in scp_controls:
-        fig.add_trace(go.Scatter(y=traj[0], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=1, col=1)
-    fig.add_trace(go.Scatter(y=u[0], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=1, col=1)
-    fig.add_hline(y=fx_min, line=dict(color='red', width=2), row = 1, col = 1)
-    fig.add_hline(y=fx_max, line=dict(color='red', width=2), row = 1, col = 1)
+    for i in range(n_u):
+        u_min = u.min[i]
+        u_max = u.max[i]
+        fig.add_trace(go.Scatter(x=t_full, y=u_full[:,i], mode='lines', showlegend=True, line=dict(color='green', width = 2)), row=(i // 3) + 1, col=(i % 3) + 1)
+        fig.add_trace(go.Scatter(x=x.guess[:,7], y=u.guess[:,i], mode='lines', showlegend=True, line=dict(color='blue', width = 0.5)), row=(i // 3) + 1, col=(i % 3) + 1)
+        fig.add_hline(y=u_min, line=dict(color='red', width=2), row = (i // 3) + 1, col = (i % 3) + 1)
+        fig.add_hline(y=u_max, line=dict(color='red', width=2), row = (i // 3) + 1, col = (i % 3) + 1)
 
-    for traj in scp_controls:
-        fig.add_trace(go.Scatter(y=traj[1], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=1, col=2)
-    fig.add_trace(go.Scatter(y=u[1], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=1, col=2)
-    fig.add_hline(y=fy_min, line=dict(color='red', width=2), row = 1, col = 2)
-    fig.add_hline(y=fy_max, line=dict(color='red', width=2), row = 1, col = 2)
+    return fig
 
-    for traj in scp_controls:
-        fig.add_trace(go.Scatter(y=traj[2], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=1, col=3)
-    fig.add_trace(go.Scatter(y=u[2], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=1, col=3)
-    fig.add_hline(y=fz_min, line=dict(color='red', width=2), row = 1, col = 3)
-    fig.add_hline(y=fz_max, line=dict(color='red', width=2), row = 1, col = 3)
-
-    for traj in scp_controls:
-        fig.add_trace(go.Scatter(y=traj[3], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=2, col=1)
-    fig.add_trace(go.Scatter(y=u[3], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=2, col=1)
-    fig.add_hline(y=tau_x_min, line=dict(color='red', width=2), row = 2, col = 1)
-    fig.add_hline(y=tau_x_max, line=dict(color='red', width=2), row = 2, col = 1)
-
-    for traj in scp_controls:
-        fig.add_trace(go.Scatter(y=traj[4], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=2, col=2)
-    fig.add_trace(go.Scatter(y=u[4], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=2, col=2)
-    fig.add_hline(y=tau_y_min, line=dict(color='red', width=2), row = 2, col = 2)
-    fig.add_hline(y=tau_y_max, line=dict(color='red', width=2), row = 2, col = 2)
-
-    for traj in scp_controls:
-        fig.add_trace(go.Scatter(y=traj[5], mode='lines', showlegend=False, line=dict(color='gray', width = 0.5)), row=2, col=3)
-    fig.add_trace(go.Scatter(y=u[5], mode='lines', showlegend=False, line=dict(color='green', width = 2)), row=2, col=3)
-    fig.add_hline(y=tau_z_min, line=dict(color='red', width=2), row = 2, col = 3)
-    fig.add_hline(y=tau_z_max, line=dict(color='red', width=2), row = 2, col = 3)
-
-    fig.show()
-
-def plot_losses(result, params: Config):
+def plot_losses(result: OptimizationResults, params: Config):
     # Plot J_tr, J_vb, J_vc, J_vc_ctcs
-    J_tr = result["J_tr_history"]
-    J_vb = result["J_vb_history"]
-    J_vc = result["J_vc_history"]
-    J_vc_ctcs = result["J_vc_ctcs_vec"]
+    J_tr = result.J_tr_history
+    J_vb = result.J_vb_history
+    J_vc = result.J_vc_history
+    J_vc_ctcs = result.plotting_data["J_vc_ctcs_vec"]
 
     fig = make_subplots(rows=2, cols=2, subplot_titles=('J_tr', 'J_vb', 'J_vc', 'J_vc_ctcs'))
     fig.update_layout(title_text="Losses", template='plotly_dark')
