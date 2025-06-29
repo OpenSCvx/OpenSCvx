@@ -163,8 +163,12 @@ def test_example_problem(name, conf):
         except ImportError as e:
             # Skip pyqtgraph tests if not available
             print(f"Skipping pyqtgraph tests for {name}: {e}")
+            # Don't fail the test if GUI packages are not available
+            pass
         except Exception as e:
             print(f"Error testing pyqtgraph functions for {name}: {e}")
+            # Don't fail the test for GUI-related errors
+            pass
 
     # extract metrics
     scp_iters = len(result["discretization_history"])

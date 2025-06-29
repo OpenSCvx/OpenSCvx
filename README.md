@@ -93,6 +93,30 @@ The GUI features include:
 - Camera view animation with `plot_camera_animation_pyqtgraph()`
 - Real-time optimization visualization in examples like `drone_racing_realtime.py`
 
+#### CVXPYGen Dependencies (Optional)
+
+For code generation and faster solver performance, CVXPYGen can be installed:
+
+- `cvxpygen` - enables code generation for faster solver performance
+- `qocogen` - custom solver backend for CVXPYGen (included with cvxpygen extras)
+
+To install with CVXPYGen support:
+
+```sh
+pip install openscvx[cvxpygen]
+```
+
+Or for both GUI and CVXPYGen:
+
+```sh
+pip install openscvx[gui,cvxpygen]
+```
+
+CVXPYGen features include:
+- Automatic C++ code generation for optimization problems
+- Faster solver performance through compiled code
+- Support for custom solver backends like QOCOGen
+
 ### Local Development
 
 This git repository can be installed using https
@@ -137,6 +161,11 @@ Dependencies can then be installed using Conda or Pip
 4. Install environment packages:
    ```sh
    pip install -r requirements.txt
+   ```
+   
+   Or install with optional dependencies:
+   ```sh
+   pip install -e ".[gui,cvxpygen]"
    ```
 </details>
 

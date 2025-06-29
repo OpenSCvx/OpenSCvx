@@ -3,9 +3,15 @@ import numpy.linalg as la
 from numpy import block
 import numpy as np
 import cvxpy as cp
-from cvxpygen import cpg
 from openscvx.config import Config
-from cvxpygen import cpg
+
+# Optional cvxpygen import
+try:
+    from cvxpygen import cpg
+    CVXPYGEN_AVAILABLE = True
+except ImportError:
+    CVXPYGEN_AVAILABLE = False
+    cpg = None
 
 
 def OptimalControlProblem(settings: Config):
@@ -152,6 +158,11 @@ def OptimalControlProblem(settings: Config):
     #########
     prob = cp.Problem(cp.Minimize(cost), constr)
     if settings.cvx.cvxpygen:
+        if not CVXPYGEN_AVAILABLE:
+            raise ImportError(
+                "cvxpygen is required for code generation but not installed. "
+                "Install it with: pip install openscvx[cvxpygen] or pip install cvxpygen"
+            )
         # Check to see if solver directory exists
         if not os.path.exists('solver'):
             cpg.generate_code(prob, solver = settings.cvx.solver, code_dir='solver', wrapper = True)

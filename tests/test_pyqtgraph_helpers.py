@@ -126,7 +126,9 @@ def check_pyqtgraph_functions_basic(result, params):
         
         return True
     except ImportError as e:
+        # Skip test if GUI packages are not available
         pytest.skip(f"pyqtgraph not available: {e}")
     except Exception as e:
+        # Don't fail the test for other errors
         print(f"Error testing pyqtgraph functions: {e}")
         return False 

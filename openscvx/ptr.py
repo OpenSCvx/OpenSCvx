@@ -13,9 +13,15 @@ warnings.filterwarnings("ignore")
 
 def PTR_init(params, ocp: cp.Problem, discretization_solver: callable, settings: Config):
     if settings.cvx.cvxpygen:
-        from solver.cpg_solver import cpg_solve
-        with open('solver/problem.pickle', 'rb') as f:
-            prob = pickle.load(f)
+        try:
+            from solver.cpg_solver import cpg_solve
+            with open('solver/problem.pickle', 'rb') as f:
+                prob = pickle.load(f)
+        except ImportError:
+            raise ImportError(
+                "cvxpygen solver not found. Make sure cvxpygen is installed and code generation has been run. "
+                "Install with: pip install openscvx[cvxpygen]"
+            )
     else:
         cpg_solve = None
 
