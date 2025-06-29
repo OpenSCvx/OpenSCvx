@@ -3,9 +3,18 @@ import random
 import plotly.graph_objects as go
 import numpy as np
 import pickle
-import pyqtgraph as pg
-import pyqtgraph.opengl as gl
-from PyQt5 import QtWidgets
+
+# Optional pyqtgraph imports
+try:
+    import pyqtgraph as pg
+    import pyqtgraph.opengl as gl
+    from PyQt5 import QtWidgets
+    PYQTPHOT_AVAILABLE = True
+except ImportError:
+    PYQTPHOT_AVAILABLE = False
+    pg = None
+    gl = None
+    QtWidgets = None
 
 from openscvx.utils import qdcm, get_kp_pose
 from openscvx.config import Config
@@ -2292,6 +2301,12 @@ def plot_animation_3DoF_rocket(result: dict,
     return fig
 
 def plot_animation_pyqtgraph(result, params, step=2):
+    if not PYQTPHOT_AVAILABLE:
+        raise ImportError(
+            "pyqtgraph is required for this function but not installed. "
+            "Install it with: pip install openscvx[gui] or pip install pyqtgraph PyQt5"
+        )
+    
     import sys
     from scipy.spatial.transform import Rotation as R
     from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QWidget, QLabel
@@ -2874,9 +2889,12 @@ def plot_animation_vispy(result, params, step=2):
         QApplication.instance().exec_()
 
 def plot_scp_animation_pyqtgraph(result, params, step=2):
-    """
-    PyQtGraph version of plot_scp_animation showing SCP iterations and multiple shooting trajectories.
-    """
+    if not PYQTPHOT_AVAILABLE:
+        raise ImportError(
+            "pyqtgraph is required for this function but not installed. "
+            "Install it with: pip install openscvx[gui] or pip install pyqtgraph PyQt5"
+        )
+    
     import sys
     from scipy.spatial.transform import Rotation as R
     from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QWidget, QLabel
@@ -3153,6 +3171,12 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
         QtWidgets.QApplication.instance().exec_()
 
 def plot_camera_animation_pyqtgraph(result, params, step=2):
+    if not PYQTPHOT_AVAILABLE:
+        raise ImportError(
+            "pyqtgraph is required for this function but not installed. "
+            "Install it with: pip install openscvx[gui] or pip install pyqtgraph PyQt5"
+        )
+    
     """
     PyQtGraph version of plot_camera_animation: animates subject projections in the camera frame (2D).
     """
