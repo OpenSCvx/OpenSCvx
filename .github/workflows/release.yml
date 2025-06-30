@@ -22,8 +22,8 @@ jobs:
 
       - name: Build distributions
         env:
-            # on this job only, use "post-release" so on tag vX.Y.Z you get X.Y.Z exactly
-            SETUPTOOLS_SCM_VERSION_SCHEME: post-release
+            # on this job only, use "only-version" so on tag vX.Y.Z you get X.Y.Z exactly
+            SETUPTOOLS_SCM_VERSION_SCHEME: only-version
             # still drop any local metadata
             SETUPTOOLS_SCM_LOCAL_SCHEME: no-local-version
         run: |
