@@ -76,6 +76,7 @@ theme:
 # Plugins
 plugins:
   - meta
+  - optimize
   - search:
       separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
   - mkdocstrings:
