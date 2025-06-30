@@ -5,7 +5,7 @@ import queue
 import time
 
 from termcolor import colored
-from openscvx._version import version
+from importlib.metadata import version, PackageNotFoundError
 import jax
 from openscvx.results import OptimizationResults
 
@@ -13,6 +13,12 @@ from openscvx.results import OptimizationResults
 col_main = "blue"
 col_pos = "green"
 col_neg = "red"
+
+def get_version() -> str:
+    try:
+        return version("openscvx")
+    except PackageNotFoundError:
+        return "0.0.0"
 
 def print_summary_box(lines, title="Summary"):
     """
@@ -146,7 +152,7 @@ def intro():
                                 Author: Chris Hayner and Griffin Norris
                                     Autonomous Controls Laboratory
                                        University of Washington
-                                         Version: {version}
+                                         Version: {get_version()}
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 '''
     # fmt: on
