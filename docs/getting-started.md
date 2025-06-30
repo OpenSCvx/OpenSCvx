@@ -1,27 +1,17 @@
-# **OpenSCvx**
+# Getting Started
 
-OpenSCvx :rocket: is an [JAX](https://github.com/jax-ml/jax)-based library for nonconvex trajectory planning in Python.
+OpenSCvx is a JAX-based Python library for trajectory optimization using Successive Convexification (SCP). It provides a simple interface for formulating and solving trajectory optimization problems with continuous-time constraint satisfaction.
 
-!!! warning
-    This repository is still in beta, here there be dragons :dragon:. A few pages are still under development and are denoted by :construction:.
+## Key Features
 
-!!! tip
-
-    If you're new to **OpenSCvx**, then this page should tell you everything you need to get started. 
-
-    - Go ahead and follow the installation instructions below.
-    - Run through the "Tutorials" to get a feel for how to problems are instantiated. For a more complex problem, check out the "Drone LoS Guidance" example.
-    - The "Basic Problem Setup" goes in depth into each neccesary element to setup your problem in detail.
-    - The "Advanced Problem Setup" goes into more advanced features parameters and options to fine tune the performance of your problem. 
-
-We provide a simple interface to define the dynamics and constraints of your problem, all in continuous time no need for you to discritize your dynamics and constraints, while keeping the repo light enough that if the aspiring user wishes to delve a bit deeper and implement there own components they can do so with relative ease. 
-
-## Features
-- Free Final Time
-- Fully-adaptive time dilation
-- [Continuous-Time Constraint Satisfaction](https://arxiv.org/pdf/2404.16826)
-- Vectorized and Ahead-of-Time ([AOT](https://docs.jax.dev/en/latest/aot.html)) Compiled Multishooting Discretization
-- JAX Automatic Differentiation for Jacobians
+- **JAX-based**: Automatic differentiation, vectorization, and compilation
+- **Continuous-time constraints**: Support for path constraints that must be satisfied at all times
+- **Successive Convexification**: Robust optimization algorithm for non-convex problems
+- **Multiple constraint types**: Continuous-time, nodal, and boundary constraints
+- **Interactive visualization**: 3D plotting and real-time optimization visualization
+- **Code generation**: Automatic C++ code generation for optimization problems
+- **Faster solver performance through compiled code for smaller problems
+- **Support for customized solver backends like QOCOGen
 
 ## Installation
 
@@ -90,6 +80,7 @@ conda env update -f environment.yml
 ```
 
 The GUI features include:
+
 - Interactive 3D trajectory visualization with `plot_animation_pyqtgraph()`
 - SCP iteration animation with `plot_scp_animation_pyqtgraph()`
 - Camera view animation with `plot_camera_animation_pyqtgraph()`
@@ -115,9 +106,10 @@ pip install openscvx[gui,cvxpygen]
 ```
 
 CVXPYGen features include:
+
 - Automatic C++ code generation for optimization problems
-- Faster solver performance through compiled code
-- Support for custom solver backends like QOCOGen
+- Faster solver performance through compiled code for smaller problems
+- Support for customized solver backends like QOCOGen
 
 ### Local Development
 
@@ -171,52 +163,9 @@ Dependencies can then be installed using Conda or Pip
    ```
 </details>
 
-## Examples
+## Next Steps
 
-See `examples/params/` folder for several example trajectory optimization problems.
-To run a problem simply run any of the examples directly, for example:
-
-```sh
-python3 examples/params/brachistochrone.py
-```
-and adjust the plotting as needed.
-
-Check out the problem definitions inside `examples/params` to see how to define your own problems.
-
-## Citation
-Please cite the following works if you use the repository,
-```
-@ARTICLE{hayner2025los,
-        author={Hayner, Christopher R. and Carson III, John M. and Açıkmeşe, Behçet and Leung, Karen},
-        journal={IEEE Robotics and Automation Letters}, 
-        title={Continuous-Time Line-of-Sight Constrained Trajectory Planning for 6-Degree of Freedom Systems}, 
-        year={2025},
-        volume={},
-        number={},
-        pages={1-8},
-        keywords={Robot sensing systems;Vectors;Vehicle dynamics;Line-of-sight propagation;Trajectory planning;Trajectory optimization;Quadrotors;Nonlinear dynamical systems;Heuristic algorithms;Convergence;Constrained Motion Planning;Optimization and Optimal Control;Aerial Systems: Perception and Autonomy},
-        doi={10.1109/LRA.2025.3545299}}
-```
-
-```
-@misc{elango2024ctscvx,
-      title={Successive Convexification for Trajectory Optimization with Continuous-Time Constraint Satisfaction}, 
-      author={Purnanand Elango and Dayou Luo and Abhinav G. Kamath and Samet Uzun and Taewan Kim and Behçet Açıkmeşe},
-      year={2024},
-      eprint={2404.16826},
-      archivePrefix={arXiv},
-      primaryClass={math.OC},
-      url={https://arxiv.org/abs/2404.16826}, 
-}
-```
-
-```
-@misc{chari2025qoco,
-  title = {QOCO: A Quadratic Objective Conic Optimizer with Custom Solver Generation},
-  author = {Chari, Govind M and A{\c{c}}{\i}kme{\c{s}}e, Beh{\c{c}}et},
-  year = {2025},
-  eprint = {2503.12658},
-  archiveprefix = {arXiv},
-  primaryclass = {math.OC},
-}
-```
+- **[Examples](examples.md)**: Explore the comprehensive set of example problems
+- **[Basic Problem Setup](Usage/basic_problem_setup.md)**: Learn how to set up your first optimization problem
+- **[API Reference](api/)**: Detailed documentation of all classes and functions
+- **[Citation](citation.md)**: Information for citing OpenSCvx in your research

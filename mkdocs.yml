@@ -154,6 +154,8 @@ nav:
     - Home: index.md
     - Getting Started:
       -  'getting-started.md'
+      - 'examples.md'
+      - 'citation.md'
     - Usage:
       - 'Usage/basic_problem_setup.md'
       - 'Usage/advanced_problem_setup.md'
@@ -165,7 +167,9 @@ nav:
           - Constraints: 'Usage/api_constraints.md'
           - Integrators: 'Usage/api_integrators.md'
           - TrajOptProblem: 'Usage/api_trajoptproblem.md'
-      - 'Usage/tutorials.md'
+      - Tutorials:
+          - 'Usage/tutorial_6dof_obstacle_avoidance.md'
+          - 'Usage/tutorial_6dof_los_guidance.md'
     - Foundations:
       - 'Overview/scvx.md'
       - 'Overview/ocp.md'
