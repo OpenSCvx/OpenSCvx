@@ -4,10 +4,28 @@ from openscvx.backend.variable import Variable
 
 
 class Fix:
+    """Class representing a fixed state variable in the optimization problem.
+    
+    A fixed state variable is one that is constrained to a specific value
+    and cannot be optimized.
+    
+    Attributes:
+        value: The fixed value that the state variable must take.
+    """
     def __init__(self, value):
+        """Initialize a new fixed state variable.
+        
+        Args:
+            value: The fixed value that the state variable must take.
+        """
         self.value = value
 
     def __repr__(self):
+        """Get a string representation of this fixed state variable.
+        
+        Returns:
+            str: A string representation showing the fixed value.
+        """
         return f"Fix({self.value})"
 
 
@@ -64,10 +82,28 @@ class Minimize:
 
 
 class Maximize:
+    """Class representing a state variable to be maximized in the optimization problem.
+    
+    A maximized state variable is one that is optimized to achieve the highest
+    possible value within its bounds.
+    
+    Attributes:
+        guess: The initial guess value for optimization.
+    """
     def __init__(self, guess):
+        """Initialize a new maximized state variable.
+        
+        Args:
+            guess: The initial guess value for optimization.
+        """
         self.guess = guess
 
     def __repr__(self):
+        """Get a string representation of this maximized state variable.
+        
+        Returns:
+            str: A string representation showing the guess value.
+        """
         return f"Maximize({self.guess})"
 
 class State(Variable):
@@ -81,24 +117,33 @@ class State(Variable):
     - Maximization objectives (Maximize)
 
     Attributes:
-        name (str): Name identifier for the state variable
-        shape (tuple): Shape of the state vector
-        _initial (np.ndarray): Initial state values
-        initial_type (np.ndarray): Types of initial conditions for each state
-        _final (np.ndarray): Final state values
-        final_type (np.ndarray): Types of final conditions for each state
-        _true_dim (int): Number of true state dimensions
-        _true_slice (slice): Slice for accessing true states
-        _augmented_slice (slice): Slice for accessing augmented states
+        name (str): Name of the state variable.
+        shape (tuple): Shape of the state variable array.
+        min (np.ndarray): Minimum bounds for the state variables. Shape: (n_states,).
+        max (np.ndarray): Maximum bounds for the state variables. Shape: (n_states,).
+        guess (np.ndarray): Used to initialize SCP and contains the current SCP solution for the state trajectory. Shape: (n_nodes, n_states).
+        initial (np.ndarray): Initial state values or boundary condition objects (Free, Fixed, Minimize, Maximize). Shape: (n_states,).
+        final (np.ndarray): Final state values or boundary condition objects (Free, Fixed, Minimize, Maximize). Shape: (n_states,).
+        _initial (np.ndarray): Internal storage for initial state values.
+        _final (np.ndarray): Internal storage for final state values.
+        initial_type (str): Type of initial boundary condition ('fix', 'free', 'minimize', 'maximize').
+        final_type (str): Type of final boundary condition ('fix', 'free', 'minimize', 'maximize').
+        _true_dim (int): True dimensionality of the state variables.
+        _true_slice (slice): Slice for accessing true state variables.
+        _augmented_slice (slice): Slice for accessing augmented state variables.
+
+    Notes:
+        Attributes prefixed with underscore (_) are for internal use only and should not be accessed directly.
 
     Example:
-        >>> state = State("position", (3,))
-        >>> state.initial = np.array([Fix(0), Free(1), 2])
-        >>> state.final = np.array([Fix(10), Free(5), Maximize(8)])
-        >>> state.guess = np.linspace([0, 1, 2], [10, 5, 8], 3)
-        >>> state.min = np.array([0, 0, 10])
-        >>> state.max = np.array([10, 10, 200])
-
+    ```python
+    state = State("position", (3,))
+    state.min = np.array([0, 0, 10])
+    state.max = np.array([10, 10, 200])
+    state.guess = np.linspace([0, 1, 2], [10, 5, 8], 3)
+    state.initial = np.array([Fix(0), Free(1), 2])
+    state.final = np.array([Fix(10), Free(5), Maximize(8)])
+    ```
     """
 
     def __init__(self, name, shape):

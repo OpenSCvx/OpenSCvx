@@ -16,17 +16,53 @@ from openscvx.backend.parameter import Parameter
 class CTCSConstraint:
     """
     Dataclass for continuous-time constraint satisfaction (CTCS) constraints over a trajectory interval.
+    
     A `CTCSConstraint` wraps a residual function `func(x, u)`, applies a
     pointwise `penalty` to its outputs, and accumulates the penalized sum
     only within a specified node interval [nodes[0], nodes[1]).
-    Note: the user is intended to instantiate `CTCSConstraint`s using the `@ctcs` decorator
+    
+    CTCS constraints are used for continuous-time constraints that need to be satisfied
+    over trajectory intervals rather than at specific nodes. The constraint function
+    should return residuals where positive values indicate constraint violations.
+
+    Usage examples:
+
+    ```python
+    @ctcs
+    def g(x_, u_):
+        return 2.0 - jnp.linalg.norm(x_[:3])  # ||x[:3]|| <= 2 constraint
+    ```
+    ```python
+    @ctcs(penalty="huber", nodes=(0, 10), idx=2)
+    def g(x_, u_):
+        return jnp.sin(x_) + u_  # sin(x) + u <= 0 constraint
+    ```
+    ```python
+    @ctcs(penalty="smooth_relu", scaling=0.5)
+    def g(x_, u_):
+        return x_[0]**2 + x_[1]**2 - 1.0  # ||x||^2 <= 1 constraint
+    ```
+
+    Or can directly wrap a function if a more lambda-function interface is desired:
+
+    ```python
+    constraint = ctcs(lambda x_, u_: jnp.maximum(0, x[0] - 1.0))
+    ```
 
     Args:
         func (Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]): 
-            Function computing constraint residuals g(x, u).
+            Function computing constraint residuals g(x, u). 
+            - x: 1D array (state at a single node), shape (n_x,)
+            - u: 1D array (control at a single node), shape (n_u,)
+            - Additional parameters: passed as keyword arguments with names matching the parameter name plus an underscore (e.g., g_ for Parameter('g')).
+            Should return positive values for constraint violations (g(x,u) > 0 indicates violation).
+            If you want to use parameters, include them as extra arguments with the underscore naming convention.
         penalty (Callable[[jnp.ndarray], jnp.ndarray]): 
             Penalty function applied elementwise to g's output. Used to calculate and penalize
-            constraint violation during state augmentation
+            constraint violation during state augmentation. Common penalties include:
+            - "squared_relu": max(0, x)² (default)
+            - "huber": smooth approximation of absolute value
+            - "smooth_relu": differentiable version of ReLU
         nodes (Optional[Tuple[int, int]]):
             Half-open interval (start, end) of node indices where this constraint is active.
             If None, the penalty applies at every node.
@@ -132,7 +168,7 @@ def ctcs(
     Or can directly wrap a function if a more lambda-function interface is desired:
 
     ```python
-    constraint = ctcs(lambda x, u: ...)
+    constraint = [ctcs(lambda x, u: ...)]
     ```
 
     Args:
