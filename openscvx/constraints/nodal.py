@@ -60,6 +60,51 @@ class NodalConstraint:
         return cp.norm(x_) <= 1.0  # cvxpy expression following DPP rules
     ```
 
+    **Expected input types:**
+
+    | Case                        | x, u type/shape                                 |
+    |-----------------------------|-------------------------------------------------|
+    | convex=False, vectorized=False | 1D arrays, shape (n_x,), (n_u,) (single node)   |
+    | convex=False, vectorized=True  | 2D arrays, shape (N, n_x), (N, n_u) (all nodes) |
+    | convex=True, vectorized=False  | list of cvxpy variables, one per node           |
+    | convex=True, vectorized=True   | list of cvxpy variables, one per node           |
+
+    **Expected output:**
+
+    | Case                        | Output type                                      |
+    |-----------------------------|--------------------------------------------------|
+    | convex=False, vectorized=False | float (single node)                              |
+    | convex=False, vectorized=True  | float array (per node)                           |
+    | convex=True, vectorized=False  | cvxpy expression (single node)                   |
+    | convex=True, vectorized=True   | list of cvxpy expressions (one per node)         |
+
+    Nonconvex examples:
+    
+    ```python
+    @nodal
+    def g(x_, u_):
+        return 1 - x_[0] <= 0
+    ```
+    ```python
+    @nodal(nodes=[0, 3])
+    def g(x_, u_):
+        return jnp.linalg.norm(x_) - 1.0 
+    ```
+
+    Or can directly wrap a function if a more lambda-function interface is desired:
+
+    ```python
+    constraint = nodal(lambda x_, u_: 1 - x_[0])
+    ```
+
+    Convex Examples:
+
+    ```python
+    @nodal(convex=True)
+    def g(x_, u_):
+        return cp.norm(x_) <= 1.0  # cvxpy expression following DPP rules
+    ```
+
     Args:
         func (Callable):
             The user-supplied constraint function. The expected input and output types depend on the values of `convex` and `vectorized`:
@@ -175,3 +220,19 @@ def nodal(
             If False, auto-vectorize over nodes using `jax.vmap`. If True, assumes
             the function already handles vectorization.
     """
+    def decorator(f: Callable):
+        return NodalConstraint(
+            func=f,
+            nodes=nodes,
+            convex=convex,
+            vectorized=vectorized,
+            grad_g_x=grad_g_x,
+            grad_g_u=grad_g_u,
+        )
+
+    if _func is None:
+        # Called with arguments, e.g., @nodal(nodes=[0, 1])
+        return decorator
+    else:
+        # Called as a bare decorator, e.g., @nodal
+        return decorator(_func)
