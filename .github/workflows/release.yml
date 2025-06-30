@@ -21,6 +21,11 @@ jobs:
         run: pip install --upgrade pip build twine setuptools-scm
 
       - name: Build distributions
+        env:
+            # on this job only, use "post-release" so on tag vX.Y.Z you get X.Y.Z exactly
+            SETUPTOOLS_SCM_VERSION_SCHEME: post-release
+            # still drop any local metadata
+            SETUPTOOLS_SCM_LOCAL_SCHEME: no-local-version
         run: |
           rm -rf dist
           python -m build
