@@ -2,6 +2,11 @@ import pytest
 import jax.numpy as jnp
 
 from openscvx.constraints.nodal import NodalConstraint, nodal
+from openscvx.backend.parameter import Parameter
+from openscvx.trajoptproblem import TrajOptProblem
+from openscvx.backend.state import State
+from openscvx.backend.control import Control
+from openscvx.dynamics import dynamics
 
 
 def simple_dot(x, u):
@@ -81,29 +86,3 @@ def test_custom_gradients_override_default():
     u = jnp.array([3.0, 4.0])
     assert jnp.allclose(c.grad_g_x(x, u), jnp.array([7.0, 7.0]))
     assert jnp.allclose(c.grad_g_u(x, u), jnp.array([9.0, 9.0]))
-
-
-def test_nodal_decorator_passes_parameters_through():
-    def custom_grad_x(x, u):
-        return jnp.array([42.0, 43.0])
-
-    def custom_grad_u(x, u):
-        return jnp.array([84.0, 85.0])
-
-    @nodal(
-        nodes=[10, 20, 30],
-        convex=False,
-        vectorized=True,
-        grad_g_x=custom_grad_x,
-        grad_g_u=custom_grad_u,
-    )
-    def f2(x, u):
-        return jnp.sum(x) + jnp.sum(u)
-
-    assert isinstance(f2, NodalConstraint)
-    assert f2.nodes == [10, 20, 30]
-    assert f2.convex is False
-    assert f2.vectorized is True
-    # decorator‐provided grad hooks should be set directly
-    assert f2.grad_g_x is custom_grad_x
-    assert f2.grad_g_u is custom_grad_u

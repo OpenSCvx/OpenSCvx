@@ -175,3 +175,19 @@ def nodal(
             If False, auto-vectorize over nodes using `jax.vmap`. If True, assumes
             the function already handles vectorization.
     """
+    def decorator(f: Callable):
+        return NodalConstraint(
+            func=f,
+            nodes=nodes,
+            convex=convex,
+            vectorized=vectorized,
+            grad_g_x=grad_g_x,
+            grad_g_u=grad_g_u,
+        )
+
+    if _func is None:
+        # Called with arguments, e.g., @nodal(nodes=[0, 1])
+        return decorator
+    else:
+        # Called as a bare decorator, e.g., @nodal
+        return decorator(_func)
