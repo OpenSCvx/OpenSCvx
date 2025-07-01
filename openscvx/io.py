@@ -53,7 +53,21 @@ def print_problem_summary(settings):
     Args:
         settings: Configuration settings containing problem information
     """
-    n_nodal_convex = sum(1 for c in settings.sim.constraints_nodal if c.convex)
+    n_nodal_convex = 0
+    for c in settings.sim.constraints_nodal:
+        if c.convex:
+            try:
+                import cvxpy as cp
+                if c.vectorized:
+                    x_dummy = [cp.Variable(settings.sim.n_states) for _ in range(settings.scp.n)]
+                    u_dummy = [cp.Variable(settings.sim.n_controls) for _ in range(settings.scp.n)]
+                else:
+                    x_dummy = cp.Variable(settings.sim.n_states)
+                    u_dummy = cp.Variable(settings.sim.n_controls)
+                constraints = c.get_cvxpy_constraints(x_dummy, u_dummy)
+                n_nodal_convex += len(constraints)
+            except Exception:
+                n_nodal_convex += 1
     n_nodal_nonconvex = sum(1 for c in settings.sim.constraints_nodal if not c.convex)
     n_ctcs = len(settings.sim.constraints_ctcs)
     n_augmented = settings.sim.n_states - settings.sim.idx_x_true.stop
