@@ -110,5 +110,5 @@ For setting up a local development environment, we recommend using Conda to mana
 - **[Examples](examples.md)**: Explore the comprehensive set of example problems
 - **[Basic Problem Setup](Usage/basic_problem_setup.md)**: Learn how to set up your first optimization problem
 - **[Advanced Problem Setup](Usage/advanced_problem_setup.md)**: Learn how to set up a more complex optimization problem
-- **[API Reference](api/)**: Detailed documentation of all classes and functions
+- **[API Reference](Usage/api_state.md)**: Detailed documentation of all classes and functions
 - **[Citation](citation.md)**: Information for citing OpenSCvx in your research
