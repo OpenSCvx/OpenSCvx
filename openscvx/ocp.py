@@ -87,11 +87,10 @@ def OptimalControlProblem(settings: Config):
                 nodes = constraint.nodes
 
             if constraint.convex and constraint.vectorized:
-                constr += [constraint(x_nonscaled, u_nonscaled)]
-                
+                constr += constraint.get_cvxpy_constraints(x_nonscaled, u_nonscaled)
             elif constraint.convex:
-                constr += [constraint(x_nonscaled[node], u_nonscaled[node]) for node in nodes]
-
+                for node in nodes:
+                    constr += constraint.get_cvxpy_constraints(x_nonscaled[node], u_nonscaled[node])
             elif not constraint.convex:
                 constr += [((g[idx_ncvx][node] + grad_g_x[idx_ncvx][node] @ dx[node] + grad_g_u[idx_ncvx][node] @ du[node])) == nu_vb[idx_ncvx][node] for node in nodes]
                 idx_ncvx += 1
