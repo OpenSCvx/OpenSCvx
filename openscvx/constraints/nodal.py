@@ -3,6 +3,7 @@ from typing import Callable, Optional, List, Union
 
 import jax.numpy as jnp
 from jax import vmap, jacfwd
+import collections.abc
 
 
 @dataclass
@@ -128,6 +129,23 @@ class NodalConstraint:
             jnp.ndarray: The constraint violation values.
         """
         return self.func(x, u)
+
+    def _flatten_cvxpy_constraints(self, result):
+        # Recursively flatten lists/tuples of constraints
+        if isinstance(result, (list, tuple)):
+            flat = []
+            for item in result:
+                flat.extend(self._flatten_cvxpy_constraints(item))
+            return flat
+        else:
+            return [result]
+
+    def get_cvxpy_constraints(self, x, u, *args, **kwargs):
+        """
+        Evaluate the constraint function and always return a flat list of cvxpy constraints.
+        """
+        result = self.func(x, u, *args, **kwargs)
+        return self._flatten_cvxpy_constraints(result)
 
 
 def nodal(
