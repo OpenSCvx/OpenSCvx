@@ -44,12 +44,6 @@ If you use OpenSCvx in your research, please cite the following works:
 }
 ```
 
-## Citation Guidelines
-
-- **For general use of OpenSCvx**: Cite the primary citation (hayner2025los)
-- **For continuous-time constraint satisfaction**: Cite both primary and methodological citations
-- **For custom solver usage**: Cite the solver citation (chari2025qoco)
-
 ## Acknowledgments
 
 This work was supported by a NASA Space Technology Graduate Research Opportunity and the Office of Naval Research under grant N00014-17-1-2433. The authors would like to acknowledge Natalia Pavlasek, Samuel Buckner, Abhi Kamath, Govind Chari, and Purnanand Elango as well as the other Autonomous Controls Laboratory members, for their many helpful discussions and support throughout this work. 
