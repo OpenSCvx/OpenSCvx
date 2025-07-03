@@ -2,17 +2,13 @@ import os
 os.environ["EQX_ON_ERROR"] = "nan"
 
 
-from typing import Callable, Any, Optional
-
-
-import jax
-import jax.numpy as jnp
-import diffrax as dfx
 from typing import Callable, Any
 
+
 import jax
 import jax.numpy as jnp
 import diffrax as dfx
+
 
 from diffrax._global_interpolation import DenseInterpolation
 from jax import tree_util

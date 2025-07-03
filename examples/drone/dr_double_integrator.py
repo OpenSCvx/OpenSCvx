@@ -9,15 +9,14 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
-from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.dynamics import dynamics
-from openscvx.constraints import ctcs, nodal
-from openscvx.utils import rot, gen_vertices
-from openscvx.backend.state import State, Free, Minimize
-from openscvx.backend.parameter import Parameter
-from openscvx.backend.control import Control
+from openscvx.trajoptproblem import TrajOptProblem  # noqa: E402
+from openscvx.dynamics import dynamics  # noqa: E402
+from openscvx.constraints import ctcs, nodal  # noqa: E402
+from openscvx.utils import rot, gen_vertices  # noqa: E402
+from openscvx.backend.state import State, Free, Minimize  # noqa: E402
+from openscvx.backend.control import Control  # noqa: E402
 
-from examples.plotting import plot_animation_double_integrator
+from examples.plotting import plot_animation_double_integrator  # noqa: E402
 
 n = 22  # Number of Nodes
 total_time = 24.0  # Total time for the simulation

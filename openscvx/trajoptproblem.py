@@ -1,4 +1,3 @@
-import jax.numpy as jnp
 from typing import List, Union, Optional
 import queue
 import threading
@@ -8,8 +7,7 @@ from copy import deepcopy
 
 import cvxpy as cp
 import jax
-from jax import export, ShapeDtypeStruct
-from functools import partial
+from jax import export
 import numpy as np
 
 from openscvx.config import (
@@ -24,7 +22,7 @@ from openscvx.config import (
 from openscvx.dynamics import Dynamics
 from openscvx.augmentation.dynamics_augmentation import build_augmented_dynamics
 from openscvx.augmentation.ctcs import sort_ctcs_constraints
-from openscvx.constraints.violation import get_g_funcs, CTCSViolation
+from openscvx.constraints.violation import get_g_funcs
 from openscvx.discretization import get_discretization_solver
 from openscvx.propagation import get_propagation_solver
 from openscvx.constraints.ctcs import CTCSConstraint
@@ -36,7 +34,6 @@ from openscvx import io
 from openscvx.utils import stable_function_hash
 from openscvx.backend.state import State, Free
 from openscvx.backend.control import Control
-from openscvx.backend.parameter import Parameter
 from openscvx.results import OptimizationResults
 
 

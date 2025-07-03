@@ -2,7 +2,6 @@ import numpy as np
 
 from openscvx.config import Config
 from openscvx.integrators import solve_ivp_diffrax_prop
-from openscvx.backend.parameter import Parameter
 
 
 def prop_aug_dy(
@@ -133,7 +132,8 @@ def t_to_tau(u, t, t_nodal, params: Config):
         tuple: (tau, u_interp) where tau is normalized time and u_interp is interpolated controls.
     """
     u_guess = u.guess
-    u_lam = lambda new_t: np.array([np.interp(new_t, t_nodal, u_guess[:,i]) for i in range(u_guess.shape[1])]).T
+    def u_lam(new_t):
+        return np.array([np.interp(new_t, t_nodal, u_guess[:,i]) for i in range(u_guess.shape[1])]).T
     u = np.array([u_lam(t_i) for t_i in t])
 
     tau = np.zeros(len(t))

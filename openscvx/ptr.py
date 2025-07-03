@@ -4,7 +4,6 @@ import cvxpy as cp
 import pickle
 import time
 
-from openscvx.backend.parameter import Parameter
 from openscvx.config import Config
 from openscvx.results import OptimizationResults
 
@@ -16,7 +15,7 @@ def PTR_init(params, ocp: cp.Problem, discretization_solver: callable, settings:
         try:
             from solver.cpg_solver import cpg_solve
             with open('solver/problem.pickle', 'rb') as f:
-                prob = pickle.load(f)
+                pickle.load(f)
         except ImportError:
             raise ImportError(
                 "cvxpygen solver not found. Make sure cvxpygen is installed and code generation has been run. "
@@ -182,7 +181,7 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
     id_ncvx = 0
     J_vb_vec = 0
     for constraint in settings.sim.constraints_nodal:
-        if constraint.convex == False:
+        if not constraint.convex:
             J_vb_vec += np.maximum(0, prob.var_dict['nu_vb_' + str(id_ncvx)].value)
             id_ncvx += 1
     return x_new_guess, u_new_guess, costs, prob.value, J_vb_vec, J_vc_vec, J_tr_vec, prob.status, V_multi_shoot, subprop_time, dis_time

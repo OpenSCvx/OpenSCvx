@@ -217,4 +217,4 @@ def test_jit_propagation_solver_compiles(dis_type):
     exported = export.export(jitted)(
         V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask
     )
-    serial = exported.serialize()
+    exported.serialize()

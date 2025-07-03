@@ -151,7 +151,6 @@ def calculate_discretization(
             - Vmulti: Full augmented state trajectory
     """
     # Define indices for slicing the augmented state vector
-    i0 = 0
     i1 = n_x
     i2 = i1 + n_x * n_x
     i3 = i2 + n_x * n_u

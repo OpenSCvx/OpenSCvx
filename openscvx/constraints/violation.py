@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import List, Optional, Tuple, Callable
+from typing import List, Optional, Callable
 from dataclasses import dataclass
 
 import jax.numpy as jnp

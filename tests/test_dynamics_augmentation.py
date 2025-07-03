@@ -156,8 +156,10 @@ def test_get_jacobians_custom_dyn_grads_no_vio_grads():
         return jnp.array([x[0] * u[0]])
 
     # supply custom A and B
-    A_custom = lambda x, u: jnp.array([[10.0]])
-    B_custom = lambda x, u: jnp.array([[20.0]])
+    def A_custom(x, u):
+        return jnp.array([[10.0]])
+    def B_custom(x, u):
+        return jnp.array([[20.0]])
     dyn_nonaug = Dynamics(f=f, A=A_custom, B=B_custom)
 
     # one violation, no custom grads ⇒ uses autodiff for g

@@ -6,7 +6,6 @@ These tests ensure the pyqtgraph functions can be imported and called without er
 import pytest
 import numpy as np
 import os
-import sys
 
 # Set up headless environment for testing
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
@@ -102,7 +101,7 @@ def test_pyqtgraph_functions_with_mocks():
         from examples.plotting import (
             plot_animation_pyqtgraph,
             plot_scp_animation_pyqtgraph,
-            plot_camera_animation_pyqtgraph
+            plot_camera_animation_pyqtgraph  # noqa: F401
         )
         
         from unittest.mock import patch, MagicMock

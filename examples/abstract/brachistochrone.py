@@ -1,6 +1,5 @@
 import numpy as np
 import jax.numpy as jnp
-import cvxpy as cp
 
 import os
 import sys
@@ -11,10 +10,8 @@ sys.path.append(grandparent_dir)
 
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.dynamics import dynamics
-from openscvx.constraints import ctcs, nodal
-from openscvx.utils import qdcm, SSMP, SSM, generate_orthogonal_unit_vectors
+from openscvx.constraints import ctcs
 from openscvx.backend.state import State, Free, Minimize
-from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
 
 from examples.plotting import plot_brachistochrone_position, plot_brachistochrone_velocity

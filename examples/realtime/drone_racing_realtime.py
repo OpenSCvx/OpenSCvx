@@ -1,14 +1,10 @@
 import numpy as np
-import jax.numpy as jnp
-import cvxpy as cp
 import time
 import threading
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QSlider, QLabel, QGridLayout, QTextEdit, QLineEdit, QScrollArea, QPushButton, QCheckBox, QGroupBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QGridLayout, QLineEdit, QScrollArea, QPushButton, QCheckBox, QGroupBox
 from PyQt5.QtCore import QTimer, pyqtSignal, QObject, Qt
-from PyQt5.QtGui import QMouseEvent
-import pyqtgraph as pg
 import pyqtgraph.opengl as gl
-from pyqtgraph.opengl import GLViewWidget, GLScatterPlotItem, GLLinePlotItem
+from pyqtgraph.opengl import GLViewWidget
 from pyqtgraph import Vector
 import sys
 import os
@@ -19,7 +15,7 @@ grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 # Import the drone racing problem and parameters
-from examples.drone.drone_racing import problem, gate_center_params, A_gate_param, A_gate_c_params, initial_gate_centers, gen_vertices
+from examples.drone.drone_racing import problem, gate_center_params, A_gate_param, A_gate_c_params, initial_gate_centers, gen_vertices  # noqa: E402
 
 problem.initialize()
 
@@ -73,7 +69,7 @@ class OptimizationWorker(QObject):
                         results['dis_time'] = 0.0
                         results['prob_stat'] = '--'
                         results['cost'] = results.get('cost', 0.0)
-                except:
+                except Exception:  # noqa: E722
                     results['dis_time'] = 0.0
                     results['prob_stat'] = '--'
                     results['cost'] = results.get('cost', 0.0)

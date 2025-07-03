@@ -5,18 +5,15 @@ Test that cvxpygen is properly handled as an optional dependency.
 import pytest
 import numpy as np
 import jax.numpy as jnp
-import os
-import shutil
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.dynamics import dynamics
 from openscvx.constraints import ctcs
-from openscvx.backend.state import State, Free, Minimize
+from openscvx.backend.state import State
 from openscvx.backend.control import Control
-from openscvx.backend.parameter import Parameter
 
 # Conditionally import cvxpygen to see if it's installed
 try:
-    import cvxpygen
+    import cvxpygen  # noqa: F401
     CVXPYGEN_INSTALLED = True
 except ImportError:
     CVXPYGEN_INSTALLED = False
@@ -34,8 +31,8 @@ def test_cvxpygen_optional_import():
     """Test that cvxpygen import is optional."""
     # This should not raise an ImportError
     try:
-        from openscvx.ocp import OptimalControlProblem
-        from openscvx.ptr import PTR_init
+        from openscvx.ocp import OptimalControlProblem  # noqa: F401
+        from openscvx.ptr import PTR_init  # noqa: F401
         assert True
     except ImportError as e:
         if "cvxpygen" in str(e):

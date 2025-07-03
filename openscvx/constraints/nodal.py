@@ -3,7 +3,6 @@ from typing import Callable, Optional, List, Union
 
 import jax.numpy as jnp
 from jax import vmap, jacfwd
-import collections.abc
 
 
 @dataclass

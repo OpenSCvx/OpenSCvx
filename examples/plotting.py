@@ -2,7 +2,6 @@ from plotly.subplots import make_subplots
 import random
 import plotly.graph_objects as go
 import numpy as np
-import pickle
 
 # Optional pyqtgraph imports
 try:
@@ -28,8 +27,7 @@ def plot_dubins_car(results: OptimizationResults, params: Config):
     x = results.x_full[:,0]
     y = results.x_full[:,1]
 
-    theta = results.x_full[:, 2]
-    t_full = results.t_full
+    results.x_full[:, 2]
 
     obs_center = results.plotting_data["obs_center"]
     obs_radius = results.plotting_data["obs_radius"]
@@ -408,7 +406,6 @@ def plot_camera_animation(result: dict, params:Config, path="") -> None:
     return fig  
 
 def plot_camera_polytope_animation(result: dict, params: Config, path="") -> None:
-    title = r'$\text{Camera Animation}$'
     sub_positions_sen, _, sub_positions_sen_node = full_subject_traj_time(result["x_full"], params, False)
     fig = go.Figure()
 
@@ -445,7 +442,7 @@ def plot_camera_polytope_animation(result: dict, params: Config, path="") -> Non
     fig.add_trace(go.Scatter(x=X, y=Y, mode='lines', line=dict(color='red', width=5), name=r'$\text{Camera Frame}$', showlegend=False))
 
     # Choose a random color for each subject
-    colors = [f'rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})' for _ in sub_positions_sen]
+    [f'rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})' for _ in sub_positions_sen]
 
     frames = []
     # Animate the subjects along their trajectories
@@ -667,7 +664,6 @@ def plot_camera_polytope_animation(result: dict, params: Config, path="") -> Non
     return fig  
 
 def plot_conic_view_animation(result: dict, params: Config, path="") -> None:
-    title = r'$\text{Conic Constraint}$'
     sub_positions_sen, _, sub_positions_sen_node = full_subject_traj_time(result["x_full"], params, False)
     fig = go.Figure()
     for i in range(100):
@@ -741,9 +737,7 @@ def plot_conic_view_animation(result: dict, params: Config, path="") -> None:
         color = f'rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})'
         colors.append(color)
 
-    color_background = f'rgb({150}, {150}, {150})'
     sub_node_plot = []
-    sub_node_idx = 0
     for i in range(0, len(sub_positions_sen[0]), 4):
         frame = go.Frame(name = str(i))
         data = []
@@ -861,7 +855,6 @@ def plot_conic_view_animation(result: dict, params: Config, path="") -> None:
     return fig
 
 def plot_conic_view_polytope_animation(result: dict, params: Config, path="") -> None:
-    title = r'$\text{Conic Constraint}$'
     sub_positions_sen, _, sub_positions_sen_node = full_subject_traj_time(result["x_full"], params, False)
     fig = go.Figure()
     for i in range(500):
@@ -929,9 +922,6 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
         color = f'rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})'
         colors.append(color)
 
-    color_background = f'rgb({150}, {150}, {150})'
-    sub_node_plot = []
-    sub_node_idx = 0
     for i in range(0, len(sub_positions_sen[0]), 4):
         frame = go.Frame(name = str(i))
         data = []
@@ -958,7 +948,7 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
 
             # Add in node when loop has reached point where node is present
             scaled_index = int((i // (sub_traj.shape[0]/sub_traj_nodal.shape[0])) + 1)
-            sub_node_plot = sub_traj_nodal[:scaled_index]
+            sub_traj_nodal[:scaled_index]
 
             # data.append(go.Scatter3d(x=sub_node_plot[:, 0], y=sub_node_plot[:, 1], z=sub_node_plot[:, 2], mode='markers', marker=dict(color='darkblue', size=5), showlegend=False))
 
@@ -1159,7 +1149,7 @@ def plot_animation(result: dict,
                    params: Config,
                    path="",
                    ) -> None:
-    tof = result["t_final"]
+    result["t_final"]
     # Make title say quadrotor simulation and insert the variable tof into the title
     # title = 'Quadrotor Simulation: Time of Flight = ' + str(tof) + 's'
     drone_positions = result.x_full[:, :3]
@@ -1272,7 +1262,7 @@ def plot_animation(result: dict,
             if k < 3:
                 axis = rotated_axes[k]
             color = colors[k]
-            label = labels[k]
+            labels[k]
 
             data.append(go.Scatter3d(
                     x=[drone_positions[indices[i], 0], drone_positions[indices[i], 0] + axis[0]],
@@ -1496,7 +1486,6 @@ def plot_brachistochrone_position(result: OptimizationResults,
 
     x = result.x_full[:,0]
     y = result.x_full[:,1]
-    t_full = result.t_full
 
     fig.add_trace(go.Scatter(x=x, y=y, mode='lines', line=dict(color='blue', width=2), name='Position'))
     fig.add_trace(go.Scatter(x=[x[0]], y=[y[0]], mode='markers', marker=dict(color='green', size=10), name='Start'))
@@ -1529,8 +1518,8 @@ def plot_scp_animation(result: dict,
     title = f'SCP Simulation: {tof} seconds'
     drone_positions = result.x_full[:, :3]
     drone_attitudes = result.x_full[:, 6:10]
-    drone_forces = result.u_full[:, :3]
-    scp_interp_trajs = scp_traj_interp(result["x_history"], params)
+    result.u_full[:, :3]
+    scp_traj_interp(result["x_history"], params)
     scp_ctcs_trajs = result["x_history"]
     scp_multi_shoot = result["discretization_history"]
     # obstacles = result_ctcs["obstacles"]
@@ -1555,7 +1544,6 @@ def plot_scp_animation(result: dict,
     n_u = params.sim.n_controls
 
     # Define indices for slicing the augmented state vector
-    i0 = 0
     i1 = n_x
     i2 = i1 + n_x * n_x
     i3 = i2 + n_x * n_u
@@ -1752,7 +1740,7 @@ def plot_scp_animation(result: dict,
     )
 
     # Rotate the camera view to the left
-    if not "moving_subject" in result:
+    if "moving_subject" not in result:
         fig.update_layout(scene_camera=dict(up=dict(x=0, y=0, z=90), center=dict(x=1, y=0.3, z=1), eye=dict(x=-1, y=2, z=1)))
 
     return fig
@@ -1760,7 +1748,7 @@ def plot_scp_animation(result: dict,
 def plot_xy_xz_yz(result: dict, params: Config):
 
     x_full = result["x_full"]
-    t_full = result["t_full"]
+    result["t_full"]
 
     fig = make_subplots(rows=2, cols=2, 
                         subplot_titles=('XY Plane', 'XZ Plane', 'YZ Plane'),
@@ -1835,7 +1823,7 @@ def plot_animation_double_integrator(result: dict,
                    params: Config,
                    path="",
                    ) -> None:
-    tof = result["t_final"]
+    result["t_final"]
     # Make title say quadrotor simulation and insert the variable tof into the title
     # title = 'Quadrotor Simulation: Time of Flight = ' + str(tof) + 's'
     drone_positions = result["x_full"][:, :3]
@@ -1900,7 +1888,7 @@ def plot_animation_double_integrator(result: dict,
 
         for k in range(3):
             color = colors[k]
-            label = labels[k]
+            labels[k]
 
             data.append(go.Scatter3d(
                     x=[drone_positions[indices[i], 0], drone_positions[indices[i], 0]],
@@ -2121,7 +2109,7 @@ def plot_animation_3DoF_rocket(result: dict,
                    params: Config,
                    path="",
                    ) -> None:
-    tof = result["t_final"]
+    result["t_final"]
     # Make title say quadrotor simulation and insert the variable tof into the title
     # title = 'Quadrotor Simulation: Time of Flight = ' + str(tof) + 's'
     drone_positions = result["x_full"][:, :3]
@@ -2144,7 +2132,7 @@ def plot_animation_3DoF_rocket(result: dict,
 
 
         # Extract axes from rotation matrix
-        axes = 20 * np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+        20 * np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
 
         data = []
 
@@ -2153,7 +2141,7 @@ def plot_animation_3DoF_rocket(result: dict,
 
         for k in range(4):
             color = colors[k]
-            label = labels[k]
+            labels[k]
 
             if labels[k] != 'Force':
                 data.append(go.Scatter3d(
@@ -2601,7 +2589,6 @@ def plot_animation_vispy(result, params, step=2):
     import vispy
     from vispy import scene
     from vispy.scene import visuals
-    from vispy.color import ColorArray
     from vispy.geometry import create_sphere
     
     # Initialize Qt application
@@ -2911,9 +2898,9 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
     # Extract data
     tof = result["t_final"]
     drone_positions = result["x_full"][:, :3]
-    drone_velocities = result["x_full"][:, 3:6]
+    result["x_full"][:, 3:6]
     drone_attitudes = result["x_full"][:, 6:10] if result["x_full"].shape[1] >= 10 else None
-    scp_interp_trajs = scp_traj_interp(result["x_history"], params)
+    scp_traj_interp(result["x_history"], params)
     scp_ctcs_trajs = result["x_history"]
     scp_multi_shoot = result["discretization_history"]
     
@@ -3028,7 +3015,6 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
     n_u = params.sim.n_controls
 
     # Define indices for slicing the augmented state vector
-    i0 = 0
     i1 = n_x
     i2 = i1 + n_x * n_x
     i3 = i2 + n_x * n_u
@@ -3244,7 +3230,7 @@ def plot_camera_animation_pyqtgraph(result, params, step=2):
     main_widget.show()
 
     # Plot the camera viewcone boundary with thicker red line
-    viewcone_curve = plot_widget.plot(X, Y, pen=pg.mkPen('r', width=5))
+    plot_widget.plot(X, Y, pen=pg.mkPen('r', width=5))
 
     # Prepare subject curves
     subject_curves = []

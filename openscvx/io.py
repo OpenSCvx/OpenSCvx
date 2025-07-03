@@ -1,13 +1,13 @@
 import sys
 import warnings
 warnings.filterwarnings("ignore")
-import queue
-import time
+import queue  # noqa: E402
+import time  # noqa: E402
 
-from termcolor import colored
-from importlib.metadata import version, PackageNotFoundError
-import jax
-from openscvx.results import OptimizationResults
+from termcolor import colored  # noqa: E402
+from importlib.metadata import version, PackageNotFoundError  # noqa: E402
+import jax  # noqa: E402
+from openscvx.results import OptimizationResults  # noqa: E402
 
 # Define colors for printing
 col_main = "blue"

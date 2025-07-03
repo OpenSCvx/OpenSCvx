@@ -82,12 +82,14 @@ def get_jacobians(
     # 2) Build the *true‐state* Jacobians of f(x_true,u_true)
     f_fn = dynamics_non_augmented.f
     if dynamics_non_augmented.A is None:
-        A_f = lambda x_true, u_true: jax.jacfwd(f_fn, argnums=0)(x_true, u_true)
+        def A_f(x_true, u_true):
+            return jax.jacfwd(f_fn, argnums=0)(x_true, u_true)
     else:
         A_f = dynamics_non_augmented.A
 
     if dynamics_non_augmented.B is None:
-        B_f = lambda x_true, u_true: jax.jacfwd(f_fn, argnums=1)(x_true, u_true)
+        def B_f(x_true, u_true):
+            return jax.jacfwd(f_fn, argnums=1)(x_true, u_true)
     else:
         B_f = dynamics_non_augmented.B
 

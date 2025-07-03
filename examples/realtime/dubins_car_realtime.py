@@ -1,19 +1,16 @@
 import threading
-import time
 import numpy as np
 import sys
 import os
 import pyqtgraph as pg
 from PyQt5.QtWidgets import QApplication, QGraphicsEllipseItem, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, QLineEdit
 from PyQt5.QtCore import QTimer, Qt
-from pyqtgraph.Qt import QtGui
 
 # --- Import your problem setup ---
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from dubins_car.dubins_car import (
-    x, u, obs_center, obs_radius, problem, plotting_dict
+    obs_center, obs_radius, problem, plotting_dict
 )
-from plotting import plot_dubins_car
 
 # --- Shared state for plotting ---
 running = {'stop': False}
@@ -71,7 +68,7 @@ def optimization_loop():
                     results['solve_time'] = 0.0
                     results['prob_stat'] = '--'
                     results['cost'] = 0.0
-            except:
+            except Exception:
                 results['dis_time'] = 0.0
                 results['solve_time'] = 0.0
                 results['prob_stat'] = '--'

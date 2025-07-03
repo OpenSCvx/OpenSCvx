@@ -1,4 +1,3 @@
-import numpy as np
 
 
 class Expr:
@@ -60,3 +59,18 @@ class Neg(Expr):
         self.operand = operand
     def children(self):
         return [self.operand]
+
+
+class Literal(Expr):
+    """Represents a literal value in an expression."""
+    def __init__(self, value):
+        self.value = value
+    def children(self):
+        return []
+
+
+def to_expr(obj):
+    """Convert an object to an expression."""
+    if isinstance(obj, Expr):
+        return obj
+    return Literal(obj)

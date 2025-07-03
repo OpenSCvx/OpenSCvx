@@ -3,10 +3,8 @@ import time
 import numpy as np
 import sys
 import os
-import pyqtgraph as pg
-from PyQt5.QtWidgets import QApplication, QGraphicsEllipseItem, QWidget, QVBoxLayout, QHBoxLayout, QSlider, QLabel, QGroupBox, QPushButton, QButtonGroup, QLineEdit, QGridLayout
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QSlider, QLabel, QGroupBox, QLineEdit
 from PyQt5.QtCore import QTimer, Qt
-from pyqtgraph.Qt import QtGui
 
 # Import PyQtGraph OpenGL modules
 try:
@@ -18,7 +16,7 @@ except ImportError:
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from drone.obstacle_avoidance_realtime_test import (
-    x, u, obs_center_1, obs_center_2, obs_center_3, problem, plotting_dict
+    obs_center_1, obs_center_2, obs_center_3, problem, plotting_dict
 )
 from openscvx.utils import generate_orthogonal_unit_vectors
 
@@ -339,7 +337,7 @@ def optimization_loop():
                     results['solve_time'] = 0.0
                     results['prob_stat'] = '--'
                     results['cost'] = 0.0
-            except:
+            except Exception:
                 results['dis_time'] = 0.0
                 results['solve_time'] = 0.0
                 results['prob_stat'] = '--'

@@ -38,7 +38,7 @@ def sort_ctcs_constraints(constraints_ctcs: List[CTCSConstraint], N: int):
     # Extract your intervals in ascending‐idx order
     ordered_ids       = sorted(idx_to_nodes.keys())
     node_intervals    = [ idx_to_nodes[i] for i in ordered_ids ]
-    id_to_position    = { ident: pos for pos, ident in enumerate(ordered_ids) }
+    { ident: pos for pos, ident in enumerate(ordered_ids) }
     num_augmented_states = len(ordered_ids)
 
     return constraints_ctcs, node_intervals, num_augmented_states,

@@ -10,13 +10,12 @@ sys.path.append(grandparent_dir)
 
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.dynamics import dynamics
-from openscvx.constraints import ctcs, nodal
-from openscvx.backend.state import State, Free, Maximize, Minimize
+from openscvx.constraints import ctcs
+from openscvx.backend.state import State, Free, Maximize
 from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
 
-from examples.plotting import plot_scp_animation, plot_control_norm, plot_xy_xz_yz, plot_animation_3DoF_rocket, plot_animation
-from openscvx.plotting import plot_state, plot_control
+from examples.plotting import plot_control_norm, plot_xy_xz_yz
 
 n = 30
 total_time = 95.0  # Total simulation time

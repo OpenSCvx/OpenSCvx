@@ -14,10 +14,9 @@ from openscvx.dynamics import dynamics
 from openscvx.utils import qdcm, SSMP, SSM, get_kp_pose
 from openscvx.constraints import ctcs
 from openscvx.backend.state import State, Free, Minimize
-from openscvx.backend.parameter import Parameter
 from openscvx.backend.control import Control
 
-from examples.plotting import plot_animation_pyqtgraph, plot_animation
+from examples.plotting import plot_animation
 
 n = 12  # Number of Nodes
 total_time = 40.0  # Total time for the simulation

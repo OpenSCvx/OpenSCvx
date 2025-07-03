@@ -1,8 +1,7 @@
 import numpy as np
-import jax.numpy as jnp
 import pytest
 
-from openscvx.backend.state import State, Free, Minimize, Fix
+from openscvx.backend.state import State, Fix
 from openscvx.backend.control import Control
 from openscvx.config import SimConfig, get_affine_scaling_matrices
 

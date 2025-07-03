@@ -9,13 +9,13 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
-from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.dynamics import dynamics
-from openscvx.constraints import ctcs, nodal
-from openscvx.backend.state import State, Free, Minimize
-from openscvx.backend.parameter import Parameter
-from openscvx.backend.control import Control
-from examples.plotting import plot_dubins_car, plot_dubins_car_disjoint
+from openscvx.trajoptproblem import TrajOptProblem  # noqa: E402
+from openscvx.dynamics import dynamics  # noqa: E402
+from openscvx.constraints import ctcs, nodal  # noqa: E402
+from openscvx.backend.state import State, Free, Minimize  # noqa: E402
+from openscvx.backend.parameter import Parameter  # noqa: E402
+from openscvx.backend.control import Control  # noqa: E402
+from examples.plotting import plot_dubins_car_disjoint  # noqa: E402
 
 n = 8
 total_time = 6.0  # Total simulation time

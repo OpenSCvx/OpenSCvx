@@ -70,7 +70,8 @@ def test_decorator_sets_attributes_and_type():
 
 def test_custom_penalty_callable():
     """Allow passing a custom callable as `penalty`."""
-    custom_pen = lambda x: x * 2.0
+    def custom_pen(x):
+        return x * 2.0
     values = jnp.array([1.0, 2.0, 3.0])
 
     @ctcs(nodes=(0, 5), penalty=custom_pen)

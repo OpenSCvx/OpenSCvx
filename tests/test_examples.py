@@ -14,13 +14,11 @@ from examples.drone.obstacle_avoidance import (
 )
 from examples.drone.dr_vp_nodal import problem as dr_vp_polytope_problem
 from examples.drone.dr_vp_nodal import plotting_dict as dr_vp_polytope_plotting_dict
-from examples.abstract.brachistochrone import problem as brachistochrone_problem
 from examples.plotting import plot_camera_animation, plot_animation, plot_scp_animation
 
 # Import pyqtgraph testing helpers
 from tests.test_pyqtgraph_helpers import (
-    run_pyqtgraph_function_headless,
-    check_pyqtgraph_functions_basic
+    run_pyqtgraph_function_headless
 )
 
 CI_OS = os.getenv("RUNNER_OS", platform.system())

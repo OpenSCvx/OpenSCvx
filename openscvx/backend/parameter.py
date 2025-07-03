@@ -1,4 +1,3 @@
-import numpy as np
 from openscvx.backend.expr import Expr
 
 

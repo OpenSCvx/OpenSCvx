@@ -111,7 +111,7 @@ def plot_constraint_violation(result: OptimizationResults, params: Config):
         print("'sub_vp_vio', 'sub_min_vio', or 'sub_max_vio' not found in result.")
     
     if "sub_direc_vio" in result:
-        sub_direc_vio = result.plotting_data["sub_direc_vio"]
+        result.plotting_data["sub_direc_vio"]
         # fig.add_trace(go.Scatter(y=sub_direc_vio, mode='lines', showlegend=False, line=dict(color='red', width = 2)), row=2, col=2)
     else:
         print("'sub_direc_vio' not found in result.")
@@ -181,8 +181,8 @@ def plot_scp_animation(result: OptimizationResults,
     title = f'SCP Simulation: {tof} seconds'
     drone_positions = result.x_full[:, :3]
     drone_attitudes = result.x_full[:, 6:10]
-    drone_forces = result.u_full[:, :3]
-    scp_interp_trajs = scp_traj_interp(result.x_history, params)
+    result.u_full[:, :3]
+    scp_traj_interp(result.x_history, params)
     scp_ctcs_trajs = result.x_history
     scp_multi_shoot = result.discretization_history
     # obstacles = result_ctcs["obstacles"]
@@ -207,7 +207,6 @@ def plot_scp_animation(result: OptimizationResults,
     n_u = params.sim.n_controls
 
     # Define indices for slicing the augmented state vector
-    i0 = 0
     i1 = n_x
     i2 = i1 + n_x * n_x
     i3 = i2 + n_x * n_u
@@ -405,7 +404,7 @@ def plot_scp_animation(result: OptimizationResults,
     )
 
     # Rotate the camera view to the left
-    if not "moving_subject" in result:
+    if "moving_subject" not in result:
         fig.update_layout(scene_camera=dict(up=dict(x=0, y=0, z=90), center=dict(x=1, y=0.3, z=1), eye=dict(x=-1, y=2, z=1)))
 
     fig.show()
@@ -424,7 +423,6 @@ def scp_traj_interp(scp_trajs, params: Config):
 def plot_state(result: OptimizationResults, params: Config):
     x_full = result.x_full
     t_full = result.t_full
-    dis_history = result.discretization_history
 
     n_x = params.sim.n_states
 
@@ -471,7 +469,7 @@ def plot_losses(result: OptimizationResults, params: Config):
     J_tr = result.J_tr_history
     J_vb = result.J_vb_history
     J_vc = result.J_vc_history
-    J_vc_ctcs = result.plotting_data["J_vc_ctcs_vec"]
+    result.plotting_data["J_vc_ctcs_vec"]
 
     fig = make_subplots(rows=2, cols=2, subplot_titles=('J_tr', 'J_vb', 'J_vc', 'J_vc_ctcs'))
     fig.update_layout(title_text="Losses", template='plotly_dark')

@@ -3,7 +3,6 @@ import jax.numpy as jnp
 import numpy as np
 import hashlib
 import ast
-import types
 import inspect
 import textwrap
 

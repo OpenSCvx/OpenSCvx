@@ -8,7 +8,6 @@ import inspect
 
 from openscvx.backend.state import State, Variable
 from openscvx.backend.control import Control
-from openscvx.backend.parameter import Parameter
 
 # TODO: (norrisg) Unclear if should specify behavior for `idx`, `jacfwd` behavior for Jacobians, etc. since that logic is handled elsewhere and could change
 
@@ -202,13 +201,15 @@ def ctcs(
     """
     # prepare penalty function once
     if penalty == "squared_relu":
-        pen = lambda x: jnp.maximum(0, x) ** 2
+        def pen(x):
+            return jnp.maximum(0, x) ** 2
     elif penalty == "huber":
         delta = 0.25
         def pen(x): return jnp.where(x < delta, 0.5 * x**2, x - 0.5 * delta)
     elif penalty == "smooth_relu":
         c = 1e-8
-        pen = lambda x: (jnp.maximum(0, x) ** 2 + c**2) ** 0.5 - c
+        def pen(x):
+            return (jnp.maximum(0, x) ** 2 + c**2) ** 0.5 - c
     elif callable(penalty):
         pen = penalty
     else:

@@ -1,12 +1,7 @@
 import pytest
 import jax.numpy as jnp
 
-from openscvx.constraints.nodal import NodalConstraint, nodal
-from openscvx.backend.parameter import Parameter
-from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.backend.state import State
-from openscvx.backend.control import Control
-from openscvx.dynamics import dynamics
+from openscvx.constraints.nodal import NodalConstraint
 
 
 def simple_dot(x, u):
