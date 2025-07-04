@@ -1,12 +1,14 @@
 # utils.py
 
-from expr import Const, Add, Mul, MatMul, Neg
+from expr import Add, Const, MatMul, Mul, Neg
+
 
 def pretty_print(expr):
     print(expr.pretty())
 
+
 def evaluate(expr, values):
-    if hasattr(expr, 'name'):
+    if hasattr(expr, "name"):
         return values[expr.name]
 
     if isinstance(expr, Const):

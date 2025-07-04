@@ -1,5 +1,5 @@
-from typing import Callable, List, Tuple
 import inspect
+from typing import Callable
 
 import jax
 import jax.numpy as jnp
@@ -7,16 +7,15 @@ import jax.numpy as jnp
 from openscvx.constraints.violation import CTCSViolation
 from openscvx.dynamics import Dynamics
 
+
 def build_augmented_dynamics(
     dynamics_non_augmented: Dynamics,
-    violations: List[CTCSViolation],
+    violations: list[CTCSViolation],
     idx_x_true: slice,
     idx_u_true: slice,
 ) -> Dynamics:
     dynamics_augmented = Dynamics(
-        f=get_augmented_dynamics(
-            dynamics_non_augmented.f, violations, idx_x_true, idx_u_true
-        ),
+        f=get_augmented_dynamics(dynamics_non_augmented.f, violations, idx_x_true, idx_u_true),
     )
     A, B = get_jacobians(
         dynamics_augmented.f, dynamics_non_augmented, violations, idx_x_true, idx_u_true
@@ -28,11 +27,10 @@ def build_augmented_dynamics(
 
 def get_augmented_dynamics(
     dynamics: Callable[..., jnp.ndarray],
-    violations: List[CTCSViolation],
+    violations: list[CTCSViolation],
     idx_x_true: slice,
     idx_u_true: slice,
 ) -> Callable[..., jnp.ndarray]:
-    
     def dynamics_augmented(x: jnp.ndarray, u: jnp.ndarray, node: int, *params) -> jnp.ndarray:
         x_true = x[idx_x_true]
         u_true = u[idx_u_true]
@@ -47,7 +45,7 @@ def get_augmented_dynamics(
 
         if "node" in expected_args:
             filtered_params["node"] = node
-            
+
         x_dot = dynamics(x_true, u_true, **filtered_params)
 
         for v in violations:
@@ -62,10 +60,10 @@ def get_augmented_dynamics(
 def get_jacobians(
     dyn_augmented: Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray],
     dynamics_non_augmented: Dynamics,
-    violations: List[CTCSViolation],
+    violations: list[CTCSViolation],
     idx_x_true: slice,
     idx_u_true: slice,
-) -> Tuple[
+) -> tuple[
     Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray],
     Callable[[jnp.ndarray, jnp.ndarray, int], jnp.ndarray],
 ]:
@@ -82,12 +80,18 @@ def get_jacobians(
     # 2) Build the *true‐state* Jacobians of f(x_true,u_true)
     f_fn = dynamics_non_augmented.f
     if dynamics_non_augmented.A is None:
-        A_f = lambda x_true, u_true: jax.jacfwd(f_fn, argnums=0)(x_true, u_true)
+
+        def A_f(x_true, u_true):
+            return jax.jacfwd(f_fn, argnums=0)(x_true, u_true)
+
     else:
         A_f = dynamics_non_augmented.A
 
     if dynamics_non_augmented.B is None:
-        B_f = lambda x_true, u_true: jax.jacfwd(f_fn, argnums=1)(x_true, u_true)
+
+        def B_f(x_true, u_true):
+            return jax.jacfwd(f_fn, argnums=1)(x_true, u_true)
+
     else:
         B_f = dynamics_non_augmented.B
 

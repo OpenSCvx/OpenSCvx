@@ -1,23 +1,21 @@
-import numpy as np
-import jax.numpy as jnp
-import cvxpy as cp
-
 import os
 import sys
+
+import cvxpy as cp
+import jax.numpy as jnp
+import numpy as np
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
-from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.dynamics import dynamics
-from openscvx.constraints import ctcs, nodal
-from openscvx.utils import rot, gen_vertices
-from openscvx.backend.state import State, Free, Minimize
-from openscvx.backend.parameter import Parameter
-from openscvx.backend.control import Control
-
 from examples.plotting import plot_animation_double_integrator
+from openscvx.backend.control import Control
+from openscvx.backend.state import Free, Minimize, State
+from openscvx.constraints import ctcs, nodal
+from openscvx.dynamics import dynamics
+from openscvx.trajoptproblem import TrajOptProblem
+from openscvx.utils import gen_vertices, rot
 
 n = 22  # Number of Nodes
 total_time = 24.0  # Total time for the simulation
@@ -35,7 +33,13 @@ u = Control("u", shape=(3,))  # Control variable with 6 dimensions
 f_max = 4.179446268 * 9.81
 u.max = np.array([f_max, f_max, f_max])
 u.min = np.array([-f_max, -f_max, -f_max])  # Lower Bound on the controls
-initial_control = np.array([0.0, 0, 10,])
+initial_control = np.array(
+    [
+        0.0,
+        0,
+        10,
+    ]
+)
 u.guess = np.repeat(initial_control[np.newaxis, :], n, axis=0)
 
 m = 1.0  # Mass of the drone
@@ -101,7 +105,6 @@ def dynamics(x_, u_):
     return jnp.hstack([r_dot, v_dot, t_dot])
 
 
-
 x_bar = np.linspace(x.initial, x.final, n)
 
 i = 0
@@ -127,7 +130,7 @@ problem = TrajOptProblem(
     x=x,
     u=u,
     constraints=constraints,
-    idx_time=len(x.max)-1,
+    idx_time=len(x.max) - 1,
     N=n,
 )
 
@@ -136,7 +139,9 @@ problem.settings.dis.custom_integrator = True
 
 problem.settings.scp.w_tr = 2e0  # Weight on the Trust Reigon
 problem.settings.scp.lam_cost = 1e-1  # 0e-1,  # Weight on the Minimal Time Objective
-problem.settings.scp.lam_vc = 1e1  # 1e1,  # Weight on the Virtual Control Objective (not including CTCS Augmentation)
+problem.settings.scp.lam_vc = (
+    1e1  # 1e1,  # Weight on the Virtual Control Objective (not including CTCS Augmentation)
+)
 problem.settings.scp.ep_tr = 1e-3  # Trust Region Tolerance
 problem.settings.scp.ep_vb = 1e-4  # Virtual Control Tolerance
 problem.settings.scp.ep_vc = 1e-8  # Virtual Control Tolerance for CTCS
@@ -145,7 +150,7 @@ problem.settings.scp.cost_relax = 0.8  # Minimal Time Relaxation Factor
 problem.settings.scp.w_tr_adapt = 1.4  # Trust Region Adaptation Factor
 problem.settings.scp.w_tr_max_scaling_factor = 1e2  # Maximum Trust Region Weight
 
-plotting_dict = dict(vertices=vertices)
+plotting_dict = {"vertices": vertices}
 
 if __name__ == "__main__":
     problem.initialize()

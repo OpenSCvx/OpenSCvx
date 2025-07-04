@@ -1,12 +1,7 @@
-import pytest
 import jax.numpy as jnp
+import pytest
 
-from openscvx.constraints.nodal import NodalConstraint, nodal
-from openscvx.backend.parameter import Parameter
-from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.backend.state import State
-from openscvx.backend.control import Control
-from openscvx.dynamics import dynamics
+from openscvx.constraints.nodal import NodalConstraint
 
 
 def simple_dot(x, u):
@@ -62,7 +57,7 @@ def test_vectorized_single_node_path():
 def test_convex_skips_jax_transforms():
     # convex=True should not define g, and leave grad_g_x/grad_g_u at their defaults (None)
     c = NodalConstraint(func=simple_dot, convex=True, vectorized=True)
-    assert not hasattr(c, 'g')
+    assert not hasattr(c, "g")
     assert c.grad_g_x is None
     assert c.grad_g_u is None
 

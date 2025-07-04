@@ -1,23 +1,25 @@
-import numpy as np
 import jax.numpy as jnp
+import numpy as np
 
-from openscvx.propagation import s_to_t, t_to_tau, simulate_nonlinear_time
 from openscvx.config import Config
+from openscvx.propagation import s_to_t, simulate_nonlinear_time, t_to_tau
 from openscvx.results import OptimizationResults
 
 
-def propagate_trajectory_results(params: dict, settings: Config, result: OptimizationResults, propagation_solver: callable) -> OptimizationResults:
+def propagate_trajectory_results(
+    params: dict, settings: Config, result: OptimizationResults, propagation_solver: callable
+) -> OptimizationResults:
     """Propagate the optimal trajectory and compute additional results.
-    
+
     This function takes the optimal control solution and propagates it through the
     nonlinear dynamics to compute the actual state trajectory and other metrics.
-    
+
     Args:
         params (dict): System parameters.
         settings (Config): Configuration settings.
         result (OptimizationResults): Optimization results object.
         propagation_solver (callable): Function for propagating the system state.
-        
+
     Returns:
         OptimizationResults: Updated results object containing:
             - t_full: Full time vector
@@ -37,13 +39,13 @@ def propagate_trajectory_results(params: dict, settings: Config, result: Optimiz
 
     # Match free values from initial state to the initial value from the result
     mask = jnp.array([t == "Free" for t in x.initial_type], dtype=bool)
-    settings.sim.x_prop.initial = jnp.where(mask, x.guess[0,:], settings.sim.x_prop.initial)
+    settings.sim.x_prop.initial = jnp.where(mask, x.guess[0, :], settings.sim.x_prop.initial)
 
     x_full = simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_solver)
 
     # Calculate cost
     i = 0
-    cost = np.zeros_like(x.guess[-1,i])
+    cost = np.zeros_like(x.guess[-1, i])
     for type in x.initial_type:
         if type == "Minimize":
             cost += x.guess[0, i]
@@ -53,7 +55,7 @@ def propagate_trajectory_results(params: dict, settings: Config, result: Optimiz
         if type == "Minimize":
             cost += x.guess[-1, i]
         i += 1
-    i=0
+    i = 0
     for type in x.initial_type:
         if type == "Maximize":
             cost -= x.guess[0, i]

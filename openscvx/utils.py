@@ -1,13 +1,23 @@
-import jax
-import jax.numpy as jnp
-import numpy as np
-import hashlib
 import ast
-import types
+import hashlib
 import inspect
 import textwrap
 
-def stable_function_hash(funcs, n_discretization_nodes=None, dt=None, total_time=None, state_max=None, state_min=None, control_max=None, control_min=None):
+import jax
+import jax.numpy as jnp
+import numpy as np
+
+
+def stable_function_hash(
+    funcs,
+    n_discretization_nodes=None,
+    dt=None,
+    total_time=None,
+    state_max=None,
+    state_min=None,
+    control_max=None,
+    control_min=None,
+):
     hasher = hashlib.sha256()
 
     for func in funcs:
@@ -18,7 +28,9 @@ def stable_function_hash(funcs, n_discretization_nodes=None, dt=None, total_time
 
             # Remove docstrings from the AST
             for node in ast.walk(parsed):
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and ast.get_docstring(node):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and ast.get_docstring(
+                    node
+                ):
                     if isinstance(node.body[0], ast.Expr):
                         node.body = node.body[1:]
 
@@ -31,22 +43,22 @@ def stable_function_hash(funcs, n_discretization_nodes=None, dt=None, total_time
     # Add additional parameters to the hash
     if n_discretization_nodes is not None:
         hasher.update(f"n_nodes:{n_discretization_nodes}".encode())
-    
+
     if dt is not None:
         hasher.update(f"dt:{dt}".encode())
-    
+
     if total_time is not None:
         hasher.update(f"total_time:{total_time}".encode())
-    
+
     if state_max is not None:
         hasher.update(f"state_max:{state_max.tobytes()}".encode())
-    
+
     if state_min is not None:
         hasher.update(f"state_min:{state_min.tobytes()}".encode())
-    
+
     if control_max is not None:
         hasher.update(f"control_max:{control_max.tobytes()}".encode())
-    
+
     if control_min is not None:
         hasher.update(f"control_min:{control_min.tobytes()}".encode())
 
@@ -106,6 +118,8 @@ rot = np.array(
         [0, 0, 1],
     ]
 )
+
+
 def gen_vertices(center, radii):
     """
     Obtains the vertices of the gate.

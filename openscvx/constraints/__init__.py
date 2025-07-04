@@ -1,9 +1,9 @@
-from .ctcs import ctcs, CTCSConstraint
-from .nodal import nodal, NodalConstraint
+from .ctcs import CTCSConstraint, ctcs
+from .nodal import NodalConstraint, nodal
 
 __all__ = [
-    "ctcs",
     "CTCSConstraint",
-    "nodal",
     "NodalConstraint",
+    "ctcs",
+    "nodal",
 ]

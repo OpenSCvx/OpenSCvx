@@ -1,9 +1,8 @@
 from dataclasses import dataclass
-from typing import Callable, Optional, List, Union
+from typing import Callable, Optional, Union
 
 import jax.numpy as jnp
-from jax import vmap, jacfwd
-import collections.abc
+from jax import jacfwd, vmap
 
 
 @dataclass
@@ -35,7 +34,7 @@ class NodalConstraint:
     | convex=True, vectorized=True   | list of cvxpy expressions (one per node)         |
 
     Nonconvex examples:
-    
+
     ```python
     @nodal
     def g(x_, u_):
@@ -44,7 +43,7 @@ class NodalConstraint:
     ```python
     @nodal(nodes=[0, 3])
     def g(x_, u_):
-        return jnp.linalg.norm(x_) - 1.0 
+        return jnp.linalg.norm(x_) - 1.0
     ```
 
     Or can directly wrap a function if a more lambda-function interface is desired:
@@ -63,17 +62,25 @@ class NodalConstraint:
 
     Args:
         func (Callable):
-            The user-supplied constraint function. The expected input and output types depend on the values of `convex` and `vectorized`:
+            The user-supplied constraint function. The expected input and output
+            types depend on the values of `convex` and `vectorized`:
 
-            | Case                          | x, u type/shape                                   | Output type                                      |
-            |-------------------------------|---------------------------------------------------|--------------------------------------------------|
-            | convex=False, vectorized=False | 1D arrays, shape (n_x,), (n_u,) (single node)     | float (single node)                              |
-            | convex=False, vectorized=True  | 2D arrays, shape (N, n_x), (N, n_u) (all nodes)   | float array (per node)                           |
-            | convex=True, vectorized=False  | list of cvxpy variables, one per node             | cvxpy expression (single node)                   |
-            | convex=True, vectorized=True   | list of cvxpy variables, one per node             | list of cvxpy expressions (one per node)         |
+            Input/Output types:
+            - convex=False, vectorized=False: x,u are 1D arrays (n_x,), (n_u,),
+              returns float
+            - convex=False, vectorized=True: x,u are 2D arrays (N, n_x), (N, n_u),
+              returns float array
+            - convex=True, vectorized=False: x,u are cvxpy variables, returns
+              cvxpy expression
+            - convex=True, vectorized=True: x,u are cvxpy variables, returns
+              list of cvxpy expressions
 
-            Additional parameters: always passed as keyword arguments with names matching the parameter name plus an underscore (e.g., `g_` for `Parameter('g')`).
-            For nonconvex constraints, the function should return constraint residuals (g(x,u) <= 0). For convex constraints, the function should return a cvxpy expression.
+            Additional parameters: always passed as keyword arguments with names
+            matching the parameter name plus an underscore (e.g., `g_` for
+            `Parameter('g')`).
+            For nonconvex constraints, the function should return constraint
+            residuals (g(x,u) <= 0). For convex constraints, the function should
+            return a cvxpy expression.
         nodes (Optional[List[int]]):
             Specific node indices where this constraint applies. If None, applies at all nodes.
         convex (bool):
@@ -85,13 +92,13 @@ class NodalConstraint:
         grad_g_x (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
             User-supplied gradient of `func` wrt `x`. If None, computed via
             `jax.jacfwd(func, argnums=0)`.
-        grad_g_u (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]): 
+        grad_g_u (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
             User-supplied gradient of `func` wrt `u`. If None, computed via
             `jax.jacfwd(func, argnums=1)`.
     """
 
     func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
-    nodes: Optional[List[int]] = None
+    nodes: Optional[list[int]] = None
     convex: bool = False
     vectorized: bool = False
     grad_g_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
@@ -99,7 +106,7 @@ class NodalConstraint:
 
     def __post_init__(self):
         """Initialize gradients and vectorization after instance creation.
-        
+
         If the constraint is not convex, this method:
         1. Sets up the constraint function
         2. Computes gradients if not provided
@@ -120,11 +127,11 @@ class NodalConstraint:
 
     def __call__(self, x: jnp.ndarray, u: jnp.ndarray):
         """Evaluate the constraint function at the given state and control.
-        
+
         Args:
             x (jnp.ndarray): The state vector.
             u (jnp.ndarray): The control vector.
-            
+
         Returns:
             jnp.ndarray: The constraint violation values.
         """
@@ -151,7 +158,7 @@ class NodalConstraint:
 def nodal(
     _func: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
     *,
-    nodes: Optional[List[int]] = None,
+    nodes: Optional[list[int]] = None,
     convex: bool = False,
     vectorized: bool = False,
     grad_g_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
@@ -193,6 +200,7 @@ def nodal(
             If False, auto-vectorize over nodes using `jax.vmap`. If True, assumes
             the function already handles vectorization.
     """
+
     def decorator(f: Callable):
         return NodalConstraint(
             func=f,
