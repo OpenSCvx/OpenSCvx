@@ -253,8 +253,8 @@ class State(Variable):
                     )
                 if val > max_i:
                     raise ValueError(
-                        f"{field_name.capitalize()} Fixed value at index {i[0]} is greater then the "
-                        f"max: {val} > {max_i}"
+                        f"{field_name.capitalize()} Fixed value at index {i[0]} is greater then "
+                        f"the max: {val} > {max_i}"
                     )
 
     @property
