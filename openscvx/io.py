@@ -78,6 +78,20 @@ def print_problem_summary(settings):
     n_ctcs = len(settings.sim.constraints_ctcs)
     n_augmented = settings.sim.n_states - settings.sim.idx_x_true.stop
     
+    # Count CVXPy variables, parameters, and constraints
+    from openscvx.ocp import OptimalControlProblem
+    try:
+        prob = OptimalControlProblem(settings)
+        # Get the actual problem size information like CVXPy verbose output
+        n_cvx_variables = sum(var.size for var in prob.variables())
+        n_cvx_parameters = sum(param.size for param in prob.parameters())
+        n_cvx_constraints = sum(constraint.size for constraint in prob.constraints)
+    except Exception:
+        # Fallback if problem construction fails
+        n_cvx_variables = 0
+        n_cvx_parameters = 0
+        n_cvx_constraints = 0
+    
     # Get JAX backend information
     jax_backend = jax.devices()[0].platform.upper()
     jax_version = jax.__version__
@@ -99,6 +113,7 @@ def print_problem_summary(settings):
         "Problem Summary",
         f"Dimensions: {settings.sim.n_states} states ({n_augmented} aug), {settings.sim.n_controls} controls, {settings.scp.n} nodes",
         f"Constraints: {n_nodal_convex} conv, {n_nodal_nonconvex} nonconv, {n_ctcs} ctcs",
+        f"Subproblem: {n_cvx_variables} vars, {n_cvx_parameters} params, {n_cvx_constraints} constraints",
         f"Weights: {weights_str}",
         f"CVX Solver: {settings.cvx.solver}, Discretization Solver: {settings.dis.solver}",
         f"JAX Backend: {jax_backend} (v{jax_version})"
