@@ -168,6 +168,7 @@ nav:
           - Constraints: 'Usage/api_constraints.md'
           - Integrators: 'Usage/api_integrators.md'
           - TrajOptProblem: 'Usage/api_trajoptproblem.md'
+          - OptimizationResults: 'Usage/api_results.md'
       - Tutorials:
           - 'Usage/tutorial_6dof_obstacle_avoidance.md'
           - 'Usage/tutorial_6dof_los_guidance.md'
