@@ -1,22 +1,22 @@
-import numpy as np
-import numpy.linalg as la
-import jax.numpy as jnp
-
 import os
 import sys
+
+import jax.numpy as jnp
+import numpy as np
+import numpy.linalg as la
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
-from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.dynamics import dynamics
-from openscvx.utils import qdcm, SSMP, SSM, get_kp_pose
-from openscvx.constraints import ctcs
-from openscvx.backend.state import State, Free, Minimize
-from openscvx.backend.control import Control
+from openscvx.trajoptproblem import TrajOptProblem  # noqa: E402
+from openscvx.dynamics import dynamics  # noqa: E402
+from openscvx.utils import qdcm, SSMP, SSM, get_kp_pose  # noqa: E402
+from openscvx.constraints import ctcs  # noqa: E402
+from openscvx.backend.state import State, Free, Minimize  # noqa: E402
+from openscvx.backend.control import Control  # noqa: E402
 
-from examples.plotting import plot_animation
+from examples.plotting import plot_animation  # noqa: E402
 
 n = 12  # Number of Nodes
 total_time = 40.0  # Total time for the simulation

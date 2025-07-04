@@ -1,21 +1,21 @@
-import numpy as np
-import jax.numpy as jnp
-
 import os
 import sys
+
+import jax.numpy as jnp
+import numpy as np
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
-from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.dynamics import dynamics
-from openscvx.constraints import ctcs
-from openscvx.backend.state import State, Free, Maximize
-from openscvx.backend.parameter import Parameter
-from openscvx.backend.control import Control
+from openscvx.trajoptproblem import TrajOptProblem  # noqa: E402
+from openscvx.dynamics import dynamics  # noqa: E402
+from openscvx.constraints import ctcs  # noqa: E402
+from openscvx.backend.state import State, Free, Maximize  # noqa: E402
+from openscvx.backend.parameter import Parameter  # noqa: E402
+from openscvx.backend.control import Control  # noqa: E402
 
-from examples.plotting import plot_control_norm, plot_xy_xz_yz
+from examples.plotting import plot_control_norm, plot_xy_xz_yz  # noqa: E402
 
 n = 30
 total_time = 95.0  # Total simulation time

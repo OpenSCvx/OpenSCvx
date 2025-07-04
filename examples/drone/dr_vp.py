@@ -1,15 +1,14 @@
-import numpy as np
-import numpy.linalg as la
-import cvxpy as cp
-import jax.numpy as jnp
-
 import os
 import sys
+
+import cvxpy as cp
+import jax.numpy as jnp
+import numpy as np
+import numpy.linalg as la
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
-
 
 from openscvx.trajoptproblem import TrajOptProblem  # noqa: E402
 from openscvx.dynamics import dynamics  # noqa: E402
