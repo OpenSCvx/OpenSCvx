@@ -2,15 +2,14 @@
 
 <img src="figures/openscvx_logo.svg" width="1200"/>
 <p align="center">
-    <a href="https://github.com//haynec/OpenSCvx/actions/workflows/website.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/website.yml/badge.svg"/></a>
+    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/ci.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/ci.yml/badge.svg"/></a>
+    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/lint.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/lint.yml/badge.svg"/></a>
     <a href="https://arxiv.org/abs/2410.22596"><img src="http://img.shields.io/badge/arXiv-2410.22596-B31B1B.svg"/></a>
     <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"/></a>
 </p>
 <p align="center">
-    <a href="https://github.com//haynec/OpenSCvx/actions/workflows/ci.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/ci.yml/badge.svg"/></a>
-    <a href="https://github.com//haynec/OpenSCvx/actions/workflows/nightly.yml/badge.svg"><img src="https://github.com//haynec/OpenSCvx/actions/workflows/nightly.yml/badge.svg"/></a>
-    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml?event=release"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml/badge.svg?event=release"/>
-  </a>
+    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/nightly.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/nightly.yml/badge.svg"/></a>
+    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml/badge.svg"/></a>
 </p>
 
 <!-- PROJECT LOGO -->
