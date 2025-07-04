@@ -1,21 +1,14 @@
 import os
-os.environ["EQX_ON_ERROR"] = "nan"
+from typing import Any, Callable
 
-
-from typing import Callable, Any, Optional
-
-
+import diffrax as dfx
 import jax
 import jax.numpy as jnp
-import diffrax as dfx
-from typing import Callable, Any
-
-import jax
-import jax.numpy as jnp
-import diffrax as dfx
-
 from diffrax._global_interpolation import DenseInterpolation
 from jax import tree_util
+
+os.environ["EQX_ON_ERROR"] = "nan"
+
 
 # Safely check if DenseInterpolation is already registered
 try:
@@ -62,6 +55,7 @@ SOLVER_MAP = {
     "KenCarp4": dfx.KenCarp4,
     "KenCarp5": dfx.KenCarp5,
 }
+
 
 # fmt: off
 def rk45_step(
@@ -142,9 +136,7 @@ def solve_ivp_rk45(
             V_result = V_result.at[i].set(y_next)
             return (t + h, y_next, V_result)
 
-        _, _, solution = jax.lax.fori_loop(
-            1, len(substeps), body_fun, (tau_0, y_0, solution)
-        )
+        _, _, solution = jax.lax.fori_loop(1, len(substeps), body_fun, (tau_0, y_0, solution))
 
     return solution
 
@@ -165,7 +157,8 @@ def solve_ivp_diffrax(
     Solve an initial-value ODE problem using a Diffrax adaptive solver.
 
     Args:
-        f (Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray]): ODE right-hand side; signature f(t, y, *args) -> dy/dt.
+        f (Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray]):
+            ODE right-hand side; f(t, y, *args).
         tau_final (float): Final integration time.
         y_0 (jnp.ndarray): Initial state at tau_0.
         args (tuple): Extra arguments to pass to `f` in the solver term.
@@ -281,6 +274,6 @@ def solve_ivp_diffrax_prop(
     # Evaluate all save_time points (static size), then mask them
     all_evals = jax.vmap(solution.evaluate)(save_time)  # shape: (MAX_TAU_LEN, n_states)
     masked_array = jnp.where(mask[:, None], all_evals, jnp.zeros_like(all_evals))
-         # shape: (variable_len, n_states)
+    # shape: (variable_len, n_states)
 
     return masked_array

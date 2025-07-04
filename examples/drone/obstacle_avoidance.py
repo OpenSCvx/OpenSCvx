@@ -1,44 +1,61 @@
-import numpy as np
-import jax.numpy as jnp
-
 import os
 import sys
+
+import jax.numpy as jnp
+import numpy as np
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
-from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.dynamics import dynamics
-from openscvx.constraints import ctcs
-from openscvx.utils import qdcm, SSMP, SSM, generate_orthogonal_unit_vectors
-from openscvx.backend.state import State, Free, Minimize
-from openscvx.backend.parameter import Parameter
+from examples.plotting import plot_animation
 from openscvx.backend.control import Control
-
-from examples.plotting import plot_animation, plot_scp_animation, plot_scp_animation_pyqtgraph, plot_animation_pyqtgraph
+from openscvx.backend.parameter import Parameter
+from openscvx.backend.state import Free, Minimize, State
+from openscvx.constraints import ctcs
+from openscvx.dynamics import dynamics
+from openscvx.trajoptproblem import TrajOptProblem
+from openscvx.utils import (
+    SSM,
+    SSMP,
+    generate_orthogonal_unit_vectors,
+    qdcm,
+)
 
 n = 6
 total_time = 4.0  # Total time for the simulation
 
 x = State("x", shape=(14,))  # State variable with 14 dimensions
 
-x.max = np.array([200., 10, 20, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 10])
-x.min = np.array(
-    [-200., -100, 0, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0]
+x.max = np.array([200.0, 10, 20, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 10])
+x.min = np.array([-200.0, -100, 0, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0])
+
+x.initial = np.array(
+    [10.0, 0, 2, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0]
+)
+x.final = np.array(
+    [
+        -10.0,
+        0,
+        2,
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(1),
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(0),
+        Minimize(total_time),
+    ]
 )
 
-x.initial = np.array([10.0, 0, 2, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0])
-x.final = np.array([-10.0, 0, 2, Free(0), Free(0), Free(0), Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), Minimize(total_time)])
-
 u = Control("u", shape=(6,))  # Control variable with 6 dimensions
-u.max=np.array(
-    [0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562]
-)  # Upper Bound on the controls
-u.min=np.array(
-    [0, 0, 0, -18.665, -18.665, -0.55562]
-)  # Lower Bound on the controls
-initial_control = np.array([0., 0., u.max[2], 0., 0., 0.])
+u.max = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])  # Upper Bound on the controls
+u.min = np.array([0, 0, 0, -18.665, -18.665, -0.55562])  # Lower Bound on the controls
+initial_control = np.array([0.0, 0.0, u.max[2], 0.0, 0.0, 0.0])
 u.guess = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
 
 
@@ -110,9 +127,9 @@ problem = TrajOptProblem(
     u=u,
     params=Parameter.get_all(),
     constraints=constraints,
-    idx_time=len(x.max)-1,
+    idx_time=len(x.max) - 1,
     N=n,
-    licq_max=1E-8
+    licq_max=1e-8,
 )
 
 problem.settings.scp.w_tr_adapt = 1.8
@@ -123,11 +140,11 @@ problem.settings.scp.cost_drop = 4  # SCP iteration to relax minimal final time 
 problem.settings.scp.cost_relax = 0.5  # Minimal Time Relaxation Factor
 
 problem.settings.prp.dt = 0.01
-plotting_dict = dict(
-    obstacles_centers=obstacle_centers,
-    obstacles_axes=axes,
-    obstacles_radii=radius,
-)
+plotting_dict = {
+    "obstacles_centers": obstacle_centers,
+    "obstacles_axes": axes,
+    "obstacles_radii": radius,
+}
 
 if __name__ == "__main__":
     problem.initialize()

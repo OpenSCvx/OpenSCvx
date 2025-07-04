@@ -5,16 +5,17 @@ from openscvx.backend.variable import Variable
 
 class Fix:
     """Class representing a fixed state variable in the optimization problem.
-    
+
     A fixed state variable is one that is constrained to a specific value
     and cannot be optimized.
-    
+
     Attributes:
         value: The fixed value that the state variable must take.
     """
+
     def __init__(self, value):
         """Initialize a new fixed state variable.
-        
+
         Args:
             value: The fixed value that the state variable must take.
         """
@@ -22,7 +23,7 @@ class Fix:
 
     def __repr__(self):
         """Get a string representation of this fixed state variable.
-        
+
         Returns:
             str: A string representation showing the fixed value.
         """
@@ -31,16 +32,17 @@ class Fix:
 
 class Free:
     """Class representing a free state variable in the optimization problem.
-    
+
     A free state variable is one that is not constrained to any specific value
     but can be optimized within its bounds.
-    
+
     Attributes:
         guess: The initial guess value for optimization.
     """
+
     def __init__(self, guess):
         """Initialize a new free state variable.
-        
+
         Args:
             guess: The initial guess value for optimization.
         """
@@ -48,7 +50,7 @@ class Free:
 
     def __repr__(self):
         """Get a string representation of this free state variable.
-        
+
         Returns:
             str: A string representation showing the guess value.
         """
@@ -57,16 +59,17 @@ class Free:
 
 class Minimize:
     """Class representing a state variable to be minimized in the optimization problem.
-    
+
     A minimized state variable is one that is optimized to achieve the lowest
     possible value within its bounds.
-    
+
     Attributes:
         guess: The initial guess value for optimization.
     """
+
     def __init__(self, guess):
         """Initialize a new minimized state variable.
-        
+
         Args:
             guess: The initial guess value for optimization.
         """
@@ -74,7 +77,7 @@ class Minimize:
 
     def __repr__(self):
         """Get a string representation of this minimized state variable.
-        
+
         Returns:
             str: A string representation showing the guess value.
         """
@@ -83,16 +86,17 @@ class Minimize:
 
 class Maximize:
     """Class representing a state variable to be maximized in the optimization problem.
-    
+
     A maximized state variable is one that is optimized to achieve the highest
     possible value within its bounds.
-    
+
     Attributes:
         guess: The initial guess value for optimization.
     """
+
     def __init__(self, guess):
         """Initialize a new maximized state variable.
-        
+
         Args:
             guess: The initial guess value for optimization.
         """
@@ -100,17 +104,19 @@ class Maximize:
 
     def __repr__(self):
         """Get a string representation of this maximized state variable.
-        
+
         Returns:
             str: A string representation showing the guess value.
         """
         return f"Maximize({self.guess})"
 
+
 class State(Variable):
     """A class representing the state variables in an optimal control problem.
 
-    The State class extends Variable to handle state-specific properties like initial and final conditions,
-    as well as true and augmented state dimensions. It supports various boundary condition types:
+    The State class extends Variable to handle state-specific properties like initial and final
+    conditions, as well as true and augmented state dimensions. It supports various boundary
+    condition types:
     - Fixed values (Fix)
     - Free variables (Free)
     - Minimization objectives (Minimize)
@@ -121,29 +127,35 @@ class State(Variable):
         shape (tuple): Shape of the state variable array.
         min (np.ndarray): Minimum bounds for the state variables. Shape: (n_states,).
         max (np.ndarray): Maximum bounds for the state variables. Shape: (n_states,).
-        guess (np.ndarray): Used to initialize SCP and contains the current SCP solution for the state trajectory. Shape: (n_nodes, n_states).
-        initial (np.ndarray): Initial state values or boundary condition objects (Free, Fixed, Minimize, Maximize). Shape: (n_states,).
-        final (np.ndarray): Final state values or boundary condition objects (Free, Fixed, Minimize, Maximize). Shape: (n_states,).
+        guess (np.ndarray): Used to initialize SCP and contains the current SCP solution for the
+            state trajectory. Shape: (n_nodes, n_states).
+        initial (np.ndarray): Initial state values or boundary condition objects (Free, Fixed,
+            Minimize, Maximize). Shape: (n_states,).
+        final (np.ndarray): Final state values or boundary condition objects (Free, Fixed,
+            Minimize, Maximize). Shape: (n_states,).
         _initial (np.ndarray): Internal storage for initial state values.
         _final (np.ndarray): Internal storage for final state values.
-        initial_type (str): Type of initial boundary condition ('fix', 'free', 'minimize', 'maximize').
-        final_type (str): Type of final boundary condition ('fix', 'free', 'minimize', 'maximize').
+        initial_type (str): Type of initial boundary condition ('fix', 'free', 'minimize',
+            'maximize').
+        final_type (str): Type of final boundary condition ('fix', 'free', 'minimize',
+            'maximize').
         _true_dim (int): True dimensionality of the state variables.
         _true_slice (slice): Slice for accessing true state variables.
         _augmented_slice (slice): Slice for accessing augmented state variables.
 
     Notes:
-        Attributes prefixed with underscore (_) are for internal use only and should not be accessed directly.
+        Attributes prefixed with underscore (_) are for internal use only and should not be
+        accessed directly.
 
     Example:
-    ```python
-    state = State("position", (3,))
-    state.min = np.array([0, 0, 10])
-    state.max = np.array([10, 10, 200])
-    state.guess = np.linspace([0, 1, 2], [10, 5, 8], 3)
-    state.initial = np.array([Fix(0), Free(1), 2])
-    state.final = np.array([Fix(10), Free(5), Maximize(8)])
-    ```
+        ```python
+        state = State("position", (3,))
+        state.min = np.array([0, 0, 10])
+        state.max = np.array([10, 10, 200])
+        state.guess = np.linspace([0, 1, 2], [10, 5, 8], 3)
+        state.initial = np.array([Fix(0), Free(1), 2])
+        state.final = np.array([Fix(10), Free(5), Maximize(8)])
+        ```
     """
 
     def __init__(self, name, shape):
@@ -223,8 +235,10 @@ class State(Variable):
         Raises:
             ValueError: If any fixed initial or final value violates the bounds
         """
-        for field_name, data, types in [('initial', self._initial, self.initial_type),
-                                        ('final', self._final, self.final_type)]:
+        for field_name, data, types in [
+            ("initial", self._initial, self.initial_type),
+            ("final", self._final, self.final_type),
+        ]:
             if data is None or types is None:
                 continue
             for i, val in np.ndenumerate(data):
@@ -233,9 +247,15 @@ class State(Variable):
                 min_i = self._min[i] if self._min is not None else -np.inf
                 max_i = self._max[i] if self._max is not None else np.inf
                 if val < min_i:
-                    raise ValueError(f"{field_name.capitalize()} Fixed value at index {i[0]} is lower then the min: {val} < {min_i}")
+                    raise ValueError(
+                        f"{field_name.capitalize()} Fixed value at index {i[0]} is lower then the "
+                        f"min: {val} < {min_i}"
+                    )
                 if val > max_i:
-                    raise ValueError(f"{field_name.capitalize()} Fixed value at index {i[0]} is greater then the max: {val} > {max_i}")
+                    raise ValueError(
+                        f"{field_name.capitalize()} Fixed value at index {i[0]} is greater then "
+                        f"the max: {val} > {max_i}"
+                    )
 
     @property
     def initial(self):
@@ -257,9 +277,8 @@ class State(Variable):
         Raises:
             ValueError: If the shape of arr doesn't match the state shape
         """
-        arr = np.asarray(arr, dtype=object)
         if arr.shape != self.shape:
-            raise ValueError(f"Initial value shape {arr.shape} does not match State shape {self.shape}")
+            raise ValueError(f"Shape mismatch: {arr.shape} != {self.shape}")
         self._initial = np.zeros(arr.shape)
         self.initial_type = np.full(arr.shape, "Fix", dtype=object)
 
@@ -304,9 +323,8 @@ class State(Variable):
         Raises:
             ValueError: If the shape of arr doesn't match the state shape
         """
-        arr = np.asarray(arr, dtype=object)
         if arr.shape != self.shape:
-            raise ValueError(f"Final value shape {arr.shape} does not match State shape {self.shape}")
+            raise ValueError(f"Shape mismatch: {arr.shape} != {self.shape}")
         self._final = np.zeros(arr.shape)
         self.final_type = np.full(arr.shape, "Fix", dtype=object)
 
@@ -349,7 +367,17 @@ class State(Variable):
         """
         return self[self._augmented_slice]
 
-    def append(self, other=None, *, min=-np.inf, max=np.inf, guess=0.0, initial=0.0, final=0.0, augmented=False):
+    def append(
+        self,
+        other=None,
+        *,
+        min=-np.inf,
+        max=np.inf,
+        guess=0.0,
+        initial=0.0,
+        final=0.0,
+        augmented=False,
+    ):
         """Append another state or create a new state variable.
 
         Args:
@@ -375,12 +403,16 @@ class State(Variable):
                 self._final = np.concatenate([self._final, other._final], axis=0)
 
             if self.initial_type is None:
-                self.initial_type = np.array(other.initial_type) if other.initial_type is not None else None
+                self.initial_type = (
+                    np.array(other.initial_type) if other.initial_type is not None else None
+                )
             elif other.initial_type is not None:
                 self.initial_type = np.concatenate([self.initial_type, other.initial_type], axis=0)
 
             if self.final_type is None:
-                self.final_type = np.array(other.final_type) if other.final_type is not None else None
+                self.final_type = (
+                    np.array(other.final_type) if other.final_type is not None else None
+                )
             elif other.final_type is not None:
                 self.final_type = np.concatenate([self.final_type, other.final_type], axis=0)
 

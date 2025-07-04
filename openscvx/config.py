@@ -1,9 +1,10 @@
-import numpy as np
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Callable
+from dataclasses import dataclass
+from typing import Callable, Optional
 
-from openscvx.backend.state import State
+import numpy as np
+
 from openscvx.backend.control import Control
+from openscvx.backend.state import State
 
 
 def get_affine_scaling_matrices(n, minimum, maximum):
@@ -14,13 +15,12 @@ def get_affine_scaling_matrices(n, minimum, maximum):
 
 @dataclass
 class DiscretizationConfig:
-
     def __init__(
         self,
         dis_type: str = "FOH",
         custom_integrator: bool = False,
         solver: str = "Tsit5",
-        args: Dict = None,
+        args: Optional[dict] = None,
         atol: float = 1e-3,
         rtol: float = 1e-6,
     ):
@@ -33,15 +33,25 @@ class DiscretizationConfig:
         These are the arguments most commonly used day-to-day.
 
         Args:
-            dis_type (str): The type of discretization to use (e.g., "FOH" for First-Order Hold). Defaults to "FOH".
-            custom_integrator (bool): This enables our custom fixed-step RK45 algorithm. This tends to be faster than Diffrax but unless you're going for speed, it's recommended to stick with Diffrax for robustness and other solver options. Defaults to False.
-            solver (str): Not used if custom_integrator is enabled. Any choice of solver in Diffrax is valid, please refer here, [How to Choose a Solver](https://docs.kidger.site/diffrax/usage/how-to-choose-a-solver/). Defaults to "Tsit5".
+            dis_type (str): The type of discretization to use (e.g., "FOH" for
+                First-Order Hold). Defaults to "FOH".
+            custom_integrator (bool): This enables our custom fixed-step RK45
+                algorithm. This tends to be faster than Diffrax but unless you're
+                going for speed, it's recommended to stick with Diffrax for
+                robustness and other solver options. Defaults to False.
+            solver (str): Not used if custom_integrator is enabled. Any choice of
+                solver in Diffrax is valid, please refer here,
+                [How to Choose a Solver](https://docs.kidger.site/diffrax/usage/
+                how-to-choose-a-solver/). Defaults to "Tsit5".
 
         Other arguments:
-        These arguments are less frequently used, and for most purposes you shouldn't need to understand these.
+        These arguments are less frequently used, and for most purposes you
+        shouldn't need to understand these.
 
         Args:
-            args (Dict): Additional arguments to pass to the solver which can be found [here](https://docs.kidger.site/diffrax/api/diffeqsolve/). Defaults to an empty dictionary.
+            args (Dict): Additional arguments to pass to the solver which can be
+                found [here](https://docs.kidger.site/diffrax/api/diffeqsolve/).
+                Defaults to an empty dictionary.
             atol (float): Absolute tolerance for the solver. Defaults to 1e-3.
             rtol (float): Relative tolerance for the solver. Defaults to 1e-6.
         """
@@ -52,33 +62,38 @@ class DiscretizationConfig:
         self.atol = atol
         self.rtol = rtol
 
+
 @dataclass
 class DevConfig:
-
     def __init__(self, profiling: bool = False, debug: bool = False, printing: bool = True):
         """
         Configuration class for development settings.
 
-        This class defines the parameters used for development and debugging purposes.
+        This class defines the parameters used for development and debugging
+        purposes.
 
         Main arguments:
         These are the arguments most commonly used day-to-day.
 
         Args:
-            profiling (bool): Whether to enable profiling for performance analysis. Defaults to False.
-            debug (bool): Disables all precompilation so you can place breakpoints and inspect values. Defaults to False.
-            printing (bool): Whether to enable printing during development. Defaults to True.
+            profiling (bool): Whether to enable profiling for performance
+                analysis. Defaults to False.
+            debug (bool): Disables all precompilation so you can place
+                breakpoints and inspect values. Defaults to False.
+            printing (bool): Whether to enable printing during development.
+                Defaults to True.
         """
         self.profiling = profiling
         self.debug = debug
         self.printing = printing
+
 
 @dataclass
 class ConvexSolverConfig:
     def __init__(
         self,
         solver: str = "QOCO",
-        solver_args: dict = {"abstol": 1e-6, "reltol": 1e-9, "enforce_dpp": True},
+        solver_args: Optional[dict] = None,
         cvxpygen: bool = False,
         cvxpygen_override: bool = False,
     ):
@@ -87,22 +102,33 @@ class ConvexSolverConfig:
 
         This class defines the parameters required for configuring a convex solver.
 
-        These are the arguments most commonly used day-to-day. Generally I have found [QOCO](https://qoco-org.github.io/qoco/index.html)
-        to be the most performant of the CVXPY solvers for these types of problems (I do have a bias as the author is from my group)
-        and can handle up to SOCP's. [CLARABEL](https://clarabel.org/stable/) is also a great option with feasibility checking and
-        can handle a few more problem types. [CVXPYGen](https://github.com/cvxgrp/cvxpygen) is also great if your problem isn't too large.
-        I have found qocogen to be the most performant of the CVXPYGen solvers.
+        These are the arguments most commonly used day-to-day. Generally I have
+        found [QOCO](https://qoco-org.github.io/qoco/index.html) to be the most
+        performant of the CVXPY solvers for these types of problems (I do have a
+        bias as the author is from my group) and can handle up to SOCP's.
+        [CLARABEL](https://clarabel.org/stable/) is also a great option with
+        feasibility checking and can handle a few more problem types.
+        [CVXPYGen](https://github.com/cvxgrp/cvxpygen) is also great if your
+        problem isn't too large. I have found qocogen to be the most performant
+        of the CVXPYGen solvers.
 
         Args:
-            solver (str): The name of the CVXPY solver to use. A list of options can be found
-                        [here](https://www.cvxpy.org/tutorial/solvers/index.html). Defaults to "QOCO".
-            solver_args (dict, optional): Ensure you are using the correct arguments for your solver as they are not all common.
-                                        Additional arguments to configure the solver, such as tolerances.
-                                        Defaults to {"abstol": 1e-6, "reltol": 1e-9}.
-            cvxpygen (bool): Whether to enable CVXPY code generation for the solver. Defaults to False.
+            solver (str): The name of the CVXPY solver to use. A list of options
+                can be found [here](https://www.cvxpy.org/tutorial/solvers/
+                index.html). Defaults to "QOCO".
+            solver_args (dict, optional): Ensure you are using the correct
+                arguments for your solver as they are not all common. Additional
+                arguments to configure the solver, such as tolerances. Defaults
+                to {"abstol": 1e-6, "reltol": 1e-9}.
+            cvxpygen (bool): Whether to enable CVXPY code generation for the
+                solver. Defaults to False.
         """
+        if solver_args is None:
+            solver_args = {"abstol": 1e-06, "reltol": 1e-09, "enforce_dpp": True}
         self.solver = solver
-        self.solver_args = solver_args if solver_args is not None else {"abstol": 1e-6, "reltol": 1e-9}
+        self.solver_args = (
+            solver_args if solver_args is not None else {"abstol": 1e-6, "reltol": 1e-9}
+        )
         self.cvxpygen = cvxpygen
         self.cvxpygen_override = cvxpygen_override
 
@@ -115,32 +141,36 @@ class PropagationConfig:
         dt: float = 0.01,
         solver: str = "Dopri8",
         max_tau_len: int = 1000,
-        args: Optional[Dict] = None,
+        args: Optional[dict] = None,
         atol: float = 1e-3,
         rtol: float = 1e-6,
     ):
         """
         Configuration class for propagation settings.
 
-        This class defines the parameters required for propagating the nonlinear system dynamics
-        using the optimal control sequence.
+        This class defines the parameters required for propagating the nonlinear
+        system dynamics using the optimal control sequence.
 
         Main arguments:
         These are the arguments most commonly used day-to-day.
 
         Other arguments:
-        The solver should likely not be changed as it is a high accuracy 8th-order Runge-Kutta method.
+        The solver should likely not be changed as it is a high accuracy 8th-order
+        Runge-Kutta method.
 
         Args:
-            inter_sample (int): How dense the propagation within multishot discretization should be. Defaults to 30.
+            inter_sample (int): How dense the propagation within multishot
+                discretization should be. Defaults to 30.
             dt (float): The time step for propagation. Defaults to 0.1.
-            solver (str): The numerical solver to use for propagation (e.g., "Dopri8"). Defaults to "Dopri8".
-            max_tau_len (int): The maximum length of the time vector for propagation. Defaults to 1000.
-            args (Dict, optional): Additional arguments to pass to the solver. Defaults to an empty dictionary.
+            solver (str): The numerical solver to use for propagation
+                (e.g., "Dopri8"). Defaults to "Dopri8".
+            max_tau_len (int): The maximum length of the time vector for
+                propagation. Defaults to 1000.
+            args (Dict, optional): Additional arguments to pass to the solver.
+                Defaults to an empty dictionary.
             atol (float): Absolute tolerance for the solver. Defaults to 1e-3.
             rtol (float): Relative tolerance for the solver. Defaults to 1e-6.
         """
-
         self.inter_sample = inter_sample
         self.dt = dt
         self.solver = solver
@@ -149,10 +179,11 @@ class PropagationConfig:
         self.atol = atol
         self.rtol = rtol
 
+
 @dataclass(init=False)
 class SimConfig:
     # No class-level field declarations
-    
+
     def __init__(
         self,
         x: State,
@@ -168,8 +199,8 @@ class SimConfig:
         idx_s: slice,
         save_compiled: bool = True,
         ctcs_node_intervals: Optional[list] = None,
-        constraints_ctcs: Optional[List[Callable]] = None,
-        constraints_nodal: Optional[List[Callable]] = None,
+        constraints_ctcs: Optional[list[Callable]] = None,
+        constraints_nodal: Optional[list[Callable]] = None,
         n_states: Optional[int] = None,
         n_states_prop: Optional[int] = None,
         n_controls: Optional[int] = None,
@@ -179,35 +210,50 @@ class SimConfig:
         """
         Configuration class for simulation settings.
 
-        This class defines the parameters required for simulating a trajectory optimization problem.
+        This class defines the parameters required for simulating a trajectory
+        optimization problem.
 
         Main arguments:
         These are the arguments most commonly used day-to-day.
 
         Args:
             x (State): State object, must have .min and .max attributes for bounds.
-            x_prop (State): Propagation state object, must have .min and .max attributes for bounds.
-            u (Control): Control object, must have .min and .max attributes for bounds.
+            x_prop (State): Propagation state object, must have .min and .max
+                attributes for bounds.
+            u (Control): Control object, must have .min and .max attributes for
+                bounds.
             total_time (float): The total simulation time.
             idx_x_true (slice): Slice for true state indices.
             idx_x_true_prop (slice): Slice for true propagation state indices.
             idx_u_true (slice): Slice for true control indices.
             idx_t (slice): Slice for time index.
             idx_y (slice): Slice for constraint violation indices.
-            idx_y_prop (slice): Slice for propagation constraint violation indices.
+            idx_y_prop (slice): Slice for propagation constraint violation
+                indices.
             idx_s (slice): Slice for time dilation index.
-            save_compiled (bool): If True, save and reuse compiled solver functions. Defaults to True.
-            ctcs_node_intervals (list, optional): Node intervals for CTCS constraints.
+            save_compiled (bool): If True, save and reuse compiled solver
+                functions. Defaults to True.
+            ctcs_node_intervals (list, optional): Node intervals for CTCS
+                constraints.
             constraints_ctcs (list, optional): List of CTCS constraints.
             constraints_nodal (list, optional): List of nodal constraints.
-            n_states (int, optional): The number of state variables. Defaults to `None` (inferred from x.max).
-            n_states_prop (int, optional): The number of propagation state variables. Defaults to `None` (inferred from x_prop.max).
-            n_controls (int, optional): The number of control variables. Defaults to `None` (inferred from u.max).
-            scaling_x_overrides (list, optional): List of (upper_bound, lower_bound, idx) for custom state scaling. Each can be scalar or array, idx can be int, list, or slice.
-            scaling_u_overrides (list, optional): List of (upper_bound, lower_bound, idx) for custom control scaling. Each can be scalar or array, idx can be int, list, or slice.
+            n_states (int, optional): The number of state variables. Defaults to
+                `None` (inferred from x.max).
+            n_states_prop (int, optional): The number of propagation state
+                variables. Defaults to `None` (inferred from x_prop.max).
+            n_controls (int, optional): The number of control variables. Defaults
+                to `None` (inferred from u.max).
+            scaling_x_overrides (list, optional): List of (upper_bound,
+                lower_bound, idx) for custom state scaling. Each can be scalar or
+                array, idx can be int, list, or slice.
+            scaling_u_overrides (list, optional): List of (upper_bound,
+                lower_bound, idx) for custom control scaling. Each can be scalar
+                or array, idx can be int, list, or slice.
 
         Note:
-            You can specify custom scaling for specific states/controls using scaling_x_overrides and scaling_u_overrides. Any indices not covered by overrides will use the default min/max bounds.
+            You can specify custom scaling for specific states/controls using
+            scaling_x_overrides and scaling_u_overrides. Any indices not covered
+            by overrides will use the default min/max bounds.
         """
         # Assign all arguments to self
         self.x = x
@@ -250,14 +296,8 @@ class SimConfig:
                         idxs = list(range(*idx.indices(size)))
                     else:
                         idxs = list(idx)
-                    if np.isscalar(ub):
-                        ub_vals = [ub] * len(idxs)
-                    else:
-                        ub_vals = ub
-                    if np.isscalar(lb):
-                        lb_vals = [lb] * len(idxs)
-                    else:
-                        lb_vals = lb
+                    ub_vals = [ub] * len(idxs) if np.isscalar(ub) else ub
+                    lb_vals = [lb] * len(idxs) if np.isscalar(lb) else lb
                     for i, uval, lval in zip(idxs, ub_vals, lb_vals):
                         upper[i] = uval
                         lower[i] = lval
@@ -282,10 +322,8 @@ class SimConfig:
         self.inv_S_u = np.diag(1 / np.diag(self.S_u))
 
 
-
 @dataclass
 class ScpConfig:
-
     def __init__(
         self,
         n: Optional[int] = None,
@@ -307,8 +345,10 @@ class ScpConfig:
         """
         Configuration class for Sequential Convex Programming (SCP).
 
-        This class defines the parameters used to configure the SCP solver. You will very likely need to modify
-        the weights for your problem. Please refer to my guide [here](https://haynec.github.io/openscvx/hyperparameter_tuning) for more information.
+        This class defines the parameters used to configure the SCP solver. You
+        will very likely need to modify the weights for your problem. Please
+        refer to my guide [here](https://haynec.github.io/openscvx/
+        hyperparameter_tuning) for more information.
 
         Attributes:
             n (int): The number of discretization nodes. Defaults to `None`.
@@ -316,16 +356,25 @@ class ScpConfig:
             w_tr (float): The trust region weight. Defaults to 1.0.
             lam_vc (float): The penalty weight for virtual control. Defaults to 1.0.
             ep_tr (float): The trust region convergence tolerance. Defaults to 1e-4.
-            ep_vb (float): The boundary constraint convergence tolerance. Defaults to 1e-4.
-            ep_vc (float): The virtual constraint convergence tolerance. Defaults to 1e-8.
+            ep_vb (float): The boundary constraint convergence tolerance.
+                Defaults to 1e-4.
+            ep_vc (float): The virtual constraint convergence tolerance.
+                Defaults to 1e-8.
             lam_cost (float): The weight for original cost. Defaults to 0.0.
-            lam_vb (float): The weight for virtual buffer. This is only used if there are nonconvex nodal constraints present. Defaults to 0.0.
-            uniform_time_grid (bool): Whether to use a uniform time grid. Defaults to `False`.
-            cost_drop (int): The number of iterations to allow for cost stagnation before termination. Defaults to -1 (disabled).
-            cost_relax (float): The relaxation factor for cost reduction. Defaults to 1.0.
-            w_tr_adapt (float): The adaptation factor for the trust region weight. Defaults to 1.0.
-            w_tr_max (float): The maximum allowable trust region weight. Defaults to `None`.
-            w_tr_max_scaling_factor (float): The scaling factor for the maximum trust region weight. Defaults to `None`.
+            lam_vb (float): The weight for virtual buffer. This is only used if
+                there are nonconvex nodal constraints present. Defaults to 0.0.
+            uniform_time_grid (bool): Whether to use a uniform time grid.
+                Defaults to `False`.
+            cost_drop (int): The number of iterations to allow for cost
+                stagnation before termination. Defaults to -1 (disabled).
+            cost_relax (float): The relaxation factor for cost reduction.
+                Defaults to 1.0.
+            w_tr_adapt (float): The adaptation factor for the trust region
+                weight. Defaults to 1.0.
+            w_tr_max (float): The maximum allowable trust region weight.
+                Defaults to `None`.
+            w_tr_max_scaling_factor (float): The scaling factor for the maximum
+                trust region weight. Defaults to `None`.
         """
         self.n = n
         self.k_max = k_max
@@ -351,6 +400,7 @@ class ScpConfig:
 
         if self.w_tr_max_scaling_factor is not None and self.w_tr_max is None:
             self.w_tr_max = self.w_tr_max_scaling_factor * self.w_tr
+
 
 @dataclass
 class Config:

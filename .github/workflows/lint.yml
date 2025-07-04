@@ -1,0 +1,35 @@
+name: 🔍 Lint
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+
+    - name: Install Ruff
+      run: |
+        python -m pip install --upgrade pip
+        pip install ruff
+
+    - name: Run Ruff linting
+      run: |
+        ruff check openscvx/ tests/
+        
+    - name: Run Ruff formatting check
+      run: |
+        ruff format --check openscvx/ tests/ 

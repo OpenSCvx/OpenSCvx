@@ -1,7 +1,7 @@
-import pytest
 import numpy as np
+import pytest
 
-from openscvx.backend.state import State, Free, Maximize, Minimize, Fix
+from openscvx.backend.state import Fix, Free, Maximize, Minimize, State
 
 
 @pytest.mark.parametrize("attr", ["initial", "final"])
@@ -26,9 +26,9 @@ def test_valid_boundary_types_parsing(attr):
     [
         ("initial", np.array([1, 2, "Fixed", 4, 5], dtype=object), "Fixed"),
         ("initial", np.array([1, "Freee", 3, 4, 5], dtype=object), "Freee"),
-        ("final",   np.array([1, "Minim", 3, 4, 5], dtype=object), "Minim"),
-        ("final",   np.array(["Max", 2, 3, 4, 5], dtype=object), "Max"),
-    ]
+        ("final", np.array([1, "Minim", 3, 4, 5], dtype=object), "Minim"),
+        ("final", np.array(["Max", 2, 3, 4, 5], dtype=object), "Max"),
+    ],
 )
 def test_invalid_boundary_type_raises(attr, bad_input, error_fragment):
     state = State("x", shape=(5,))
@@ -44,10 +44,13 @@ def test_shape_mismatch_raises(attr):
         setattr(state, attr, bad_input)
 
 
-@pytest.mark.parametrize("attr, type_wrapper, expected_type", [
-    ("initial", Free(1.0), "Free"),
-    ("final", Minimize(2.0), "Minimize"),
-])
+@pytest.mark.parametrize(
+    "attr, type_wrapper, expected_type",
+    [
+        ("initial", Free(1.0), "Free"),
+        ("final", Minimize(2.0), "Minimize"),
+    ],
+)
 def test_single_type_assignment_correct(attr, type_wrapper, expected_type):
     state = State("x", shape=(3,))
     setattr(state, attr, np.array([type_wrapper] * 3))

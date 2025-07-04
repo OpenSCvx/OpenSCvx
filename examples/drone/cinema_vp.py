@@ -1,23 +1,21 @@
-import numpy as np
-import numpy.linalg as la
-import jax.numpy as jnp
-
 import os
 import sys
+
+import jax.numpy as jnp
+import numpy as np
+import numpy.linalg as la
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
-from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.dynamics import dynamics
-from openscvx.utils import qdcm, SSMP, SSM, get_kp_pose
-from openscvx.constraints import ctcs
-from openscvx.backend.state import State, Free, Minimize
-from openscvx.backend.parameter import Parameter
+from examples.plotting import plot_animation
 from openscvx.backend.control import Control
-
-from examples.plotting import plot_animation_pyqtgraph, plot_animation
+from openscvx.backend.state import Free, Minimize, State
+from openscvx.constraints import ctcs
+from openscvx.dynamics import dynamics
+from openscvx.trajoptproblem import TrajOptProblem
+from openscvx.utils import SSM, SSMP, get_kp_pose, qdcm
 
 n = 12  # Number of Nodes
 total_time = 40.0  # Total time for the simulation
@@ -27,11 +25,35 @@ t_inds = 14
 s_inds = 6  # Time dilation index in Control
 
 x = State("x", shape=(15,))  # State variable with 15 dimensions
-x.max = np.array([200.0, 100, 50, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 2000, 40])  # Upper Bound on the states
-x.min = np.array([-100.0, -100, -10, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0, 0])  # Lower Bound on the states
+x.max = np.array(
+    [200.0, 100, 50, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 2000, 40]
+)  # Upper Bound on the states
+x.min = np.array(
+    [-100.0, -100, -10, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0, 0]
+)  # Lower Bound on the states
 
-x.initial = np.array([8.0, -0.2, 2.2, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0, 0])
-x.final = np.array([Free(-10.0), Free(0), Free(2), Free(0), Free(0), Free(0), Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), Minimize(0), 40])
+x.initial = np.array(
+    [8.0, -0.2, 2.2, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0, 0]
+)
+x.final = np.array(
+    [
+        Free(-10.0),
+        Free(0),
+        Free(2),
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(1),
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(0),
+        Minimize(0),
+        40,
+    ]
+)
 
 u = Control("u", shape=(6,))  # Control variable with 6 dimensions
 
@@ -149,17 +171,17 @@ problem.settings.scp.ep_vc = 1e-8  # Virtual Control Tolerance for CTCS
 problem.settings.scp.w_tr_adapt = 1.3  # Trust Region Adaptation Factor
 problem.settings.scp.w_tr_max_scaling_factor = 1e3  # Maximum Trust Region Weight
 
-plotting_dict = dict(
-    n_subs=n_subs,
-    alpha_x=alpha_x,
-    alpha_y=alpha_y,
-    R_sb=R_sb,
-    init_poses=init_pose,
-    norm_type=norm_type,
-    min_range=min_range,
-    max_range=max_range,
-    moving_subject=True,
-)
+plotting_dict = {
+    "n_subs": n_subs,
+    "alpha_x": alpha_x,
+    "alpha_y": alpha_y,
+    "R_sb": R_sb,
+    "init_poses": init_pose,
+    "norm_type": norm_type,
+    "min_range": min_range,
+    "max_range": max_range,
+    "moving_subject": True,
+}
 
 if __name__ == "__main__":
     problem.initialize()

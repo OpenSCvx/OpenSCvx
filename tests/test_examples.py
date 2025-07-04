@@ -1,27 +1,23 @@
-import pytest
 import os
 import platform
 
 import jax
+import pytest
 
-from examples.drone.cinema_vp import problem as cinema_vp_problem
 from examples.drone.cinema_vp import plotting_dict as cinema_vp_plotting_dict
-from examples.drone.dr_vp import problem as dr_vp_problem
+from examples.drone.cinema_vp import problem as cinema_vp_problem
 from examples.drone.dr_vp import plotting_dict as dr_vp_plotting_dict
-from examples.drone.obstacle_avoidance import problem as obstacle_avoidance_problem
+from examples.drone.dr_vp import problem as dr_vp_problem
+from examples.drone.dr_vp_nodal import plotting_dict as dr_vp_polytope_plotting_dict
+from examples.drone.dr_vp_nodal import problem as dr_vp_polytope_problem
 from examples.drone.obstacle_avoidance import (
     plotting_dict as obstacle_avoidance_plotting_dict,
 )
-from examples.drone.dr_vp_nodal import problem as dr_vp_polytope_problem
-from examples.drone.dr_vp_nodal import plotting_dict as dr_vp_polytope_plotting_dict
-from examples.abstract.brachistochrone import problem as brachistochrone_problem
-from examples.plotting import plot_camera_animation, plot_animation, plot_scp_animation
+from examples.drone.obstacle_avoidance import problem as obstacle_avoidance_problem
+from examples.plotting import plot_animation, plot_camera_animation, plot_scp_animation
 
 # Import pyqtgraph testing helpers
-from tests.test_pyqtgraph_helpers import (
-    run_pyqtgraph_function_headless,
-    check_pyqtgraph_functions_basic
-)
+from tests.test_pyqtgraph_helpers import run_pyqtgraph_function_headless
 
 CI_OS = os.getenv("RUNNER_OS", platform.system())
 
@@ -49,7 +45,11 @@ TEST_CASES = {
         "problem": dr_vp_polytope_problem,
         "plotting_dict": dr_vp_polytope_plotting_dict,
         "plot_funcs": [plot_animation, plot_camera_animation, plot_scp_animation],
-        "pyqtgraph_funcs": ["plot_animation_pyqtgraph", "plot_camera_animation_pyqtgraph", "plot_scp_animation_pyqtgraph"],
+        "pyqtgraph_funcs": [
+            "plot_animation_pyqtgraph",
+            "plot_camera_animation_pyqtgraph",
+            "plot_scp_animation_pyqtgraph",
+        ],
         "cost_idx": -2,
         "vio_idx": -1,
         "max_cost": 30.0,
@@ -64,7 +64,11 @@ TEST_CASES = {
         "problem": dr_vp_problem,
         "plotting_dict": dr_vp_plotting_dict,
         "plot_funcs": [plot_animation, plot_camera_animation, plot_scp_animation],
-        "pyqtgraph_funcs": ["plot_animation_pyqtgraph", "plot_camera_animation_pyqtgraph", "plot_scp_animation_pyqtgraph"],
+        "pyqtgraph_funcs": [
+            "plot_animation_pyqtgraph",
+            "plot_camera_animation_pyqtgraph",
+            "plot_scp_animation_pyqtgraph",
+        ],
         "cost_idx": -2,
         "vio_idx": -1,
         "max_cost": 45.0,
@@ -79,7 +83,11 @@ TEST_CASES = {
         "problem": cinema_vp_problem,
         "plotting_dict": cinema_vp_plotting_dict,
         "plot_funcs": [plot_animation, plot_camera_animation, plot_scp_animation],
-        "pyqtgraph_funcs": ["plot_animation_pyqtgraph", "plot_camera_animation_pyqtgraph", "plot_scp_animation_pyqtgraph"],
+        "pyqtgraph_funcs": [
+            "plot_animation_pyqtgraph",
+            "plot_camera_animation_pyqtgraph",
+            "plot_scp_animation_pyqtgraph",
+        ],
         "cost_idx": -3,
         "vio_idx": -1,
         "max_cost": 400.0,
@@ -105,7 +113,6 @@ TEST_CASES = {
     #         lambda p: setattr(p.settings.cvx, "solver", "qocogen"),
     #         lambda p: setattr(p.settings.cvx, "cvxpygen", True),
     #         lambda p: setattr(p.settings.cvx, "cvxpygen_override", True),
-            
     #     ],
     # },
 }
@@ -137,21 +144,21 @@ def test_example_problem(name, conf):
         fn(result, problem.settings)
 
     # Test pyqtgraph functions if specified
-    if "pyqtgraph_funcs" in conf and conf["pyqtgraph_funcs"]:
+    if conf.get("pyqtgraph_funcs"):
         try:
             from examples.plotting import (
                 plot_animation_pyqtgraph,
+                plot_camera_animation_pyqtgraph,
                 plot_scp_animation_pyqtgraph,
-                plot_camera_animation_pyqtgraph
             )
-            
+
             # Map function names to actual functions
             pyqtgraph_func_map = {
                 "plot_animation_pyqtgraph": plot_animation_pyqtgraph,
                 "plot_scp_animation_pyqtgraph": plot_scp_animation_pyqtgraph,
                 "plot_camera_animation_pyqtgraph": plot_camera_animation_pyqtgraph,
             }
-            
+
             # Test each pyqtgraph function
             for func_name in conf["pyqtgraph_funcs"]:
                 if func_name in pyqtgraph_func_map:
@@ -159,7 +166,7 @@ def test_example_problem(name, conf):
                     success = run_pyqtgraph_function_headless(func, result, problem.settings)
                     if not success:
                         print(f"Warning: pyqtgraph function {func_name} failed for {name}")
-                        
+
         except ImportError as e:
             # Skip pyqtgraph tests if not available
             print(f"Skipping pyqtgraph tests for {name}: {e}")
@@ -182,29 +189,19 @@ def test_example_problem(name, conf):
         assert sol_cost < conf["max_cost"], "Problem failed with solution cost"
         assert prop_cost < conf["max_cost"], "Problem failed with propagated cost"
     if conf["max_vio"] > 0.0:
-        assert (
-            sol_constr_vio < conf["max_vio"]
-        ), "Problem failed with solution constraint violation"
-        assert (
-            prop_constr_vio < conf["max_vio"]
-        ), "Problem failed with propagated constraint violation"
+        assert sol_constr_vio < conf["max_vio"], "Problem failed with solution constraint violation"
+        assert prop_constr_vio < conf["max_vio"], (
+            "Problem failed with propagated constraint violation"
+        )
     if "max_iters" in conf and conf["max_iters"] > 0:
-        assert (
-            scp_iters < conf["max_iters"]
-        ), "Problem took more then expected iterations"
+        assert scp_iters < conf["max_iters"], "Problem took more then expected iterations"
     assert result["converged"], "Problem failed with output"
 
     # timing checks
     t = conf["timing"]
-    assert (
-        problem.timing_init < t["init"]
-    ), "Problem took more then expected initialization time"
-    assert (
-        problem.timing_solve < t["solve"]
-    ), "Problem took more then expected solve time"
-    assert (
-        problem.timing_post < t["post"]
-    ), "Problem took more then expected post process time"
+    assert problem.timing_init < t["init"], "Problem took more then expected initialization time"
+    assert problem.timing_solve < t["solve"], "Problem took more then expected solve time"
+    assert problem.timing_post < t["post"], "Problem took more then expected post process time"
 
     # clean up
     jax.clear_caches()

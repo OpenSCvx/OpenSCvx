@@ -21,6 +21,10 @@ jobs:
         run: pip install --upgrade pip build twine setuptools-scm
 
       - name: Build distributions
+        env:
+            # on this job only, use "only-version" so on tag vX.Y.Z you get X.Y.Z exactly
+            SETUPTOOLS_SCM_VERSION_SCHEME: only-version
+            SETUPTOOLS_SCM_LOCAL_SCHEME: no-local-version
         run: |
           rm -rf dist
           python -m build
