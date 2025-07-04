@@ -1,3 +1,4 @@
+import os
 import queue
 import threading
 import time
@@ -8,6 +9,8 @@ from typing import TYPE_CHECKING, List, Optional, Union
 import jax
 import numpy as np
 from jax import export
+
+os.environ["EQX_ON_ERROR"] = "nan"
 
 from openscvx import io
 from openscvx.augmentation.ctcs import sort_ctcs_constraints

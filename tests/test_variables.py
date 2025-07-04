@@ -142,7 +142,7 @@ def test_state_fix_bounds_check(field, values, min_val, max_val, should_raise, e
 
     if should_raise:
         with pytest.raises(ValueError) as excinfo:
-            setattr(s, field, values)
+            setattr(s, field, np.array(values))
         # Construct expected error message pattern
         val = values[expected_index].value
         i_str = (
@@ -161,7 +161,7 @@ def test_state_fix_bounds_check(field, values, min_val, max_val, should_raise, e
             )
         assert err_msg in str(excinfo.value)
     else:
-        setattr(s, field, values)
+        setattr(s, field, np.array(values))
 
 
 @pytest.mark.parametrize(
@@ -177,11 +177,11 @@ def test_state_fix_bounds_check(field, values, min_val, max_val, should_raise, e
 )
 def test_state_fix_bounds_check_min_only(field, values, min_val, should_raise, expected_index):
     s = State("x", shape=(2,))
-    setattr(s, field, values)
+    s.min = np.array(min_val)
 
     if should_raise:
         with pytest.raises(ValueError) as excinfo:
-            s.min = np.array(min_val)
+            setattr(s, field, np.array(values))
         val = values[expected_index].value
         i_str = expected_index if isinstance(expected_index, int) else expected_index[0]
         err_msg = (
@@ -190,7 +190,7 @@ def test_state_fix_bounds_check_min_only(field, values, min_val, should_raise, e
         )
         assert err_msg in str(excinfo.value)
     else:
-        s.min = np.array(min_val)
+        setattr(s, field, np.array(values))
 
 
 @pytest.mark.parametrize(
@@ -206,20 +206,20 @@ def test_state_fix_bounds_check_min_only(field, values, min_val, should_raise, e
 )
 def test_state_fix_bounds_check_max_only(field, values, max_val, should_raise, expected_index):
     s = State("x", shape=(2,))
-    setattr(s, field, values)
+    s.max = np.array(max_val)
 
     if should_raise:
         with pytest.raises(ValueError) as excinfo:
-            s.max = np.array(max_val)
+            setattr(s, field, np.array(values))
         val = values[expected_index].value
         i_str = expected_index if isinstance(expected_index, int) else expected_index[0]
         err_msg = (
-            f"{field.capitalize()} Fixed value at index {i_str} is greater then the max: {val} >"
-            f" {max_val[i_str]}"
+            f"{field.capitalize()} Fixed value at index {i_str} is greater then the max:"
+            f" {val} > {max_val[i_str]}"
         )
         assert err_msg in str(excinfo.value)
     else:
-        s.max = np.array(max_val)
+        setattr(s, field, np.array(values))
 
 
 @pytest.mark.parametrize("shapes", [[(3,), (2,)], [(4,), (5,)]])
