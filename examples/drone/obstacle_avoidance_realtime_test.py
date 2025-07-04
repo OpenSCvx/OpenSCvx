@@ -8,33 +8,53 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
-from openscvx.trajoptproblem import TrajOptProblem  # noqa: E402
-from openscvx.dynamics import dynamics  # noqa: E402
-from openscvx.constraints import ctcs  # noqa: E402
-from openscvx.utils import qdcm, SSMP, SSM, generate_orthogonal_unit_vectors  # noqa: E402
-from openscvx.backend.state import State, Free, Minimize  # noqa: E402
-from openscvx.backend.parameter import Parameter  # noqa: E402
-from openscvx.backend.control import Control  # noqa: E402
-from examples.plotting import plot_animation  # noqa: E402
+from examples.plotting import plot_animation
+from openscvx.backend.control import Control
+from openscvx.backend.parameter import Parameter
+from openscvx.backend.state import Free, Minimize, State
+from openscvx.constraints import ctcs
+from openscvx.dynamics import dynamics
+from openscvx.trajoptproblem import TrajOptProblem
+from openscvx.utils import (
+    SSM,
+    SSMP,
+    generate_orthogonal_unit_vectors,
+    qdcm,
+)
 
 n = 6
 total_time = 4.0  # Total time for the simulation
 x = State("x", shape=(14,))  # State variable with 14 dimensions
-x.max = np.array([200., 10, 20, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 10])
-x.min = np.array(
-    [-200., -100, 0, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0]
+x.max = np.array([200.0, 10, 20, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 10])
+x.min = np.array([-200.0, -100, 0, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0])
+x.initial = np.array(
+    [10.0, 0, 2, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0]
 )
-x.initial = np.array([10.0, 0, 2, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0])
-x.final = np.array([-10.0, 0, 2, Free(0), Free(0), Free(0), Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), Minimize(total_time)])
+x.final = np.array(
+    [
+        -10.0,
+        0,
+        2,
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(1),
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(0),
+        Minimize(total_time),
+    ]
+)
 u = Control("u", shape=(6,))  # Control variable with 6 dimensions
-u.max=np.array(
-    [0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562]
-)  # Upper Bound on the controls
-u.min=np.array(
-    [0, 0, 0, -18.665, -18.665, -0.55562]
-)  # Lower Bound on the controls
-initial_control = np.array([0., 0., u.max[2], 0., 0., 0.])
+u.max = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])  # Upper Bound on the controls
+u.min = np.array([0, 0, 0, -18.665, -18.665, -0.55562])  # Lower Bound on the controls
+initial_control = np.array([0.0, 0.0, u.max[2], 0.0, 0.0, 0.0])
 u.guess = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
+
+
 @dynamics
 def dynamics(x_, u_):
     m = 1.0  # Mass of the drone
@@ -55,9 +75,13 @@ def dynamics(x_, u_):
     w_dot = jnp.diag(1 / J_b) @ (tau - SSM(w) @ jnp.diag(J_b) @ w)
     t_dot = 1
     return jnp.hstack([r_dot, v_dot, q_dot, w_dot, t_dot])
+
+
 def g_obs(center, A, x_):
     value = 1 - (x_[:3] - center).T @ A @ (x_[:3] - center)
     return value
+
+
 A_obs = []
 radius = []
 axes = []
@@ -89,21 +113,21 @@ problem = TrajOptProblem(
     u=u,
     params=Parameter.get_all(),
     constraints=constraints,
-    idx_time=len(x.max)-1,
+    idx_time=len(x.max) - 1,
     N=n,
-    licq_max=1E-8,
-    time_dilation_factor_min=0.15
+    licq_max=1e-8,
+    time_dilation_factor_min=0.15,
 )
 problem.settings.scp.w_tr_adapt = 1
 problem.settings.scp.w_tr = 4e0
 problem.settings.scp.lam_cost = 4e1  # Weight on the Nonlinear Cost
 problem.settings.scp.lam_vc = 1e2  # Weight on the Virtual Control Objective
 problem.settings.prp.dt = 0.01
-plotting_dict = dict(
-    obstacles_centers=obstacle_centers,
-    obstacles_axes=axes,
-    obstacles_radii=radius,
-)
+plotting_dict = {
+    "obstacles_centers": obstacle_centers,
+    "obstacles_axes": axes,
+    "obstacles_radii": radius,
+}
 if __name__ == "__main__":
     problem.initialize()
     results = problem.solve()

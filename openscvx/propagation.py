@@ -15,13 +15,13 @@ def prop_aug_dy(
     state_dot: callable,
     dis_type: str,
     N: int,
-    *params
+    *params,
 ) -> np.ndarray:
     """Compute the augmented dynamics for propagation.
-    
+
     This function computes the time-scaled dynamics for propagating the system state,
     taking into account the discretization type (ZOH or FOH) and time dilation.
-    
+
     Args:
         tau (float): Current normalized time in [0,1].
         x (np.ndarray): Current state vector.
@@ -34,7 +34,7 @@ def prop_aug_dy(
         dis_type (str): Discretization type ("ZOH" or "FOH").
         N (int): Number of nodes in trajectory.
         *params: Additional parameters passed to state_dot.
-        
+
     Returns:
         np.ndarray: Time-scaled state derivatives.
     """
@@ -48,63 +48,65 @@ def prop_aug_dy(
 
     return u[:, idx_s] * state_dot(x, u[:, :-1], node, *params).squeeze()
 
+
 def get_propagation_solver(state_dot, settings, param_map):
     """Create a propagation solver function.
-    
+
     This function creates a solver that propagates the system state using the
     specified dynamics and settings.
-    
+
     Args:
         state_dot (callable): Function computing state derivatives.
         settings: Configuration settings for propagation.
         param_map (dict): Mapping of parameter names to values.
-        
+
     Returns:
         callable: A function that solves the propagation problem.
     """
-    def propagation_solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask, *params):
+
+    def propagation_solver(
+        V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask, *params
+    ):
         param_map_update = dict(zip(param_map.keys(), params))
         return solve_ivp_diffrax_prop(
             f=prop_aug_dy,
             tau_final=tau_grid[1],  # scalar
-            y_0=V0,                 # shape (n_states,)
+            y_0=V0,  # shape (n_states,)
             args=(
-                u_cur,             # shape (1, n_controls)
-                u_next,            # shape (1, n_controls)
-                tau_init,          # shape (1, 1)
-                node,              # shape (1, 1)
-                idx_s,             # int
-                state_dot,         # function or array
+                u_cur,  # shape (1, n_controls)
+                u_next,  # shape (1, n_controls)
+                tau_init,  # shape (1, 1)
+                node,  # shape (1, 1)
+                idx_s,  # int
+                state_dot,  # function or array
                 settings.dis.dis_type,
                 settings.scp.n,
                 *param_map_update.items(),
                 # additional named parameters as **kwargs
             ),
-            tau_0=tau_grid[0],      # scalar
-            save_time=save_time,    # shape (MAX_TAU_LEN,)
-            mask=mask              # shape (MAX_TAU_LEN,), dtype=bool
+            tau_0=tau_grid[0],  # scalar
+            save_time=save_time,  # shape (MAX_TAU_LEN,)
+            mask=mask,  # shape (MAX_TAU_LEN,), dtype=bool
         )
 
     return propagation_solver
 
 
-
-
 def s_to_t(x, u, params: Config):
     """Convert normalized time s to real time t.
-    
+
     This function converts the normalized time variable s to real time t
     based on the discretization type and time dilation factors.
-    
+
     Args:
         x: State trajectory.
         u: Control trajectory.
         params (Config): Configuration settings.
-        
+
     Returns:
         list: List of real time points.
     """
-    t = [x.guess[:,params.sim.idx_t][0]]
+    t = [x.guess[:, params.sim.idx_t][0]]
     tau = np.linspace(0, 1, params.scp.n)
     for k in range(1, params.scp.n):
         s_kp = u.guess[k - 1, -1]
@@ -118,22 +120,26 @@ def s_to_t(x, u, params: Config):
 
 def t_to_tau(u, t, t_nodal, params: Config):
     """Convert real time t to normalized time tau.
-    
+
     This function converts real time t to normalized time tau and interpolates
     the control inputs accordingly.
-    
+
     Args:
         u: Control trajectory.
         t (np.ndarray): Real time points.
         t_nodal (np.ndarray): Nodal time points.
         params (Config): Configuration settings.
-        
+
     Returns:
         tuple: (tau, u_interp) where tau is normalized time and u_interp is interpolated controls.
     """
     u_guess = u.guess
+
     def u_lam(new_t):
-        return np.array([np.interp(new_t, t_nodal, u_guess[:,i]) for i in range(u_guess.shape[1])]).T
+        return np.array(
+            [np.interp(new_t, t_nodal, u_guess[:, i]) for i in range(u_guess.shape[1])]
+        ).T
+
     u = np.array([u_lam(t_i) for t_i in t])
 
     tau = np.zeros(len(t))
@@ -154,10 +160,10 @@ def t_to_tau(u, t, t_nodal, params: Config):
 
 def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_solver):
     """Simulate the nonlinear system dynamics over time.
-    
+
     This function simulates the system dynamics using the optimal control sequence
     and returns the resulting state trajectory.
-    
+
     Args:
         params: System parameters.
         x: State trajectory.
@@ -166,7 +172,7 @@ def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_sol
         t (np.ndarray): Real time points.
         settings: Configuration settings.
         propagation_solver (callable): Function for propagating the system state.
-        
+
     Returns:
         np.ndarray: Simulated state trajectory.
     """
@@ -178,14 +184,12 @@ def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_sol
 
     params = params.items()
     param_values = tuple([param.value for _, param in params])
-    
+
     states = np.empty((n_states, n_tau))
     tau = np.linspace(0, 1, settings.scp.n)
 
     # Precompute control interpolation
-    u_interp = np.stack([
-        np.interp(t, t, u.guess[:, i]) for i in range(u.guess.shape[1])
-    ], axis=-1)
+    u_interp = np.stack([np.interp(t, t, u.guess[:, i]) for i in range(u.guess.shape[1])], axis=-1)
 
     # Bin tau_vals into segments of tau
     tau_inds = np.digitize(tau_vals, tau) - 1
@@ -202,7 +206,7 @@ def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_sol
         mask = (tau_inds >= k) & (tau_inds < k + 1)
         count = np.sum(mask)
 
-        tau_cur = tau_vals[prev_count:prev_count + count]
+        tau_cur = tau_vals[prev_count : prev_count + count]
         tau_cur = np.concatenate([tau_cur, np.array([tau[k + 1]])])  # Always include final point
         count += 1
 
@@ -222,14 +226,14 @@ def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_sol
             settings.sim.idx_s.stop,
             tau_cur_padded,
             mask_padded,
-            *param_values
+            *param_values,
         )
 
         # Only store the valid portion (excluding the final point which becomes next x_0)
-        states[:, out_idx:out_idx + count - 1] = sol[:count - 1].T
+        states[:, out_idx : out_idx + count - 1] = sol[: count - 1].T
         out_idx += count - 1
         x_0 = sol[count - 1]  # Last value used as next x_0
 
-        prev_count += (count - 1)
+        prev_count += count - 1
 
     return states.T

@@ -1,13 +1,15 @@
-from plotly.subplots import make_subplots
 import random
-import plotly.graph_objects as go
+
 import numpy as np
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # Optional pyqtgraph imports
 try:
     import pyqtgraph as pg
     import pyqtgraph.opengl as gl
     from PyQt5 import QtWidgets
+
     PYQTPHOT_AVAILABLE = True
 except ImportError:
     PYQTPHOT_AVAILABLE = False
@@ -15,17 +17,17 @@ except ImportError:
     gl = None
     QtWidgets = None
 
-from openscvx.utils import qdcm, get_kp_pose
 from openscvx.config import Config
 from openscvx.results import OptimizationResults
+from openscvx.utils import get_kp_pose, qdcm
 
 
 def plot_dubins_car(results: OptimizationResults, params: Config):
     # Plot the trajectory of the Dubins car in 3d as an animaiton
     fig = go.Figure()
 
-    x = results.x_full[:,0]
-    y = results.x_full[:,1]
+    x = results.x_full[:, 0]
+    y = results.x_full[:, 1]
 
     results.x_full[:, 2]
 
@@ -33,45 +35,54 @@ def plot_dubins_car(results: OptimizationResults, params: Config):
     obs_radius = results.plotting_data["obs_radius"]
 
     # Create a 2D scatter plot
-    fig.add_trace(go.Scatter(x=x, y=y, mode='lines', line=dict(color='blue', width=2), name='Trajectory'))
+    fig.add_trace(
+        go.Scatter(x=x, y=y, mode="lines", line={"color": "blue", "width": 2}, name="Trajectory")
+    )
 
     # Plot the circular obstacle
-    fig.add_trace(go.Scatter(x=obs_center.value[0] + obs_radius.value * np.cos(np.linspace(0, 2 * np.pi, 100)),
-                             y=obs_center.value[1] + obs_radius.value * np.sin(np.linspace(0, 2 * np.pi, 100)),
-                             mode='lines', line=dict(color='red', width=2), name='Obstacle'))
-    
-    fig.update_layout(title='Dubins Car Trajectory', title_x=0.5, template='plotly_dark')
+    fig.add_trace(
+        go.Scatter(
+            x=obs_center.value[0] + obs_radius.value * np.cos(np.linspace(0, 2 * np.pi, 100)),
+            y=obs_center.value[1] + obs_radius.value * np.sin(np.linspace(0, 2 * np.pi, 100)),
+            mode="lines",
+            line={"color": "red", "width": 2},
+            name="Obstacle",
+        )
+    )
+
+    fig.update_layout(title="Dubins Car Trajectory", title_x=0.5, template="plotly_dark")
 
     # Set axis to be equal
     fig.update_xaxes(scaleanchor="y", scaleratio=1)
     return fig
 
+
 def plot_dubins_car_disjoint(results: OptimizationResults, params: Config):
     # Plot the trajectory of the Dubins car, but show wp1 and wp2 as circles with centers and radii
     fig = go.Figure()
 
-    x = results.x_full[:,0]
-    y = results.x_full[:,1]
+    x = results.x_full[:, 0]
+    y = results.x_full[:, 1]
     # Use the forward velocity from the control input
-    if "u_full" in results:
-        velocity = results.u_full[:, 0]
-    else:
-        velocity = np.zeros_like(x)
+    velocity = results.u_full[:, 0] if "u_full" in results else np.zeros_like(x)
 
     # Plot the trajectory colored by velocity
-    fig.add_trace(go.Scatter(
-        x=x, y=y,
-        mode='lines+markers',
-        line=dict(color='rgba(0,0,0,0)'),  # Hide default line
-        marker=dict(
-            color=velocity,
-            colorscale='Viridis',
-            size=6,
-            colorbar=dict(title='Velocity'),
-            showscale=True
-        ),
-        name='Trajectory (velocity)'
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=x,
+            y=y,
+            mode="lines+markers",
+            line={"color": "rgba(0,0,0,0)"},  # Hide default line
+            marker={
+                "color": velocity,
+                "colorscale": "Viridis",
+                "size": 6,
+                "colorbar": {"title": "Velocity"},
+                "showscale": True,
+            },
+            name="Trajectory (velocity)",
+        )
+    )
 
     # Plot waypoints wp1 and wp2 as circles and their centers
     if "wp1_center" in results and "wp1_radius" in results:
@@ -80,8 +91,24 @@ def plot_dubins_car_disjoint(results: OptimizationResults, params: Config):
         theta = np.linspace(0, 2 * np.pi, 100)
         circle_x = wp1_center[0] + wp1_radius * np.cos(theta)
         circle_y = wp1_center[1] + wp1_radius * np.sin(theta)
-        fig.add_trace(go.Scatter(x=circle_x, y=circle_y, mode='lines', line=dict(color='green', width=2, dash='dash'), name='Waypoint 1 Area'))
-        fig.add_trace(go.Scatter(x=[wp1_center[0]], y=[wp1_center[1]], mode='markers', marker=dict(color='green', size=12, symbol='x'), name='Waypoint 1 Center'))
+        fig.add_trace(
+            go.Scatter(
+                x=circle_x,
+                y=circle_y,
+                mode="lines",
+                line={"color": "green", "width": 2, "dash": "dash"},
+                name="Waypoint 1 Area",
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=[wp1_center[0]],
+                y=[wp1_center[1]],
+                mode="markers",
+                marker={"color": "green", "size": 12, "symbol": "x"},
+                name="Waypoint 1 Center",
+            )
+        )
 
     if "wp2_center" in results and "wp2_radius" in results:
         wp2_center = results.plotting_data["wp2_center"]
@@ -89,23 +116,42 @@ def plot_dubins_car_disjoint(results: OptimizationResults, params: Config):
         theta = np.linspace(0, 2 * np.pi, 100)
         circle_x = wp2_center[0] + wp2_radius * np.cos(theta)
         circle_y = wp2_center[1] + wp2_radius * np.sin(theta)
-        fig.add_trace(go.Scatter(x=circle_x, y=circle_y, mode='lines', line=dict(color='orange', width=2, dash='dash'), name='Waypoint 2 Area'))
-        fig.add_trace(go.Scatter(x=[wp2_center[0]], y=[wp2_center[1]], mode='markers', marker=dict(color='orange', size=12, symbol='x'), name='Waypoint 2 Center'))
+        fig.add_trace(
+            go.Scatter(
+                x=circle_x,
+                y=circle_y,
+                mode="lines",
+                line={"color": "orange", "width": 2, "dash": "dash"},
+                name="Waypoint 2 Area",
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=[wp2_center[0]],
+                y=[wp2_center[1]],
+                mode="markers",
+                marker={"color": "orange", "size": 12, "symbol": "x"},
+                name="Waypoint 2 Center",
+            )
+        )
 
-    fig.update_layout(title='Dubins Car Trajectory with Waypoints', title_x=0.5, template='plotly_dark')
+    fig.update_layout(
+        title="Dubins Car Trajectory with Waypoints", title_x=0.5, template="plotly_dark"
+    )
     fig.update_xaxes(scaleanchor="y", scaleratio=1)
     return fig
+
 
 def full_subject_traj_time(results: OptimizationResults, params: Config):
     x_full = results.x_full
     x_nodes = results.x.guess
-    t_nodes = x_nodes[:,params.sim.idx_t]
+    t_nodes = x_nodes[:, params.sim.idx_t]
     t_full = results.t_full
     subs_traj = []
     subs_traj_node = []
     subs_traj_sen = []
     subs_traj_sen_node = []
-    
+
     # if hasattr(params.dyn, 'get_kp_pose'):
     if "moving_subject" in results and "init_poses" in results:
         init_poses = results.plotting_data["init_poses"]
@@ -116,10 +162,10 @@ def full_subject_traj_time(results: OptimizationResults, params: Config):
         init_poses = results.plotting_data["init_poses"]
         for pose in init_poses:
             # repeat the pose for all time steps
-            pose_full = np.repeat(pose[:,np.newaxis], x_full.shape[0], axis=1).T
+            pose_full = np.repeat(pose[:, np.newaxis], x_full.shape[0], axis=1).T
             subs_traj.append(pose_full)
-            
-            pose_node = np.repeat(pose[:,np.newaxis], x_nodes.shape[0], axis=1).T
+
+            pose_node = np.repeat(pose[:, np.newaxis], x_nodes.shape[0], axis=1).T
             subs_traj_node.append(pose_node)
     else:
         raise ValueError("No valid method to get keypoint poses.")
@@ -137,27 +183,36 @@ def full_subject_traj_time(results: OptimizationResults, params: Config):
             sub_traj_sen_node = []
             for i in range(x_nodes.shape[0]):
                 sub_pose = sub_traj_node[i]
-                sub_traj_sen_node.append(R_sb @ qdcm(x_nodes[i, 6:10]).T @ (sub_pose - x_nodes[i, 0:3]).T)
+                sub_traj_sen_node.append(
+                    R_sb @ qdcm(x_nodes[i, 6:10]).T @ (sub_pose - x_nodes[i, 0:3]).T
+                )
             subs_traj_sen_node.append(np.array(sub_traj_sen_node).squeeze())
         return subs_traj, subs_traj_sen, subs_traj_node, subs_traj_sen_node
     else:
         raise ValueError("`R_sb` not found in results. Cannot compute sensor frame.")
 
+
 def frame_args(duration):
     return {
-            "frame": {"duration": duration},
-            "mode": "immediate",
-            "fromcurrent": True,
-            "transition": {"duration": duration, "easing": "linear"},
-            }
+        "frame": {"duration": duration},
+        "mode": "immediate",
+        "fromcurrent": True,
+        "transition": {"duration": duration, "easing": "linear"},
+    }
+
 
 def plot_camera_view(result: OptimizationResults, params: Config) -> None:
-    title = r'$\text{Camera View}$'
+    title = r"$\text{Camera View}$"
     _, sub_positions_sen, _, sub_positions_sen_node = full_subject_traj_time(result, params)
     fig = go.Figure()
 
     # Create a cone plot
-    A = np.diag([1 / np.tan(np.pi / result.plotting_data['alpha_y']), 1 / np.tan(np.pi / result.plotting_data['alpha_x'])])  # Conic Matrix
+    A = np.diag(
+        [
+            1 / np.tan(np.pi / result.plotting_data["alpha_y"]),
+            1 / np.tan(np.pi / result.plotting_data["alpha_x"]),
+        ]
+    )  # Conic Matrix
 
     # Meshgrid
     if "moving_subject" in result:
@@ -168,24 +223,28 @@ def plot_camera_view(result: OptimizationResults, params: Config) -> None:
         x = np.linspace(-80, 80, 100)
         y = np.linspace(-80, 80, 100)
         z = np.linspace(-80, 80, 100)
- 
+
     X, Y = np.meshgrid(x, y)
 
     # Define the condition for the second order cone
     z = []
     for x_val in x:
         for y_val in y:
-            if result.plotting_data['norm_type'] == 'inf':
-                z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord = np.inf))
+            if result.plotting_data["norm_type"] == "inf":
+                z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord=np.inf))
             else:
-                z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord = result.plotting_data['norm_type']))
+                z.append(
+                    np.linalg.norm(
+                        A @ np.array([x_val, y_val]), axis=0, ord=result.plotting_data["norm_type"]
+                    )
+                )
     z = np.array(z)
 
     # Extract the points from the meshgrid
     X = X.flatten()
     Y = Y.flatten()
     Z = z.flatten()
-    
+
     # Normalize the coordinates by the Z value
     X = X / Z
     Y = Y / Z
@@ -200,25 +259,45 @@ def plot_camera_view(result: OptimizationResults, params: Config) -> None:
     Y = np.append(Y, Y[0])
 
     # Plot the points on a red scatter plot
-    fig.add_trace(go.Scatter(x=X, y=Y, mode='lines', line=dict(color='red', width=5), name = r'$\text{Camera Frame}$'))
+    fig.add_trace(
+        go.Scatter(
+            x=X, y=Y, mode="lines", line={"color": "red", "width": 5}, name=r"$\text{Camera Frame}$"
+        )
+    )
 
     sub_idx = 0
     for sub_traj in sub_positions_sen:
-        color = f'rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})'
+        color = f"rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})"
         sub_traj = np.array(sub_traj)
-        sub_traj[:,0] = sub_traj[:,0] / sub_traj[:,2]
-        sub_traj[:,1] = sub_traj[:,1] / sub_traj[:,2]
-        fig.add_trace(go.Scatter(x=sub_traj[:, 0], y=sub_traj[:, 1], mode='lines',line=dict(color=color, width=3), name = r'$\text{Subject }' + str(sub_idx) + '$'))
-        
+        sub_traj[:, 0] = sub_traj[:, 0] / sub_traj[:, 2]
+        sub_traj[:, 1] = sub_traj[:, 1] / sub_traj[:, 2]
+        fig.add_trace(
+            go.Scatter(
+                x=sub_traj[:, 0],
+                y=sub_traj[:, 1],
+                mode="lines",
+                line={"color": color, "width": 3},
+                name=r"$\text{Subject }" + str(sub_idx) + "$",
+            )
+        )
+
         sub_traj_nodal = np.array(sub_positions_sen_node[sub_idx])
-        sub_traj_nodal[:,0] = sub_traj_nodal[:,0] / sub_traj_nodal[:,2]
-        sub_traj_nodal[:,1] = sub_traj_nodal[:,1] / sub_traj_nodal[:,2]
-        fig.add_trace(go.Scatter(x=sub_traj_nodal[:, 0], y=sub_traj_nodal[:, 1], mode='markers',marker=dict(color=color, size=20), name = r'$\text{Subject }' + str(sub_idx) + r'\text{ Node}$'))
+        sub_traj_nodal[:, 0] = sub_traj_nodal[:, 0] / sub_traj_nodal[:, 2]
+        sub_traj_nodal[:, 1] = sub_traj_nodal[:, 1] / sub_traj_nodal[:, 2]
+        fig.add_trace(
+            go.Scatter(
+                x=sub_traj_nodal[:, 0],
+                y=sub_traj_nodal[:, 1],
+                mode="markers",
+                marker={"color": color, "size": 20},
+                name=r"$\text{Subject }" + str(sub_idx) + r"\text{ Node}$",
+            )
+        )
         sub_idx += 1
-    
+
     # Center the title for the plot
     fig.update_layout(title=title, title_x=0.5)
-    fig.update_layout(template='simple_white')
+    fig.update_layout(template="simple_white")
 
     # Increase title size
     fig.update_layout(title_font_size=20)
@@ -240,18 +319,23 @@ def plot_camera_view(result: OptimizationResults, params: Config) -> None:
 
     return fig
 
-def plot_camera_animation(result: dict, params:Config, path="") -> None:
-    title = r'$\text{Camera Animation}$'
+
+def plot_camera_animation(result: dict, params: Config, path="") -> None:
+    title = r"$\text{Camera Animation}$"
     _, subs_positions_sen, _, subs_positions_sen_node = full_subject_traj_time(result, params)
     fig = go.Figure()
 
     # Add blank plots for the subjects
     for _ in range(50):
-        fig.add_trace(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='blue', width=2)))
+        fig.add_trace(
+            go.Scatter3d(x=[], y=[], z=[], mode="lines+markers", line={"color": "blue", "width": 2})
+        )
 
     # Create a cone plot
     if "alpha_x" in result and "alpha_y" in result:
-        A = np.diag([1 / np.tan(np.pi / result["alpha_y"]), 1 / np.tan(np.pi / result["alpha_x"])])  # Conic Matrix
+        A = np.diag(
+            [1 / np.tan(np.pi / result["alpha_y"]), 1 / np.tan(np.pi / result["alpha_x"])]
+        )  # Conic Matrix
     else:
         raise ValueError("`alpha_x` and `alpha_y` not found in result dictionary.")
 
@@ -263,7 +347,17 @@ def plot_camera_animation(result: dict, params:Config, path="") -> None:
 
     # Define the condition for the second order cone
     if "norm_type" in result:
-        z = np.array([np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord=(np.inf if result["norm_type"] == 'inf' else result["norm_type"])) for x_val in x for y_val in y])
+        z = np.array(
+            [
+                np.linalg.norm(
+                    A @ np.array([x_val, y_val]),
+                    axis=0,
+                    ord=(np.inf if result["norm_type"] == "inf" else result["norm_type"]),
+                )
+                for x_val in x
+                for y_val in y
+            ]
+        )
     else:
         raise ValueError("`norm_type` not found in result dictionary.")
 
@@ -281,10 +375,22 @@ def plot_camera_animation(result: dict, params:Config, path="") -> None:
     X, Y = np.append(X, X[0]), np.append(Y, Y[0])
 
     # Plot the points on a red scatter plot
-    fig.add_trace(go.Scatter(x=X, y=Y, mode='lines', line=dict(color='red', width=5), name=r'$\text{Camera Frame}$', showlegend=False))
+    fig.add_trace(
+        go.Scatter(
+            x=X,
+            y=Y,
+            mode="lines",
+            line={"color": "red", "width": 5},
+            name=r"$\text{Camera Frame}$",
+            showlegend=False,
+        )
+    )
 
     # Choose a random color for each subject
-    colors = [f'rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})' for _ in subs_positions_sen]
+    colors = [
+        f"rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})"
+        for _ in subs_positions_sen
+    ]
 
     frames = []
     # Animate the subjects along their trajectories
@@ -296,14 +402,30 @@ def plot_camera_animation(result: dict, params:Config, path="") -> None:
             sub_traj_nodal = np.array(subs_positions_sen_node[sub_idx])
             sub_traj[:, 0] /= sub_traj[:, 2]
             sub_traj[:, 1] /= sub_traj[:, 2]
-            frame_data.append(go.Scatter(x=sub_traj[:i+1, 0], y=sub_traj[:i+1, 1], mode='lines', line=dict(color=color, width=3), showlegend=False))
+            frame_data.append(
+                go.Scatter(
+                    x=sub_traj[: i + 1, 0],
+                    y=sub_traj[: i + 1, 1],
+                    mode="lines",
+                    line={"color": color, "width": 3},
+                    showlegend=False,
+                )
+            )
 
             # Add in node when loop has reached point where node is present
             scaled_index = int((i // (sub_traj.shape[0] / sub_traj_nodal.shape[0])) + 1)
             sub_node_plot = sub_traj_nodal[:scaled_index]
             sub_node_plot[:, 0] /= sub_node_plot[:, 2]
             sub_node_plot[:, 1] /= sub_node_plot[:, 2]
-            frame_data.append(go.Scatter(x=sub_node_plot[:, 0], y=sub_node_plot[:, 1], mode='markers', marker=dict(color=color, size=10), showlegend=False))
+            frame_data.append(
+                go.Scatter(
+                    x=sub_node_plot[:, 0],
+                    y=sub_node_plot[:, 1],
+                    mode="markers",
+                    marker={"color": color, "size": 10},
+                    showlegend=False,
+                )
+            )
 
         frames.append(go.Frame(name=str(i), data=frame_data))
 
@@ -320,38 +442,42 @@ def plot_camera_animation(result: dict, params:Config, path="") -> None:
                     "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
                     "label": f.name,
                     "method": "animate",
-                } for f in fig.frames
-            ]
+                }
+                for f in fig.frames
+            ],
         }
     ]
 
-    fig.update_layout(updatemenus = [{"buttons":[
-                                        {
-                                            "args": [None, frame_args(50)],
-                                            "label": "Play",
-                                            "method": "animate",
-                                        },
-                                        {
-                                            "args": [[None], frame_args(0)],
-                                            "label": "Pause",
-                                            "method": "animate",
-                                    }],
-
-                                    "direction": "left",
-                                    "pad": {"r": 10, "t": 70},
-                                    "type": "buttons",
-                                    "x": 0.15,
-                                    "y": 0.15,
-                                }
-                            ],
-                            sliders=sliders
-                        )
+    fig.update_layout(
+        updatemenus=[
+            {
+                "buttons": [
+                    {
+                        "args": [None, frame_args(50)],
+                        "label": "Play",
+                        "method": "animate",
+                    },
+                    {
+                        "args": [[None], frame_args(0)],
+                        "label": "Pause",
+                        "method": "animate",
+                    },
+                ],
+                "direction": "left",
+                "pad": {"r": 10, "t": 70},
+                "type": "buttons",
+                "x": 0.15,
+                "y": 0.15,
+            }
+        ],
+        sliders=sliders,
+    )
 
     fig.update_layout(sliders=sliders)
-    
+
     # Center the title for the plot
     fig.update_layout(title=title, title_x=0.5)
-    fig.update_layout(template='plotly_dark')
+    fig.update_layout(template="plotly_dark")
     # Remove grid lines
     fig.update_xaxes(showgrid=False)
     fig.update_yaxes(showgrid=False)
@@ -370,9 +496,8 @@ def plot_camera_animation(result: dict, params:Config, path="") -> None:
     fig.update_xaxes(showticklabels=False)
     fig.update_yaxes(showticklabels=False)
     # Remove ticks enrtirely
-    fig.update_xaxes(ticks="outside", tickwidth=0, tickcolor='black')
-    fig.update_yaxes(ticks="outside", tickwidth=0, tickcolor='black')
-    
+    fig.update_xaxes(ticks="outside", tickwidth=0, tickcolor="black")
+    fig.update_yaxes(ticks="outside", tickwidth=0, tickcolor="black")
 
     # Set x axis and y axis limits
     fig.update_xaxes(range=[-1.1, 1.1])
@@ -384,456 +509,7 @@ def plot_camera_animation(result: dict, params:Config, path="") -> None:
     # Set aspect ratio to be equal
     # fig.update_layout(autosize=False, width=650, height=650)
     # Remove marigns
-    fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
-
-    # # Make the background transparent
-    # fig.update_layout(scene=dict(bgcolor='rgba(0,0,0,0)'))
-    # # Make the axis backgrounds transparent
-    # fig.update_layout(scene=dict(
-    #     xaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
-    #     yaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
-    #     zaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey')
-    # ))
-    # # Remove the plot background
-    # fig.update_layout(plot_bgcolor='rgba(0,0,0,0)')
-
-    # # Make ticks themselves transparent
-    # fig.update_layout(scene=dict(xaxis=dict(showticklabels=False), yaxis=dict(showticklabels=False), zaxis=dict(showticklabels=False)))
-
-    # # Remove the paper background
-    # fig.update_layout(paper_bgcolor='rgba(0,0,0,0)')
-
-    return fig  
-
-def plot_camera_polytope_animation(result: dict, params: Config, path="") -> None:
-    sub_positions_sen, _, sub_positions_sen_node = full_subject_traj_time(result["x_full"], params, False)
-    fig = go.Figure()
-
-    # Add blank plots for the subjects
-    for _ in range(500):
-        fig.add_trace(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='blue', width=2)))
-
-    # Create a cone plot
-    A = np.diag([1 / np.tan(np.pi / params.vp.alpha_y), 1 / np.tan(np.pi / params.vp.alpha_x)])  # Conic Matrix
-
-    # Meshgrid
-    range_limit = 10 if params.vp.tracking else 80
-    x = np.linspace(-range_limit, range_limit, 50)
-    y = np.linspace(-range_limit, range_limit, 50)
-    X, Y = np.meshgrid(x, y)
-
-    # Define the condition for the second order cone
-    z = np.array([np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord=(np.inf if params.vp.norm == 'inf' else params.vp.norm)) for x_val in x for y_val in y])
-
-    # Extract the points from the meshgrid
-    X, Y, Z = X.flatten(), Y.flatten(), z.flatten()
-
-    # Normalize the coordinates by the Z value
-    X, Y = X / Z, Y / Z
-
-    # Order the points so they are connected in radial order about the origin
-    order = np.argsort(np.arctan2(Y, X))
-    X, Y = X[order], Y[order]
-
-    # Repeat the first point to close the cone
-    X, Y = np.append(X, X[0]), np.append(Y, Y[0])
-
-    # Plot the points on a red scatter plot
-    fig.add_trace(go.Scatter(x=X, y=Y, mode='lines', line=dict(color='red', width=5), name=r'$\text{Camera Frame}$', showlegend=False))
-
-    # Choose a random color for each subject
-    [f'rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})' for _ in sub_positions_sen]
-
-    frames = []
-    # Animate the subjects along their trajectories
-    for i in range(0, len(sub_positions_sen[0]), 2):
-        frame_data = []
-        for sub_idx, sub_traj in enumerate(sub_positions_sen):
-            sub_traj = np.array(sub_traj)
-            sub_traj_nodal = np.array(sub_positions_sen_node[sub_idx])
-            sub_traj[:, 0] /= sub_traj[:, 2]
-            sub_traj[:, 1] /= sub_traj[:, 2]
-            frame_data.append(go.Scatter(x=sub_traj[:i+1, 0], y=sub_traj[:i+1, 1], mode='lines', line=dict(color='darkblue', width=3), showlegend=False))
-
-            # Add in node when loop has reached point where node is present
-            scaled_index = int((i // (sub_traj.shape[0] / sub_traj_nodal.shape[0])) + 1)
-            sub_node_plot = sub_traj_nodal[:scaled_index]
-            sub_node_plot[:, 0] /= sub_node_plot[:, 2]
-            sub_node_plot[:, 1] /= sub_node_plot[:, 2]
-            frame_data.append(go.Scatter(x=sub_node_plot[:, 0], y=sub_node_plot[:, 1], mode='markers', marker=dict(color='darkblue', size=10), showlegend=False))
-
-        # Connect each of the polytope vertices or subjects of polytope to eachother at each time i, don't use sub_traj_nodal
-        
-        # Connect 0 to 16, 8, 12
-        frame_data.append(go.Scatter(x=[sub_positions_sen[0][i][0]/sub_positions_sen[0][i][2], sub_positions_sen[16][i][0]/sub_positions_sen[16][i][2]], y=[sub_positions_sen[0][i][1]/sub_positions_sen[0][i][2], sub_positions_sen[16][i][1]/sub_positions_sen[16][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[0][i][0]/sub_positions_sen[0][i][2], sub_positions_sen[8][i][0]/sub_positions_sen[8][i][2]], y=[sub_positions_sen[0][i][1]/sub_positions_sen[0][i][2], sub_positions_sen[8][i][1]/sub_positions_sen[8][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[0][i][0]/sub_positions_sen[0][i][2], sub_positions_sen[12][i][0]/sub_positions_sen[12][i][2]], y=[sub_positions_sen[0][i][1]/sub_positions_sen[0][i][2], sub_positions_sen[12][i][1]/sub_positions_sen[12][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 1 to 17, 9, 12
-        frame_data.append(go.Scatter(x=[sub_positions_sen[1][i][0]/sub_positions_sen[1][i][2], sub_positions_sen[17][i][0]/sub_positions_sen[17][i][2]], y=[sub_positions_sen[1][i][1]/sub_positions_sen[1][i][2], sub_positions_sen[17][i][1]/sub_positions_sen[17][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[1][i][0]/sub_positions_sen[1][i][2], sub_positions_sen[9][i][0]/sub_positions_sen[9][i][2]], y=[sub_positions_sen[1][i][1]/sub_positions_sen[1][i][2], sub_positions_sen[9][i][1]/sub_positions_sen[9][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[1][i][0]/sub_positions_sen[1][i][2], sub_positions_sen[12][i][0]/sub_positions_sen[12][i][2]], y=[sub_positions_sen[1][i][1]/sub_positions_sen[1][i][2], sub_positions_sen[12][i][1]/sub_positions_sen[12][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 2 to 16, 13, 10
-        frame_data.append(go.Scatter(x=[sub_positions_sen[2][i][0]/sub_positions_sen[2][i][2], sub_positions_sen[16][i][0]/sub_positions_sen[16][i][2]], y=[sub_positions_sen[2][i][1]/sub_positions_sen[2][i][2], sub_positions_sen[16][i][1]/sub_positions_sen[16][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[2][i][0]/sub_positions_sen[2][i][2], sub_positions_sen[13][i][0]/sub_positions_sen[13][i][2]], y=[sub_positions_sen[2][i][1]/sub_positions_sen[2][i][2], sub_positions_sen[13][i][1]/sub_positions_sen[13][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[2][i][0]/sub_positions_sen[2][i][2], sub_positions_sen[10][i][0]/sub_positions_sen[10][i][2]], y=[sub_positions_sen[2][i][1]/sub_positions_sen[2][i][2], sub_positions_sen[10][i][1]/sub_positions_sen[10][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 3 to 17, 11, 13
-        frame_data.append(go.Scatter(x=[sub_positions_sen[3][i][0]/sub_positions_sen[3][i][2], sub_positions_sen[17][i][0]/sub_positions_sen[17][i][2]], y=[sub_positions_sen[3][i][1]/sub_positions_sen[3][i][2], sub_positions_sen[17][i][1]/sub_positions_sen[17][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[3][i][0]/sub_positions_sen[3][i][2], sub_positions_sen[11][i][0]/sub_positions_sen[11][i][2]], y=[sub_positions_sen[3][i][1]/sub_positions_sen[3][i][2], sub_positions_sen[11][i][1]/sub_positions_sen[11][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[3][i][0]/sub_positions_sen[3][i][2], sub_positions_sen[13][i][0]/sub_positions_sen[13][i][2]], y=[sub_positions_sen[3][i][1]/sub_positions_sen[3][i][2], sub_positions_sen[13][i][1]/sub_positions_sen[13][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 4 to 18, 14, 8
-        frame_data.append(go.Scatter(x=[sub_positions_sen[4][i][0]/sub_positions_sen[4][i][2], sub_positions_sen[18][i][0]/sub_positions_sen[18][i][2]], y=[sub_positions_sen[4][i][1]/sub_positions_sen[4][i][2], sub_positions_sen[18][i][1]/sub_positions_sen[18][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[4][i][0]/sub_positions_sen[4][i][2], sub_positions_sen[14][i][0]/sub_positions_sen[14][i][2]], y=[sub_positions_sen[4][i][1]/sub_positions_sen[4][i][2], sub_positions_sen[14][i][1]/sub_positions_sen[14][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[4][i][0]/sub_positions_sen[4][i][2], sub_positions_sen[8][i][0]/sub_positions_sen[8][i][2]], y=[sub_positions_sen[4][i][1]/sub_positions_sen[4][i][2], sub_positions_sen[8][i][1]/sub_positions_sen[8][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        
-        # Connect 5 to 19, 9, 14
-        frame_data.append(go.Scatter(x=[sub_positions_sen[5][i][0]/sub_positions_sen[5][i][2], sub_positions_sen[19][i][0]/sub_positions_sen[19][i][2]], y=[sub_positions_sen[5][i][1]/sub_positions_sen[5][i][2], sub_positions_sen[19][i][1]/sub_positions_sen[19][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[5][i][0]/sub_positions_sen[5][i][2], sub_positions_sen[9][i][0]/sub_positions_sen[9][i][2]], y=[sub_positions_sen[5][i][1]/sub_positions_sen[5][i][2], sub_positions_sen[9][i][1]/sub_positions_sen[9][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[5][i][0]/sub_positions_sen[5][i][2], sub_positions_sen[14][i][0]/sub_positions_sen[14][i][2]], y=[sub_positions_sen[5][i][1]/sub_positions_sen[5][i][2], sub_positions_sen[14][i][1]/sub_positions_sen[14][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 6 to 18, 15, 10
-        frame_data.append(go.Scatter(x=[sub_positions_sen[6][i][0]/sub_positions_sen[6][i][2], sub_positions_sen[18][i][0]/sub_positions_sen[18][i][2]], y=[sub_positions_sen[6][i][1]/sub_positions_sen[6][i][2], sub_positions_sen[18][i][1]/sub_positions_sen[18][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[6][i][0]/sub_positions_sen[6][i][2], sub_positions_sen[15][i][0]/sub_positions_sen[15][i][2]], y=[sub_positions_sen[6][i][1]/sub_positions_sen[6][i][2], sub_positions_sen[15][i][1]/sub_positions_sen[15][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[6][i][0]/sub_positions_sen[6][i][2], sub_positions_sen[10][i][0]/sub_positions_sen[10][i][2]], y=[sub_positions_sen[6][i][1]/sub_positions_sen[6][i][2], sub_positions_sen[10][i][1]/sub_positions_sen[10][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 7 to 19, 11, 15
-        frame_data.append(go.Scatter(x=[sub_positions_sen[7][i][0]/sub_positions_sen[7][i][2], sub_positions_sen[19][i][0]/sub_positions_sen[19][i][2]], y=[sub_positions_sen[7][i][1]/sub_positions_sen[7][i][2], sub_positions_sen[19][i][1]/sub_positions_sen[19][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[7][i][0]/sub_positions_sen[7][i][2], sub_positions_sen[11][i][0]/sub_positions_sen[11][i][2]], y=[sub_positions_sen[7][i][1]/sub_positions_sen[7][i][2], sub_positions_sen[11][i][1]/sub_positions_sen[11][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[7][i][0]/sub_positions_sen[7][i][2], sub_positions_sen[15][i][0]/sub_positions_sen[15][i][2]], y=[sub_positions_sen[7][i][1]/sub_positions_sen[7][i][2], sub_positions_sen[15][i][1]/sub_positions_sen[15][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 8 to 0, 4, 12 -> 10 BAD
-        frame_data.append(go.Scatter(x=[sub_positions_sen[8][i][0]/sub_positions_sen[8][i][2], sub_positions_sen[0][i][0]/sub_positions_sen[0][i][2]], y=[sub_positions_sen[8][i][1]/sub_positions_sen[8][i][2], sub_positions_sen[0][i][1]/sub_positions_sen[0][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[8][i][0]/sub_positions_sen[8][i][2], sub_positions_sen[4][i][0]/sub_positions_sen[4][i][2]], y=[sub_positions_sen[8][i][1]/sub_positions_sen[8][i][2], sub_positions_sen[4][i][1]/sub_positions_sen[4][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[8][i][0]/sub_positions_sen[8][i][2], sub_positions_sen[10][i][0]/sub_positions_sen[10][i][2]], y=[sub_positions_sen[8][i][1]/sub_positions_sen[8][i][2], sub_positions_sen[10][i][1]/sub_positions_sen[10][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 9 to 1, 5, 13 -> 11 BAD
-        frame_data.append(go.Scatter(x=[sub_positions_sen[9][i][0]/sub_positions_sen[9][i][2], sub_positions_sen[1][i][0]/sub_positions_sen[1][i][2]], y=[sub_positions_sen[9][i][1]/sub_positions_sen[9][i][2], sub_positions_sen[1][i][1]/sub_positions_sen[1][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[9][i][0]/sub_positions_sen[9][i][2], sub_positions_sen[5][i][0]/sub_positions_sen[5][i][2]], y=[sub_positions_sen[9][i][1]/sub_positions_sen[9][i][2], sub_positions_sen[5][i][1]/sub_positions_sen[5][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[9][i][0]/sub_positions_sen[9][i][2], sub_positions_sen[11][i][0]/sub_positions_sen[11][i][2]], y=[sub_positions_sen[9][i][1]/sub_positions_sen[9][i][2], sub_positions_sen[11][i][1]/sub_positions_sen[11][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 10 to 8, 2, 6
-        frame_data.append(go.Scatter(x=[sub_positions_sen[10][i][0]/sub_positions_sen[10][i][2], sub_positions_sen[8][i][0]/sub_positions_sen[8][i][2]], y=[sub_positions_sen[10][i][1]/sub_positions_sen[10][i][2], sub_positions_sen[8][i][1]/sub_positions_sen[8][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[10][i][0]/sub_positions_sen[10][i][2], sub_positions_sen[2][i][0]/sub_positions_sen[2][i][2]], y=[sub_positions_sen[10][i][1]/sub_positions_sen[10][i][2], sub_positions_sen[2][i][1]/sub_positions_sen[2][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[10][i][0]/sub_positions_sen[10][i][2], sub_positions_sen[6][i][0]/sub_positions_sen[6][i][2]], y=[sub_positions_sen[10][i][1]/sub_positions_sen[10][i][2], sub_positions_sen[6][i][1]/sub_positions_sen[6][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 11 to 3, 7, 15 -> 9 BAD
-        frame_data.append(go.Scatter(x=[sub_positions_sen[11][i][0]/sub_positions_sen[11][i][2], sub_positions_sen[3][i][0]/sub_positions_sen[3][i][2]], y=[sub_positions_sen[11][i][1]/sub_positions_sen[11][i][2], sub_positions_sen[3][i][1]/sub_positions_sen[3][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[11][i][0]/sub_positions_sen[11][i][2], sub_positions_sen[7][i][0]/sub_positions_sen[7][i][2]], y=[sub_positions_sen[11][i][1]/sub_positions_sen[11][i][2], sub_positions_sen[7][i][1]/sub_positions_sen[7][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[11][i][0]/sub_positions_sen[11][i][2], sub_positions_sen[9][i][0]/sub_positions_sen[9][i][2]], y=[sub_positions_sen[11][i][1]/sub_positions_sen[11][i][2], sub_positions_sen[9][i][1]/sub_positions_sen[9][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 12 to 0, 1, 8 -> 14 BAD
-        frame_data.append(go.Scatter(x=[sub_positions_sen[12][i][0]/sub_positions_sen[12][i][2], sub_positions_sen[0][i][0]/sub_positions_sen[0][i][2]], y=[sub_positions_sen[12][i][1]/sub_positions_sen[12][i][2], sub_positions_sen[0][i][1]/sub_positions_sen[0][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[12][i][0]/sub_positions_sen[12][i][2], sub_positions_sen[1][i][0]/sub_positions_sen[1][i][2]], y=[sub_positions_sen[12][i][1]/sub_positions_sen[12][i][2], sub_positions_sen[1][i][1]/sub_positions_sen[1][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[12][i][0]/sub_positions_sen[12][i][2], sub_positions_sen[14][i][0]/sub_positions_sen[14][i][2]], y=[sub_positions_sen[12][i][1]/sub_positions_sen[12][i][2], sub_positions_sen[14][i][1]/sub_positions_sen[14][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 13 to 2, 3, 9 -> 15 BAD
-        frame_data.append(go.Scatter(x=[sub_positions_sen[13][i][0]/sub_positions_sen[13][i][2], sub_positions_sen[2][i][0]/sub_positions_sen[2][i][2]], y=[sub_positions_sen[13][i][1]/sub_positions_sen[13][i][2], sub_positions_sen[2][i][1]/sub_positions_sen[2][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[13][i][0]/sub_positions_sen[13][i][2], sub_positions_sen[3][i][0]/sub_positions_sen[3][i][2]], y=[sub_positions_sen[13][i][1]/sub_positions_sen[13][i][2], sub_positions_sen[3][i][1]/sub_positions_sen[3][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[13][i][0]/sub_positions_sen[13][i][2], sub_positions_sen[15][i][0]/sub_positions_sen[15][i][2]], y=[sub_positions_sen[13][i][1]/sub_positions_sen[13][i][2], sub_positions_sen[15][i][1]/sub_positions_sen[15][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 14 to 4, 5, 10 -> 12 BAD
-        frame_data.append(go.Scatter(x=[sub_positions_sen[14][i][0]/sub_positions_sen[14][i][2], sub_positions_sen[4][i][0]/sub_positions_sen[4][i][2]], y=[sub_positions_sen[14][i][1]/sub_positions_sen[14][i][2], sub_positions_sen[4][i][1]/sub_positions_sen[4][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[14][i][0]/sub_positions_sen[14][i][2], sub_positions_sen[5][i][0]/sub_positions_sen[5][i][2]], y=[sub_positions_sen[14][i][1]/sub_positions_sen[14][i][2], sub_positions_sen[5][i][1]/sub_positions_sen[5][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[14][i][0]/sub_positions_sen[14][i][2], sub_positions_sen[12][i][0]/sub_positions_sen[12][i][2]], y=[sub_positions_sen[14][i][1]/sub_positions_sen[14][i][2], sub_positions_sen[12][i][1]/sub_positions_sen[12][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 15 to 13, 6, 7 
-        frame_data.append(go.Scatter(x=[sub_positions_sen[15][i][0]/sub_positions_sen[15][i][2], sub_positions_sen[13][i][0]/sub_positions_sen[13][i][2]], y=[sub_positions_sen[15][i][1]/sub_positions_sen[15][i][2], sub_positions_sen[13][i][1]/sub_positions_sen[13][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[15][i][0]/sub_positions_sen[15][i][2], sub_positions_sen[6][i][0]/sub_positions_sen[6][i][2]], y=[sub_positions_sen[15][i][1]/sub_positions_sen[15][i][2], sub_positions_sen[6][i][1]/sub_positions_sen[6][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[15][i][0]/sub_positions_sen[15][i][2], sub_positions_sen[7][i][0]/sub_positions_sen[7][i][2]], y=[sub_positions_sen[15][i][1]/sub_positions_sen[15][i][2], sub_positions_sen[7][i][1]/sub_positions_sen[7][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 16 to 0, 2, 17
-        frame_data.append(go.Scatter(x=[sub_positions_sen[16][i][0]/sub_positions_sen[16][i][2], sub_positions_sen[0][i][0]/sub_positions_sen[0][i][2]], y=[sub_positions_sen[16][i][1]/sub_positions_sen[16][i][2], sub_positions_sen[0][i][1]/sub_positions_sen[0][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[16][i][0]/sub_positions_sen[16][i][2], sub_positions_sen[2][i][0]/sub_positions_sen[2][i][2]], y=[sub_positions_sen[16][i][1]/sub_positions_sen[16][i][2], sub_positions_sen[2][i][1]/sub_positions_sen[2][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[16][i][0]/sub_positions_sen[16][i][2], sub_positions_sen[17][i][0]/sub_positions_sen[17][i][2]], y=[sub_positions_sen[16][i][1]/sub_positions_sen[16][i][2], sub_positions_sen[17][i][1]/sub_positions_sen[17][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 17 to 1, 3, 16
-        frame_data.append(go.Scatter(x=[sub_positions_sen[17][i][0]/sub_positions_sen[17][i][2], sub_positions_sen[1][i][0]/sub_positions_sen[1][i][2]], y=[sub_positions_sen[17][i][1]/sub_positions_sen[17][i][2], sub_positions_sen[1][i][1]/sub_positions_sen[1][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[17][i][0]/sub_positions_sen[17][i][2], sub_positions_sen[3][i][0]/sub_positions_sen[3][i][2]], y=[sub_positions_sen[17][i][1]/sub_positions_sen[17][i][2], sub_positions_sen[3][i][1]/sub_positions_sen[3][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[17][i][0]/sub_positions_sen[17][i][2], sub_positions_sen[16][i][0]/sub_positions_sen[16][i][2]], y=[sub_positions_sen[17][i][1]/sub_positions_sen[17][i][2], sub_positions_sen[16][i][1]/sub_positions_sen[16][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 18 to 4, 6, 19
-        frame_data.append(go.Scatter(x=[sub_positions_sen[18][i][0]/sub_positions_sen[18][i][2], sub_positions_sen[4][i][0]/sub_positions_sen[4][i][2]], y=[sub_positions_sen[18][i][1]/sub_positions_sen[18][i][2], sub_positions_sen[4][i][1]/sub_positions_sen[4][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[18][i][0]/sub_positions_sen[18][i][2], sub_positions_sen[6][i][0]/sub_positions_sen[6][i][2]], y=[sub_positions_sen[18][i][1]/sub_positions_sen[18][i][2], sub_positions_sen[6][i][1]/sub_positions_sen[6][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[18][i][0]/sub_positions_sen[18][i][2], sub_positions_sen[19][i][0]/sub_positions_sen[19][i][2]], y=[sub_positions_sen[18][i][1]/sub_positions_sen[18][i][2], sub_positions_sen[19][i][1]/sub_positions_sen[19][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 19 to 5, 7, 18
-        frame_data.append(go.Scatter(x=[sub_positions_sen[19][i][0]/sub_positions_sen[19][i][2], sub_positions_sen[5][i][0]/sub_positions_sen[5][i][2]], y=[sub_positions_sen[19][i][1]/sub_positions_sen[19][i][2], sub_positions_sen[5][i][1]/sub_positions_sen[5][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[19][i][0]/sub_positions_sen[19][i][2], sub_positions_sen[7][i][0]/sub_positions_sen[7][i][2]], y=[sub_positions_sen[19][i][1]/sub_positions_sen[19][i][2], sub_positions_sen[7][i][1]/sub_positions_sen[7][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        frame_data.append(go.Scatter(x=[sub_positions_sen[19][i][0]/sub_positions_sen[19][i][2], sub_positions_sen[18][i][0]/sub_positions_sen[18][i][2]], y=[sub_positions_sen[19][i][1]/sub_positions_sen[19][i][2], sub_positions_sen[18][i][1]/sub_positions_sen[18][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        frames.append(go.Frame(name=str(i), data=frame_data))
-
-    fig.frames = frames
-
-    sliders = [
-        {
-            "pad": {"b": 10, "t": 60},
-            "len": 0.8,
-            "x": 0.15,
-            "y": 0.15,
-            "steps": [
-                {
-                    "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
-                    "label": f.name,
-                    "method": "animate",
-                } for f in fig.frames
-            ]
-        }
-    ]
-
-    fig.update_layout(updatemenus = [{"buttons":[
-                                        {
-                                            "args": [None, frame_args(50)],
-                                            "label": "Play",
-                                            "method": "animate",
-                                        },
-                                        {
-                                            "args": [[None], frame_args(0)],
-                                            "label": "Pause",
-                                            "method": "animate",
-                                    }],
-
-                                    "direction": "left",
-                                    "pad": {"r": 10, "t": 70},
-                                    "type": "buttons",
-                                    "x": 0.15,
-                                    "y": 0.15,
-                                }
-                            ],
-                            sliders=sliders
-                        )
-
-    fig.update_layout(sliders=sliders)
-    
-    # Center the title for the plot
-    # fig.update_layout(title=title, title_x=0.5)
-    fig.update_layout(template='plotly_dark')
-    # Remove grid lines
-    fig.update_xaxes(showgrid=False)
-    fig.update_yaxes(showgrid=False)
-
-    # Remove center line
-    fig.update_xaxes(zeroline=False)
-    fig.update_yaxes(zeroline=False)
-
-    # Increase title size
-    fig.update_layout(title_font_size=20)
-
-    # Increase legend size
-    fig.update_layout(legend_font_size=15)
-
-    # Remove the axis numbers
-    fig.update_xaxes(showticklabels=False)
-    fig.update_yaxes(showticklabels=False)
-    # Remove ticks enrtirely
-    fig.update_xaxes(ticks="outside", tickwidth=0, tickcolor='black')
-    fig.update_yaxes(ticks="outside", tickwidth=0, tickcolor='black')
-    
-
-    # Set x axis and y axis limits
-    fig.update_xaxes(range=[-1.1, 1.1])
-    fig.update_yaxes(range=[-1.1, 1.1])
-
-    # Move Title down
-    fig.update_layout(title_y=0.9)
-
-    # Set aspect ratio to be equal
-    # fig.update_layout(autosize=False, width=650, height=650)
-    # Remove marigns
-    fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
-
-    # # Make the background transparent
-    # fig.update_layout(scene=dict(bgcolor='rgba(0,0,0,0)'))
-    # # Make the axis backgrounds transparent
-    # fig.update_layout(scene=dict(
-    #     xaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
-    #     yaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
-    #     zaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey')
-    # ))
-    # # Remove the plot background
-    # fig.update_layout(plot_bgcolor='rgba(0,0,0,0)')
-
-    # # Make ticks themselves transparent
-    # fig.update_layout(scene=dict(xaxis=dict(showticklabels=False), yaxis=dict(showticklabels=False), zaxis=dict(showticklabels=False)))
-
-    # # Remove the paper background
-    # fig.update_layout(paper_bgcolor='rgba(0,0,0,0)')
-    return fig  
-
-def plot_conic_view_animation(result: dict, params: Config, path="") -> None:
-    sub_positions_sen, _, sub_positions_sen_node = full_subject_traj_time(result["x_full"], params, False)
-    fig = go.Figure()
-    for i in range(100):
-        fig.add_trace(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='blue', width = 2)))
-
-
-    # Create a cone plot
-    if "alpha_x" in result and "alpha_y" in result:
-        A = np.diag([1 / np.tan(np.pi / result["alpha_y"]), 1 / np.tan(np.pi / result["alpha_x"])])  # Conic Matrix
-    else:
-        raise ValueError("`alpha_x` and `alpha_y` not found in result dictionary.")
-
-    # Meshgrid
-    if "moving_subject" in result:
-        x = np.linspace(-6, 6, 20)
-        y = np.linspace(-6, 6, 20)
-        z = np.linspace(-6, 6, 20)
-    else:
-        x = np.linspace(-80, 80, 20)
-        y = np.linspace(-80, 80, 20)
-        z = np.linspace(-80, 80, 20)
- 
-    X, Y = np.meshgrid(x, y)
-
-    if "norm_type" in result:
-        # Define the condition for the second order cone
-        z = []
-        for x_val in x:
-            for y_val in y:
-                if result["norm_type"] == 'inf':
-                    z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord = np.inf))
-                else:
-                    z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord = result["norm_type"]))
-        z = np.array(z)
-    
-        fig.add_trace(go.Surface(x=X, y=Y, z=z.reshape(20,20), opacity = 0.25, showscale=False))
-        frames = []
-
-        if "moving_subject" in result:
-            x_vals = 12 * np.ones_like(np.array(sub_positions_sen[0])[:,0])
-            y_vals = 12 * np.ones_like(np.array(sub_positions_sen[0])[:,0])
-        else:
-            x_vals = 110 * np.ones_like(np.array(sub_positions_sen[0])[:,0])
-            y_vals = 110 * np.ones_like(np.array(sub_positions_sen[0])[:,0])
-
-        # Add the projection of the second order cone onto the x-z plane
-        z = []
-        for x_val in x:
-            if result["norm_type"] == 'inf':
-                z.append(np.linalg.norm(A @ np.array([x_val, 0]), axis=0, ord = np.inf))
-            else:
-                z.append(np.linalg.norm(A @ np.array([x_val, 0]), axis=0, ord = result["norm_type"]))
-        z = np.array(z)
-        fig.add_trace(go.Scatter3d(y=x, x=y_vals, z=z, mode='lines', showlegend=False, line=dict(color='grey', width=3)))
-
-        # Add the projection of the second order cone onto the y-z plane
-        z = []
-        for y_val in y:
-            if result["norm_type"] == 'inf':
-                z.append(np.linalg.norm(A @ np.array([0, y_val]), axis=0, ord = np.inf))
-            else:
-                z.append(np.linalg.norm(A @ np.array([0, y_val]), axis=0, ord = result["norm_type"]))
-        z = np.array(z)
-        fig.add_trace(go.Scatter3d(y=x_vals, x=y, z=z, mode='lines', showlegend=False, line=dict(color='grey', width=3)))
-    else:
-        raise ValueError("`norm_type` not found in result dictionary.")
-
-    # Choose a random color for each subject
-    colors = []
-    for sub_traj in sub_positions_sen:
-        color = f'rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})'
-        colors.append(color)
-
-    sub_node_plot = []
-    for i in range(0, len(sub_positions_sen[0]), 4):
-        frame = go.Frame(name = str(i))
-        data = []
-        sub_idx = 0
-
-        for sub_traj in sub_positions_sen:
-            sub_traj = np.array(sub_traj)
-            sub_traj_nodal = np.array(sub_positions_sen_node[sub_idx])
-
-            if "moving_subject" in result:
-                x_vals = 12 * np.ones_like(sub_traj[:i+1, 0])
-                y_vals = 12 * np.ones_like(sub_traj[:i+1, 0])
-            else:
-                x_vals = 110 * np.ones_like(sub_traj[:i+1, 0])
-                y_vals = 110 * np.ones_like(sub_traj[:i+1, 0])
-
-            data.append(go.Scatter3d(x = sub_traj[:i+1, 0], y = y_vals, z=sub_traj[:i+1, 2], mode='lines', showlegend=False, line=dict(color='grey', width=4)))
-            data.append(go.Scatter3d(x = x_vals, y = sub_traj[:i+1, 1], z=sub_traj[:i+1, 2], mode='lines', showlegend=False, line=dict(color='grey', width=4)))
-
-            # Add subject position to data
-            # color = f'rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})'
-            sub_traj = np.array(sub_traj)
-            data.append(go.Scatter3d(x=sub_traj[:i+1, 0], y=sub_traj[:i+1, 1], z=sub_traj[:i+1, 2], mode='lines',line=dict(color=colors[sub_idx], width=3), showlegend=False))
-
-            # Add in node when loop has reached point where node is present
-            scaled_index = int((i // (sub_traj.shape[0]/sub_traj_nodal.shape[0])) + 1)
-            sub_node_plot = sub_traj_nodal[:scaled_index]
-
-            data.append(go.Scatter3d(x=sub_node_plot[:, 0], y=sub_node_plot[:, 1], z=sub_node_plot[:, 2], mode='markers', marker=dict(color=colors[sub_idx], size=5), showlegend=False))
-
-            sub_idx += 1
-        
-        frame.data = data
-        frames.append(frame)
-    
-    fig.frames = frames
-
-    sliders = [
-        {
-            "pad": {"b": 10, "t": 60},
-            "len": 0.8,
-            "x": 0.15,
-            "y": 0.32,
-            "steps": [
-                {
-                    "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
-                    "label": f.name,
-                    "method": "animate",
-                } for f in fig.frames
-            ]
-        }
-    ]
-
-    fig.update_layout(updatemenus = [{"buttons":[
-                                        {
-                                            "args": [None, frame_args(50)],
-                                            "label": "Play",
-                                            "method": "animate",
-                                        },
-                                        {
-                                            "args": [[None], frame_args(0)],
-                                            "label": "Pause",
-                                            "method": "animate",
-                                    }],
-
-                                    "direction": "left",
-                                    "pad": {"r": 10, "t": 70},
-                                    "type": "buttons",
-                                    "x": 0.15,
-                                    "y": 0.32,
-                                }
-                            ],
-                            sliders=sliders
-                        )
-
-    fig.update_layout(sliders=sliders)
-
-    # Set camera position
-    fig.update_layout(scene_camera=dict(up=dict(x=0, y=0, z=10), center=dict(x=-2, y=0, z=-3), eye=dict(x=-28, y=-22, z=15)))
-
-    # Set axis labels 
-    fig.update_layout(scene=dict(xaxis_title='x (m)', yaxis_title='y (m)', zaxis_title='z (m)'))
-
-    fig.update_layout(template='plotly_dark')
-    
-    # Make only the grid lines thicker in the template
-    fig.update_layout(scene=dict(xaxis=dict(showgrid=True, gridwidth=5),
-                                yaxis=dict(showgrid=True, gridwidth=5),
-                                zaxis=dict(showgrid=True, gridwidth=5)))
-
-
-    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=20, y=20, z=20)))
-    # fig.update_layout(autosize=False, width=600, height=600)
-
-    # Remove marigns
-    fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
+    fig.update_layout(margin={"l": 0, "r": 0, "b": 0, "t": 0})
 
     # # Make the background transparent
     # fig.update_layout(scene=dict(bgcolor='rgba(0,0,0,0)'))
@@ -854,18 +530,1173 @@ def plot_conic_view_animation(result: dict, params: Config, path="") -> None:
 
     return fig
 
-def plot_conic_view_polytope_animation(result: dict, params: Config, path="") -> None:
-    sub_positions_sen, _, sub_positions_sen_node = full_subject_traj_time(result["x_full"], params, False)
-    fig = go.Figure()
-    for i in range(500):
-        fig.add_trace(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='blue', width = 2)))
 
+def plot_camera_polytope_animation(result: dict, params: Config, path="") -> None:
+    sub_positions_sen, _, sub_positions_sen_node = full_subject_traj_time(
+        result["x_full"], params, False
+    )
+    fig = go.Figure()
+
+    # Add blank plots for the subjects
+    for _ in range(500):
+        fig.add_trace(
+            go.Scatter3d(x=[], y=[], z=[], mode="lines+markers", line={"color": "blue", "width": 2})
+        )
 
     # Create a cone plot
-    A = np.diag([1 / np.tan(np.pi / params.vp.alpha_y), 1 / np.tan(np.pi / params.vp.alpha_x)])  # Conic Matrix
+    A = np.diag(
+        [1 / np.tan(np.pi / params.vp.alpha_y), 1 / np.tan(np.pi / params.vp.alpha_x)]
+    )  # Conic Matrix
 
     # Meshgrid
-    if params.vp.tracking:
+    range_limit = 10 if params.vp.tracking else 80
+    x = np.linspace(-range_limit, range_limit, 50)
+    y = np.linspace(-range_limit, range_limit, 50)
+    X, Y = np.meshgrid(x, y)
+
+    # Define the condition for the second order cone
+    z = np.array(
+        [
+            np.linalg.norm(
+                A @ np.array([x_val, y_val]),
+                axis=0,
+                ord=(np.inf if params.vp.norm == "inf" else params.vp.norm),
+            )
+            for x_val in x
+            for y_val in y
+        ]
+    )
+
+    # Extract the points from the meshgrid
+    X, Y, Z = X.flatten(), Y.flatten(), z.flatten()
+
+    # Normalize the coordinates by the Z value
+    X, Y = X / Z, Y / Z
+
+    # Order the points so they are connected in radial order about the origin
+    order = np.argsort(np.arctan2(Y, X))
+    X, Y = X[order], Y[order]
+
+    # Repeat the first point to close the cone
+    X, Y = np.append(X, X[0]), np.append(Y, Y[0])
+
+    # Plot the points on a red scatter plot
+    fig.add_trace(
+        go.Scatter(
+            x=X,
+            y=Y,
+            mode="lines",
+            line={"color": "red", "width": 5},
+            name=r"$\text{Camera Frame}$",
+            showlegend=False,
+        )
+    )
+
+    # Choose a random color for each subject
+    [
+        f"rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})"
+        for _ in sub_positions_sen
+    ]
+
+    frames = []
+    # Animate the subjects along their trajectories
+    for i in range(0, len(sub_positions_sen[0]), 2):
+        frame_data = []
+        for sub_idx, sub_traj in enumerate(sub_positions_sen):
+            sub_traj = np.array(sub_traj)
+            sub_traj_nodal = np.array(sub_positions_sen_node[sub_idx])
+            sub_traj[:, 0] /= sub_traj[:, 2]
+            sub_traj[:, 1] /= sub_traj[:, 2]
+            frame_data.append(
+                go.Scatter(
+                    x=sub_traj[: i + 1, 0],
+                    y=sub_traj[: i + 1, 1],
+                    mode="lines",
+                    line={"color": "darkblue", "width": 3},
+                    showlegend=False,
+                )
+            )
+
+            # Add in node when loop has reached point where node is present
+            scaled_index = int((i // (sub_traj.shape[0] / sub_traj_nodal.shape[0])) + 1)
+            sub_node_plot = sub_traj_nodal[:scaled_index]
+            sub_node_plot[:, 0] /= sub_node_plot[:, 2]
+            sub_node_plot[:, 1] /= sub_node_plot[:, 2]
+            frame_data.append(
+                go.Scatter(
+                    x=sub_node_plot[:, 0],
+                    y=sub_node_plot[:, 1],
+                    mode="markers",
+                    marker={"color": "darkblue", "size": 10},
+                    showlegend=False,
+                )
+            )
+
+        # Connect each of the polytope vertices or subjects of polytope to eachother at each time i, don't use sub_traj_nodal
+
+        # Connect 0 to 16, 8, 12
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[0][i][0] / sub_positions_sen[0][i][2],
+                    sub_positions_sen[16][i][0] / sub_positions_sen[16][i][2],
+                ],
+                y=[
+                    sub_positions_sen[0][i][1] / sub_positions_sen[0][i][2],
+                    sub_positions_sen[16][i][1] / sub_positions_sen[16][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[0][i][0] / sub_positions_sen[0][i][2],
+                    sub_positions_sen[8][i][0] / sub_positions_sen[8][i][2],
+                ],
+                y=[
+                    sub_positions_sen[0][i][1] / sub_positions_sen[0][i][2],
+                    sub_positions_sen[8][i][1] / sub_positions_sen[8][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[0][i][0] / sub_positions_sen[0][i][2],
+                    sub_positions_sen[12][i][0] / sub_positions_sen[12][i][2],
+                ],
+                y=[
+                    sub_positions_sen[0][i][1] / sub_positions_sen[0][i][2],
+                    sub_positions_sen[12][i][1] / sub_positions_sen[12][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 1 to 17, 9, 12
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[1][i][0] / sub_positions_sen[1][i][2],
+                    sub_positions_sen[17][i][0] / sub_positions_sen[17][i][2],
+                ],
+                y=[
+                    sub_positions_sen[1][i][1] / sub_positions_sen[1][i][2],
+                    sub_positions_sen[17][i][1] / sub_positions_sen[17][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[1][i][0] / sub_positions_sen[1][i][2],
+                    sub_positions_sen[9][i][0] / sub_positions_sen[9][i][2],
+                ],
+                y=[
+                    sub_positions_sen[1][i][1] / sub_positions_sen[1][i][2],
+                    sub_positions_sen[9][i][1] / sub_positions_sen[9][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[1][i][0] / sub_positions_sen[1][i][2],
+                    sub_positions_sen[12][i][0] / sub_positions_sen[12][i][2],
+                ],
+                y=[
+                    sub_positions_sen[1][i][1] / sub_positions_sen[1][i][2],
+                    sub_positions_sen[12][i][1] / sub_positions_sen[12][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 2 to 16, 13, 10
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[2][i][0] / sub_positions_sen[2][i][2],
+                    sub_positions_sen[16][i][0] / sub_positions_sen[16][i][2],
+                ],
+                y=[
+                    sub_positions_sen[2][i][1] / sub_positions_sen[2][i][2],
+                    sub_positions_sen[16][i][1] / sub_positions_sen[16][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[2][i][0] / sub_positions_sen[2][i][2],
+                    sub_positions_sen[13][i][0] / sub_positions_sen[13][i][2],
+                ],
+                y=[
+                    sub_positions_sen[2][i][1] / sub_positions_sen[2][i][2],
+                    sub_positions_sen[13][i][1] / sub_positions_sen[13][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[2][i][0] / sub_positions_sen[2][i][2],
+                    sub_positions_sen[10][i][0] / sub_positions_sen[10][i][2],
+                ],
+                y=[
+                    sub_positions_sen[2][i][1] / sub_positions_sen[2][i][2],
+                    sub_positions_sen[10][i][1] / sub_positions_sen[10][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 3 to 17, 11, 13
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[3][i][0] / sub_positions_sen[3][i][2],
+                    sub_positions_sen[17][i][0] / sub_positions_sen[17][i][2],
+                ],
+                y=[
+                    sub_positions_sen[3][i][1] / sub_positions_sen[3][i][2],
+                    sub_positions_sen[17][i][1] / sub_positions_sen[17][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[3][i][0] / sub_positions_sen[3][i][2],
+                    sub_positions_sen[11][i][0] / sub_positions_sen[11][i][2],
+                ],
+                y=[
+                    sub_positions_sen[3][i][1] / sub_positions_sen[3][i][2],
+                    sub_positions_sen[11][i][1] / sub_positions_sen[11][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[3][i][0] / sub_positions_sen[3][i][2],
+                    sub_positions_sen[13][i][0] / sub_positions_sen[13][i][2],
+                ],
+                y=[
+                    sub_positions_sen[3][i][1] / sub_positions_sen[3][i][2],
+                    sub_positions_sen[13][i][1] / sub_positions_sen[13][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 4 to 18, 14, 8
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[4][i][0] / sub_positions_sen[4][i][2],
+                    sub_positions_sen[18][i][0] / sub_positions_sen[18][i][2],
+                ],
+                y=[
+                    sub_positions_sen[4][i][1] / sub_positions_sen[4][i][2],
+                    sub_positions_sen[18][i][1] / sub_positions_sen[18][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[4][i][0] / sub_positions_sen[4][i][2],
+                    sub_positions_sen[14][i][0] / sub_positions_sen[14][i][2],
+                ],
+                y=[
+                    sub_positions_sen[4][i][1] / sub_positions_sen[4][i][2],
+                    sub_positions_sen[14][i][1] / sub_positions_sen[14][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[4][i][0] / sub_positions_sen[4][i][2],
+                    sub_positions_sen[8][i][0] / sub_positions_sen[8][i][2],
+                ],
+                y=[
+                    sub_positions_sen[4][i][1] / sub_positions_sen[4][i][2],
+                    sub_positions_sen[8][i][1] / sub_positions_sen[8][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 5 to 19, 9, 14
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[5][i][0] / sub_positions_sen[5][i][2],
+                    sub_positions_sen[19][i][0] / sub_positions_sen[19][i][2],
+                ],
+                y=[
+                    sub_positions_sen[5][i][1] / sub_positions_sen[5][i][2],
+                    sub_positions_sen[19][i][1] / sub_positions_sen[19][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[5][i][0] / sub_positions_sen[5][i][2],
+                    sub_positions_sen[9][i][0] / sub_positions_sen[9][i][2],
+                ],
+                y=[
+                    sub_positions_sen[5][i][1] / sub_positions_sen[5][i][2],
+                    sub_positions_sen[9][i][1] / sub_positions_sen[9][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[5][i][0] / sub_positions_sen[5][i][2],
+                    sub_positions_sen[14][i][0] / sub_positions_sen[14][i][2],
+                ],
+                y=[
+                    sub_positions_sen[5][i][1] / sub_positions_sen[5][i][2],
+                    sub_positions_sen[14][i][1] / sub_positions_sen[14][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 6 to 18, 15, 10
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[6][i][0] / sub_positions_sen[6][i][2],
+                    sub_positions_sen[18][i][0] / sub_positions_sen[18][i][2],
+                ],
+                y=[
+                    sub_positions_sen[6][i][1] / sub_positions_sen[6][i][2],
+                    sub_positions_sen[18][i][1] / sub_positions_sen[18][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[6][i][0] / sub_positions_sen[6][i][2],
+                    sub_positions_sen[15][i][0] / sub_positions_sen[15][i][2],
+                ],
+                y=[
+                    sub_positions_sen[6][i][1] / sub_positions_sen[6][i][2],
+                    sub_positions_sen[15][i][1] / sub_positions_sen[15][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[6][i][0] / sub_positions_sen[6][i][2],
+                    sub_positions_sen[10][i][0] / sub_positions_sen[10][i][2],
+                ],
+                y=[
+                    sub_positions_sen[6][i][1] / sub_positions_sen[6][i][2],
+                    sub_positions_sen[10][i][1] / sub_positions_sen[10][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 7 to 19, 11, 15
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[7][i][0] / sub_positions_sen[7][i][2],
+                    sub_positions_sen[19][i][0] / sub_positions_sen[19][i][2],
+                ],
+                y=[
+                    sub_positions_sen[7][i][1] / sub_positions_sen[7][i][2],
+                    sub_positions_sen[19][i][1] / sub_positions_sen[19][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[7][i][0] / sub_positions_sen[7][i][2],
+                    sub_positions_sen[11][i][0] / sub_positions_sen[11][i][2],
+                ],
+                y=[
+                    sub_positions_sen[7][i][1] / sub_positions_sen[7][i][2],
+                    sub_positions_sen[11][i][1] / sub_positions_sen[11][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[7][i][0] / sub_positions_sen[7][i][2],
+                    sub_positions_sen[15][i][0] / sub_positions_sen[15][i][2],
+                ],
+                y=[
+                    sub_positions_sen[7][i][1] / sub_positions_sen[7][i][2],
+                    sub_positions_sen[15][i][1] / sub_positions_sen[15][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 8 to 0, 4, 12 -> 10 BAD
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[8][i][0] / sub_positions_sen[8][i][2],
+                    sub_positions_sen[0][i][0] / sub_positions_sen[0][i][2],
+                ],
+                y=[
+                    sub_positions_sen[8][i][1] / sub_positions_sen[8][i][2],
+                    sub_positions_sen[0][i][1] / sub_positions_sen[0][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[8][i][0] / sub_positions_sen[8][i][2],
+                    sub_positions_sen[4][i][0] / sub_positions_sen[4][i][2],
+                ],
+                y=[
+                    sub_positions_sen[8][i][1] / sub_positions_sen[8][i][2],
+                    sub_positions_sen[4][i][1] / sub_positions_sen[4][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[8][i][0] / sub_positions_sen[8][i][2],
+                    sub_positions_sen[10][i][0] / sub_positions_sen[10][i][2],
+                ],
+                y=[
+                    sub_positions_sen[8][i][1] / sub_positions_sen[8][i][2],
+                    sub_positions_sen[10][i][1] / sub_positions_sen[10][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 9 to 1, 5, 13 -> 11 BAD
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[9][i][0] / sub_positions_sen[9][i][2],
+                    sub_positions_sen[1][i][0] / sub_positions_sen[1][i][2],
+                ],
+                y=[
+                    sub_positions_sen[9][i][1] / sub_positions_sen[9][i][2],
+                    sub_positions_sen[1][i][1] / sub_positions_sen[1][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[9][i][0] / sub_positions_sen[9][i][2],
+                    sub_positions_sen[5][i][0] / sub_positions_sen[5][i][2],
+                ],
+                y=[
+                    sub_positions_sen[9][i][1] / sub_positions_sen[9][i][2],
+                    sub_positions_sen[5][i][1] / sub_positions_sen[5][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[9][i][0] / sub_positions_sen[9][i][2],
+                    sub_positions_sen[11][i][0] / sub_positions_sen[11][i][2],
+                ],
+                y=[
+                    sub_positions_sen[9][i][1] / sub_positions_sen[9][i][2],
+                    sub_positions_sen[11][i][1] / sub_positions_sen[11][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 10 to 8, 2, 6
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[10][i][0] / sub_positions_sen[10][i][2],
+                    sub_positions_sen[8][i][0] / sub_positions_sen[8][i][2],
+                ],
+                y=[
+                    sub_positions_sen[10][i][1] / sub_positions_sen[10][i][2],
+                    sub_positions_sen[8][i][1] / sub_positions_sen[8][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[10][i][0] / sub_positions_sen[10][i][2],
+                    sub_positions_sen[2][i][0] / sub_positions_sen[2][i][2],
+                ],
+                y=[
+                    sub_positions_sen[10][i][1] / sub_positions_sen[10][i][2],
+                    sub_positions_sen[2][i][1] / sub_positions_sen[2][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[10][i][0] / sub_positions_sen[10][i][2],
+                    sub_positions_sen[6][i][0] / sub_positions_sen[6][i][2],
+                ],
+                y=[
+                    sub_positions_sen[10][i][1] / sub_positions_sen[10][i][2],
+                    sub_positions_sen[6][i][1] / sub_positions_sen[6][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 11 to 3, 7, 15 -> 9 BAD
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[11][i][0] / sub_positions_sen[11][i][2],
+                    sub_positions_sen[3][i][0] / sub_positions_sen[3][i][2],
+                ],
+                y=[
+                    sub_positions_sen[11][i][1] / sub_positions_sen[11][i][2],
+                    sub_positions_sen[3][i][1] / sub_positions_sen[3][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[11][i][0] / sub_positions_sen[11][i][2],
+                    sub_positions_sen[7][i][0] / sub_positions_sen[7][i][2],
+                ],
+                y=[
+                    sub_positions_sen[11][i][1] / sub_positions_sen[11][i][2],
+                    sub_positions_sen[7][i][1] / sub_positions_sen[7][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[11][i][0] / sub_positions_sen[11][i][2],
+                    sub_positions_sen[9][i][0] / sub_positions_sen[9][i][2],
+                ],
+                y=[
+                    sub_positions_sen[11][i][1] / sub_positions_sen[11][i][2],
+                    sub_positions_sen[9][i][1] / sub_positions_sen[9][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 12 to 0, 1, 8 -> 14 BAD
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[12][i][0] / sub_positions_sen[12][i][2],
+                    sub_positions_sen[0][i][0] / sub_positions_sen[0][i][2],
+                ],
+                y=[
+                    sub_positions_sen[12][i][1] / sub_positions_sen[12][i][2],
+                    sub_positions_sen[0][i][1] / sub_positions_sen[0][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[12][i][0] / sub_positions_sen[12][i][2],
+                    sub_positions_sen[1][i][0] / sub_positions_sen[1][i][2],
+                ],
+                y=[
+                    sub_positions_sen[12][i][1] / sub_positions_sen[12][i][2],
+                    sub_positions_sen[1][i][1] / sub_positions_sen[1][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[12][i][0] / sub_positions_sen[12][i][2],
+                    sub_positions_sen[14][i][0] / sub_positions_sen[14][i][2],
+                ],
+                y=[
+                    sub_positions_sen[12][i][1] / sub_positions_sen[12][i][2],
+                    sub_positions_sen[14][i][1] / sub_positions_sen[14][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 13 to 2, 3, 9 -> 15 BAD
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[13][i][0] / sub_positions_sen[13][i][2],
+                    sub_positions_sen[2][i][0] / sub_positions_sen[2][i][2],
+                ],
+                y=[
+                    sub_positions_sen[13][i][1] / sub_positions_sen[13][i][2],
+                    sub_positions_sen[2][i][1] / sub_positions_sen[2][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[13][i][0] / sub_positions_sen[13][i][2],
+                    sub_positions_sen[3][i][0] / sub_positions_sen[3][i][2],
+                ],
+                y=[
+                    sub_positions_sen[13][i][1] / sub_positions_sen[13][i][2],
+                    sub_positions_sen[3][i][1] / sub_positions_sen[3][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[13][i][0] / sub_positions_sen[13][i][2],
+                    sub_positions_sen[15][i][0] / sub_positions_sen[15][i][2],
+                ],
+                y=[
+                    sub_positions_sen[13][i][1] / sub_positions_sen[13][i][2],
+                    sub_positions_sen[15][i][1] / sub_positions_sen[15][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 14 to 4, 5, 10 -> 12 BAD
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[14][i][0] / sub_positions_sen[14][i][2],
+                    sub_positions_sen[4][i][0] / sub_positions_sen[4][i][2],
+                ],
+                y=[
+                    sub_positions_sen[14][i][1] / sub_positions_sen[14][i][2],
+                    sub_positions_sen[4][i][1] / sub_positions_sen[4][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[14][i][0] / sub_positions_sen[14][i][2],
+                    sub_positions_sen[5][i][0] / sub_positions_sen[5][i][2],
+                ],
+                y=[
+                    sub_positions_sen[14][i][1] / sub_positions_sen[14][i][2],
+                    sub_positions_sen[5][i][1] / sub_positions_sen[5][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[14][i][0] / sub_positions_sen[14][i][2],
+                    sub_positions_sen[12][i][0] / sub_positions_sen[12][i][2],
+                ],
+                y=[
+                    sub_positions_sen[14][i][1] / sub_positions_sen[14][i][2],
+                    sub_positions_sen[12][i][1] / sub_positions_sen[12][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 15 to 13, 6, 7
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[15][i][0] / sub_positions_sen[15][i][2],
+                    sub_positions_sen[13][i][0] / sub_positions_sen[13][i][2],
+                ],
+                y=[
+                    sub_positions_sen[15][i][1] / sub_positions_sen[15][i][2],
+                    sub_positions_sen[13][i][1] / sub_positions_sen[13][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[15][i][0] / sub_positions_sen[15][i][2],
+                    sub_positions_sen[6][i][0] / sub_positions_sen[6][i][2],
+                ],
+                y=[
+                    sub_positions_sen[15][i][1] / sub_positions_sen[15][i][2],
+                    sub_positions_sen[6][i][1] / sub_positions_sen[6][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[15][i][0] / sub_positions_sen[15][i][2],
+                    sub_positions_sen[7][i][0] / sub_positions_sen[7][i][2],
+                ],
+                y=[
+                    sub_positions_sen[15][i][1] / sub_positions_sen[15][i][2],
+                    sub_positions_sen[7][i][1] / sub_positions_sen[7][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 16 to 0, 2, 17
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[16][i][0] / sub_positions_sen[16][i][2],
+                    sub_positions_sen[0][i][0] / sub_positions_sen[0][i][2],
+                ],
+                y=[
+                    sub_positions_sen[16][i][1] / sub_positions_sen[16][i][2],
+                    sub_positions_sen[0][i][1] / sub_positions_sen[0][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[16][i][0] / sub_positions_sen[16][i][2],
+                    sub_positions_sen[2][i][0] / sub_positions_sen[2][i][2],
+                ],
+                y=[
+                    sub_positions_sen[16][i][1] / sub_positions_sen[16][i][2],
+                    sub_positions_sen[2][i][1] / sub_positions_sen[2][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[16][i][0] / sub_positions_sen[16][i][2],
+                    sub_positions_sen[17][i][0] / sub_positions_sen[17][i][2],
+                ],
+                y=[
+                    sub_positions_sen[16][i][1] / sub_positions_sen[16][i][2],
+                    sub_positions_sen[17][i][1] / sub_positions_sen[17][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 17 to 1, 3, 16
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[17][i][0] / sub_positions_sen[17][i][2],
+                    sub_positions_sen[1][i][0] / sub_positions_sen[1][i][2],
+                ],
+                y=[
+                    sub_positions_sen[17][i][1] / sub_positions_sen[17][i][2],
+                    sub_positions_sen[1][i][1] / sub_positions_sen[1][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[17][i][0] / sub_positions_sen[17][i][2],
+                    sub_positions_sen[3][i][0] / sub_positions_sen[3][i][2],
+                ],
+                y=[
+                    sub_positions_sen[17][i][1] / sub_positions_sen[17][i][2],
+                    sub_positions_sen[3][i][1] / sub_positions_sen[3][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[17][i][0] / sub_positions_sen[17][i][2],
+                    sub_positions_sen[16][i][0] / sub_positions_sen[16][i][2],
+                ],
+                y=[
+                    sub_positions_sen[17][i][1] / sub_positions_sen[17][i][2],
+                    sub_positions_sen[16][i][1] / sub_positions_sen[16][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 18 to 4, 6, 19
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[18][i][0] / sub_positions_sen[18][i][2],
+                    sub_positions_sen[4][i][0] / sub_positions_sen[4][i][2],
+                ],
+                y=[
+                    sub_positions_sen[18][i][1] / sub_positions_sen[18][i][2],
+                    sub_positions_sen[4][i][1] / sub_positions_sen[4][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[18][i][0] / sub_positions_sen[18][i][2],
+                    sub_positions_sen[6][i][0] / sub_positions_sen[6][i][2],
+                ],
+                y=[
+                    sub_positions_sen[18][i][1] / sub_positions_sen[18][i][2],
+                    sub_positions_sen[6][i][1] / sub_positions_sen[6][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[18][i][0] / sub_positions_sen[18][i][2],
+                    sub_positions_sen[19][i][0] / sub_positions_sen[19][i][2],
+                ],
+                y=[
+                    sub_positions_sen[18][i][1] / sub_positions_sen[18][i][2],
+                    sub_positions_sen[19][i][1] / sub_positions_sen[19][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 19 to 5, 7, 18
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[19][i][0] / sub_positions_sen[19][i][2],
+                    sub_positions_sen[5][i][0] / sub_positions_sen[5][i][2],
+                ],
+                y=[
+                    sub_positions_sen[19][i][1] / sub_positions_sen[19][i][2],
+                    sub_positions_sen[5][i][1] / sub_positions_sen[5][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[19][i][0] / sub_positions_sen[19][i][2],
+                    sub_positions_sen[7][i][0] / sub_positions_sen[7][i][2],
+                ],
+                y=[
+                    sub_positions_sen[19][i][1] / sub_positions_sen[19][i][2],
+                    sub_positions_sen[7][i][1] / sub_positions_sen[7][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        frame_data.append(
+            go.Scatter(
+                x=[
+                    sub_positions_sen[19][i][0] / sub_positions_sen[19][i][2],
+                    sub_positions_sen[18][i][0] / sub_positions_sen[18][i][2],
+                ],
+                y=[
+                    sub_positions_sen[19][i][1] / sub_positions_sen[19][i][2],
+                    sub_positions_sen[18][i][1] / sub_positions_sen[18][i][2],
+                ],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        frames.append(go.Frame(name=str(i), data=frame_data))
+
+    fig.frames = frames
+
+    sliders = [
+        {
+            "pad": {"b": 10, "t": 60},
+            "len": 0.8,
+            "x": 0.15,
+            "y": 0.15,
+            "steps": [
+                {
+                    "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
+                    "label": f.name,
+                    "method": "animate",
+                }
+                for f in fig.frames
+            ],
+        }
+    ]
+
+    fig.update_layout(
+        updatemenus=[
+            {
+                "buttons": [
+                    {
+                        "args": [None, frame_args(50)],
+                        "label": "Play",
+                        "method": "animate",
+                    },
+                    {
+                        "args": [[None], frame_args(0)],
+                        "label": "Pause",
+                        "method": "animate",
+                    },
+                ],
+                "direction": "left",
+                "pad": {"r": 10, "t": 70},
+                "type": "buttons",
+                "x": 0.15,
+                "y": 0.15,
+            }
+        ],
+        sliders=sliders,
+    )
+
+    fig.update_layout(sliders=sliders)
+
+    # Center the title for the plot
+    # fig.update_layout(title=title, title_x=0.5)
+    fig.update_layout(template="plotly_dark")
+    # Remove grid lines
+    fig.update_xaxes(showgrid=False)
+    fig.update_yaxes(showgrid=False)
+
+    # Remove center line
+    fig.update_xaxes(zeroline=False)
+    fig.update_yaxes(zeroline=False)
+
+    # Increase title size
+    fig.update_layout(title_font_size=20)
+
+    # Increase legend size
+    fig.update_layout(legend_font_size=15)
+
+    # Remove the axis numbers
+    fig.update_xaxes(showticklabels=False)
+    fig.update_yaxes(showticklabels=False)
+    # Remove ticks enrtirely
+    fig.update_xaxes(ticks="outside", tickwidth=0, tickcolor="black")
+    fig.update_yaxes(ticks="outside", tickwidth=0, tickcolor="black")
+
+    # Set x axis and y axis limits
+    fig.update_xaxes(range=[-1.1, 1.1])
+    fig.update_yaxes(range=[-1.1, 1.1])
+
+    # Move Title down
+    fig.update_layout(title_y=0.9)
+
+    # Set aspect ratio to be equal
+    # fig.update_layout(autosize=False, width=650, height=650)
+    # Remove marigns
+    fig.update_layout(margin={"l": 0, "r": 0, "b": 0, "t": 0})
+
+    # # Make the background transparent
+    # fig.update_layout(scene=dict(bgcolor='rgba(0,0,0,0)'))
+    # # Make the axis backgrounds transparent
+    # fig.update_layout(scene=dict(
+    #     xaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
+    #     yaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
+    #     zaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey')
+    # ))
+    # # Remove the plot background
+    # fig.update_layout(plot_bgcolor='rgba(0,0,0,0)')
+
+    # # Make ticks themselves transparent
+    # fig.update_layout(scene=dict(xaxis=dict(showticklabels=False), yaxis=dict(showticklabels=False), zaxis=dict(showticklabels=False)))
+
+    # # Remove the paper background
+    # fig.update_layout(paper_bgcolor='rgba(0,0,0,0)')
+    return fig
+
+
+def plot_conic_view_animation(result: dict, params: Config, path="") -> None:
+    sub_positions_sen, _, sub_positions_sen_node = full_subject_traj_time(
+        result["x_full"], params, False
+    )
+    fig = go.Figure()
+    for i in range(100):
+        fig.add_trace(
+            go.Scatter3d(x=[], y=[], z=[], mode="lines+markers", line={"color": "blue", "width": 2})
+        )
+
+    # Create a cone plot
+    if "alpha_x" in result and "alpha_y" in result:
+        A = np.diag(
+            [1 / np.tan(np.pi / result["alpha_y"]), 1 / np.tan(np.pi / result["alpha_x"])]
+        )  # Conic Matrix
+    else:
+        raise ValueError("`alpha_x` and `alpha_y` not found in result dictionary.")
+
+    # Meshgrid
+    if "moving_subject" in result:
         x = np.linspace(-6, 6, 20)
         y = np.linspace(-6, 6, 20)
         z = np.linspace(-6, 6, 20)
@@ -873,57 +1704,83 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
         x = np.linspace(-80, 80, 20)
         y = np.linspace(-80, 80, 20)
         z = np.linspace(-80, 80, 20)
- 
+
     X, Y = np.meshgrid(x, y)
 
-    # Define the condition for the second order cone
-    z = []
-    for x_val in x:
-        for y_val in y:
-            if params.vp.norm == 'inf':
-                z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord = np.inf))
+    if "norm_type" in result:
+        # Define the condition for the second order cone
+        z = []
+        for x_val in x:
+            for y_val in y:
+                if result["norm_type"] == "inf":
+                    z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord=np.inf))
+                else:
+                    z.append(
+                        np.linalg.norm(
+                            A @ np.array([x_val, y_val]), axis=0, ord=result["norm_type"]
+                        )
+                    )
+        z = np.array(z)
+
+        fig.add_trace(go.Surface(x=X, y=Y, z=z.reshape(20, 20), opacity=0.25, showscale=False))
+        frames = []
+
+        if "moving_subject" in result:
+            x_vals = 12 * np.ones_like(np.array(sub_positions_sen[0])[:, 0])
+            y_vals = 12 * np.ones_like(np.array(sub_positions_sen[0])[:, 0])
+        else:
+            x_vals = 110 * np.ones_like(np.array(sub_positions_sen[0])[:, 0])
+            y_vals = 110 * np.ones_like(np.array(sub_positions_sen[0])[:, 0])
+
+        # Add the projection of the second order cone onto the x-z plane
+        z = []
+        for x_val in x:
+            if result["norm_type"] == "inf":
+                z.append(np.linalg.norm(A @ np.array([x_val, 0]), axis=0, ord=np.inf))
             else:
-                z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord = params.vp.norm))
-    z = np.array(z)
-    
-    fig.add_trace(go.Surface(x=X, y=Y, z=z.reshape(20,20), opacity = 0.25, showscale=False))
-    frames = []
+                z.append(np.linalg.norm(A @ np.array([x_val, 0]), axis=0, ord=result["norm_type"]))
+        z = np.array(z)
+        fig.add_trace(
+            go.Scatter3d(
+                y=x,
+                x=y_vals,
+                z=z,
+                mode="lines",
+                showlegend=False,
+                line={"color": "grey", "width": 3},
+            )
+        )
 
-    if params.vp.tracking:
-        x_vals = 12 * np.ones_like(np.array(sub_positions_sen[0])[:,0])
-        y_vals = 12 * np.ones_like(np.array(sub_positions_sen[0])[:,0])
+        # Add the projection of the second order cone onto the y-z plane
+        z = []
+        for y_val in y:
+            if result["norm_type"] == "inf":
+                z.append(np.linalg.norm(A @ np.array([0, y_val]), axis=0, ord=np.inf))
+            else:
+                z.append(np.linalg.norm(A @ np.array([0, y_val]), axis=0, ord=result["norm_type"]))
+        z = np.array(z)
+        fig.add_trace(
+            go.Scatter3d(
+                y=x_vals,
+                x=y,
+                z=z,
+                mode="lines",
+                showlegend=False,
+                line={"color": "grey", "width": 3},
+            )
+        )
     else:
-        x_vals = 110 * np.ones_like(np.array(sub_positions_sen[0])[:,0])
-        y_vals = 110 * np.ones_like(np.array(sub_positions_sen[0])[:,0])
-
-    # Add the projection of the second order cone onto the x-z plane
-    z = []
-    for x_val in x:
-        if params.vp.norm == 'inf':
-            z.append(np.linalg.norm(A @ np.array([x_val, 0]), axis=0, ord = np.inf))
-        else:
-            z.append(np.linalg.norm(A @ np.array([x_val, 0]), axis=0, ord = params.vp.norm))
-    z = np.array(z)
-    fig.add_trace(go.Scatter3d(y=x, x=y_vals, z=z, mode='lines', showlegend=False, line=dict(color='grey', width=3)))
-
-    # Add the projection of the second order cone onto the y-z plane
-    z = []
-    for y_val in y:
-        if params.vp.norm == 'inf':
-            z.append(np.linalg.norm(A @ np.array([0, y_val]), axis=0, ord = np.inf))
-        else:
-            z.append(np.linalg.norm(A @ np.array([0, y_val]), axis=0, ord = params.vp.norm))
-    z = np.array(z)
-    fig.add_trace(go.Scatter3d(y=x_vals, x=y, z=z, mode='lines', showlegend=False, line=dict(color='grey', width=3)))
+        raise ValueError("`norm_type` not found in result dictionary.")
 
     # Choose a random color for each subject
     colors = []
     for sub_traj in sub_positions_sen:
-        color = f'rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})'
+        color = f"rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})"
         colors.append(color)
 
+    sub_node_plot = []
     for i in range(0, len(sub_positions_sen[0]), 4):
-        frame = go.Frame(name = str(i))
+        frame = go.Frame(name=str(i))
         data = []
         sub_idx = 0
 
@@ -931,133 +1788,68 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
             sub_traj = np.array(sub_traj)
             sub_traj_nodal = np.array(sub_positions_sen_node[sub_idx])
 
-            if params.vp.tracking:
-                x_vals = 12 * np.ones_like(sub_traj[:i+1, 0])
-                y_vals = 12 * np.ones_like(sub_traj[:i+1, 0])
+            if "moving_subject" in result:
+                x_vals = 12 * np.ones_like(sub_traj[: i + 1, 0])
+                y_vals = 12 * np.ones_like(sub_traj[: i + 1, 0])
             else:
-                x_vals = 110 * np.ones_like(sub_traj[:i+1, 0])
-                y_vals = 110 * np.ones_like(sub_traj[:i+1, 0])
+                x_vals = 110 * np.ones_like(sub_traj[: i + 1, 0])
+                y_vals = 110 * np.ones_like(sub_traj[: i + 1, 0])
 
-            data.append(go.Scatter3d(x = sub_traj[:i+1, 0], y = y_vals, z=sub_traj[:i+1, 2], mode='lines', showlegend=False, line=dict(color='grey', width=4)))
-            data.append(go.Scatter3d(x = x_vals, y = sub_traj[:i+1, 1], z=sub_traj[:i+1, 2], mode='lines', showlegend=False, line=dict(color='grey', width=4)))
+            data.append(
+                go.Scatter3d(
+                    x=sub_traj[: i + 1, 0],
+                    y=y_vals,
+                    z=sub_traj[: i + 1, 2],
+                    mode="lines",
+                    showlegend=False,
+                    line={"color": "grey", "width": 4},
+                )
+            )
+            data.append(
+                go.Scatter3d(
+                    x=x_vals,
+                    y=sub_traj[: i + 1, 1],
+                    z=sub_traj[: i + 1, 2],
+                    mode="lines",
+                    showlegend=False,
+                    line={"color": "grey", "width": 4},
+                )
+            )
 
             # Add subject position to data
             # color = f'rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})'
             sub_traj = np.array(sub_traj)
-            data.append(go.Scatter3d(x=sub_traj[:i+1, 0], y=sub_traj[:i+1, 1], z=sub_traj[:i+1, 2], mode='lines',line=dict(color='darkblue', width=3), showlegend=False))
+            data.append(
+                go.Scatter3d(
+                    x=sub_traj[: i + 1, 0],
+                    y=sub_traj[: i + 1, 1],
+                    z=sub_traj[: i + 1, 2],
+                    mode="lines",
+                    line={"color": colors[sub_idx], "width": 3},
+                    showlegend=False,
+                )
+            )
 
             # Add in node when loop has reached point where node is present
-            scaled_index = int((i // (sub_traj.shape[0]/sub_traj_nodal.shape[0])) + 1)
-            sub_traj_nodal[:scaled_index]
+            scaled_index = int((i // (sub_traj.shape[0] / sub_traj_nodal.shape[0])) + 1)
+            sub_node_plot = sub_traj_nodal[:scaled_index]
 
-            # data.append(go.Scatter3d(x=sub_node_plot[:, 0], y=sub_node_plot[:, 1], z=sub_node_plot[:, 2], mode='markers', marker=dict(color='darkblue', size=5), showlegend=False))
+            data.append(
+                go.Scatter3d(
+                    x=sub_node_plot[:, 0],
+                    y=sub_node_plot[:, 1],
+                    z=sub_node_plot[:, 2],
+                    mode="markers",
+                    marker={"color": colors[sub_idx], "size": 5},
+                    showlegend=False,
+                )
+            )
 
             sub_idx += 1
-        
-        # Connect 0 to 16, 8, 12
-        data.append(go.Scatter3d(x=[sub_positions_sen[0][i][0], sub_positions_sen[16][i][0]], y=[sub_positions_sen[0][i][1], sub_positions_sen[16][i][1]], z=[sub_positions_sen[0][i][2], sub_positions_sen[16][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[0][i][0], sub_positions_sen[8][i][0]], y=[sub_positions_sen[0][i][1], sub_positions_sen[8][i][1]], z=[sub_positions_sen[0][i][2], sub_positions_sen[8][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[0][i][0], sub_positions_sen[12][i][0]], y=[sub_positions_sen[0][i][1], sub_positions_sen[12][i][1]], z=[sub_positions_sen[0][i][2], sub_positions_sen[12][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 1 to 17, 9, 12
-        data.append(go.Scatter3d(x=[sub_positions_sen[1][i][0], sub_positions_sen[17][i][0]], y=[sub_positions_sen[1][i][1], sub_positions_sen[17][i][1]], z=[sub_positions_sen[1][i][2], sub_positions_sen[17][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[1][i][0], sub_positions_sen[9][i][0]], y=[sub_positions_sen[1][i][1], sub_positions_sen[9][i][1]], z=[sub_positions_sen[1][i][2], sub_positions_sen[9][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[1][i][0], sub_positions_sen[12][i][0]], y=[sub_positions_sen[1][i][1], sub_positions_sen[12][i][1]], z=[sub_positions_sen[1][i][2], sub_positions_sen[12][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 2 to 16, 13, 10
-        data.append(go.Scatter3d(x=[sub_positions_sen[2][i][0], sub_positions_sen[16][i][0]], y=[sub_positions_sen[2][i][1], sub_positions_sen[16][i][1]], z=[sub_positions_sen[2][i][2], sub_positions_sen[16][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[2][i][0], sub_positions_sen[13][i][0]], y=[sub_positions_sen[2][i][1], sub_positions_sen[13][i][1]], z=[sub_positions_sen[2][i][2], sub_positions_sen[13][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[2][i][0], sub_positions_sen[10][i][0]], y=[sub_positions_sen[2][i][1], sub_positions_sen[10][i][1]], z=[sub_positions_sen[2][i][2], sub_positions_sen[10][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 3 to 17, 11, 13
-        data.append(go.Scatter3d(x=[sub_positions_sen[3][i][0], sub_positions_sen[17][i][0]], y=[sub_positions_sen[3][i][1], sub_positions_sen[17][i][1]], z=[sub_positions_sen[3][i][2], sub_positions_sen[17][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[3][i][0], sub_positions_sen[11][i][0]], y=[sub_positions_sen[3][i][1], sub_positions_sen[11][i][1]], z=[sub_positions_sen[3][i][2], sub_positions_sen[11][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[3][i][0], sub_positions_sen[13][i][0]], y=[sub_positions_sen[3][i][1], sub_positions_sen[13][i][1]], z=[sub_positions_sen[3][i][2], sub_positions_sen[13][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 4 to 18, 14, 8
-        data.append(go.Scatter3d(x=[sub_positions_sen[4][i][0], sub_positions_sen[18][i][0]], y=[sub_positions_sen[4][i][1], sub_positions_sen[18][i][1]], z=[sub_positions_sen[4][i][2], sub_positions_sen[18][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[4][i][0], sub_positions_sen[14][i][0]], y=[sub_positions_sen[4][i][1], sub_positions_sen[14][i][1]], z=[sub_positions_sen[4][i][2], sub_positions_sen[14][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[4][i][0], sub_positions_sen[8][i][0]], y=[sub_positions_sen[4][i][1], sub_positions_sen[8][i][1]], z=[sub_positions_sen[4][i][2], sub_positions_sen[8][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 5 to 19, 9, 14
-        data.append(go.Scatter3d(x=[sub_positions_sen[5][i][0], sub_positions_sen[19][i][0]], y=[sub_positions_sen[5][i][1], sub_positions_sen[19][i][1]], z=[sub_positions_sen[5][i][2], sub_positions_sen[19][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[5][i][0], sub_positions_sen[9][i][0]], y=[sub_positions_sen[5][i][1], sub_positions_sen[9][i][1]], z=[sub_positions_sen[5][i][2], sub_positions_sen[9][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[5][i][0], sub_positions_sen[14][i][0]], y=[sub_positions_sen[5][i][1], sub_positions_sen[14][i][1]], z=[sub_positions_sen[5][i][2], sub_positions_sen[14][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        
-        # Connect 6 to 18, 15, 10
-        data.append(go.Scatter3d(x=[sub_positions_sen[6][i][0], sub_positions_sen[18][i][0]], y=[sub_positions_sen[6][i][1], sub_positions_sen[18][i][1]], z=[sub_positions_sen[6][i][2], sub_positions_sen[18][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[6][i][0], sub_positions_sen[15][i][0]], y=[sub_positions_sen[6][i][1], sub_positions_sen[15][i][1]], z=[sub_positions_sen[6][i][2], sub_positions_sen[15][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[6][i][0], sub_positions_sen[10][i][0]], y=[sub_positions_sen[6][i][1], sub_positions_sen[10][i][1]], z=[sub_positions_sen[6][i][2], sub_positions_sen[10][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 7 to 19, 11, 15
-        data.append(go.Scatter3d(x=[sub_positions_sen[7][i][0], sub_positions_sen[19][i][0]], y=[sub_positions_sen[7][i][1], sub_positions_sen[19][i][1]], z=[sub_positions_sen[7][i][2], sub_positions_sen[19][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[7][i][0], sub_positions_sen[11][i][0]], y=[sub_positions_sen[7][i][1], sub_positions_sen[11][i][1]], z=[sub_positions_sen[7][i][2], sub_positions_sen[11][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[7][i][0], sub_positions_sen[15][i][0]], y=[sub_positions_sen[7][i][1], sub_positions_sen[15][i][1]], z=[sub_positions_sen[7][i][2], sub_positions_sen[15][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 8 to 0, 4, 12
-        data.append(go.Scatter3d(x=[sub_positions_sen[8][i][0], sub_positions_sen[0][i][0]], y=[sub_positions_sen[8][i][1], sub_positions_sen[0][i][1]], z=[sub_positions_sen[8][i][2], sub_positions_sen[0][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[8][i][0], sub_positions_sen[4][i][0]], y=[sub_positions_sen[8][i][1], sub_positions_sen[4][i][1]], z=[sub_positions_sen[8][i][2], sub_positions_sen[4][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[8][i][0], sub_positions_sen[12][i][0]], y=[sub_positions_sen[8][i][1], sub_positions_sen[12][i][1]], z=[sub_positions_sen[8][i][2], sub_positions_sen[12][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 9 to 1, 5, 11
-        data.append(go.Scatter3d(x=[sub_positions_sen[9][i][0], sub_positions_sen[1][i][0]], y=[sub_positions_sen[9][i][1], sub_positions_sen[1][i][1]], z=[sub_positions_sen[9][i][2], sub_positions_sen[1][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[9][i][0], sub_positions_sen[5][i][0]], y=[sub_positions_sen[9][i][1], sub_positions_sen[5][i][1]], z=[sub_positions_sen[9][i][2], sub_positions_sen[5][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[9][i][0], sub_positions_sen[11][i][0]], y=[sub_positions_sen[9][i][1], sub_positions_sen[11][i][1]], z=[sub_positions_sen[9][i][2], sub_positions_sen[11][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 10 to 8, 2, 6
-        data.append(go.Scatter3d(x=[sub_positions_sen[10][i][0], sub_positions_sen[8][i][0]], y=[sub_positions_sen[10][i][1], sub_positions_sen[8][i][1]], z=[sub_positions_sen[10][i][2], sub_positions_sen[8][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[10][i][0], sub_positions_sen[2][i][0]], y=[sub_positions_sen[10][i][1], sub_positions_sen[2][i][1]], z=[sub_positions_sen[10][i][2], sub_positions_sen[2][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[10][i][0], sub_positions_sen[6][i][0]], y=[sub_positions_sen[10][i][1], sub_positions_sen[6][i][1]], z=[sub_positions_sen[10][i][2], sub_positions_sen[6][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 11 to 3, 7, 9
-        data.append(go.Scatter3d(x=[sub_positions_sen[11][i][0], sub_positions_sen[3][i][0]], y=[sub_positions_sen[11][i][1], sub_positions_sen[3][i][1]], z=[sub_positions_sen[11][i][2], sub_positions_sen[3][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[11][i][0], sub_positions_sen[7][i][0]], y=[sub_positions_sen[11][i][1], sub_positions_sen[7][i][1]], z=[sub_positions_sen[11][i][2], sub_positions_sen[7][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[11][i][0], sub_positions_sen[9][i][0]], y=[sub_positions_sen[11][i][1], sub_positions_sen[9][i][1]], z=[sub_positions_sen[11][i][2], sub_positions_sen[9][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        
-        # Connect 12 to 0, 1, 14
-        data.append(go.Scatter3d(x=[sub_positions_sen[12][i][0], sub_positions_sen[0][i][0]], y=[sub_positions_sen[12][i][1], sub_positions_sen[0][i][1]], z=[sub_positions_sen[12][i][2], sub_positions_sen[0][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[12][i][0], sub_positions_sen[1][i][0]], y=[sub_positions_sen[12][i][1], sub_positions_sen[1][i][1]], z=[sub_positions_sen[12][i][2], sub_positions_sen[1][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[12][i][0], sub_positions_sen[14][i][0]], y=[sub_positions_sen[12][i][1], sub_positions_sen[14][i][1]], z=[sub_positions_sen[12][i][2], sub_positions_sen[14][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 13 to 2, 3, 15
-        data.append(go.Scatter3d(x=[sub_positions_sen[13][i][0], sub_positions_sen[2][i][0]], y=[sub_positions_sen[13][i][1], sub_positions_sen[2][i][1]], z=[sub_positions_sen[13][i][2], sub_positions_sen[2][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[13][i][0], sub_positions_sen[3][i][0]], y=[sub_positions_sen[13][i][1], sub_positions_sen[3][i][1]], z=[sub_positions_sen[13][i][2], sub_positions_sen[3][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[13][i][0], sub_positions_sen[15][i][0]], y=[sub_positions_sen[13][i][1], sub_positions_sen[15][i][1]], z=[sub_positions_sen[13][i][2], sub_positions_sen[15][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 14 to 4, 5, 12
-        data.append(go.Scatter3d(x=[sub_positions_sen[14][i][0], sub_positions_sen[4][i][0]], y=[sub_positions_sen[14][i][1], sub_positions_sen[4][i][1]], z=[sub_positions_sen[14][i][2], sub_positions_sen[4][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[14][i][0], sub_positions_sen[5][i][0]], y=[sub_positions_sen[14][i][1], sub_positions_sen[5][i][1]], z=[sub_positions_sen[14][i][2], sub_positions_sen[5][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[14][i][0], sub_positions_sen[12][i][0]], y=[sub_positions_sen[14][i][1], sub_positions_sen[12][i][1]], z=[sub_positions_sen[14][i][2], sub_positions_sen[12][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 15 to 13, 6, 7
-        data.append(go.Scatter3d(x=[sub_positions_sen[15][i][0], sub_positions_sen[13][i][0]], y=[sub_positions_sen[15][i][1], sub_positions_sen[13][i][1]], z=[sub_positions_sen[15][i][2], sub_positions_sen[13][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[15][i][0], sub_positions_sen[6][i][0]], y=[sub_positions_sen[15][i][1], sub_positions_sen[6][i][1]], z=[sub_positions_sen[15][i][2], sub_positions_sen[6][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[15][i][0], sub_positions_sen[7][i][0]], y=[sub_positions_sen[15][i][1], sub_positions_sen[7][i][1]], z=[sub_positions_sen[15][i][2], sub_positions_sen[7][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 16 to 0, 2, 17
-        data.append(go.Scatter3d(x=[sub_positions_sen[16][i][0], sub_positions_sen[0][i][0]], y=[sub_positions_sen[16][i][1], sub_positions_sen[0][i][1]], z=[sub_positions_sen[16][i][2], sub_positions_sen[0][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[16][i][0], sub_positions_sen[2][i][0]], y=[sub_positions_sen[16][i][1], sub_positions_sen[2][i][1]], z=[sub_positions_sen[16][i][2], sub_positions_sen[2][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[16][i][0], sub_positions_sen[17][i][0]], y=[sub_positions_sen[16][i][1], sub_positions_sen[17][i][1]], z=[sub_positions_sen[16][i][2], sub_positions_sen[17][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 17 to 1, 3, 16
-        data.append(go.Scatter3d(x=[sub_positions_sen[17][i][0], sub_positions_sen[1][i][0]], y=[sub_positions_sen[17][i][1], sub_positions_sen[1][i][1]], z=[sub_positions_sen[17][i][2], sub_positions_sen[1][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[17][i][0], sub_positions_sen[3][i][0]], y=[sub_positions_sen[17][i][1], sub_positions_sen[3][i][1]], z=[sub_positions_sen[17][i][2], sub_positions_sen[3][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[17][i][0], sub_positions_sen[16][i][0]], y=[sub_positions_sen[17][i][1], sub_positions_sen[16][i][1]], z=[sub_positions_sen[17][i][2], sub_positions_sen[16][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        
-        # Connect 18 to 4, 6, 19
-        data.append(go.Scatter3d(x=[sub_positions_sen[18][i][0], sub_positions_sen[4][i][0]], y=[sub_positions_sen[18][i][1], sub_positions_sen[4][i][1]], z=[sub_positions_sen[18][i][2], sub_positions_sen[4][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[18][i][0], sub_positions_sen[6][i][0]], y=[sub_positions_sen[18][i][1], sub_positions_sen[6][i][1]], z=[sub_positions_sen[18][i][2], sub_positions_sen[6][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[18][i][0], sub_positions_sen[19][i][0]], y=[sub_positions_sen[18][i][1], sub_positions_sen[19][i][1]], z=[sub_positions_sen[18][i][2], sub_positions_sen[19][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
-        # Connect 19 to 5, 7, 18
-        data.append(go.Scatter3d(x=[sub_positions_sen[19][i][0], sub_positions_sen[5][i][0]], y=[sub_positions_sen[19][i][1], sub_positions_sen[5][i][1]], z=[sub_positions_sen[19][i][2], sub_positions_sen[5][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[19][i][0], sub_positions_sen[7][i][0]], y=[sub_positions_sen[19][i][1], sub_positions_sen[7][i][1]], z=[sub_positions_sen[19][i][2], sub_positions_sen[7][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-        data.append(go.Scatter3d(x=[sub_positions_sen[19][i][0], sub_positions_sen[18][i][0]], y=[sub_positions_sen[19][i][1], sub_positions_sen[18][i][1]], z=[sub_positions_sen[19][i][2], sub_positions_sen[18][i][2]], mode='lines', line=dict(color='red', width=3), showlegend=False))
-
 
         frame.data = data
         frames.append(frame)
-    
+
     fig.frames = frames
 
     sliders = [
@@ -1071,54 +1863,949 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
                     "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
                     "label": f.name,
                     "method": "animate",
-                } for f in fig.frames
-            ]
+                }
+                for f in fig.frames
+            ],
         }
     ]
 
-    fig.update_layout(updatemenus = [{"buttons":[
-                                        {
-                                            "args": [None, frame_args(50)],
-                                            "label": "Play",
-                                            "method": "animate",
-                                        },
-                                        {
-                                            "args": [[None], frame_args(0)],
-                                            "label": "Pause",
-                                            "method": "animate",
-                                    }],
-
-                                    "direction": "left",
-                                    "pad": {"r": 10, "t": 70},
-                                    "type": "buttons",
-                                    "x": 0.15,
-                                    "y": 0.32,
-                                }
-                            ],
-                            sliders=sliders
-                        )
+    fig.update_layout(
+        updatemenus=[
+            {
+                "buttons": [
+                    {
+                        "args": [None, frame_args(50)],
+                        "label": "Play",
+                        "method": "animate",
+                    },
+                    {
+                        "args": [[None], frame_args(0)],
+                        "label": "Pause",
+                        "method": "animate",
+                    },
+                ],
+                "direction": "left",
+                "pad": {"r": 10, "t": 70},
+                "type": "buttons",
+                "x": 0.15,
+                "y": 0.32,
+            }
+        ],
+        sliders=sliders,
+    )
 
     fig.update_layout(sliders=sliders)
 
     # Set camera position
-    fig.update_layout(scene_camera=dict(up=dict(x=0, y=0, z=10), center=dict(x=-2, y=0, z=-3), eye=dict(x=-28, y=-22, z=15)))
+    fig.update_layout(
+        scene_camera={
+            "up": {"x": 0, "y": 0, "z": 10},
+            "center": {"x": -2, "y": 0, "z": -3},
+            "eye": {"x": -28, "y": -22, "z": 15},
+        }
+    )
 
-    # Set axis labels 
-    fig.update_layout(scene=dict(xaxis_title='x (m)', yaxis_title='y (m)', zaxis_title='z (m)'))
+    # Set axis labels
+    fig.update_layout(
+        scene={"xaxis_title": "x (m)", "yaxis_title": "y (m)", "zaxis_title": "z (m)"}
+    )
 
-    fig.update_layout(template='plotly_dark')
-    
+    fig.update_layout(template="plotly_dark")
+
     # Make only the grid lines thicker in the template
-    fig.update_layout(scene=dict(xaxis=dict(showgrid=True, gridwidth=5),
-                                yaxis=dict(showgrid=True, gridwidth=5),
-                                zaxis=dict(showgrid=True, gridwidth=5)))
+    fig.update_layout(
+        scene={
+            "xaxis": {"showgrid": True, "gridwidth": 5},
+            "yaxis": {"showgrid": True, "gridwidth": 5},
+            "zaxis": {"showgrid": True, "gridwidth": 5},
+        }
+    )
 
-
-    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=20, y=20, z=20)))
+    fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 20, "y": 20, "z": 20}})
     # fig.update_layout(autosize=False, width=600, height=600)
 
     # Remove marigns
-    fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
+    fig.update_layout(margin={"l": 0, "r": 0, "b": 0, "t": 0})
+
+    # # Make the background transparent
+    # fig.update_layout(scene=dict(bgcolor='rgba(0,0,0,0)'))
+    # # Make the axis backgrounds transparent
+    # fig.update_layout(scene=dict(
+    #     xaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
+    #     yaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
+    #     zaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey')
+    # ))
+    # # Remove the plot background
+    # fig.update_layout(plot_bgcolor='rgba(0,0,0,0)')
+
+    # # Make ticks themselves transparent
+    # fig.update_layout(scene=dict(xaxis=dict(showticklabels=False), yaxis=dict(showticklabels=False), zaxis=dict(showticklabels=False)))
+
+    # # Remove the paper background
+    # fig.update_layout(paper_bgcolor='rgba(0,0,0,0)')
+
+    return fig
+
+
+def plot_conic_view_polytope_animation(result: dict, params: Config, path="") -> None:
+    sub_positions_sen, _, sub_positions_sen_node = full_subject_traj_time(
+        result["x_full"], params, False
+    )
+    fig = go.Figure()
+    for i in range(500):
+        fig.add_trace(
+            go.Scatter3d(x=[], y=[], z=[], mode="lines+markers", line={"color": "blue", "width": 2})
+        )
+
+    # Create a cone plot
+    A = np.diag(
+        [1 / np.tan(np.pi / params.vp.alpha_y), 1 / np.tan(np.pi / params.vp.alpha_x)]
+    )  # Conic Matrix
+
+    # Meshgrid
+    if params.vp.tracking:
+        x = np.linspace(-6, 6, 20)
+        y = np.linspace(-6, 6, 20)
+        z = np.linspace(-6, 6, 20)
+    else:
+        x = np.linspace(-80, 80, 20)
+        y = np.linspace(-80, 80, 20)
+        z = np.linspace(-80, 80, 20)
+
+    X, Y = np.meshgrid(x, y)
+
+    # Define the condition for the second order cone
+    z = []
+    for x_val in x:
+        for y_val in y:
+            if params.vp.norm == "inf":
+                z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord=np.inf))
+            else:
+                z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord=params.vp.norm))
+    z = np.array(z)
+
+    fig.add_trace(go.Surface(x=X, y=Y, z=z.reshape(20, 20), opacity=0.25, showscale=False))
+    frames = []
+
+    if params.vp.tracking:
+        x_vals = 12 * np.ones_like(np.array(sub_positions_sen[0])[:, 0])
+        y_vals = 12 * np.ones_like(np.array(sub_positions_sen[0])[:, 0])
+    else:
+        x_vals = 110 * np.ones_like(np.array(sub_positions_sen[0])[:, 0])
+        y_vals = 110 * np.ones_like(np.array(sub_positions_sen[0])[:, 0])
+
+    # Add the projection of the second order cone onto the x-z plane
+    z = []
+    for x_val in x:
+        if params.vp.norm == "inf":
+            z.append(np.linalg.norm(A @ np.array([x_val, 0]), axis=0, ord=np.inf))
+        else:
+            z.append(np.linalg.norm(A @ np.array([x_val, 0]), axis=0, ord=params.vp.norm))
+    z = np.array(z)
+    fig.add_trace(
+        go.Scatter3d(
+            y=x, x=y_vals, z=z, mode="lines", showlegend=False, line={"color": "grey", "width": 3}
+        )
+    )
+
+    # Add the projection of the second order cone onto the y-z plane
+    z = []
+    for y_val in y:
+        if params.vp.norm == "inf":
+            z.append(np.linalg.norm(A @ np.array([0, y_val]), axis=0, ord=np.inf))
+        else:
+            z.append(np.linalg.norm(A @ np.array([0, y_val]), axis=0, ord=params.vp.norm))
+    z = np.array(z)
+    fig.add_trace(
+        go.Scatter3d(
+            y=x_vals, x=y, z=z, mode="lines", showlegend=False, line={"color": "grey", "width": 3}
+        )
+    )
+
+    # Choose a random color for each subject
+    colors = []
+    for sub_traj in sub_positions_sen:
+        color = f"rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})"
+        colors.append(color)
+
+    for i in range(0, len(sub_positions_sen[0]), 4):
+        frame = go.Frame(name=str(i))
+        data = []
+        sub_idx = 0
+
+        for sub_traj in sub_positions_sen:
+            sub_traj = np.array(sub_traj)
+            sub_traj_nodal = np.array(sub_positions_sen_node[sub_idx])
+
+            if params.vp.tracking:
+                x_vals = 12 * np.ones_like(sub_traj[: i + 1, 0])
+                y_vals = 12 * np.ones_like(sub_traj[: i + 1, 0])
+            else:
+                x_vals = 110 * np.ones_like(sub_traj[: i + 1, 0])
+                y_vals = 110 * np.ones_like(sub_traj[: i + 1, 0])
+
+            data.append(
+                go.Scatter3d(
+                    x=sub_traj[: i + 1, 0],
+                    y=y_vals,
+                    z=sub_traj[: i + 1, 2],
+                    mode="lines",
+                    showlegend=False,
+                    line={"color": "grey", "width": 4},
+                )
+            )
+            data.append(
+                go.Scatter3d(
+                    x=x_vals,
+                    y=sub_traj[: i + 1, 1],
+                    z=sub_traj[: i + 1, 2],
+                    mode="lines",
+                    showlegend=False,
+                    line={"color": "grey", "width": 4},
+                )
+            )
+
+            # Add subject position to data
+            # color = f'rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})'
+            sub_traj = np.array(sub_traj)
+            data.append(
+                go.Scatter3d(
+                    x=sub_traj[: i + 1, 0],
+                    y=sub_traj[: i + 1, 1],
+                    z=sub_traj[: i + 1, 2],
+                    mode="lines",
+                    line={"color": "darkblue", "width": 3},
+                    showlegend=False,
+                )
+            )
+
+            # Add in node when loop has reached point where node is present
+            scaled_index = int((i // (sub_traj.shape[0] / sub_traj_nodal.shape[0])) + 1)
+            sub_traj_nodal[:scaled_index]
+
+            # data.append(go.Scatter3d(x=sub_node_plot[:, 0], y=sub_node_plot[:, 1], z=sub_node_plot[:, 2], mode='markers', marker=dict(color='darkblue', size=5), showlegend=False))
+
+            sub_idx += 1
+
+        # Connect 0 to 16, 8, 12
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[0][i][0], sub_positions_sen[16][i][0]],
+                y=[sub_positions_sen[0][i][1], sub_positions_sen[16][i][1]],
+                z=[sub_positions_sen[0][i][2], sub_positions_sen[16][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[0][i][0], sub_positions_sen[8][i][0]],
+                y=[sub_positions_sen[0][i][1], sub_positions_sen[8][i][1]],
+                z=[sub_positions_sen[0][i][2], sub_positions_sen[8][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[0][i][0], sub_positions_sen[12][i][0]],
+                y=[sub_positions_sen[0][i][1], sub_positions_sen[12][i][1]],
+                z=[sub_positions_sen[0][i][2], sub_positions_sen[12][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 1 to 17, 9, 12
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[1][i][0], sub_positions_sen[17][i][0]],
+                y=[sub_positions_sen[1][i][1], sub_positions_sen[17][i][1]],
+                z=[sub_positions_sen[1][i][2], sub_positions_sen[17][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[1][i][0], sub_positions_sen[9][i][0]],
+                y=[sub_positions_sen[1][i][1], sub_positions_sen[9][i][1]],
+                z=[sub_positions_sen[1][i][2], sub_positions_sen[9][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[1][i][0], sub_positions_sen[12][i][0]],
+                y=[sub_positions_sen[1][i][1], sub_positions_sen[12][i][1]],
+                z=[sub_positions_sen[1][i][2], sub_positions_sen[12][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 2 to 16, 13, 10
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[2][i][0], sub_positions_sen[16][i][0]],
+                y=[sub_positions_sen[2][i][1], sub_positions_sen[16][i][1]],
+                z=[sub_positions_sen[2][i][2], sub_positions_sen[16][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[2][i][0], sub_positions_sen[13][i][0]],
+                y=[sub_positions_sen[2][i][1], sub_positions_sen[13][i][1]],
+                z=[sub_positions_sen[2][i][2], sub_positions_sen[13][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[2][i][0], sub_positions_sen[10][i][0]],
+                y=[sub_positions_sen[2][i][1], sub_positions_sen[10][i][1]],
+                z=[sub_positions_sen[2][i][2], sub_positions_sen[10][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 3 to 17, 11, 13
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[3][i][0], sub_positions_sen[17][i][0]],
+                y=[sub_positions_sen[3][i][1], sub_positions_sen[17][i][1]],
+                z=[sub_positions_sen[3][i][2], sub_positions_sen[17][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[3][i][0], sub_positions_sen[11][i][0]],
+                y=[sub_positions_sen[3][i][1], sub_positions_sen[11][i][1]],
+                z=[sub_positions_sen[3][i][2], sub_positions_sen[11][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[3][i][0], sub_positions_sen[13][i][0]],
+                y=[sub_positions_sen[3][i][1], sub_positions_sen[13][i][1]],
+                z=[sub_positions_sen[3][i][2], sub_positions_sen[13][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 4 to 18, 14, 8
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[4][i][0], sub_positions_sen[18][i][0]],
+                y=[sub_positions_sen[4][i][1], sub_positions_sen[18][i][1]],
+                z=[sub_positions_sen[4][i][2], sub_positions_sen[18][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[4][i][0], sub_positions_sen[14][i][0]],
+                y=[sub_positions_sen[4][i][1], sub_positions_sen[14][i][1]],
+                z=[sub_positions_sen[4][i][2], sub_positions_sen[14][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[4][i][0], sub_positions_sen[8][i][0]],
+                y=[sub_positions_sen[4][i][1], sub_positions_sen[8][i][1]],
+                z=[sub_positions_sen[4][i][2], sub_positions_sen[8][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 5 to 19, 9, 14
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[5][i][0], sub_positions_sen[19][i][0]],
+                y=[sub_positions_sen[5][i][1], sub_positions_sen[19][i][1]],
+                z=[sub_positions_sen[5][i][2], sub_positions_sen[19][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[5][i][0], sub_positions_sen[9][i][0]],
+                y=[sub_positions_sen[5][i][1], sub_positions_sen[9][i][1]],
+                z=[sub_positions_sen[5][i][2], sub_positions_sen[9][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[5][i][0], sub_positions_sen[14][i][0]],
+                y=[sub_positions_sen[5][i][1], sub_positions_sen[14][i][1]],
+                z=[sub_positions_sen[5][i][2], sub_positions_sen[14][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 6 to 18, 15, 10
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[6][i][0], sub_positions_sen[18][i][0]],
+                y=[sub_positions_sen[6][i][1], sub_positions_sen[18][i][1]],
+                z=[sub_positions_sen[6][i][2], sub_positions_sen[18][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[6][i][0], sub_positions_sen[15][i][0]],
+                y=[sub_positions_sen[6][i][1], sub_positions_sen[15][i][1]],
+                z=[sub_positions_sen[6][i][2], sub_positions_sen[15][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[6][i][0], sub_positions_sen[10][i][0]],
+                y=[sub_positions_sen[6][i][1], sub_positions_sen[10][i][1]],
+                z=[sub_positions_sen[6][i][2], sub_positions_sen[10][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 7 to 19, 11, 15
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[7][i][0], sub_positions_sen[19][i][0]],
+                y=[sub_positions_sen[7][i][1], sub_positions_sen[19][i][1]],
+                z=[sub_positions_sen[7][i][2], sub_positions_sen[19][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[7][i][0], sub_positions_sen[11][i][0]],
+                y=[sub_positions_sen[7][i][1], sub_positions_sen[11][i][1]],
+                z=[sub_positions_sen[7][i][2], sub_positions_sen[11][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[7][i][0], sub_positions_sen[15][i][0]],
+                y=[sub_positions_sen[7][i][1], sub_positions_sen[15][i][1]],
+                z=[sub_positions_sen[7][i][2], sub_positions_sen[15][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 8 to 0, 4, 12
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[8][i][0], sub_positions_sen[0][i][0]],
+                y=[sub_positions_sen[8][i][1], sub_positions_sen[0][i][1]],
+                z=[sub_positions_sen[8][i][2], sub_positions_sen[0][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[8][i][0], sub_positions_sen[4][i][0]],
+                y=[sub_positions_sen[8][i][1], sub_positions_sen[4][i][1]],
+                z=[sub_positions_sen[8][i][2], sub_positions_sen[4][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[8][i][0], sub_positions_sen[12][i][0]],
+                y=[sub_positions_sen[8][i][1], sub_positions_sen[12][i][1]],
+                z=[sub_positions_sen[8][i][2], sub_positions_sen[12][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 9 to 1, 5, 11
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[9][i][0], sub_positions_sen[1][i][0]],
+                y=[sub_positions_sen[9][i][1], sub_positions_sen[1][i][1]],
+                z=[sub_positions_sen[9][i][2], sub_positions_sen[1][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[9][i][0], sub_positions_sen[5][i][0]],
+                y=[sub_positions_sen[9][i][1], sub_positions_sen[5][i][1]],
+                z=[sub_positions_sen[9][i][2], sub_positions_sen[5][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[9][i][0], sub_positions_sen[11][i][0]],
+                y=[sub_positions_sen[9][i][1], sub_positions_sen[11][i][1]],
+                z=[sub_positions_sen[9][i][2], sub_positions_sen[11][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 10 to 8, 2, 6
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[10][i][0], sub_positions_sen[8][i][0]],
+                y=[sub_positions_sen[10][i][1], sub_positions_sen[8][i][1]],
+                z=[sub_positions_sen[10][i][2], sub_positions_sen[8][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[10][i][0], sub_positions_sen[2][i][0]],
+                y=[sub_positions_sen[10][i][1], sub_positions_sen[2][i][1]],
+                z=[sub_positions_sen[10][i][2], sub_positions_sen[2][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[10][i][0], sub_positions_sen[6][i][0]],
+                y=[sub_positions_sen[10][i][1], sub_positions_sen[6][i][1]],
+                z=[sub_positions_sen[10][i][2], sub_positions_sen[6][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 11 to 3, 7, 9
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[11][i][0], sub_positions_sen[3][i][0]],
+                y=[sub_positions_sen[11][i][1], sub_positions_sen[3][i][1]],
+                z=[sub_positions_sen[11][i][2], sub_positions_sen[3][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[11][i][0], sub_positions_sen[7][i][0]],
+                y=[sub_positions_sen[11][i][1], sub_positions_sen[7][i][1]],
+                z=[sub_positions_sen[11][i][2], sub_positions_sen[7][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[11][i][0], sub_positions_sen[9][i][0]],
+                y=[sub_positions_sen[11][i][1], sub_positions_sen[9][i][1]],
+                z=[sub_positions_sen[11][i][2], sub_positions_sen[9][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 12 to 0, 1, 14
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[12][i][0], sub_positions_sen[0][i][0]],
+                y=[sub_positions_sen[12][i][1], sub_positions_sen[0][i][1]],
+                z=[sub_positions_sen[12][i][2], sub_positions_sen[0][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[12][i][0], sub_positions_sen[1][i][0]],
+                y=[sub_positions_sen[12][i][1], sub_positions_sen[1][i][1]],
+                z=[sub_positions_sen[12][i][2], sub_positions_sen[1][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[12][i][0], sub_positions_sen[14][i][0]],
+                y=[sub_positions_sen[12][i][1], sub_positions_sen[14][i][1]],
+                z=[sub_positions_sen[12][i][2], sub_positions_sen[14][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 13 to 2, 3, 15
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[13][i][0], sub_positions_sen[2][i][0]],
+                y=[sub_positions_sen[13][i][1], sub_positions_sen[2][i][1]],
+                z=[sub_positions_sen[13][i][2], sub_positions_sen[2][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[13][i][0], sub_positions_sen[3][i][0]],
+                y=[sub_positions_sen[13][i][1], sub_positions_sen[3][i][1]],
+                z=[sub_positions_sen[13][i][2], sub_positions_sen[3][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[13][i][0], sub_positions_sen[15][i][0]],
+                y=[sub_positions_sen[13][i][1], sub_positions_sen[15][i][1]],
+                z=[sub_positions_sen[13][i][2], sub_positions_sen[15][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 14 to 4, 5, 12
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[14][i][0], sub_positions_sen[4][i][0]],
+                y=[sub_positions_sen[14][i][1], sub_positions_sen[4][i][1]],
+                z=[sub_positions_sen[14][i][2], sub_positions_sen[4][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[14][i][0], sub_positions_sen[5][i][0]],
+                y=[sub_positions_sen[14][i][1], sub_positions_sen[5][i][1]],
+                z=[sub_positions_sen[14][i][2], sub_positions_sen[5][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[14][i][0], sub_positions_sen[12][i][0]],
+                y=[sub_positions_sen[14][i][1], sub_positions_sen[12][i][1]],
+                z=[sub_positions_sen[14][i][2], sub_positions_sen[12][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 15 to 13, 6, 7
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[15][i][0], sub_positions_sen[13][i][0]],
+                y=[sub_positions_sen[15][i][1], sub_positions_sen[13][i][1]],
+                z=[sub_positions_sen[15][i][2], sub_positions_sen[13][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[15][i][0], sub_positions_sen[6][i][0]],
+                y=[sub_positions_sen[15][i][1], sub_positions_sen[6][i][1]],
+                z=[sub_positions_sen[15][i][2], sub_positions_sen[6][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[15][i][0], sub_positions_sen[7][i][0]],
+                y=[sub_positions_sen[15][i][1], sub_positions_sen[7][i][1]],
+                z=[sub_positions_sen[15][i][2], sub_positions_sen[7][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 16 to 0, 2, 17
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[16][i][0], sub_positions_sen[0][i][0]],
+                y=[sub_positions_sen[16][i][1], sub_positions_sen[0][i][1]],
+                z=[sub_positions_sen[16][i][2], sub_positions_sen[0][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[16][i][0], sub_positions_sen[2][i][0]],
+                y=[sub_positions_sen[16][i][1], sub_positions_sen[2][i][1]],
+                z=[sub_positions_sen[16][i][2], sub_positions_sen[2][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[16][i][0], sub_positions_sen[17][i][0]],
+                y=[sub_positions_sen[16][i][1], sub_positions_sen[17][i][1]],
+                z=[sub_positions_sen[16][i][2], sub_positions_sen[17][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 17 to 1, 3, 16
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[17][i][0], sub_positions_sen[1][i][0]],
+                y=[sub_positions_sen[17][i][1], sub_positions_sen[1][i][1]],
+                z=[sub_positions_sen[17][i][2], sub_positions_sen[1][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[17][i][0], sub_positions_sen[3][i][0]],
+                y=[sub_positions_sen[17][i][1], sub_positions_sen[3][i][1]],
+                z=[sub_positions_sen[17][i][2], sub_positions_sen[3][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[17][i][0], sub_positions_sen[16][i][0]],
+                y=[sub_positions_sen[17][i][1], sub_positions_sen[16][i][1]],
+                z=[sub_positions_sen[17][i][2], sub_positions_sen[16][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 18 to 4, 6, 19
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[18][i][0], sub_positions_sen[4][i][0]],
+                y=[sub_positions_sen[18][i][1], sub_positions_sen[4][i][1]],
+                z=[sub_positions_sen[18][i][2], sub_positions_sen[4][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[18][i][0], sub_positions_sen[6][i][0]],
+                y=[sub_positions_sen[18][i][1], sub_positions_sen[6][i][1]],
+                z=[sub_positions_sen[18][i][2], sub_positions_sen[6][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[18][i][0], sub_positions_sen[19][i][0]],
+                y=[sub_positions_sen[18][i][1], sub_positions_sen[19][i][1]],
+                z=[sub_positions_sen[18][i][2], sub_positions_sen[19][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        # Connect 19 to 5, 7, 18
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[19][i][0], sub_positions_sen[5][i][0]],
+                y=[sub_positions_sen[19][i][1], sub_positions_sen[5][i][1]],
+                z=[sub_positions_sen[19][i][2], sub_positions_sen[5][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[19][i][0], sub_positions_sen[7][i][0]],
+                y=[sub_positions_sen[19][i][1], sub_positions_sen[7][i][1]],
+                z=[sub_positions_sen[19][i][2], sub_positions_sen[7][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+        data.append(
+            go.Scatter3d(
+                x=[sub_positions_sen[19][i][0], sub_positions_sen[18][i][0]],
+                y=[sub_positions_sen[19][i][1], sub_positions_sen[18][i][1]],
+                z=[sub_positions_sen[19][i][2], sub_positions_sen[18][i][2]],
+                mode="lines",
+                line={"color": "red", "width": 3},
+                showlegend=False,
+            )
+        )
+
+        frame.data = data
+        frames.append(frame)
+
+    fig.frames = frames
+
+    sliders = [
+        {
+            "pad": {"b": 10, "t": 60},
+            "len": 0.8,
+            "x": 0.15,
+            "y": 0.32,
+            "steps": [
+                {
+                    "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
+                    "label": f.name,
+                    "method": "animate",
+                }
+                for f in fig.frames
+            ],
+        }
+    ]
+
+    fig.update_layout(
+        updatemenus=[
+            {
+                "buttons": [
+                    {
+                        "args": [None, frame_args(50)],
+                        "label": "Play",
+                        "method": "animate",
+                    },
+                    {
+                        "args": [[None], frame_args(0)],
+                        "label": "Pause",
+                        "method": "animate",
+                    },
+                ],
+                "direction": "left",
+                "pad": {"r": 10, "t": 70},
+                "type": "buttons",
+                "x": 0.15,
+                "y": 0.32,
+            }
+        ],
+        sliders=sliders,
+    )
+
+    fig.update_layout(sliders=sliders)
+
+    # Set camera position
+    fig.update_layout(
+        scene_camera={
+            "up": {"x": 0, "y": 0, "z": 10},
+            "center": {"x": -2, "y": 0, "z": -3},
+            "eye": {"x": -28, "y": -22, "z": 15},
+        }
+    )
+
+    # Set axis labels
+    fig.update_layout(
+        scene={"xaxis_title": "x (m)", "yaxis_title": "y (m)", "zaxis_title": "z (m)"}
+    )
+
+    fig.update_layout(template="plotly_dark")
+
+    # Make only the grid lines thicker in the template
+    fig.update_layout(
+        scene={
+            "xaxis": {"showgrid": True, "gridwidth": 5},
+            "yaxis": {"showgrid": True, "gridwidth": 5},
+            "zaxis": {"showgrid": True, "gridwidth": 5},
+        }
+    )
+
+    fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 20, "y": 20, "z": 20}})
+    # fig.update_layout(autosize=False, width=600, height=600)
+
+    # Remove marigns
+    fig.update_layout(margin={"l": 0, "r": 0, "b": 0, "t": 0})
 
     # # Make the background transparent
     # fig.update_layout(scene=dict(bgcolor='rgba(0,0,0,0)'))
@@ -1145,10 +2832,12 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
 
     return fig
 
-def plot_animation(result: dict,
-                   params: Config,
-                   path="",
-                   ) -> None:
+
+def plot_animation(
+    result: dict,
+    params: Config,
+    path="",
+) -> None:
     result["t_final"]
     # Make title say quadrotor simulation and insert the variable tof into the title
     # title = 'Quadrotor Simulation: Time of Flight = ' + str(tof) + 's'
@@ -1159,12 +2848,18 @@ def plot_animation(result: dict,
         subs_positions, _, _, _ = full_subject_traj_time(result, params)
 
     step = 2
-    indices = np.array(list(range(drone_positions.shape[0]-1)[::step]) + [drone_positions.shape[0]-1])
+    indices = np.array(
+        [*list(range(drone_positions.shape[0] - 1)[::step]), drone_positions.shape[0] - 1]
+    )
 
-    fig = go.Figure(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='gray', width = 2)))
+    fig = go.Figure(
+        go.Scatter3d(x=[], y=[], z=[], mode="lines+markers", line={"color": "gray", "width": 2})
+    )
     for i in range(100):
-        fig.add_trace(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='red', width = 2)))
-    
+        fig.add_trace(
+            go.Scatter3d(x=[], y=[], z=[], mode="lines+markers", line={"color": "red", "width": 2})
+        )
+
     frames = []
     i = 0
     # Generate a color for each keypoint
@@ -1172,13 +2867,17 @@ def plot_animation(result: dict,
         color_kp = []
         if "init_poses" in result:
             for j in range(len(result["init_poses"])):
-                color_kp.append(f'rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})')
+                color_kp.append(
+                    f"rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})"
+                )
         else:
             for j in range(1):
-                color_kp.append(f'rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})')
+                color_kp.append(
+                    f"rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})"
+                )
 
     # Draw drone attitudes as axes
-    for i in range(0, len(indices)-1, step):
+    for i in range(0, len(indices) - 1, step):
         att = drone_attitudes[indices[i]]
         frame = go.Frame(name=str(i))
 
@@ -1191,14 +2890,13 @@ def plot_animation(result: dict,
         # Convert quaternion to rotation matrix
         rotation_matrix = qdcm(att)
 
-
         # Extract axes from rotation matrix
         axes = 20 * np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-            
+
         rotated_axes = np.dot(rotation_matrix, axes).T
 
         # Meshgrid
-        if "moving_subject" in result:    
+        if "moving_subject" in result:
             x = np.linspace(-5, 5, 20)
             y = np.linspace(-5, 5, 20)
             z = np.linspace(-5, 5, 20)
@@ -1210,27 +2908,34 @@ def plot_animation(result: dict,
             x = np.linspace(-30, 30, 20)
             y = np.linspace(-30, 30, 20)
             z = np.linspace(-30, 30, 20)
-        
-        
+
         X, Y = np.meshgrid(x, y)
 
         data = []
 
         # Define the condition for the second order cone
-        if ("init_poses" in result or "moving_subject" in result):
+        if "init_poses" in result or "moving_subject" in result:
             if "alpha_x" in result and "alpha_y" in result:
-                A = np.diag([1 / np.tan(np.pi / result["alpha_y"]), 1 / np.tan(np.pi / result["alpha_x"])])  # Conic Matrix
+                A = np.diag(
+                    [1 / np.tan(np.pi / result["alpha_y"]), 1 / np.tan(np.pi / result["alpha_x"])]
+                )  # Conic Matrix
             else:
                 raise ValueError("`alpha_x` and `alpha_y` not found in result dictionary.")
             if "norm_type" in result:
                 z = []
                 for x_val in x:
                     for y_val in y:
-                        if result["norm_type"] == 'inf':
-                            z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord = np.inf))
+                        if result["norm_type"] == "inf":
+                            z.append(
+                                np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord=np.inf)
+                            )
                         else:
-                            z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord = result["norm_type"]))
-                Z = np.array(z).reshape(20,20)
+                            z.append(
+                                np.linalg.norm(
+                                    A @ np.array([x_val, y_val]), axis=0, ord=result["norm_type"]
+                                )
+                            )
+                Z = np.array(z).reshape(20, 20)
             else:
                 raise ValueError("`norm_type` not found in result dictionary.")
 
@@ -1249,14 +2954,18 @@ def plot_animation(result: dict,
             Z += drone_positions[indices[i], 2]
 
             # Make X, Y, Z back into a meshgrid
-            X = X.reshape(20,20)
-            Y = Y.reshape(20,20)
-            Z = Z.reshape(20,20)
+            X = X.reshape(20, 20)
+            Y = Y.reshape(20, 20)
+            Z = Z.reshape(20, 20)
 
-            data.append(go.Surface(x=X, y=Y, z=Z, opacity = 0.5, showscale=False, showlegend=True, name='Viewcone'))
+            data.append(
+                go.Surface(
+                    x=X, y=Y, z=Z, opacity=0.5, showscale=False, showlegend=True, name="Viewcone"
+                )
+            )
 
-        colors = ['#FF0000', '#00FF00', '#0000FF']
-        labels = ['X', 'Y', 'Z']
+        colors = ["#FF0000", "#00FF00", "#0000FF"]
+        labels = ["X", "Y", "Z"]
 
         for k in range(3):
             if k < 3:
@@ -1264,43 +2973,72 @@ def plot_animation(result: dict,
             color = colors[k]
             labels[k]
 
-            data.append(go.Scatter3d(
+            data.append(
+                go.Scatter3d(
                     x=[drone_positions[indices[i], 0], drone_positions[indices[i], 0] + axis[0]],
                     y=[drone_positions[indices[i], 1], drone_positions[indices[i], 1] + axis[1]],
                     z=[drone_positions[indices[i], 2], drone_positions[indices[i], 2] + axis[2]],
-                    mode='lines+text',
-                    line=dict(color=color, width=4),
-                    showlegend=False
-                ))
+                    mode="lines+text",
+                    line={"color": color, "width": 4},
+                    showlegend=False,
+                )
+            )
         # Add subject position to data
         j = 0
         for sub_pose in subs_pose:
             # Use color iter to change the color of the subject in rgb
-            data.append(go.Scatter3d(x=[sub_pose[0]], y=[sub_pose[1]], z=[sub_pose[2]], mode='markers', marker=dict(size=10, color=color_kp[j]), showlegend=False, name='Subject'))
+            data.append(
+                go.Scatter3d(
+                    x=[sub_pose[0]],
+                    y=[sub_pose[1]],
+                    z=[sub_pose[2]],
+                    mode="markers",
+                    marker={"size": 10, "color": color_kp[j]},
+                    showlegend=False,
+                    name="Subject",
+                )
+            )
             # if params.vp.n_subs != 1:
             j += 1
-    
-        data.append(go.Scatter3d(
-            x=drone_positions[:indices[i]+1,0], 
-            y=drone_positions[:indices[i]+1,1], 
-            z=drone_positions[:indices[i]+1,2], 
-            mode='markers',
-            marker=dict(
-                size=5,
-                color=np.linalg.norm(drone_velocities[:indices[i]+1], axis = 1), # set color to an array/list of desired values
-                colorscale='Viridis', # choose a colorscale
-                colorbar=dict(title='Velocity Norm (m/s)', x=0.02, y=0.55, len=0.75) # add colorbar
-            ),
-            name='Nonlinear Propagation'
-        ))
-        
+
+        data.append(
+            go.Scatter3d(
+                x=drone_positions[: indices[i] + 1, 0],
+                y=drone_positions[: indices[i] + 1, 1],
+                z=drone_positions[: indices[i] + 1, 2],
+                mode="markers",
+                marker={
+                    "size": 5,
+                    "color": np.linalg.norm(
+                        drone_velocities[: indices[i] + 1], axis=1
+                    ),  # set color to an array/list of desired values
+                    "colorscale": "Viridis",  # choose a colorscale
+                    "colorbar": {
+                        "title": "Velocity Norm (m/s)",
+                        "x": 0.02,
+                        "y": 0.55,
+                        "len": 0.75,
+                    },  # add colorbar
+                },
+                name="Nonlinear Propagation",
+            )
+        )
 
         # Make the subject draw a line as it moves
         if "moving_subject" in result:
             if result["moving_subject"]:
                 for sub_positions in subs_positions:
-                    data.append(go.Scatter3d(x=sub_positions[:indices[i]+1,0], y=sub_positions[:indices[i]+1,1], z=sub_positions[:indices[i]+1,2], mode='lines', line=dict(color='red', width = 10), name='Subject Position'))
-                    
+                    data.append(
+                        go.Scatter3d(
+                            x=sub_positions[: indices[i] + 1, 0],
+                            y=sub_positions[: indices[i] + 1, 1],
+                            z=sub_positions[: indices[i] + 1, 2],
+                            mode="lines",
+                            line={"color": "red", "width": 10},
+                            name="Subject Position",
+                        )
+                    )
+
                     sub_position = sub_positions[indices[i]]
 
                     # Plot two spheres as a surface at the location of the subject to represent the minimum and maximum allowed range from the subject
@@ -1324,18 +3062,41 @@ def plot_animation(result: dict,
                         y_max = result["max_range"] * y
                         z_max = result["max_range"] * z
                     else:
-                        raise ValueError("`min_range` and `max_range` not found in result dictionary.")
+                        raise ValueError(
+                            "`min_range` and `max_range` not found in result dictionary."
+                        )
 
                     # Rotate and translate points
                     points_min = np.array([x_min.flatten(), y_min.flatten(), z_min.flatten()])
                     points_max = np.array([x_max.flatten(), y_max.flatten(), z_max.flatten()])
-                    
+
                     points_min = points_min.T + sub_position
                     points_max = points_max.T + sub_position
 
-                    data.append(go.Surface(x=points_min[:, 0].reshape(n,n), y=points_min[:, 1].reshape(n,n), z=points_min[:, 2].reshape(n,n), opacity = 0.2, colorscale='reds', name='Minimum Range', showlegend=True, showscale=False))
-                    data.append(go.Surface(x=points_max[:, 0].reshape(n,n), y=points_max[:, 1].reshape(n,n), z=points_max[:, 2].reshape(n,n), opacity = 0.2, colorscale='blues', name='Maximum Range', showlegend=True, showscale=False))
-
+                    data.append(
+                        go.Surface(
+                            x=points_min[:, 0].reshape(n, n),
+                            y=points_min[:, 1].reshape(n, n),
+                            z=points_min[:, 2].reshape(n, n),
+                            opacity=0.2,
+                            colorscale="reds",
+                            name="Minimum Range",
+                            showlegend=True,
+                            showscale=False,
+                        )
+                    )
+                    data.append(
+                        go.Surface(
+                            x=points_max[:, 0].reshape(n, n),
+                            y=points_max[:, 1].reshape(n, n),
+                            z=points_max[:, 2].reshape(n, n),
+                            opacity=0.2,
+                            colorscale="blues",
+                            name="Maximum Range",
+                            showlegend=True,
+                            showscale=False,
+                        )
+                    )
 
         frame.data = data
         frames.append(frame)
@@ -1343,35 +3104,83 @@ def plot_animation(result: dict,
     fig.frames = frames
 
     if "obstacles_centers" in result:
-        for center, axes, radius in zip(result['obstacles_centers'], result['obstacles_axes'], result['obstacles_radii']):
-                n = 20
-                # Generate points on the unit sphere
-                u = np.linspace(0, 2 * np.pi, n)
-                v = np.linspace(0, np.pi, n)
+        for center, axes, radius in zip(
+            result["obstacles_centers"], result["obstacles_axes"], result["obstacles_radii"]
+        ):
+            n = 20
+            # Generate points on the unit sphere
+            u = np.linspace(0, 2 * np.pi, n)
+            v = np.linspace(0, np.pi, n)
 
-                x = np.outer(np.cos(u), np.sin(v))
-                y = np.outer(np.sin(u), np.sin(v))
-                z = np.outer(np.ones(np.size(u)), np.cos(v))
+            x = np.outer(np.cos(u), np.sin(v))
+            y = np.outer(np.sin(u), np.sin(v))
+            z = np.outer(np.ones(np.size(u)), np.cos(v))
 
-                # Scale points by radii
-                x = 1/radius[0] * x
-                y = 1/radius[1] * y
-                z = 1/radius[2] * z
+            # Scale points by radii
+            x = 1 / radius[0] * x
+            y = 1 / radius[1] * y
+            z = 1 / radius[2] * z
 
-                # Rotate and translate points
-                points = np.array([x.flatten(), y.flatten(), z.flatten()])
-                points = axes @ points
-                points = points.T + center.value
+            # Rotate and translate points
+            points = np.array([x.flatten(), y.flatten(), z.flatten()])
+            points = axes @ points
+            points = points.T + center.value
 
-                fig.add_trace(go.Surface(x=points[:, 0].reshape(n,n), y=points[:, 1].reshape(n,n), z=points[:, 2].reshape(n,n), opacity = 0.5, showscale=False))
+            fig.add_trace(
+                go.Surface(
+                    x=points[:, 0].reshape(n, n),
+                    y=points[:, 1].reshape(n, n),
+                    z=points[:, 2].reshape(n, n),
+                    opacity=0.5,
+                    showscale=False,
+                )
+            )
 
     if "vertices" in result:
         for vertices in result["vertices"]:
             # Plot a line through the vertices of the gate
-            fig.add_trace(go.Scatter3d(x=[vertices[0][0], vertices[1][0], vertices[2][0], vertices[3][0], vertices[0][0]], y=[vertices[0][1], vertices[1][1], vertices[2][1], vertices[3][1], vertices[0][1]], z=[vertices[0][2], vertices[1][2], vertices[2][2], vertices[3][2], vertices[0][2]], mode='lines', showlegend=False, line=dict(color='blue', width=10)))
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[
+                        vertices[0][0],
+                        vertices[1][0],
+                        vertices[2][0],
+                        vertices[3][0],
+                        vertices[0][0],
+                    ],
+                    y=[
+                        vertices[0][1],
+                        vertices[1][1],
+                        vertices[2][1],
+                        vertices[3][1],
+                        vertices[0][1],
+                    ],
+                    z=[
+                        vertices[0][2],
+                        vertices[1][2],
+                        vertices[2][2],
+                        vertices[3][2],
+                        vertices[0][2],
+                    ],
+                    mode="lines",
+                    showlegend=False,
+                    line={"color": "blue", "width": 10},
+                )
+            )
 
     # Add ground plane
-    fig.add_trace(go.Surface(x=[-200, 200, 200, -200], y=[-200, -200, 200, 200], z=[[0, 0], [0, 0], [0, 0], [0, 0]], opacity=0.3, showscale=False, colorscale='Greys', showlegend = True, name='Ground Plane'))
+    fig.add_trace(
+        go.Surface(
+            x=[-200, 200, 200, -200],
+            y=[-200, -200, 200, 200],
+            z=[[0, 0], [0, 0], [0, 0], [0, 0]],
+            opacity=0.3,
+            showscale=False,
+            colorscale="Greys",
+            showlegend=True,
+            name="Ground Plane",
+        )
+    )
 
     sliders = [
         {
@@ -1384,119 +3193,134 @@ def plot_animation(result: dict,
                     "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
                     "label": f.name,
                     "method": "animate",
-                } for f in fig.frames
-            ]
+                }
+                for f in fig.frames
+            ],
         }
     ]
 
-    fig.update_layout(updatemenus = [{"buttons":[
-                                        {
-                                            "args": [None, frame_args(50)],
-                                            "label": "Play",
-                                            "method": "animate",
-                                        },
-                                        {
-                                            "args": [[None], frame_args(0)],
-                                            "label": "Pause",
-                                            "method": "animate",
-                                    }],
-
-                                    "direction": "left",
-                                    "pad": {"r": 10, "t": 70},
-                                    "type": "buttons",
-                                    "x": 0.1,
-                                    "y": 0,
-                                }
-                            ],
-                            sliders=sliders
-                        )
+    fig.update_layout(
+        updatemenus=[
+            {
+                "buttons": [
+                    {
+                        "args": [None, frame_args(50)],
+                        "label": "Play",
+                        "method": "animate",
+                    },
+                    {
+                        "args": [[None], frame_args(0)],
+                        "label": "Pause",
+                        "method": "animate",
+                    },
+                ],
+                "direction": "left",
+                "pad": {"r": 10, "t": 70},
+                "type": "buttons",
+                "x": 0.1,
+                "y": 0,
+            }
+        ],
+        sliders=sliders,
+    )
 
     fig.update_layout(sliders=sliders)
 
-    fig.update_layout(template='plotly_dark') #, title=title)
-    
-    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
-    
+    fig.update_layout(template="plotly_dark")  # , title=title)
+
+    fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 10, "y": 10, "z": 10}})
+
     # Check if covariance exists
     if "covariance" in result:
-        fig.update_layout(scene=dict(xaxis=dict(range=[0, 4000]), yaxis=dict(range=[0, 4000]), zaxis=dict(range=[-1000, 3000])))
+        fig.update_layout(
+            scene={
+                "xaxis": {"range": [0, 4000]},
+                "yaxis": {"range": [0, 4000]},
+                "zaxis": {"range": [-1000, 3000]},
+            }
+        )
     else:
-        fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
+        fig.update_layout(
+            scene={
+                "xaxis": {"range": [-200, 200]},
+                "yaxis": {"range": [-200, 200]},
+                "zaxis": {"range": [-200, 200]},
+            }
+        )
 
     # Overlay the title onto the plot
     fig.update_layout(title_y=0.95, title_x=0.5)
 
-    
-
-
-
     # Overlay the sliders and buttons onto the plot
-    fig.update_layout(updatemenus = [{"buttons":[
-                                        {
-                                            "args": [None, frame_args(50)],
-                                            "label": "Play",
-                                            "method": "animate",
-                                        },
-                                        {
-                                            "args": [[None], frame_args(0)],
-                                            "label": "Pause",
-                                            "method": "animate",
-                                    }],
-
-                                    "direction": "left",
-                                    "pad": {"r": 10, "t": 70},
-                                    "type": "buttons",
-                                    "x": 0.22,
-                                    "y": 0.37,
-                                }
-                            ],
-                            sliders=sliders
-                        )
-    
-    
+    fig.update_layout(
+        updatemenus=[
+            {
+                "buttons": [
+                    {
+                        "args": [None, frame_args(50)],
+                        "label": "Play",
+                        "method": "animate",
+                    },
+                    {
+                        "args": [[None], frame_args(0)],
+                        "label": "Pause",
+                        "method": "animate",
+                    },
+                ],
+                "direction": "left",
+                "pad": {"r": 10, "t": 70},
+                "type": "buttons",
+                "x": 0.22,
+                "y": 0.37,
+            }
+        ],
+        sliders=sliders,
+    )
 
     # Show the legend overlayed on the plot
-    fig.update_layout(legend=dict(yanchor="top", y=0.9, xanchor="left", x=0.75))
+    fig.update_layout(legend={"yanchor": "top", "y": 0.9, "xanchor": "left", "x": 0.75})
 
     # fig.update_layout(height=450, width = 800)
 
     # Remove the black border around the fig
-    fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
+    fig.update_layout(margin={"l": 0, "r": 0, "b": 0, "t": 0})
 
     # Rmeove the background from the legend
-    fig.update_layout(legend=dict(bgcolor='rgba(0,0,0,0)'))
+    fig.update_layout(legend={"bgcolor": "rgba(0,0,0,0)"})
 
-    fig.update_xaxes(
-        dtick=1.0,
-        showline=False
-    )
-    fig.update_yaxes(
-        scaleanchor="x",
-        scaleratio=1,
-        showline=False,
-        dtick=1.0
-    )
+    fig.update_xaxes(dtick=1.0, showline=False)
+    fig.update_yaxes(scaleanchor="x", scaleratio=1, showline=False, dtick=1.0)
 
     return fig
 
-def plot_brachistochrone_position(result: OptimizationResults,
-                                   params = None):
+
+def plot_brachistochrone_position(result: OptimizationResults, params=None):
     # Plot the position of the brachistochrone problem
     fig = go.Figure()
 
-    x = result.x_full[:,0]
-    y = result.x_full[:,1]
+    x = result.x_full[:, 0]
+    y = result.x_full[:, 1]
 
-    fig.add_trace(go.Scatter(x=x, y=y, mode='lines', line=dict(color='blue', width=2), name='Position'))
-    fig.add_trace(go.Scatter(x=[x[0]], y=[y[0]], mode='markers', marker=dict(color='green', size=10), name='Start'))
-    fig.add_trace(go.Scatter(x=[x[-1]], y=[y[-1]], mode='markers', marker=dict(color='red', size=10), name='End'))
+    fig.add_trace(
+        go.Scatter(x=x, y=y, mode="lines", line={"color": "blue", "width": 2}, name="Position")
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[x[0]], y=[y[0]], mode="markers", marker={"color": "green", "size": 10}, name="Start"
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[x[-1]], y=[y[-1]], mode="markers", marker={"color": "red", "size": 10}, name="End"
+        )
+    )
 
-    fig.update_layout(title='Brachistochrone Position', title_x=0.5, template='plotly_dark')
+    fig.update_layout(title="Brachistochrone Position", title_x=0.5, template="plotly_dark")
     fig.update_xaxes(scaleanchor="y", scaleratio=1)
     return fig
 
-def plot_brachistochrone_velocity(results: OptimizationResults,
-                                  params = None):
+
+def plot_brachistochrone_velocity(results: OptimizationResults, params=None):
     # Plot the velocity of the brachistochrone problem
     fig = go.Figure()
 
@@ -1504,18 +3328,21 @@ def plot_brachistochrone_velocity(results: OptimizationResults,
     x_full = results.x_full
     t_full = results.t_full
 
-    v = x_full[:,3]  # velocity is the 4th state
+    v = x_full[:, 3]  # velocity is the 4th state
 
-    fig.add_trace(go.Scatter(x=t_full, y=v, mode='lines', line=dict(color='blue', width=2), name='Velocity'))
+    fig.add_trace(
+        go.Scatter(x=t_full, y=v, mode="lines", line={"color": "blue", "width": 2}, name="Velocity")
+    )
 
-    fig.update_layout(title=f'Brachistochrone Velocity: {tof} seconds', title_x=0.5, template='plotly_dark')
+    fig.update_layout(
+        title=f"Brachistochrone Velocity: {tof} seconds", title_x=0.5, template="plotly_dark"
+    )
     return fig
 
-def plot_scp_animation(result: dict,
-                       params = None,
-                       path=""):
+
+def plot_scp_animation(result: dict, params=None, path=""):
     tof = result["t_final"]
-    title = f'SCP Simulation: {tof} seconds'
+    title = f"SCP Simulation: {tof} seconds"
     drone_positions = result.x_full[:, :3]
     drone_attitudes = result.x_full[:, 6:10]
     result.u_full[:, :3]
@@ -1526,17 +3353,37 @@ def plot_scp_animation(result: dict,
     # gates = result_ctcs["gates"]
     if "moving_subject" in result or "init_poses" in result:
         subs_positions, _, _, _ = full_subject_traj_time(result, params)
-    fig = go.Figure(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='gray', width = 2), name='SCP Iterations'))
+    fig = go.Figure(
+        go.Scatter3d(
+            x=[],
+            y=[],
+            z=[],
+            mode="lines+markers",
+            line={"color": "gray", "width": 2},
+            name="SCP Iterations",
+        )
+    )
     for j in range(200):
-        fig.add_trace(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='gray', width = 2)))
+        fig.add_trace(
+            go.Scatter3d(x=[], y=[], z=[], mode="lines+markers", line={"color": "gray", "width": 2})
+        )
 
     # fig.update_layout(height=1000)
 
-    fig.add_trace(go.Scatter3d(x=drone_positions[:,0], y=drone_positions[:,1], z=drone_positions[:,2], mode='lines', line=dict(color='green', width = 5), name='Nonlinear Propagation'))
+    fig.add_trace(
+        go.Scatter3d(
+            x=drone_positions[:, 0],
+            y=drone_positions[:, 1],
+            z=drone_positions[:, 2],
+            mode="lines",
+            line={"color": "green", "width": 5},
+            name="Nonlinear Propagation",
+        )
+    )
 
-    fig.update_layout(template='plotly_dark', title=title)
+    fig.update_layout(template="plotly_dark", title=title)
 
-    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
+    fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 10, "y": 10, "z": 10}})
     # fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
 
     # Extract the number of states and controls from the parameters
@@ -1555,24 +3402,44 @@ def plot_scp_animation(result: dict,
     traj_iter = 0
 
     for scp_traj in scp_ctcs_trajs:
-        drone_positions = scp_traj[:,0:3]
-        drone_attitudes = scp_traj[:,6:10]
+        drone_positions = scp_traj[:, 0:3]
+        drone_attitudes = scp_traj[:, 6:10]
         frame = go.Frame(name=str(traj_iter))
         data = []
         # Plot the multiple shooting trajectories
         pos_traj = []
         if traj_iter < len(scp_multi_shoot):
             for i_multi in range(scp_multi_shoot[traj_iter].shape[1]):
-                pos_traj.append(scp_multi_shoot[traj_iter][:,i_multi].reshape(-1, i5)[:,0:3])
+                pos_traj.append(scp_multi_shoot[traj_iter][:, i_multi].reshape(-1, i5)[:, 0:3])
             pos_traj = np.array(pos_traj)
-            
+
             for j in range(pos_traj.shape[1]):
                 if j == 0:
-                    data.append(go.Scatter3d(x=pos_traj[:,j, 0], y=pos_traj[:,j, 1], z=pos_traj[:,j, 2], mode='lines', legendgroup='Multishot Trajectory', name='Multishot Trajectory ' + str(traj_iter), showlegend=True, line=dict(color='blue', width = 5)))
+                    data.append(
+                        go.Scatter3d(
+                            x=pos_traj[:, j, 0],
+                            y=pos_traj[:, j, 1],
+                            z=pos_traj[:, j, 2],
+                            mode="lines",
+                            legendgroup="Multishot Trajectory",
+                            name="Multishot Trajectory " + str(traj_iter),
+                            showlegend=True,
+                            line={"color": "blue", "width": 5},
+                        )
+                    )
                 else:
-                    data.append(go.Scatter3d(x=pos_traj[:,j, 0], y=pos_traj[:,j, 1], z=pos_traj[:,j, 2], mode='lines', legendgroup='Multishot Trajectory', showlegend=False, line=dict(color='blue', width = 5)))
-        
-            
+                    data.append(
+                        go.Scatter3d(
+                            x=pos_traj[:, j, 0],
+                            y=pos_traj[:, j, 1],
+                            z=pos_traj[:, j, 2],
+                            mode="lines",
+                            legendgroup="Multishot Trajectory",
+                            showlegend=False,
+                            line={"color": "blue", "width": 5},
+                        )
+                    )
+
         for i in range(drone_attitudes.shape[0]):
             att = drone_attitudes[i]
 
@@ -1583,28 +3450,32 @@ def plot_scp_animation(result: dict,
             axes = 2 * np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
             rotated_axes = np.dot(rotation_matrix, axes.T).T
 
-            colors = ['#FF0000', '#00FF00', '#0000FF']
+            colors = ["#FF0000", "#00FF00", "#0000FF"]
 
             for k in range(3):
                 axis = rotated_axes[k]
                 color = colors[k]
 
-                data.append(go.Scatter3d(
-                    x=[scp_traj[i, 0], scp_traj[i, 0] + axis[0]],
-                    y=[scp_traj[i, 1], scp_traj[i, 1] + axis[1]],
-                    z=[scp_traj[i, 2], scp_traj[i, 2] + axis[2]],
-                    mode='lines+text',
-                    line=dict(color=color, width=4),
-                    showlegend=False
-                ))
-        traj_iter += 1  
+                data.append(
+                    go.Scatter3d(
+                        x=[scp_traj[i, 0], scp_traj[i, 0] + axis[0]],
+                        y=[scp_traj[i, 1], scp_traj[i, 1] + axis[1]],
+                        z=[scp_traj[i, 2], scp_traj[i, 2] + axis[2]],
+                        mode="lines+text",
+                        line={"color": color, "width": 4},
+                        showlegend=False,
+                    )
+                )
+        traj_iter += 1
         frame.data = data
         frames.append(frame)
-    fig.frames = frames 
+    fig.frames = frames
 
     i = 1
     if "obstacles_centers" in result:
-        for center, axes, radius in zip(result['obstacles_centers'], result['obstacles_axes'], result['obstacles_radii']):
+        for center, axes, radius in zip(
+            result["obstacles_centers"], result["obstacles_axes"], result["obstacles_radii"]
+        ):
             n = 20
             # Generate points on the unit sphere
             u = np.linspace(0, 2 * np.pi, n)
@@ -1615,36 +3486,99 @@ def plot_scp_animation(result: dict,
             z = np.outer(np.ones(np.size(u)), np.cos(v))
 
             # Scale points by radii
-            x = 1/radius[0] * x
-            y = 1/radius[1] * y
-            z = 1/radius[2] * z
+            x = 1 / radius[0] * x
+            y = 1 / radius[1] * y
+            z = 1 / radius[2] * z
 
             # Rotate and translate points
             points = np.array([x.flatten(), y.flatten(), z.flatten()])
             points = axes @ points
             points = points.T + center.value
 
-            fig.add_trace(go.Surface(x=points[:, 0].reshape(n,n), y=points[:, 1].reshape(n,n), z=points[:, 2].reshape(n,n), opacity = 0.5, showscale=False))
+            fig.add_trace(
+                go.Surface(
+                    x=points[:, 0].reshape(n, n),
+                    y=points[:, 1].reshape(n, n),
+                    z=points[:, 2].reshape(n, n),
+                    opacity=0.5,
+                    showscale=False,
+                )
+            )
 
     if "vertices" in result:
         for vertices in result["vertices"]:
             # Plot a line through the vertices of the gate
-            fig.add_trace(go.Scatter3d(x=[vertices[0][0], vertices[1][0], vertices[2][0], vertices[3][0], vertices[0][0]], y=[vertices[0][1], vertices[1][1], vertices[2][1], vertices[3][1], vertices[0][1]], z=[vertices[0][2], vertices[1][2], vertices[2][2], vertices[3][2], vertices[0][2]], mode='lines', showlegend=False, line=dict(color='blue', width=10)))
-            
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[
+                        vertices[0][0],
+                        vertices[1][0],
+                        vertices[2][0],
+                        vertices[3][0],
+                        vertices[0][0],
+                    ],
+                    y=[
+                        vertices[0][1],
+                        vertices[1][1],
+                        vertices[2][1],
+                        vertices[3][1],
+                        vertices[0][1],
+                    ],
+                    z=[
+                        vertices[0][2],
+                        vertices[1][2],
+                        vertices[2][2],
+                        vertices[3][2],
+                        vertices[0][2],
+                    ],
+                    mode="lines",
+                    showlegend=False,
+                    line={"color": "blue", "width": 10},
+                )
+            )
+
     # Add the subject positions
-    if "n_subs" in result and result["n_subs"] != 0:     
+    if "n_subs" in result and result["n_subs"] != 0:
         if "moving_subject" in result:
             if result["moving_subject"]:
                 for sub_positions in subs_positions:
-                    fig.add_trace(go.Scatter3d(x=sub_positions[:,0], y=sub_positions[:,1], z=sub_positions[:,2], mode='lines', line=dict(color='red', width = 5), showlegend=False))
+                    fig.add_trace(
+                        go.Scatter3d(
+                            x=sub_positions[:, 0],
+                            y=sub_positions[:, 1],
+                            z=sub_positions[:, 2],
+                            mode="lines",
+                            line={"color": "red", "width": 5},
+                            showlegend=False,
+                        )
+                    )
         else:
             # Plot the subject positions as points
             for sub_positions in subs_positions:
-                fig.add_trace(go.Scatter3d(x=sub_positions[:,0], y=sub_positions[:,1], z=sub_positions[:,2], mode='markers', marker=dict(size=10, color='red'), showlegend=False))
+                fig.add_trace(
+                    go.Scatter3d(
+                        x=sub_positions[:, 0],
+                        y=sub_positions[:, 1],
+                        z=sub_positions[:, 2],
+                        mode="markers",
+                        marker={"size": 10, "color": "red"},
+                        showlegend=False,
+                    )
+                )
 
-
-    fig.add_trace(go.Surface(x=[-2000, 2000, 2000, -2000], y=[-2000, -2000, 2000, 2000], z=[[0, 0], [0, 0], [0, 0], [0, 0]], opacity=0.3, showscale=False, colorscale='Greys', showlegend = True, name='Ground Plane'))
-    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
+    fig.add_trace(
+        go.Surface(
+            x=[-2000, 2000, 2000, -2000],
+            y=[-2000, -2000, 2000, 2000],
+            z=[[0, 0], [0, 0], [0, 0], [0, 0]],
+            opacity=0.3,
+            showscale=False,
+            colorscale="Greys",
+            showlegend=True,
+            name="Ground Plane",
+        )
+    )
+    fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 10, "y": 10, "z": 10}})
     # fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
 
     sliders = [
@@ -1658,140 +3592,170 @@ def plot_scp_animation(result: dict,
                     "args": [[f.name], frame_args(0)],
                     "label": f.name,
                     "method": "animate",
-                } for f in fig.frames
-            ]
+                }
+                for f in fig.frames
+            ],
         }
     ]
 
-    fig.update_layout(updatemenus = [{"buttons":[
-                                        {
-                                            "args": [None, frame_args(50)],
-                                            "label": "Play",
-                                            "method": "animate",
-                                        },
-                                        {
-                                            "args": [[None], frame_args(0)],
-                                            "label": "Pause",
-                                            "method": "animate",
-                                    }],
-
-                                    "direction": "left",
-                                    "pad": {"r": 10, "t": 70},
-                                    "type": "buttons",
-                                    "x": 0.15,
-                                    "y": 0.32,
-                                }
-                            ],
-                            sliders=sliders
-                        )
+    fig.update_layout(
+        updatemenus=[
+            {
+                "buttons": [
+                    {
+                        "args": [None, frame_args(50)],
+                        "label": "Play",
+                        "method": "animate",
+                    },
+                    {
+                        "args": [[None], frame_args(0)],
+                        "label": "Pause",
+                        "method": "animate",
+                    },
+                ],
+                "direction": "left",
+                "pad": {"r": 10, "t": 70},
+                "type": "buttons",
+                "x": 0.15,
+                "y": 0.32,
+            }
+        ],
+        sliders=sliders,
+    )
     fig.update_layout(sliders=sliders)
 
-    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
+    fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 10, "y": 10, "z": 10}})
     # fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
 
     # Overlay the title onto the plot
     fig.update_layout(title_y=0.95, title_x=0.5)
 
     # Overlay the sliders and buttons onto the plot
-    fig.update_layout(updatemenus = [{"buttons":[
-                                        {
-                                            "args": [None, frame_args(50)],
-                                            "label": "Play",
-                                            "method": "animate",
-                                        },
-                                        {
-                                            "args": [[None], frame_args(0)],
-                                            "label": "Pause",
-                                            "method": "animate",
-                                    }],
-
-                                    "direction": "left",
-                                    "pad": {"r": 10, "t": 70},
-                                    "type": "buttons",
-                                    "x": 0.15,
-                                    "y": 0.32,
-                                }
-                            ],
-                            sliders=sliders
-                        )
-    
-    
+    fig.update_layout(
+        updatemenus=[
+            {
+                "buttons": [
+                    {
+                        "args": [None, frame_args(50)],
+                        "label": "Play",
+                        "method": "animate",
+                    },
+                    {
+                        "args": [[None], frame_args(0)],
+                        "label": "Pause",
+                        "method": "animate",
+                    },
+                ],
+                "direction": "left",
+                "pad": {"r": 10, "t": 70},
+                "type": "buttons",
+                "x": 0.15,
+                "y": 0.32,
+            }
+        ],
+        sliders=sliders,
+    )
 
     # Show the legend overlayed on the plot
-    fig.update_layout(legend=dict(yanchor="top", y=0.9, xanchor="left", x=0.75))
+    fig.update_layout(legend={"yanchor": "top", "y": 0.9, "xanchor": "left", "x": 0.75})
 
     # fig.update_layout(height=450, width = 800)
 
     # Remove the black border around the fig
-    fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
+    fig.update_layout(margin={"l": 0, "r": 0, "b": 0, "t": 0})
 
     # Rmeove the background from the legend
-    fig.update_layout(legend=dict(bgcolor='rgba(0,0,0,0)'))
+    fig.update_layout(legend={"bgcolor": "rgba(0,0,0,0)"})
 
-    fig.update_xaxes(
-        dtick=1.0,
-        showline=False
-    )
-    fig.update_yaxes(
-        scaleanchor="x",
-        scaleratio=1,
-        showline=False,
-        dtick=1.0
-    )
+    fig.update_xaxes(dtick=1.0, showline=False)
+    fig.update_yaxes(scaleanchor="x", scaleratio=1, showline=False, dtick=1.0)
 
     # Rotate the camera view to the left
     if "moving_subject" not in result:
-        fig.update_layout(scene_camera=dict(up=dict(x=0, y=0, z=90), center=dict(x=1, y=0.3, z=1), eye=dict(x=-1, y=2, z=1)))
+        fig.update_layout(
+            scene_camera={
+                "up": {"x": 0, "y": 0, "z": 90},
+                "center": {"x": 1, "y": 0.3, "z": 1},
+                "eye": {"x": -1, "y": 2, "z": 1},
+            }
+        )
 
     return fig
 
-def plot_xy_xz_yz(result: dict, params: Config):
 
+def plot_xy_xz_yz(result: dict, params: Config):
     x_full = result["x_full"]
     result["t_full"]
 
-    fig = make_subplots(rows=2, cols=2, 
-                        subplot_titles=('XY Plane', 'XZ Plane', 'YZ Plane'),
-                        specs=[[{}, {}],
-                               [{}, None]])
+    fig = make_subplots(
+        rows=2,
+        cols=2,
+        subplot_titles=("XY Plane", "XZ Plane", "YZ Plane"),
+        specs=[[{}, {}], [{}, None]],
+    )
 
     # Add trajectory traces
-    fig.add_trace(go.Scatter(x=x_full[:, 0], y=x_full[:, 1], mode='lines',
-                             line=dict(color='blue', width=2), name='Trajectory XY Plane'),
-                  row=1, col=1)
-    
-    fig.add_trace(go.Scatter(x=x_full[:, 0], y=x_full[:, 2], mode='lines',
-                             line=dict(color='blue', width=2), name='Trajectory XZ Plane'),
-                  row=1, col=2)
-    
-    fig.add_trace(go.Scatter(x=x_full[:, 1], y=x_full[:, 2], mode='lines',
-                             line=dict(color='blue', width=2), name='Trajectory YZ Plane'),
-                  row=2, col=1)
+    fig.add_trace(
+        go.Scatter(
+            x=x_full[:, 0],
+            y=x_full[:, 1],
+            mode="lines",
+            line={"color": "blue", "width": 2},
+            name="Trajectory XY Plane",
+        ),
+        row=1,
+        col=1,
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=x_full[:, 0],
+            y=x_full[:, 2],
+            mode="lines",
+            line={"color": "blue", "width": 2},
+            name="Trajectory XZ Plane",
+        ),
+        row=1,
+        col=2,
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=x_full[:, 1],
+            y=x_full[:, 2],
+            mode="lines",
+            line={"color": "blue", "width": 2},
+            name="Trajectory YZ Plane",
+        ),
+        row=2,
+        col=1,
+    )
 
     # Set axis titles
-    fig.update_xaxes(title_text='X (m)', row=1, col=1)
-    fig.update_yaxes(title_text='Y (m)', row=1, col=1)
-    fig.update_xaxes(title_text='X (m)', row=1, col=2)
-    fig.update_yaxes(title_text='Z (m)', row=1, col=2)
-    fig.update_xaxes(title_text='Y (m)', row=2, col=1)
-    fig.update_yaxes(title_text='Z (m)', row=2, col=1)
+    fig.update_xaxes(title_text="X (m)", row=1, col=1)
+    fig.update_yaxes(title_text="Y (m)", row=1, col=1)
+    fig.update_xaxes(title_text="X (m)", row=1, col=2)
+    fig.update_yaxes(title_text="Z (m)", row=1, col=2)
+    fig.update_xaxes(title_text="Y (m)", row=2, col=1)
+    fig.update_yaxes(title_text="Z (m)", row=2, col=1)
 
     # Set equal aspect ratio for each subplot
     fig.update_layout(
-        title='Trajectory in XY, XZ, and YZ Planes',
-        template='plotly_dark',
-        xaxis=dict(scaleanchor="y"),      # row=1, col=1
-        xaxis2=dict(scaleanchor="y2"),    # row=1, col=2
-        xaxis3=dict(scaleanchor="y3")     # row=2, col=1
+        title="Trajectory in XY, XZ, and YZ Planes",
+        template="plotly_dark",
+        xaxis={"scaleanchor": "y"},  # row=1, col=1
+        xaxis2={"scaleanchor": "y2"},  # row=1, col=2
+        xaxis3={"scaleanchor": "y3"},  # row=2, col=1
     )
 
     return fig
+
 
 def plot_control_norm(results: OptimizationResults, params: Config):
     # Plot the control norm over time
     fig = go.Figure()
 
-    u_full = results.u_full[:,:3]
+    u_full = results.u_full[:, :3]
     t_full = results.t_full
 
     # Compute the norm of the control vector
@@ -1800,29 +3764,44 @@ def plot_control_norm(results: OptimizationResults, params: Config):
     rho_min = results.plotting_data["rho_min"]
     rho_max = results.plotting_data["rho_max"]
 
-    fig.add_trace(go.Scatter(x=t_full, y=u_norm, mode='lines', line=dict(color='blue', width=2), name='Control Norm'))
-    fig.add_hline(y=rho_min, line=dict(color='red', width=2, dash='dash'), name='Min Thrust')
-    fig.add_hline(y=rho_max, line=dict(color='red', width=2, dash='dash'), name='Max Thrust')
+    fig.add_trace(
+        go.Scatter(
+            x=t_full,
+            y=u_norm,
+            mode="lines",
+            line={"color": "blue", "width": 2},
+            name="Control Norm",
+        )
+    )
+    fig.add_hline(y=rho_min, line={"color": "red", "width": 2, "dash": "dash"}, name="Min Thrust")
+    fig.add_hline(y=rho_max, line={"color": "red", "width": 2, "dash": "dash"}, name="Max Thrust")
 
-    title = f'Control Norm: {results.t_final} seconds'
-    fig.update_layout(title=title, xaxis_title='Time (s)', yaxis_title='Control Norm', template='plotly_dark')
+    title = f"Control Norm: {results.t_final} seconds"
+    fig.update_layout(
+        title=title, xaxis_title="Time (s)", yaxis_title="Control Norm", template="plotly_dark"
+    )
     return fig
+
 
 def scp_traj_interp(scp_trajs, params: Config):
     scp_prop_trajs = []
     for traj in scp_trajs:
         states = []
         for k in range(params.scp.n):
-            traj_temp = np.repeat(np.expand_dims(traj[k], axis = 1), params.prp.inter_sample - 1, axis = 1)
+            traj_temp = np.repeat(
+                np.expand_dims(traj[k], axis=1), params.prp.inter_sample - 1, axis=1
+            )
             for i in range(1, params.prp.inter_sample - 1):
-                states.append(traj_temp[:,i])
+                states.append(traj_temp[:, i])
         scp_prop_trajs.append(np.array(states))
     return scp_prop_trajs
 
-def plot_animation_double_integrator(result: dict,
-                   params: Config,
-                   path="",
-                   ) -> None:
+
+def plot_animation_double_integrator(
+    result: dict,
+    params: Config,
+    path="",
+) -> None:
     result["t_final"]
     # Make title say quadrotor simulation and insert the variable tof into the title
     # title = 'Quadrotor Simulation: Time of Flight = ' + str(tof) + 's'
@@ -1832,12 +3811,18 @@ def plot_animation_double_integrator(result: dict,
         subs_positions, _, _, _ = full_subject_traj_time(result, params)
 
     step = 2
-    indices = np.array(list(range(drone_positions.shape[0]-1)[::step]) + [drone_positions.shape[0]-1])
+    indices = np.array(
+        [*list(range(drone_positions.shape[0] - 1)[::step]), drone_positions.shape[0] - 1]
+    )
 
-    fig = go.Figure(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='gray', width = 2)))
+    fig = go.Figure(
+        go.Scatter3d(x=[], y=[], z=[], mode="lines+markers", line={"color": "gray", "width": 2})
+    )
     for i in range(100):
-        fig.add_trace(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='red', width = 2)))
-    
+        fig.add_trace(
+            go.Scatter3d(x=[], y=[], z=[], mode="lines+markers", line={"color": "red", "width": 2})
+        )
+
     frames = []
     i = 0
     # Generate a color for each keypoint
@@ -1845,13 +3830,17 @@ def plot_animation_double_integrator(result: dict,
         color_kp = []
         if "init_poses" in result:
             for j in range(len(result["init_poses"])):
-                color_kp.append(f'rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})')
+                color_kp.append(
+                    f"rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})"
+                )
         else:
             for j in range(1):
-                color_kp.append(f'rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})')
+                color_kp.append(
+                    f"rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})"
+                )
 
     # Draw drone attitudes as axes
-    for i in range(0, len(indices)-1, step):
+    for i in range(0, len(indices) - 1, step):
         frame = go.Frame(name=str(i))
 
         subs_pose = []
@@ -1860,12 +3849,11 @@ def plot_animation_double_integrator(result: dict,
             for sub_positions in subs_positions:
                 subs_pose.append(sub_positions[indices[i]])
 
-
         # Extract axes from rotation matrix
         axes = 20 * np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
 
         # Meshgrid
-        if "moving_subject" in result:    
+        if "moving_subject" in result:
             x = np.linspace(-5, 5, 20)
             y = np.linspace(-5, 5, 20)
             z = np.linspace(-5, 5, 20)
@@ -1877,56 +3865,84 @@ def plot_animation_double_integrator(result: dict,
             x = np.linspace(-30, 30, 20)
             y = np.linspace(-30, 30, 20)
             z = np.linspace(-30, 30, 20)
-        
-        
+
         X, Y = np.meshgrid(x, y)
 
         data = []
 
-        colors = ['#FF0000', '#00FF00', '#0000FF']
-        labels = ['X', 'Y', 'Z']
+        colors = ["#FF0000", "#00FF00", "#0000FF"]
+        labels = ["X", "Y", "Z"]
 
         for k in range(3):
             color = colors[k]
             labels[k]
 
-            data.append(go.Scatter3d(
+            data.append(
+                go.Scatter3d(
                     x=[drone_positions[indices[i], 0], drone_positions[indices[i], 0]],
                     y=[drone_positions[indices[i], 1], drone_positions[indices[i], 1]],
                     z=[drone_positions[indices[i], 2], drone_positions[indices[i], 2]],
-                    mode='lines+text',
-                    line=dict(color=color, width=4),
-                    showlegend=False
-                ))
+                    mode="lines+text",
+                    line={"color": color, "width": 4},
+                    showlegend=False,
+                )
+            )
         # Add subject position to data
         j = 0
         for sub_pose in subs_pose:
             # Use color iter to change the color of the subject in rgb
-            data.append(go.Scatter3d(x=[sub_pose[0]], y=[sub_pose[1]], z=[sub_pose[2]], mode='markers', marker=dict(size=10, color=color_kp[j]), showlegend=False, name='Subject'))
+            data.append(
+                go.Scatter3d(
+                    x=[sub_pose[0]],
+                    y=[sub_pose[1]],
+                    z=[sub_pose[2]],
+                    mode="markers",
+                    marker={"size": 10, "color": color_kp[j]},
+                    showlegend=False,
+                    name="Subject",
+                )
+            )
             # if params.vp.n_subs != 1:
             j += 1
-    
-        data.append(go.Scatter3d(
-            x=drone_positions[:indices[i]+1,0], 
-            y=drone_positions[:indices[i]+1,1], 
-            z=drone_positions[:indices[i]+1,2], 
-            mode='markers',
-            marker=dict(
-                size=5,
-                color=np.linalg.norm(drone_velocities[:indices[i]+1], axis = 1), # set color to an array/list of desired values
-                colorscale='Viridis', # choose a colorscale
-                colorbar=dict(title='Velocity Norm (m/s)', x=0.02, y=0.55, len=0.75) # add colorbar
-            ),
-            name='Nonlinear Propagation'
-        ))
-        
+
+        data.append(
+            go.Scatter3d(
+                x=drone_positions[: indices[i] + 1, 0],
+                y=drone_positions[: indices[i] + 1, 1],
+                z=drone_positions[: indices[i] + 1, 2],
+                mode="markers",
+                marker={
+                    "size": 5,
+                    "color": np.linalg.norm(
+                        drone_velocities[: indices[i] + 1], axis=1
+                    ),  # set color to an array/list of desired values
+                    "colorscale": "Viridis",  # choose a colorscale
+                    "colorbar": {
+                        "title": "Velocity Norm (m/s)",
+                        "x": 0.02,
+                        "y": 0.55,
+                        "len": 0.75,
+                    },  # add colorbar
+                },
+                name="Nonlinear Propagation",
+            )
+        )
 
         # Make the subject draw a line as it moves
         if "moving_subject" in result:
             if result["moving_subject"]:
                 for sub_positions in subs_positions:
-                    data.append(go.Scatter3d(x=sub_positions[:indices[i]+1,0], y=sub_positions[:indices[i]+1,1], z=sub_positions[:indices[i]+1,2], mode='lines', line=dict(color='red', width = 10), name='Subject Position'))
-                    
+                    data.append(
+                        go.Scatter3d(
+                            x=sub_positions[: indices[i] + 1, 0],
+                            y=sub_positions[: indices[i] + 1, 1],
+                            z=sub_positions[: indices[i] + 1, 2],
+                            mode="lines",
+                            line={"color": "red", "width": 10},
+                            name="Subject Position",
+                        )
+                    )
+
                     sub_position = sub_positions[indices[i]]
 
                     # Plot two spheres as a surface at the location of the subject to represent the minimum and maximum allowed range from the subject
@@ -1950,18 +3966,41 @@ def plot_animation_double_integrator(result: dict,
                         y_max = result["max_range"] * y
                         z_max = result["max_range"] * z
                     else:
-                        raise ValueError("`min_range` and `max_range` not found in result dictionary.")
+                        raise ValueError(
+                            "`min_range` and `max_range` not found in result dictionary."
+                        )
 
                     # Rotate and translate points
                     points_min = np.array([x_min.flatten(), y_min.flatten(), z_min.flatten()])
                     points_max = np.array([x_max.flatten(), y_max.flatten(), z_max.flatten()])
-                    
+
                     points_min = points_min.T + sub_position
                     points_max = points_max.T + sub_position
 
-                    data.append(go.Surface(x=points_min[:, 0].reshape(n,n), y=points_min[:, 1].reshape(n,n), z=points_min[:, 2].reshape(n,n), opacity = 0.2, colorscale='reds', name='Minimum Range', showlegend=True, showscale=False))
-                    data.append(go.Surface(x=points_max[:, 0].reshape(n,n), y=points_max[:, 1].reshape(n,n), z=points_max[:, 2].reshape(n,n), opacity = 0.2, colorscale='blues', name='Maximum Range', showlegend=True, showscale=False))
-
+                    data.append(
+                        go.Surface(
+                            x=points_min[:, 0].reshape(n, n),
+                            y=points_min[:, 1].reshape(n, n),
+                            z=points_min[:, 2].reshape(n, n),
+                            opacity=0.2,
+                            colorscale="reds",
+                            name="Minimum Range",
+                            showlegend=True,
+                            showscale=False,
+                        )
+                    )
+                    data.append(
+                        go.Surface(
+                            x=points_max[:, 0].reshape(n, n),
+                            y=points_max[:, 1].reshape(n, n),
+                            z=points_max[:, 2].reshape(n, n),
+                            opacity=0.2,
+                            colorscale="blues",
+                            name="Maximum Range",
+                            showlegend=True,
+                            showscale=False,
+                        )
+                    )
 
         frame.data = data
         frames.append(frame)
@@ -1969,35 +4008,83 @@ def plot_animation_double_integrator(result: dict,
     fig.frames = frames
 
     if "obstacles_centers" in result:
-        for center, axes, radius in zip(result['obstacles_centers'], result['obstacles_axes'], result['obstacles_radii']):
-                n = 20
-                # Generate points on the unit sphere
-                u = np.linspace(0, 2 * np.pi, n)
-                v = np.linspace(0, np.pi, n)
+        for center, axes, radius in zip(
+            result["obstacles_centers"], result["obstacles_axes"], result["obstacles_radii"]
+        ):
+            n = 20
+            # Generate points on the unit sphere
+            u = np.linspace(0, 2 * np.pi, n)
+            v = np.linspace(0, np.pi, n)
 
-                x = np.outer(np.cos(u), np.sin(v))
-                y = np.outer(np.sin(u), np.sin(v))
-                z = np.outer(np.ones(np.size(u)), np.cos(v))
+            x = np.outer(np.cos(u), np.sin(v))
+            y = np.outer(np.sin(u), np.sin(v))
+            z = np.outer(np.ones(np.size(u)), np.cos(v))
 
-                # Scale points by radii
-                x = 1/radius[0] * x
-                y = 1/radius[1] * y
-                z = 1/radius[2] * z
+            # Scale points by radii
+            x = 1 / radius[0] * x
+            y = 1 / radius[1] * y
+            z = 1 / radius[2] * z
 
-                # Rotate and translate points
-                points = np.array([x.flatten(), y.flatten(), z.flatten()])
-                points = axes @ points
-                points = points.T + center
+            # Rotate and translate points
+            points = np.array([x.flatten(), y.flatten(), z.flatten()])
+            points = axes @ points
+            points = points.T + center
 
-                fig.add_trace(go.Surface(x=points[:, 0].reshape(n,n), y=points[:, 1].reshape(n,n), z=points[:, 2].reshape(n,n), opacity = 0.5, showscale=False))
+            fig.add_trace(
+                go.Surface(
+                    x=points[:, 0].reshape(n, n),
+                    y=points[:, 1].reshape(n, n),
+                    z=points[:, 2].reshape(n, n),
+                    opacity=0.5,
+                    showscale=False,
+                )
+            )
 
     if "vertices" in result:
         for vertices in result["vertices"]:
             # Plot a line through the vertices of the gate
-            fig.add_trace(go.Scatter3d(x=[vertices[0][0], vertices[1][0], vertices[2][0], vertices[3][0], vertices[0][0]], y=[vertices[0][1], vertices[1][1], vertices[2][1], vertices[3][1], vertices[0][1]], z=[vertices[0][2], vertices[1][2], vertices[2][2], vertices[3][2], vertices[0][2]], mode='lines', showlegend=False, line=dict(color='blue', width=10)))
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[
+                        vertices[0][0],
+                        vertices[1][0],
+                        vertices[2][0],
+                        vertices[3][0],
+                        vertices[0][0],
+                    ],
+                    y=[
+                        vertices[0][1],
+                        vertices[1][1],
+                        vertices[2][1],
+                        vertices[3][1],
+                        vertices[0][1],
+                    ],
+                    z=[
+                        vertices[0][2],
+                        vertices[1][2],
+                        vertices[2][2],
+                        vertices[3][2],
+                        vertices[0][2],
+                    ],
+                    mode="lines",
+                    showlegend=False,
+                    line={"color": "blue", "width": 10},
+                )
+            )
 
     # Add ground plane
-    fig.add_trace(go.Surface(x=[-200, 200, 200, -200], y=[-200, -200, 200, 200], z=[[0, 0], [0, 0], [0, 0], [0, 0]], opacity=0.3, showscale=False, colorscale='Greys', showlegend = True, name='Ground Plane'))
+    fig.add_trace(
+        go.Surface(
+            x=[-200, 200, 200, -200],
+            y=[-200, -200, 200, 200],
+            z=[[0, 0], [0, 0], [0, 0], [0, 0]],
+            opacity=0.3,
+            showscale=False,
+            colorscale="Greys",
+            showlegend=True,
+            name="Ground Plane",
+        )
+    )
 
     sliders = [
         {
@@ -2010,105 +4097,112 @@ def plot_animation_double_integrator(result: dict,
                     "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
                     "label": f.name,
                     "method": "animate",
-                } for f in fig.frames
-            ]
+                }
+                for f in fig.frames
+            ],
         }
     ]
 
-    fig.update_layout(updatemenus = [{"buttons":[
-                                        {
-                                            "args": [None, frame_args(50)],
-                                            "label": "Play",
-                                            "method": "animate",
-                                        },
-                                        {
-                                            "args": [[None], frame_args(0)],
-                                            "label": "Pause",
-                                            "method": "animate",
-                                    }],
-
-                                    "direction": "left",
-                                    "pad": {"r": 10, "t": 70},
-                                    "type": "buttons",
-                                    "x": 0.1,
-                                    "y": 0,
-                                }
-                            ],
-                            sliders=sliders
-                        )
+    fig.update_layout(
+        updatemenus=[
+            {
+                "buttons": [
+                    {
+                        "args": [None, frame_args(50)],
+                        "label": "Play",
+                        "method": "animate",
+                    },
+                    {
+                        "args": [[None], frame_args(0)],
+                        "label": "Pause",
+                        "method": "animate",
+                    },
+                ],
+                "direction": "left",
+                "pad": {"r": 10, "t": 70},
+                "type": "buttons",
+                "x": 0.1,
+                "y": 0,
+            }
+        ],
+        sliders=sliders,
+    )
 
     fig.update_layout(sliders=sliders)
 
-    fig.update_layout(template='plotly_dark') #, title=title)
-    
-    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
-    
+    fig.update_layout(template="plotly_dark")  # , title=title)
+
+    fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 10, "y": 10, "z": 10}})
+
     # Check if covariance exists
     if "covariance" in result:
-        fig.update_layout(scene=dict(xaxis=dict(range=[0, 4000]), yaxis=dict(range=[0, 4000]), zaxis=dict(range=[-1000, 3000])))
+        fig.update_layout(
+            scene={
+                "xaxis": {"range": [0, 4000]},
+                "yaxis": {"range": [0, 4000]},
+                "zaxis": {"range": [-1000, 3000]},
+            }
+        )
     else:
-        fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
+        fig.update_layout(
+            scene={
+                "xaxis": {"range": [-200, 200]},
+                "yaxis": {"range": [-200, 200]},
+                "zaxis": {"range": [-200, 200]},
+            }
+        )
 
     # Overlay the title onto the plot
     fig.update_layout(title_y=0.95, title_x=0.5)
 
-    
-
-
-
     # Overlay the sliders and buttons onto the plot
-    fig.update_layout(updatemenus = [{"buttons":[
-                                        {
-                                            "args": [None, frame_args(50)],
-                                            "label": "Play",
-                                            "method": "animate",
-                                        },
-                                        {
-                                            "args": [[None], frame_args(0)],
-                                            "label": "Pause",
-                                            "method": "animate",
-                                    }],
-
-                                    "direction": "left",
-                                    "pad": {"r": 10, "t": 70},
-                                    "type": "buttons",
-                                    "x": 0.22,
-                                    "y": 0.37,
-                                }
-                            ],
-                            sliders=sliders
-                        )
-    
-    
+    fig.update_layout(
+        updatemenus=[
+            {
+                "buttons": [
+                    {
+                        "args": [None, frame_args(50)],
+                        "label": "Play",
+                        "method": "animate",
+                    },
+                    {
+                        "args": [[None], frame_args(0)],
+                        "label": "Pause",
+                        "method": "animate",
+                    },
+                ],
+                "direction": "left",
+                "pad": {"r": 10, "t": 70},
+                "type": "buttons",
+                "x": 0.22,
+                "y": 0.37,
+            }
+        ],
+        sliders=sliders,
+    )
 
     # Show the legend overlayed on the plot
-    fig.update_layout(legend=dict(yanchor="top", y=0.9, xanchor="left", x=0.75))
+    fig.update_layout(legend={"yanchor": "top", "y": 0.9, "xanchor": "left", "x": 0.75})
 
     # fig.update_layout(height=450, width = 800)
 
     # Remove the black border around the fig
-    fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
+    fig.update_layout(margin={"l": 0, "r": 0, "b": 0, "t": 0})
 
     # Rmeove the background from the legend
-    fig.update_layout(legend=dict(bgcolor='rgba(0,0,0,0)'))
+    fig.update_layout(legend={"bgcolor": "rgba(0,0,0,0)"})
 
-    fig.update_xaxes(
-        dtick=1.0,
-        showline=False
-    )
-    fig.update_yaxes(
-        scaleanchor="x",
-        scaleratio=1,
-        showline=False,
-        dtick=1.0
-    )
+    fig.update_xaxes(dtick=1.0, showline=False)
+    fig.update_yaxes(scaleanchor="x", scaleratio=1, showline=False, dtick=1.0)
 
     return fig
 
-def plot_animation_3DoF_rocket(result: dict,
-                   params: Config,
-                   path="",
-                   ) -> None:
+
+def plot_animation_3DoF_rocket(
+    result: dict,
+    params: Config,
+    path="",
+) -> None:
     result["t_final"]
     # Make title say quadrotor simulation and insert the variable tof into the title
     # title = 'Quadrotor Simulation: Time of Flight = ' + str(tof) + 's'
@@ -2117,65 +4211,91 @@ def plot_animation_3DoF_rocket(result: dict,
     drone_forces = 0.01 * result["u_full"][:, :3]
 
     step = 2
-    indices = np.array(list(range(drone_positions.shape[0]-1)[::step]) + [drone_positions.shape[0]-1])
+    indices = np.array(
+        [*list(range(drone_positions.shape[0] - 1)[::step]), drone_positions.shape[0] - 1]
+    )
 
-    fig = go.Figure(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='gray', width = 2)))
+    fig = go.Figure(
+        go.Scatter3d(x=[], y=[], z=[], mode="lines+markers", line={"color": "gray", "width": 2})
+    )
     for i in range(100):
-        fig.add_trace(go.Scatter3d(x=[], y=[], z=[], mode='lines+markers', line=dict(color='red', width = 2)))
-    
+        fig.add_trace(
+            go.Scatter3d(x=[], y=[], z=[], mode="lines+markers", line={"color": "red", "width": 2})
+        )
+
     frames = []
     i = 0
 
     # Draw drone attitudes as axes
-    for i in range(0, len(indices)-1, step):
+    for i in range(0, len(indices) - 1, step):
         frame = go.Frame(name=str(i))
-
 
         # Extract axes from rotation matrix
         20 * np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
 
         data = []
 
-        colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFFFF']
-        labels = ['X', 'Y', 'Z', 'Force']
+        colors = ["#FF0000", "#00FF00", "#0000FF", "#FFFFFF"]
+        labels = ["X", "Y", "Z", "Force"]
 
         for k in range(4):
             color = colors[k]
             labels[k]
 
-            if labels[k] != 'Force':
-                data.append(go.Scatter3d(
+            if labels[k] != "Force":
+                data.append(
+                    go.Scatter3d(
                         x=[drone_positions[indices[i], 0], drone_positions[indices[i], 0]],
                         y=[drone_positions[indices[i], 1], drone_positions[indices[i], 1]],
                         z=[drone_positions[indices[i], 2], drone_positions[indices[i], 2]],
-                        mode='lines+text',
-                        line=dict(color=color, width=4),
-                        showlegend=False
-                    ))
+                        mode="lines+text",
+                        line={"color": color, "width": 4},
+                        showlegend=False,
+                    )
+                )
             else:
-                data.append(go.Scatter3d(
-                        x=[drone_positions[indices[i], 0], drone_positions[indices[i], 0] - drone_forces[indices[i], 0]],
-                        y=[drone_positions[indices[i], 1], drone_positions[indices[i], 1] - drone_forces[indices[i], 1]],
-                        z=[drone_positions[indices[i], 2], drone_positions[indices[i], 2] - drone_forces[indices[i], 2]],
-                        mode='lines+text',
-                        line=dict(color=color, width=10),
-                        showlegend=False
-                    ))
+                data.append(
+                    go.Scatter3d(
+                        x=[
+                            drone_positions[indices[i], 0],
+                            drone_positions[indices[i], 0] - drone_forces[indices[i], 0],
+                        ],
+                        y=[
+                            drone_positions[indices[i], 1],
+                            drone_positions[indices[i], 1] - drone_forces[indices[i], 1],
+                        ],
+                        z=[
+                            drone_positions[indices[i], 2],
+                            drone_positions[indices[i], 2] - drone_forces[indices[i], 2],
+                        ],
+                        mode="lines+text",
+                        line={"color": color, "width": 10},
+                        showlegend=False,
+                    )
+                )
 
-        data.append(go.Scatter3d(
-            x=drone_positions[:indices[i]+1,0], 
-            y=drone_positions[:indices[i]+1,1], 
-            z=drone_positions[:indices[i]+1,2], 
-            mode='markers',
-            marker=dict(
-                size=5,
-                color=np.linalg.norm(drone_velocities[:indices[i]+1], axis = 1), # set color to an array/list of desired values
-                colorscale='Viridis', # choose a colorscale
-                colorbar=dict(title='Velocity Norm (m/s)', x=0.02, y=0.55, len=0.75) # add colorbar
-            ),
-            name='Nonlinear Propagation'
-        ))
-        
+        data.append(
+            go.Scatter3d(
+                x=drone_positions[: indices[i] + 1, 0],
+                y=drone_positions[: indices[i] + 1, 1],
+                z=drone_positions[: indices[i] + 1, 2],
+                mode="markers",
+                marker={
+                    "size": 5,
+                    "color": np.linalg.norm(
+                        drone_velocities[: indices[i] + 1], axis=1
+                    ),  # set color to an array/list of desired values
+                    "colorscale": "Viridis",  # choose a colorscale
+                    "colorbar": {
+                        "title": "Velocity Norm (m/s)",
+                        "x": 0.02,
+                        "y": 0.55,
+                        "len": 0.75,
+                    },  # add colorbar
+                },
+                name="Nonlinear Propagation",
+            )
+        )
 
         frame.data = data
         frames.append(frame)
@@ -2183,7 +4303,18 @@ def plot_animation_3DoF_rocket(result: dict,
     fig.frames = frames
 
     # Add ground plane
-    fig.add_trace(go.Surface(x=[-200, 200, 200, -200], y=[-200, -200, 200, 200], z=[[0, 0], [0, 0], [0, 0], [0, 0]], opacity=0.3, showscale=False, colorscale='Greys', showlegend = True, name='Ground Plane'))
+    fig.add_trace(
+        go.Surface(
+            x=[-200, 200, 200, -200],
+            y=[-200, -200, 200, 200],
+            z=[[0, 0], [0, 0], [0, 0], [0, 0]],
+            opacity=0.3,
+            showscale=False,
+            colorscale="Greys",
+            showlegend=True,
+            name="Ground Plane",
+        )
+    )
 
     sliders = [
         {
@@ -2196,97 +4327,97 @@ def plot_animation_3DoF_rocket(result: dict,
                     "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
                     "label": f.name,
                     "method": "animate",
-                } for f in fig.frames
-            ]
+                }
+                for f in fig.frames
+            ],
         }
     ]
 
-    fig.update_layout(updatemenus = [{"buttons":[
-                                        {
-                                            "args": [None, frame_args(50)],
-                                            "label": "Play",
-                                            "method": "animate",
-                                        },
-                                        {
-                                            "args": [[None], frame_args(0)],
-                                            "label": "Pause",
-                                            "method": "animate",
-                                    }],
-
-                                    "direction": "left",
-                                    "pad": {"r": 10, "t": 70},
-                                    "type": "buttons",
-                                    "x": 0.1,
-                                    "y": 0,
-                                }
-                            ],
-                            sliders=sliders
-                        )
+    fig.update_layout(
+        updatemenus=[
+            {
+                "buttons": [
+                    {
+                        "args": [None, frame_args(50)],
+                        "label": "Play",
+                        "method": "animate",
+                    },
+                    {
+                        "args": [[None], frame_args(0)],
+                        "label": "Pause",
+                        "method": "animate",
+                    },
+                ],
+                "direction": "left",
+                "pad": {"r": 10, "t": 70},
+                "type": "buttons",
+                "x": 0.1,
+                "y": 0,
+            }
+        ],
+        sliders=sliders,
+    )
 
     fig.update_layout(sliders=sliders)
 
-    fig.update_layout(template='plotly_dark') #, title=title)
-    
-    fig.update_layout(scene=dict(aspectmode='manual', aspectratio=dict(x=10, y=10, z=10)))
-    
+    fig.update_layout(template="plotly_dark")  # , title=title)
+
+    fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 10, "y": 10, "z": 10}})
+
     # Check if covariance exists
-    fig.update_layout(scene=dict(xaxis=dict(range=[-3000, 3000]), yaxis=dict(range=[-3000, 3000]), zaxis=dict(range=[-200, 2000])))
+    fig.update_layout(
+        scene={
+            "xaxis": {"range": [-3000, 3000]},
+            "yaxis": {"range": [-3000, 3000]},
+            "zaxis": {"range": [-200, 2000]},
+        }
+    )
 
     # Overlay the title onto the plot
     fig.update_layout(title_y=0.95, title_x=0.5)
 
-    
-
-
-
     # Overlay the sliders and buttons onto the plot
-    fig.update_layout(updatemenus = [{"buttons":[
-                                        {
-                                            "args": [None, frame_args(50)],
-                                            "label": "Play",
-                                            "method": "animate",
-                                        },
-                                        {
-                                            "args": [[None], frame_args(0)],
-                                            "label": "Pause",
-                                            "method": "animate",
-                                    }],
-
-                                    "direction": "left",
-                                    "pad": {"r": 10, "t": 70},
-                                    "type": "buttons",
-                                    "x": 0.22,
-                                    "y": 0.37,
-                                }
-                            ],
-                            sliders=sliders
-                        )
-    
-    
+    fig.update_layout(
+        updatemenus=[
+            {
+                "buttons": [
+                    {
+                        "args": [None, frame_args(50)],
+                        "label": "Play",
+                        "method": "animate",
+                    },
+                    {
+                        "args": [[None], frame_args(0)],
+                        "label": "Pause",
+                        "method": "animate",
+                    },
+                ],
+                "direction": "left",
+                "pad": {"r": 10, "t": 70},
+                "type": "buttons",
+                "x": 0.22,
+                "y": 0.37,
+            }
+        ],
+        sliders=sliders,
+    )
 
     # Show the legend overlayed on the plot
-    fig.update_layout(legend=dict(yanchor="top", y=0.9, xanchor="left", x=0.75))
+    fig.update_layout(legend={"yanchor": "top", "y": 0.9, "xanchor": "left", "x": 0.75})
 
     # fig.update_layout(height=450, width = 800)
 
     # Remove the black border around the fig
-    fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
+    fig.update_layout(margin={"l": 0, "r": 0, "b": 0, "t": 0})
 
     # Rmeove the background from the legend
-    fig.update_layout(legend=dict(bgcolor='rgba(0,0,0,0)'))
+    fig.update_layout(legend={"bgcolor": "rgba(0,0,0,0)"})
 
-    fig.update_xaxes(
-        dtick=1.0,
-        showline=False
-    )
-    fig.update_yaxes(
-        scaleanchor="x",
-        scaleratio=1,
-        showline=False,
-        dtick=1.0
-    )
+    fig.update_xaxes(dtick=1.0, showline=False)
+    fig.update_yaxes(scaleanchor="x", scaleratio=1, showline=False, dtick=1.0)
 
     return fig
+
 
 def plot_animation_pyqtgraph(result, params, step=2):
     if not PYQTPHOT_AVAILABLE:
@@ -2294,38 +4425,47 @@ def plot_animation_pyqtgraph(result, params, step=2):
             "pyqtgraph is required for this function but not installed. "
             "Install it with: pip install openscvx[gui] or pip install pyqtgraph PyQt5"
         )
-    
+
     import sys
-    from scipy.spatial.transform import Rotation as R
-    from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QWidget, QLabel
+
     from PyQt5.QtCore import Qt
+    from PyQt5.QtWidgets import (
+        QHBoxLayout,
+        QLabel,
+        QPushButton,
+        QSlider,
+        QVBoxLayout,
+        QWidget,
+    )
+    from scipy.spatial.transform import Rotation as R
+
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
 
     # Main window and layout
     main_widget = QWidget()
     main_layout = QVBoxLayout(main_widget)
     w = gl.GLViewWidget()
-    w.setWindowTitle('Quadrotor Simulation (pyqtgraph)')
+    w.setWindowTitle("Quadrotor Simulation (pyqtgraph)")
     w.setGeometry(0, 110, 1280, 720)
-    
+
     # Extract data
     drone_positions = result["x_full"][:, :3]
     drone_velocities = result["x_full"][:, 3:6]
     drone_attitudes = result["x_full"][:, 6:10] if result["x_full"].shape[1] >= 10 else None
     velocity_norm = np.linalg.norm(drone_velocities, axis=1)
     n_points = drone_positions.shape[0]
-    indices = np.array(list(range(n_points-1)[::step]) + [n_points-1])
-    
+    indices = np.array([*list(range(n_points - 1)[::step]), n_points - 1])
+
     # Auto-calculate plotting bounds
     pos_min = drone_positions.min(axis=0)
     pos_max = drone_positions.max(axis=0)
     pos_range = pos_max - pos_min
-    
+
     # Add padding to bounds (20% of range)
     padding = pos_range * 0.2
     bounds_min = pos_min - padding
     bounds_max = pos_max + padding
-    
+
     # Ensure minimum bounds for small trajectories
     min_bounds_size = 10.0
     for i in range(3):
@@ -2333,42 +4473,44 @@ def plot_animation_pyqtgraph(result, params, step=2):
             center = (bounds_max[i] + bounds_min[i]) / 2
             bounds_min[i] = center - min_bounds_size / 2
             bounds_max[i] = center + min_bounds_size / 2
-    
+
     # Auto-calculate camera distance based on bounds
     max_range = max(bounds_max - bounds_min)
     camera_distance = max_range * 1.5  # 1.5x the maximum range
-    
+
     # Auto-calculate vehicle axes length based on trajectory size
     axes_length = max(pos_range) * 0.1  # 10% of trajectory range
     axes_length = max(axes_length, 2.0)  # Minimum 2 units
     axes_length = min(axes_length, 20.0)  # Maximum 20 units
-    
+
     w.setCameraPosition(distance=camera_distance, elevation=20, azimuth=45)
     main_layout.addWidget(w)
 
     # Controls
     controls_layout = QHBoxLayout()
-    play_btn = QPushButton('Play')
-    pause_btn = QPushButton('Pause')
+    play_btn = QPushButton("Play")
+    pause_btn = QPushButton("Pause")
     slider = QSlider(Qt.Horizontal)
     slider.setMinimum(0)
     slider.setSingleStep(1)
     controls_layout.addWidget(play_btn)
     controls_layout.addWidget(pause_btn)
-    controls_layout.addWidget(QLabel('Time:'))
+    controls_layout.addWidget(QLabel("Time:"))
     controls_layout.addWidget(slider)
     main_layout.addLayout(controls_layout)
     main_widget.show()
 
-    slider.setMaximum(len(indices)-1)
+    slider.setMaximum(len(indices) - 1)
 
-    cmap = pg.colormap.get('viridis')
+    cmap = pg.colormap.get("viridis")
     vmin, vmax = velocity_norm.min(), velocity_norm.max()
     normed_vel = (velocity_norm - vmin) / (vmax - vmin + 1e-8)
-    colors = cmap.map(normed_vel, mode='float')
+    colors = cmap.map(normed_vel, mode="float")
 
     # Thicker trajectory line
-    traj_line = gl.GLLinePlotItem(pos=np.zeros((0, 3)), color=np.ones((0, 4)), width=5, antialias=True)
+    traj_line = gl.GLLinePlotItem(
+        pos=np.zeros((0, 3)), color=np.ones((0, 4)), width=5, antialias=True
+    )
     w.addItem(traj_line)
     drone_dot = gl.GLScatterPlotItem(pos=np.zeros((1, 3)), color=(1, 1, 1, 1), size=10)
     w.addItem(drone_dot)
@@ -2376,42 +4518,63 @@ def plot_animation_pyqtgraph(result, params, step=2):
     axis_items = [gl.GLLinePlotItem(width=3) for _ in range(3)]
     for item in axis_items:
         w.addItem(item)
-    axis_colors = [(1,0,0,1), (0,1,0,1), (0,0,1,1)]
+    axis_colors = [(1, 0, 0, 1), (0, 1, 0, 1), (0, 0, 1, 1)]
 
     # Add a nice ground grid - auto-scale based on bounds
     grid_size = max(bounds_max[:2] - bounds_min[:2]) * 0.3  # 30% of XY range (reduced from 60%)
     grid_spacing = grid_size / 8  # 8 grid lines (reduced from 10 for tighter spacing)
     grid_lines = []
-    for x in np.arange(bounds_min[0] - grid_size/2, bounds_max[0] + grid_size/2, grid_spacing):
-        pts = np.array([[x, bounds_min[1] - grid_size/2, bounds_min[2]], [x, bounds_max[1] + grid_size/2, bounds_min[2]]])
-        line = gl.GLLinePlotItem(pos=pts, color=(0.7,0.7,0.7,0.5), width=1, antialias=True)
+    for x in np.arange(bounds_min[0] - grid_size / 2, bounds_max[0] + grid_size / 2, grid_spacing):
+        pts = np.array(
+            [
+                [x, bounds_min[1] - grid_size / 2, bounds_min[2]],
+                [x, bounds_max[1] + grid_size / 2, bounds_min[2]],
+            ]
+        )
+        line = gl.GLLinePlotItem(pos=pts, color=(0.7, 0.7, 0.7, 0.5), width=1, antialias=True)
         w.addItem(line)
         grid_lines.append(line)
-    for y in np.arange(bounds_min[1] - grid_size/2, bounds_max[1] + grid_size/2, grid_spacing):
-        pts = np.array([[bounds_min[0] - grid_size/2, y, bounds_min[2]], [bounds_max[0] + grid_size/2, y, bounds_min[2]]])
-        line = gl.GLLinePlotItem(pos=pts, color=(0.7,0.7,0.7,0.5), width=1, antialias=True)
+    for y in np.arange(bounds_min[1] - grid_size / 2, bounds_max[1] + grid_size / 2, grid_spacing):
+        pts = np.array(
+            [
+                [bounds_min[0] - grid_size / 2, y, bounds_min[2]],
+                [bounds_max[0] + grid_size / 2, y, bounds_min[2]],
+            ]
+        )
+        line = gl.GLLinePlotItem(pos=pts, color=(0.7, 0.7, 0.7, 0.5), width=1, antialias=True)
         w.addItem(line)
         grid_lines.append(line)
 
     obstacle_items = []
     if "obstacles_centers" in result and "obstacles_radii" in result and "obstacles_axes" in result:
-        for center, axes, radius in zip(result['obstacles_centers'], result['obstacles_axes'], result['obstacles_radii']):
+        for center, axes, radius in zip(
+            result["obstacles_centers"], result["obstacles_axes"], result["obstacles_radii"]
+        ):
             # Create a sphere mesh and transform it to an ellipsoid
             sphere_mesh = gl.MeshData.sphere(rows=20, cols=40)
             verts = sphere_mesh.vertexes()
             # Scale by 1/radius to match the original plot_animation function
-            verts = verts * np.array([1/radius[0], 1/radius[1], 1/radius[2]])
+            verts = verts * np.array([1 / radius[0], 1 / radius[1], 1 / radius[2]])
             verts = (axes @ verts.T).T  # rotate
             verts = verts + center.value  # translate
             sphere_mesh.setVertexes(verts)
-            obstacle = gl.GLMeshItem(meshdata=sphere_mesh, smooth=True, color=(1,0,0,0.6), shader='shaded', drawEdges=False, glOptions='translucent')
+            obstacle = gl.GLMeshItem(
+                meshdata=sphere_mesh,
+                smooth=True,
+                color=(1, 0, 0, 0.6),
+                shader="shaded",
+                drawEdges=False,
+                glOptions="translucent",
+            )
             w.addItem(obstacle)
             obstacle_items.append(obstacle)
 
     gate_items = []
     if "vertices" in result:
         for vertices in result["vertices"]:
-            gate = gl.GLLinePlotItem(pos=np.array(vertices + [vertices[0]]), color=(0,0,1,1), width=5, antialias=True)
+            gate = gl.GLLinePlotItem(
+                pos=np.array([*vertices, vertices[0]]), color=(0, 0, 1, 1), width=5, antialias=True
+            )
             w.addItem(gate)
             gate_items.append(gate)
 
@@ -2422,9 +4585,9 @@ def plot_animation_pyqtgraph(result, params, step=2):
             subs_positions, _, _, _ = full_subject_traj_time(result, params)
         else:
             subs_positions, _, _, _ = full_subject_traj_time(result, params)
-        for sub_traj in subs_positions:
-            line = gl.GLLinePlotItem(pos=np.zeros((0,3)), color=(1,0,0,1), width=3)
-            dot = gl.GLScatterPlotItem(pos=np.zeros((1,3)), color=(1,0,0,1), size=10)
+        for _sub_traj in subs_positions:
+            line = gl.GLLinePlotItem(pos=np.zeros((0, 3)), color=(1, 0, 0, 1), width=3)
+            dot = gl.GLScatterPlotItem(pos=np.zeros((1, 3)), color=(1, 0, 0, 1), size=10)
             w.addItem(line)
             w.addItem(dot)
             subject_lines.append(line)
@@ -2438,9 +4601,23 @@ def plot_animation_pyqtgraph(result, params, step=2):
         x = np.outer(np.cos(u), np.sin(v))
         y = np.outer(np.sin(u), np.sin(v))
         z = np.outer(np.ones(np.size(u)), np.cos(v))
-        for sub_traj in subs_positions:
-            min_sphere = gl.GLMeshItem(meshdata=gl.MeshData.sphere(rows=10, cols=20, radius=result["min_range"]), color=(1,0,0,0.4), smooth=True, shader='shaded', drawEdges=False, glOptions='translucent')
-            max_sphere = gl.GLMeshItem(meshdata=gl.MeshData.sphere(rows=10, cols=20, radius=result["max_range"]), color=(0,0,1,0.4), smooth=True, shader='shaded', drawEdges=False, glOptions='translucent')
+        for _sub_traj in subs_positions:
+            min_sphere = gl.GLMeshItem(
+                meshdata=gl.MeshData.sphere(rows=10, cols=20, radius=result["min_range"]),
+                color=(1, 0, 0, 0.4),
+                smooth=True,
+                shader="shaded",
+                drawEdges=False,
+                glOptions="translucent",
+            )
+            max_sphere = gl.GLMeshItem(
+                meshdata=gl.MeshData.sphere(rows=10, cols=20, radius=result["max_range"]),
+                color=(0, 0, 1, 0.4),
+                smooth=True,
+                shader="shaded",
+                drawEdges=False,
+                glOptions="translucent",
+            )
             w.addItem(min_sphere)
             w.addItem(max_sphere)
             range_spheres.append((min_sphere, max_sphere))
@@ -2448,9 +4625,14 @@ def plot_animation_pyqtgraph(result, params, step=2):
     # Viewcone as a transparent surface
     viewcone_mesh = None
     cone_meshdata = None
-    if drone_attitudes is not None and "alpha_x" in result and "alpha_y" in result and "R_sb" in result:
+    if (
+        drone_attitudes is not None
+        and "alpha_x" in result
+        and "alpha_y" in result
+        and "R_sb" in result
+    ):
         n_cone = 40
-        theta = np.linspace(0, 2*np.pi, n_cone)
+        theta = np.linspace(0, 2 * np.pi, n_cone)
         alpha_x = result["alpha_x"]
         alpha_y = result["alpha_y"]
         A = np.diag([1 / np.tan(np.pi / alpha_x), 1 / np.tan(np.pi / alpha_y)])
@@ -2459,17 +4641,17 @@ def plot_animation_pyqtgraph(result, params, step=2):
         cone_length = max(cone_length, 10.0)  # Minimum 10 units
         cone_length = min(cone_length, 50.0)  # Maximum 50 units
         circle = np.stack([np.cos(theta), np.sin(theta)])
-        
+
         # Use norm_type from results to plot the cone correctly
         if "norm_type" in result:
-            if result["norm_type"] == np.inf or result["norm_type"] == 'inf':
+            if result["norm_type"] == np.inf or result["norm_type"] == "inf":
                 z = np.linalg.norm(A @ circle, axis=0, ord=np.inf)
             else:
                 z = np.linalg.norm(A @ circle, axis=0, ord=result["norm_type"])
         else:
             # Default to 2-norm if norm_type not specified
             z = np.linalg.norm(A @ circle, axis=0, ord=2)
-            
+
         X = circle[0] / z
         Y = circle[1] / z
         Z = np.ones_like(X)
@@ -2478,12 +4660,19 @@ def plot_animation_pyqtgraph(result, params, step=2):
         vertices = np.vstack([apex, base_points])
         faces = []
         for i in range(1, n_cone):
-            faces.append([0, i, i+1])
+            faces.append([0, i, i + 1])
         faces.append([0, n_cone, 1])
         faces = np.array(faces)
         cone_meshdata = gl.MeshData(vertexes=vertices, faces=faces)
         # Draw cone last for correct depth compositing
-        viewcone_mesh = gl.GLMeshItem(meshdata=cone_meshdata, smooth=True, color=(1,1,0,0.5), shader='shaded', drawEdges=False, glOptions='additive')
+        viewcone_mesh = gl.GLMeshItem(
+            meshdata=cone_meshdata,
+            smooth=True,
+            color=(1, 1, 0, 0.5),
+            shader="shaded",
+            drawEdges=False,
+            glOptions="additive",
+        )
         # Do not add yet, will add after all other objects
 
     ptr = [0]
@@ -2500,7 +4689,7 @@ def plot_animation_pyqtgraph(result, params, step=2):
         slider.blockSignals(True)
         slider.setValue(i)
         slider.blockSignals(False)
-        idx = indices[:i+1]
+        idx = indices[: i + 1]
         pos = drone_positions[idx]
         col = colors[idx]
         traj_line.setData(pos=pos, color=col)
@@ -2512,12 +4701,16 @@ def plot_animation_pyqtgraph(result, params, step=2):
             axes = axes_length * np.eye(3)
             axes_rot = rotmat @ axes
             for k in range(3):
-                axis_pts = np.stack([drone_positions[indices[i]], drone_positions[indices[i]] + axes_rot[:,k]])
+                axis_pts = np.stack(
+                    [drone_positions[indices[i]], drone_positions[indices[i]] + axes_rot[:, k]]
+                )
                 axis_items[k].setData(pos=axis_pts, color=axis_colors[k])
         if "init_poses" in result or "moving_subject" in result:
             for j, sub_traj in enumerate(subs_positions):
-                subject_lines[j].setData(pos=sub_traj[:indices[i]+1], color=(1,0,0,1))
-                subject_dots[j].setData(pos=sub_traj[indices[i]:indices[i]+1], color=(1,0,0,1))
+                subject_lines[j].setData(pos=sub_traj[: indices[i] + 1], color=(1, 0, 0, 1))
+                subject_dots[j].setData(
+                    pos=sub_traj[indices[i] : indices[i] + 1], color=(1, 0, 0, 1)
+                )
                 if j < len(range_spheres):
                     min_sphere, max_sphere = range_spheres[j]
                     min_sphere.resetTransform()
@@ -2566,15 +4759,16 @@ def plot_animation_pyqtgraph(result, params, step=2):
     slider.valueChanged.connect(set_frame)
     pause_btn.setEnabled(False)
 
-    main_widget.setWindowTitle('Quadrotor Simulation (pyqtgraph)')
+    main_widget.setWindowTitle("Quadrotor Simulation (pyqtgraph)")
     main_widget.resize(1280, 800)
 
     update()  # Draw initial frame
 
-    if not hasattr(QtWidgets.QApplication.instance(), 'exec_'):
+    if not hasattr(QtWidgets.QApplication.instance(), "exec_"):
         app.exec()
     else:
         QtWidgets.QApplication.instance().exec_()
+
 
 def plot_animation_vispy(result, params, step=2):
     """
@@ -2582,103 +4776,116 @@ def plot_animation_vispy(result, params, step=2):
     Provides the same functionality as plot_animation_pyqtgraph but uses VisPy backend.
     """
     import sys
+
     import numpy as np
-    from scipy.spatial.transform import Rotation as R
-    from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QWidget, QLabel, QApplication
-    from PyQt5.QtCore import Qt, QTimer
     import vispy
+    from PyQt5.QtCore import Qt, QTimer
+    from PyQt5.QtWidgets import (
+        QApplication,
+        QHBoxLayout,
+        QLabel,
+        QPushButton,
+        QSlider,
+        QVBoxLayout,
+        QWidget,
+    )
+    from scipy.spatial.transform import Rotation as R
     from vispy import scene
-    from vispy.scene import visuals
     from vispy.geometry import create_sphere
-    
+    from vispy.scene import visuals
+
     # Initialize Qt application
     app = QApplication.instance() or QApplication(sys.argv)
-    
+
     # Main window and layout
     main_widget = QWidget()
     main_layout = QVBoxLayout(main_widget)
-    
+
     # Create canvas and embed it properly
-    canvas = scene.SceneCanvas(keys='interactive', size=(1280, 720))
+    canvas = scene.SceneCanvas(keys="interactive", size=(1280, 720))
     view = canvas.central_widget.add_view()
-    view.camera = 'turntable'
+    view.camera = "turntable"
     view.camera.fov = 45
     view.camera.distance = 150
     view.camera.elevation = 20
     view.camera.azimuth = 45
-    
+
     # Embed VisPy canvas in Qt widget
     canvas_widget = canvas.native
     main_layout.addWidget(canvas_widget)
-    
+
     # Controls
     controls_layout = QHBoxLayout()
-    play_btn = QPushButton('Play')
-    pause_btn = QPushButton('Pause')
+    play_btn = QPushButton("Play")
+    pause_btn = QPushButton("Pause")
     slider = QSlider(Qt.Horizontal)
     slider.setMinimum(0)
     slider.setSingleStep(1)
     controls_layout.addWidget(play_btn)
     controls_layout.addWidget(pause_btn)
-    controls_layout.addWidget(QLabel('Time:'))
+    controls_layout.addWidget(QLabel("Time:"))
     controls_layout.addWidget(slider)
     main_layout.addLayout(controls_layout)
     main_widget.show()
-    
+
     # Extract data and convert JAX arrays to NumPy arrays
     drone_positions = np.array(result["x_full"][:, :3])
     drone_velocities = np.array(result["x_full"][:, 3:6])
-    drone_attitudes = np.array(result["x_full"][:, 6:10]) if result["x_full"].shape[1] >= 10 else None
+    drone_attitudes = (
+        np.array(result["x_full"][:, 6:10]) if result["x_full"].shape[1] >= 10 else None
+    )
     velocity_norm = np.linalg.norm(drone_velocities, axis=1)
     n_points = drone_positions.shape[0]
-    indices = np.array(list(range(n_points-1)[::step]) + [n_points-1])
-    slider.setMaximum(len(indices)-1)
-    
+    indices = np.array([*list(range(n_points - 1)[::step]), n_points - 1])
+    slider.setMaximum(len(indices) - 1)
+
     # Color mapping for velocity
     vmin, vmax = velocity_norm.min(), velocity_norm.max()
     normed_vel = (velocity_norm - vmin) / (vmax - vmin + 1e-8)
-    colors = vispy.color.get_colormap('viridis').map(normed_vel)
-    
+    colors = vispy.color.get_colormap("viridis").map(normed_vel)
+
     # Create trajectory line - initialize with first point
-    traj_line = visuals.Line(pos=drone_positions[:1], color=colors[:1], width=5, connect='strip')
+    traj_line = visuals.Line(pos=drone_positions[:1], color=colors[:1], width=5, connect="strip")
     view.add(traj_line)
-    
+
     # Create drone position marker
-    drone_dot = visuals.Markers(pos=drone_positions[:1], face_color='white', size=10)
+    drone_dot = visuals.Markers(pos=drone_positions[:1], face_color="white", size=10)
     view.add(drone_dot)
-    
+
     # Create coordinate axes
     axis_lines = []
-    axis_colors = ['red', 'green', 'blue']
+    axis_colors = ["red", "green", "blue"]
     for color in axis_colors:
         axis_line = visuals.Line(pos=np.zeros((2, 3)), color=color, width=3)
         view.add(axis_line)
         axis_lines.append(axis_line)
-    
+
     # Create ground grid
     grid_size = 200
     grid_spacing = 20
     grid_lines = []
-    for x in range(-grid_size, grid_size+1, grid_spacing):
+    for x in range(-grid_size, grid_size + 1, grid_spacing):
         pts = np.array([[x, -grid_size, 0], [x, grid_size, 0]])
         line = visuals.Line(pos=pts, color=(0.7, 0.7, 0.7, 0.5), width=1)
         view.add(line)
         grid_lines.append(line)
-    for y in range(-grid_size, grid_size+1, grid_spacing):
+    for y in range(-grid_size, grid_size + 1, grid_spacing):
         pts = np.array([[-grid_size, y, 0], [grid_size, y, 0]])
         line = visuals.Line(pos=pts, color=(0.7, 0.7, 0.7, 0.5), width=1)
         view.add(line)
         grid_lines.append(line)
-    
+
     # Create obstacles
     obstacle_meshes = []
     if "obstacles_centers" in result and "obstacles_radii" in result and "obstacles_axes" in result:
-        for center, axes, radius in zip(result['obstacles_centers'], result['obstacles_axes'], result['obstacles_radii']):
+        for center, axes, radius in zip(
+            result["obstacles_centers"], result["obstacles_axes"], result["obstacles_radii"]
+        ):
             # Convert to NumPy arrays
             center = np.array(center)
             axes = np.array(axes)
             radius = np.array(radius)
-            
+
             # Create sphere mesh and transform to ellipsoid
             sphere_mesh = create_sphere(radius=1.0, rows=20, cols=40)
             sphere_verts = sphere_mesh.get_vertices()
@@ -2686,21 +4893,22 @@ def plot_animation_vispy(result, params, step=2):
             sphere_verts = sphere_verts * radius  # scale to ellipsoid radii
             sphere_verts = (axes @ sphere_verts.T).T  # rotate
             sphere_verts = sphere_verts + center  # translate
-            
-            obstacle = visuals.Mesh(vertices=sphere_verts, faces=sphere_faces, 
-                                  color=(1, 0, 0, 0.3), shading='smooth')
+
+            obstacle = visuals.Mesh(
+                vertices=sphere_verts, faces=sphere_faces, color=(1, 0, 0, 0.3), shading="smooth"
+            )
             view.add(obstacle)
             obstacle_meshes.append(obstacle)
-    
+
     # Create gates
     gate_lines = []
     if "vertices" in result:
         for vertices in result["vertices"]:
-            gate_pts = np.array(vertices + [vertices[0]])
+            gate_pts = np.array([*vertices, vertices[0]])
             gate = visuals.Line(pos=gate_pts, color=(0, 0, 1, 1), width=5)
             view.add(gate)
             gate_lines.append(gate)
-    
+
     # Create subject trajectories
     subject_lines = []
     subject_dots = []
@@ -2710,10 +4918,10 @@ def plot_animation_vispy(result, params, step=2):
             subs_positions, _, _, _ = full_subject_traj_time(result, params)
         else:
             subs_positions, _, _, _ = full_subject_traj_time(result, params)
-        
+
         # Convert subject positions to NumPy arrays
         subs_positions = [np.array(sub_pos) for sub_pos in subs_positions]
-        
+
         for sub_traj in subs_positions:
             line = visuals.Line(pos=sub_traj[:1], color=(1, 0, 0, 1), width=3)
             dot = visuals.Markers(pos=sub_traj[:1], face_color=(1, 0, 0, 1), size=10)
@@ -2721,34 +4929,47 @@ def plot_animation_vispy(result, params, step=2):
             view.add(dot)
             subject_lines.append(line)
             subject_dots.append(dot)
-    
+
     # Create range spheres
     range_spheres = []
     if "min_range" in result and "max_range" in result and "init_poses" in result:
         for sub_traj in subs_positions:
             # Min range sphere
             min_mesh = create_sphere(radius=result["min_range"], rows=10, cols=20)
-            min_sphere = visuals.Mesh(vertices=min_mesh.get_vertices(), faces=min_mesh.get_faces(), 
-                                    color=(1, 0, 0, 0.2), shading='smooth')
+            min_sphere = visuals.Mesh(
+                vertices=min_mesh.get_vertices(),
+                faces=min_mesh.get_faces(),
+                color=(1, 0, 0, 0.2),
+                shading="smooth",
+            )
             view.add(min_sphere)
-            
+
             # Max range sphere
             max_mesh = create_sphere(radius=result["max_range"], rows=10, cols=20)
-            max_sphere = visuals.Mesh(vertices=max_mesh.get_vertices(), faces=max_mesh.get_faces(), 
-                                    color=(0, 0, 1, 0.2), shading='smooth')
+            max_sphere = visuals.Mesh(
+                vertices=max_mesh.get_vertices(),
+                faces=max_mesh.get_faces(),
+                color=(0, 0, 1, 0.2),
+                shading="smooth",
+            )
             view.add(max_sphere)
-            
+
             range_spheres.append((min_sphere, max_sphere))
-    
+
     # Create viewcone
     viewcone_mesh = None
-    if drone_attitudes is not None and "alpha_x" in result and "alpha_y" in result and "R_sb" in result:
+    if (
+        drone_attitudes is not None
+        and "alpha_x" in result
+        and "alpha_y" in result
+        and "R_sb" in result
+    ):
         n_cone = 40
-        theta = np.linspace(0, 2*np.pi, n_cone)
+        theta = np.linspace(0, 2 * np.pi, n_cone)
         alpha_x = result["alpha_x"]
         alpha_y = result["alpha_y"]
         A = np.diag([1 / np.tan(np.pi / alpha_y), 1 / np.tan(np.pi / alpha_x)])
-        
+
         # Create cone geometry
         cone_length = 30.0
         circle = np.stack([np.cos(theta), np.sin(theta)])
@@ -2759,22 +4980,23 @@ def plot_animation_vispy(result, params, step=2):
         base_points = np.stack([X, Y, Z], axis=1) * cone_length
         apex = np.array([[0, 0, 0]])
         vertices = np.vstack([apex, base_points])
-        
+
         # Create faces for cone
         faces = []
         for i in range(1, n_cone):
-            faces.append([0, i, i+1])
+            faces.append([0, i, i + 1])
         faces.append([0, n_cone, 1])
         faces = np.array(faces)
-        
-        viewcone_mesh = visuals.Mesh(vertices=vertices, faces=faces, 
-                                   color=(1, 0, 0, 0.3), shading='smooth')
+
+        viewcone_mesh = visuals.Mesh(
+            vertices=vertices, faces=faces, color=(1, 0, 0, 0.3), shading="smooth"
+        )
         view.add(viewcone_mesh)
-    
+
     # Animation state
     ptr = [0]
     playing = [False]
-    
+
     def update():
         i = ptr[0]
         if i >= len(indices):
@@ -2783,19 +5005,19 @@ def plot_animation_vispy(result, params, step=2):
             play_btn.setEnabled(True)
             pause_btn.setEnabled(False)
             return
-        
+
         slider.blockSignals(True)
         slider.setValue(i)
         slider.blockSignals(False)
-        
-        idx = indices[:i+1]
+
+        idx = indices[: i + 1]
         pos = drone_positions[idx]
         col = colors[idx]
-        
+
         # Update trajectory
         traj_line.set_data(pos=pos, color=col)
-        drone_dot.set_data(pos=pos[-1:], face_color='white')
-        
+        drone_dot.set_data(pos=pos[-1:], face_color="white")
+
         # Update coordinate axes
         if drone_attitudes is not None:
             att = drone_attitudes[indices[i]]
@@ -2803,77 +5025,83 @@ def plot_animation_vispy(result, params, step=2):
             rotmat = r.as_matrix()
             axes = 20 * np.eye(3)
             axes_rot = rotmat @ axes
-            
+
             for k in range(3):
-                axis_pts = np.stack([drone_positions[indices[i]], 
-                                   drone_positions[indices[i]] + axes_rot[:, k]])
+                axis_pts = np.stack(
+                    [drone_positions[indices[i]], drone_positions[indices[i]] + axes_rot[:, k]]
+                )
                 axis_lines[k].set_data(pos=axis_pts)
-        
+
         # Update subject trajectories
         if len(subs_positions) > 0:
             for j, sub_traj in enumerate(subs_positions):
-                subject_lines[j].set_data(pos=sub_traj[:indices[i]+1])
-                subject_dots[j].set_data(pos=sub_traj[indices[i]:indices[i]+1])
-                
+                subject_lines[j].set_data(pos=sub_traj[: indices[i] + 1])
+                subject_dots[j].set_data(pos=sub_traj[indices[i] : indices[i] + 1])
+
                 # Update range spheres
                 if j < len(range_spheres):
                     min_sphere, max_sphere = range_spheres[j]
-                    min_sphere.transform = vispy.visuals.transforms.STTransform(translate=sub_traj[indices[i]])
-                    max_sphere.transform = vispy.visuals.transforms.STTransform(translate=sub_traj[indices[i]])
-        
+                    min_sphere.transform = vispy.visuals.transforms.STTransform(
+                        translate=sub_traj[indices[i]]
+                    )
+                    max_sphere.transform = vispy.visuals.transforms.STTransform(
+                        translate=sub_traj[indices[i]]
+                    )
+
         # Update viewcone
         if viewcone_mesh is not None and drone_attitudes is not None:
             att = drone_attitudes[indices[i]]
             r = R.from_quat([att[1], att[2], att[3], att[0]])
             rotmat = r.as_matrix()
             R_sb = np.array(result["R_sb"])
-            
+
             # Transform cone vertices
             cone_mesh = create_sphere(radius=1.0, rows=10, cols=20)
             verts = cone_mesh.get_vertices() * 30.0  # Scale to cone size
             verts = (rotmat @ R_sb.T @ verts.T).T + drone_positions[indices[i]]
             viewcone_mesh.set_data(vertices=verts, faces=cone_mesh.get_faces())
-        
+
         ptr[0] += 1
         canvas.update()
-    
+
     def set_frame(i):
         ptr[0] = i
         update()
-    
+
     timer = QTimer()
     timer.timeout.connect(update)
     timer.setInterval(30)
-    
+
     def play():
         if not playing[0]:
             playing[0] = True
             play_btn.setEnabled(False)
             pause_btn.setEnabled(True)
             timer.start()
-    
+
     def pause():
         playing[0] = False
         play_btn.setEnabled(True)
         pause_btn.setEnabled(False)
         timer.stop()
-    
+
     play_btn.clicked.connect(play)
     pause_btn.clicked.connect(pause)
     slider.valueChanged.connect(set_frame)
     pause_btn.setEnabled(False)
-    
-    main_widget.setWindowTitle('Quadrotor Simulation (VisPy)')
+
+    main_widget.setWindowTitle("Quadrotor Simulation (VisPy)")
     main_widget.resize(1280, 800)
-    
+
     # Draw initial frame
     update()
-    
+
     # Start Qt event loop
-    if not hasattr(QApplication.instance(), 'exec_'):
+    if not hasattr(QApplication.instance(), "exec_"):
         app.exec()
     else:
         QApplication.instance().exec_()
+
 
 def plot_scp_animation_pyqtgraph(result, params, step=2):
     if not PYQTPHOT_AVAILABLE:
@@ -2881,20 +5109,29 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
             "pyqtgraph is required for this function but not installed. "
             "Install it with: pip install openscvx[gui] or pip install pyqtgraph PyQt5"
         )
-    
+
     import sys
-    from scipy.spatial.transform import Rotation as R
-    from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QWidget, QLabel
+
     from PyQt5.QtCore import Qt
+    from PyQt5.QtWidgets import (
+        QHBoxLayout,
+        QLabel,
+        QPushButton,
+        QSlider,
+        QVBoxLayout,
+        QWidget,
+    )
+    from scipy.spatial.transform import Rotation as R
+
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
 
     # Main window and layout
     main_widget = QWidget()
     main_layout = QVBoxLayout(main_widget)
     w = gl.GLViewWidget()
-    w.setWindowTitle('SCP Animation (pyqtgraph)')
+    w.setWindowTitle("SCP Animation (pyqtgraph)")
     w.setGeometry(0, 110, 1280, 720)
-    
+
     # Extract data
     tof = result["t_final"]
     drone_positions = result["x_full"][:, :3]
@@ -2903,20 +5140,20 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
     scp_traj_interp(result["x_history"], params)
     scp_ctcs_trajs = result["x_history"]
     scp_multi_shoot = result["discretization_history"]
-    
+
     if "moving_subject" in result or "init_poses" in result:
         subs_positions, _, _, _ = full_subject_traj_time(result, params)
-    
+
     # Auto-calculate plotting bounds
     pos_min = drone_positions.min(axis=0)
     pos_max = drone_positions.max(axis=0)
     pos_range = pos_max - pos_min
-    
+
     # Add padding to bounds (20% of range)
     padding = pos_range * 0.2
     bounds_min = pos_min - padding
     bounds_max = pos_max + padding
-    
+
     # Ensure minimum bounds for small trajectories
     min_bounds_size = 10.0
     for i in range(3):
@@ -2924,24 +5161,24 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
             center = (bounds_max[i] + bounds_min[i]) / 2
             bounds_min[i] = center - min_bounds_size / 2
             bounds_max[i] = center + min_bounds_size / 2
-    
+
     # Auto-calculate camera distance based on bounds
     max_range = max(bounds_max - bounds_min)
     camera_distance = max_range * 1.5  # 1.5x the maximum range
-    
+
     w.setCameraPosition(distance=camera_distance, elevation=20, azimuth=45)
     main_layout.addWidget(w)
 
     # Controls
     controls_layout = QHBoxLayout()
-    play_btn = QPushButton('Play')
-    pause_btn = QPushButton('Pause')
+    play_btn = QPushButton("Play")
+    pause_btn = QPushButton("Pause")
     slider = QSlider(Qt.Horizontal)
     slider.setMinimum(0)
     slider.setSingleStep(1)
     controls_layout.addWidget(play_btn)
     controls_layout.addWidget(pause_btn)
-    controls_layout.addWidget(QLabel('SCP Iteration:'))
+    controls_layout.addWidget(QLabel("SCP Iteration:"))
     controls_layout.addWidget(slider)
     main_layout.addLayout(controls_layout)
     main_widget.show()
@@ -2951,37 +5188,58 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
     slider.setMaximum(n_iterations - 1)
 
     # Final trajectory (nonlinear propagation)
-    final_traj_line = gl.GLLinePlotItem(pos=drone_positions, color=(0,1,0,1), width=5, antialias=True)
+    final_traj_line = gl.GLLinePlotItem(
+        pos=drone_positions, color=(0, 1, 0, 1), width=5, antialias=True
+    )
     w.addItem(final_traj_line)
 
     # Add a nice ground grid - auto-scale based on bounds
     grid_size = max(bounds_max[:2] - bounds_min[:2]) * 0.3  # 30% of XY range
     grid_spacing = grid_size / 8  # 8 grid lines
     grid_lines = []
-    for x in np.arange(bounds_min[0] - grid_size/2, bounds_max[0] + grid_size/2, grid_spacing):
-        pts = np.array([[x, bounds_min[1] - grid_size/2, bounds_min[2]], [x, bounds_max[1] + grid_size/2, bounds_min[2]]])
-        line = gl.GLLinePlotItem(pos=pts, color=(0.7,0.7,0.7,0.5), width=1, antialias=True)
+    for x in np.arange(bounds_min[0] - grid_size / 2, bounds_max[0] + grid_size / 2, grid_spacing):
+        pts = np.array(
+            [
+                [x, bounds_min[1] - grid_size / 2, bounds_min[2]],
+                [x, bounds_max[1] + grid_size / 2, bounds_min[2]],
+            ]
+        )
+        line = gl.GLLinePlotItem(pos=pts, color=(0.7, 0.7, 0.7, 0.5), width=1, antialias=True)
         w.addItem(line)
         grid_lines.append(line)
-    for y in np.arange(bounds_min[1] - grid_size/2, bounds_max[1] + grid_size/2, grid_spacing):
-        pts = np.array([[bounds_min[0] - grid_size/2, y, bounds_min[2]], [bounds_max[0] + grid_size/2, y, bounds_min[2]]])
-        line = gl.GLLinePlotItem(pos=pts, color=(0.7,0.7,0.7,0.5), width=1, antialias=True)
+    for y in np.arange(bounds_min[1] - grid_size / 2, bounds_max[1] + grid_size / 2, grid_spacing):
+        pts = np.array(
+            [
+                [bounds_min[0] - grid_size / 2, y, bounds_min[2]],
+                [bounds_max[0] + grid_size / 2, y, bounds_min[2]],
+            ]
+        )
+        line = gl.GLLinePlotItem(pos=pts, color=(0.7, 0.7, 0.7, 0.5), width=1, antialias=True)
         w.addItem(line)
         grid_lines.append(line)
 
     # Create obstacles
     obstacle_items = []
     if "obstacles_centers" in result and "obstacles_radii" in result and "obstacles_axes" in result:
-        for center, axes, radius in zip(result['obstacles_centers'], result['obstacles_axes'], result['obstacles_radii']):
+        for center, axes, radius in zip(
+            result["obstacles_centers"], result["obstacles_axes"], result["obstacles_radii"]
+        ):
             # Create a sphere mesh and transform it to an ellipsoid
             sphere_mesh = gl.MeshData.sphere(rows=20, cols=40)
             verts = sphere_mesh.vertexes()
             # Scale by 1/radius to match the original plot_animation function
-            verts = verts * np.array([1/radius[0], 1/radius[1], 1/radius[2]])
+            verts = verts * np.array([1 / radius[0], 1 / radius[1], 1 / radius[2]])
             verts = (axes @ verts.T).T  # rotate
             verts = verts + center.value  # translate
             sphere_mesh.setVertexes(verts)
-            obstacle = gl.GLMeshItem(meshdata=sphere_mesh, smooth=True, color=(1,0,0,0.6), shader='shaded', drawEdges=False, glOptions='translucent')
+            obstacle = gl.GLMeshItem(
+                meshdata=sphere_mesh,
+                smooth=True,
+                color=(1, 0, 0, 0.6),
+                shader="shaded",
+                drawEdges=False,
+                glOptions="translucent",
+            )
             w.addItem(obstacle)
             obstacle_items.append(obstacle)
 
@@ -2989,7 +5247,9 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
     gate_items = []
     if "vertices" in result:
         for vertices in result["vertices"]:
-            gate = gl.GLLinePlotItem(pos=np.array(vertices + [vertices[0]]), color=(0,0,1,1), width=5, antialias=True)
+            gate = gl.GLLinePlotItem(
+                pos=np.array([*vertices, vertices[0]]), color=(0, 0, 1, 1), width=5, antialias=True
+            )
             w.addItem(gate)
             gate_items.append(gate)
 
@@ -2998,8 +5258,8 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
     subject_dots = []
     if "init_poses" in result or "moving_subject" in result:
         for sub_traj in subs_positions:
-            line = gl.GLLinePlotItem(pos=sub_traj, color=(1,0,0,1), width=3)
-            dot = gl.GLScatterPlotItem(pos=sub_traj[-1:], color=(1,0,0,1), size=10)
+            line = gl.GLLinePlotItem(pos=sub_traj, color=(1, 0, 0, 1), width=3)
+            dot = gl.GLScatterPlotItem(pos=sub_traj[-1:], color=(1, 0, 0, 1), size=10)
             w.addItem(line)
             w.addItem(dot)
             subject_lines.append(line)
@@ -3009,7 +5269,7 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
     scp_traj_lines = []
     multishot_traj_lines = []
     scp_axes_items = []  # Store axes for each SCP iteration
-    
+
     # Extract the number of states and controls from the parameters
     n_x = params.sim.n_states
     n_u = params.sim.n_controls
@@ -3030,10 +5290,10 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
     for traj_iter, scp_traj in enumerate(scp_ctcs_trajs):
         # SCP trajectory line - only show actual data points, not connecting lines
         scp_positions = scp_traj[:, 0:3]
-        scp_line = gl.GLScatterPlotItem(pos=scp_positions, color=(0.5,0.5,0.5,0.7), size=3)
+        scp_line = gl.GLScatterPlotItem(pos=scp_positions, color=(0.5, 0.5, 0.5, 0.7), size=3)
         w.addItem(scp_line)
         scp_traj_lines.append(scp_line)
-        
+
         # Create axes for this SCP iteration
         if drone_attitudes is not None:
             iteration_axes = []
@@ -3043,12 +5303,12 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
                 rotmat = r.as_matrix()
                 axes = axes_length * np.eye(3)
                 axes_rot = rotmat @ axes
-                
+
                 # Create axis lines for this position
                 pos_axes = []
-                axis_colors = [(1,0,0,1), (0,1,0,1), (0,0,1,1)]  # Red, Green, Blue
+                axis_colors = [(1, 0, 0, 1), (0, 1, 0, 1), (0, 0, 1, 1)]  # Red, Green, Blue
                 for k in range(3):
-                    axis_pts = np.stack([scp_positions[i], scp_positions[i] + axes_rot[:,k]])
+                    axis_pts = np.stack([scp_positions[i], scp_positions[i] + axes_rot[:, k]])
                     axis_line = gl.GLLinePlotItem(pos=axis_pts, color=axis_colors[k], width=2)
                     w.addItem(axis_line)
                     pos_axes.append(axis_line)
@@ -3056,17 +5316,19 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
             scp_axes_items.append(iteration_axes)
         else:
             scp_axes_items.append([])
-        
+
         # Multiple shooting trajectories - only show actual data points
         if traj_iter < len(scp_multi_shoot):
             pos_traj = []
             for i_multi in range(scp_multi_shoot[traj_iter].shape[1]):
-                pos_traj.append(scp_multi_shoot[traj_iter][:,i_multi].reshape(-1, i5)[:,0:3])
+                pos_traj.append(scp_multi_shoot[traj_iter][:, i_multi].reshape(-1, i5)[:, 0:3])
             pos_traj = np.array(pos_traj)
-            
+
             iteration_multishot_lines = []
             for j in range(pos_traj.shape[1]):
-                multishot_line = gl.GLScatterPlotItem(pos=pos_traj[:,j], color=(0.3,0.7,1.0,0.8), size=4)
+                multishot_line = gl.GLScatterPlotItem(
+                    pos=pos_traj[:, j], color=(0.3, 0.7, 1.0, 0.8), size=4
+                )
                 w.addItem(multishot_line)
                 iteration_multishot_lines.append(multishot_line)
             multishot_traj_lines.append(iteration_multishot_lines)
@@ -3083,19 +5345,19 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
             play_btn.setEnabled(True)
             pause_btn.setEnabled(False)
             return
-        
+
         slider.blockSignals(True)
         slider.setValue(i)
         slider.blockSignals(False)
-        
+
         # Show only the current SCP iteration and all previous ones
         for j, scp_line in enumerate(scp_traj_lines):
             if j <= i:
                 scp_line.setVisible(True)
-                scp_line.setData(color=(0.5,0.5,0.5,0.7))
+                scp_line.setData(color=(0.5, 0.5, 0.5, 0.7))
             else:
                 scp_line.setVisible(False)
-        
+
         # Show/hide axes for each iteration
         for j, iteration_axes in enumerate(scp_axes_items):
             if j == i:  # Only show axes for current iteration
@@ -3106,17 +5368,17 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
                 for pos_axes in iteration_axes:
                     for axis_line in pos_axes:
                         axis_line.setVisible(False)
-        
+
         # Show multiple shooting trajectories for current iteration
         for j, iteration_lines in enumerate(multishot_traj_lines):
             if j == i:
                 for line in iteration_lines:
                     line.setVisible(True)
-                    line.setData(color=(0.3,0.7,1.0,0.8))
+                    line.setData(color=(0.3, 0.7, 1.0, 0.8))
             else:
                 for line in iteration_lines:
                     line.setVisible(False)
-        
+
         ptr[0] += 1
 
     def set_frame(i):
@@ -3145,16 +5407,17 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
     slider.valueChanged.connect(set_frame)
     pause_btn.setEnabled(False)
 
-    main_widget.setWindowTitle(f'SCP Animation: {tof} seconds (pyqtgraph)')
+    main_widget.setWindowTitle(f"SCP Animation: {tof} seconds (pyqtgraph)")
     main_widget.resize(1280, 800)
 
     # Initialize display
     set_frame(0)
 
-    if not hasattr(QtWidgets.QApplication.instance(), 'exec_'):
+    if not hasattr(QtWidgets.QApplication.instance(), "exec_"):
         app.exec()
     else:
         QtWidgets.QApplication.instance().exec_()
+
 
 def plot_camera_animation_pyqtgraph(result, params, step=2):
     if not PYQTPHOT_AVAILABLE:
@@ -3162,23 +5425,32 @@ def plot_camera_animation_pyqtgraph(result, params, step=2):
             "pyqtgraph is required for this function but not installed. "
             "Install it with: pip install openscvx[gui] or pip install pyqtgraph PyQt5"
         )
-    
+
     """
     PyQtGraph version of plot_camera_animation: animates subject projections in the camera frame (2D).
     """
     import sys
+
     import numpy as np
-    from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QPushButton, QSlider, QWidget, QLabel
-    from PyQt5.QtCore import Qt
     import pyqtgraph as pg
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtWidgets import (
+        QHBoxLayout,
+        QLabel,
+        QPushButton,
+        QSlider,
+        QVBoxLayout,
+        QWidget,
+    )
+
     app = pg.QtWidgets.QApplication.instance() or pg.QtWidgets.QApplication(sys.argv)
 
     # Get subject projections in the camera frame
     _, subs_positions_sen, _, subs_positions_sen_node = full_subject_traj_time(result, params)
     n_frames = len(subs_positions_sen[0])
     indices = np.arange(0, n_frames, step)
-    if indices[-1] != n_frames-1:
-        indices = np.append(indices, n_frames-1)
+    if indices[-1] != n_frames - 1:
+        indices = np.append(indices, n_frames - 1)
 
     # Camera viewcone boundary (red curve)
     if "alpha_x" in result and "alpha_y" in result:
@@ -3186,19 +5458,19 @@ def plot_camera_animation_pyqtgraph(result, params, step=2):
     else:
         raise ValueError("`alpha_x` and `alpha_y` not found in result dictionary.")
     n_cone = 400
-    theta = np.linspace(0, 2*np.pi, n_cone)
+    theta = np.linspace(0, 2 * np.pi, n_cone)
     circle = np.stack([np.cos(theta), np.sin(theta)])
-    
+
     # Use the correct norm type from the result
     if "norm_type" in result:
-        if result["norm_type"] == np.inf or result["norm_type"] == 'inf':
+        if result["norm_type"] == np.inf or result["norm_type"] == "inf":
             z = np.linalg.norm(A @ circle, axis=0, ord=np.inf)
         else:
             z = np.linalg.norm(A @ circle, axis=0, ord=result["norm_type"])
     else:
         # Default to 2-norm if norm_type not specified
         z = np.linalg.norm(A @ circle, axis=0)
-    
+
     X = circle[0] / z
     Y = circle[1] / z
     # Repeat first point to close the curve
@@ -3216,21 +5488,21 @@ def plot_camera_animation_pyqtgraph(result, params, step=2):
 
     # Controls
     controls_layout = QHBoxLayout()
-    play_btn = QPushButton('Play')
-    pause_btn = QPushButton('Pause')
+    play_btn = QPushButton("Play")
+    pause_btn = QPushButton("Pause")
     slider = QSlider(Qt.Horizontal)
     slider.setMinimum(0)
-    slider.setMaximum(len(indices)-1)
+    slider.setMaximum(len(indices) - 1)
     slider.setSingleStep(1)
     controls_layout.addWidget(play_btn)
     controls_layout.addWidget(pause_btn)
-    controls_layout.addWidget(QLabel('Frame:'))
+    controls_layout.addWidget(QLabel("Frame:"))
     controls_layout.addWidget(slider)
     main_layout.addLayout(controls_layout)
     main_widget.show()
 
     # Plot the camera viewcone boundary with thicker red line
-    plot_widget.plot(X, Y, pen=pg.mkPen('r', width=5))
+    plot_widget.plot(X, Y, pen=pg.mkPen("r", width=5))
 
     # Prepare subject curves
     subject_curves = []
@@ -3238,14 +5510,18 @@ def plot_camera_animation_pyqtgraph(result, params, step=2):
     colors = [pg.intColor(i, hues=len(subs_positions_sen)) for i in range(len(subs_positions_sen))]
     for color in colors:
         curve = plot_widget.plot([], [], pen=pg.mkPen(color, width=2))
-        dot = plot_widget.plot([], [], pen=None, symbol='o', symbolBrush=color, symbolSize=6)  # Even smaller dots
+        dot = plot_widget.plot(
+            [], [], pen=None, symbol="o", symbolBrush=color, symbolSize=6
+        )  # Even smaller dots
         subject_curves.append(curve)
         subject_dots.append(dot)
 
     # Prepare nodal points - remove outline and make smaller
     subject_node_dots = []
     for color in colors:
-        node_dot = plot_widget.plot([], [], pen=None, symbol='o', symbolBrush=color, symbolSize=8)  # Smaller nodal points
+        node_dot = plot_widget.plot(
+            [], [], pen=None, symbol="o", symbolBrush=color, symbolSize=8
+        )  # Smaller nodal points
         subject_node_dots.append(node_dot)
 
     ptr = [0]
@@ -3265,9 +5541,9 @@ def plot_camera_animation_pyqtgraph(result, params, step=2):
         frame_idx = indices[i]
         for j, sub_traj in enumerate(subs_positions_sen):
             # Project trajectory up to current frame
-            traj = np.array(sub_traj[:frame_idx+1])
-            x = traj[:,0] / traj[:,2]
-            y = traj[:,1] / traj[:,2]
+            traj = np.array(sub_traj[: frame_idx + 1])
+            x = traj[:, 0] / traj[:, 2]
+            y = traj[:, 1] / traj[:, 2]
             subject_curves[j].setData(x, y)
             # Current dot
             subject_dots[j].setData([x[-1]], [y[-1]])
@@ -3277,8 +5553,8 @@ def plot_camera_animation_pyqtgraph(result, params, step=2):
                 node_idx = int((frame_idx // (len(sub_traj) / len(node_traj))) + 1)
                 node_traj = node_traj[:node_idx]
                 if len(node_traj) > 0:
-                    node_x = node_traj[:,0] / node_traj[:,2]
-                    node_y = node_traj[:,1] / node_traj[:,2]
+                    node_x = node_traj[:, 0] / node_traj[:, 2]
+                    node_y = node_traj[:, 1] / node_traj[:, 2]
                     subject_node_dots[j].setData(node_x, node_y)
                 else:
                     subject_node_dots[j].setData([], [])
@@ -3310,12 +5586,12 @@ def plot_camera_animation_pyqtgraph(result, params, step=2):
     slider.valueChanged.connect(set_frame)
     pause_btn.setEnabled(False)
 
-    main_widget.setWindowTitle('Camera Animation (pyqtgraph)')
+    main_widget.setWindowTitle("Camera Animation (pyqtgraph)")
     main_widget.resize(800, 800)
 
     update()  # Draw initial frame
 
-    if not hasattr(pg.QtWidgets.QApplication.instance(), 'exec_'):
+    if not hasattr(pg.QtWidgets.QApplication.instance(), "exec_"):
         app.exec()
     else:
         pg.QtWidgets.QApplication.instance().exec_()

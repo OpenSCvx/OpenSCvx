@@ -1,14 +1,15 @@
 # test_propagation.py
 
-import numpy as np
 import jax
-from jax import export
 import jax.numpy as jnp
+import numpy as np
 import pytest
+from jax import export
 
-from openscvx.propagation import prop_aug_dy, s_to_t, t_to_tau, get_propagation_solver
-from openscvx.backend.state import State
 from openscvx.backend.control import Control
+from openscvx.backend.state import State
+from openscvx.propagation import get_propagation_solver, prop_aug_dy, s_to_t, t_to_tau
+
 
 # simple scalar decay: x' = -x
 def decay(x, u, node):
@@ -38,10 +39,7 @@ def test_prop_aug_dy_linear(dis_type, beta_expected):
     node = 0  # dummy node index
 
     # compute beta
-    if dis_type == "ZOH":
-        beta = 0.0
-    else:
-        beta = (tau - tau_init) * N
+    beta = 0.0 if dis_type == "ZOH" else (tau - tau_init) * N
     assert pytest.approx(beta) == beta_expected
 
     # manually compute expected
@@ -156,7 +154,7 @@ def test_propagation_solver_decay(dis_type):
     # Initial conditions
     V0 = jnp.array([1.0])
     tau_grid = jnp.array([0.0, 1.0])
-    u_cur = jnp.array([[0.0, 1.0]])   # slack = 1
+    u_cur = jnp.array([[0.0, 1.0]])  # slack = 1
     u_next = jnp.array([[0.0, 1.0]])  # slack = 1
     tau_init = jnp.array([[0.0]])
     node = jnp.array([[0]])
@@ -175,6 +173,7 @@ def test_propagation_solver_decay(dis_type):
     # Check against exact solution
     expected = np.exp(-0.5)
     assert np.isclose(y_half, expected, rtol=1e-2, atol=1e-3)
+
 
 @pytest.mark.parametrize("dis_type", ["ZOH", "FOH"])
 def test_jit_propagation_solver_compiles(dis_type):
@@ -209,8 +208,9 @@ def test_jit_propagation_solver_compiles(dis_type):
 
     # JIT and export the solver
     jitted = jax.jit(
-        lambda V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask:
-            solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask)
+        lambda V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask: solver(
+            V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask
+        )
     )
 
     # Export

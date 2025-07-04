@@ -1,21 +1,23 @@
-import pytest
+from typing import Optional
+
 import jax.numpy as jnp
+import pytest
 
 from openscvx.constraints.ctcs import CTCSConstraint
 from openscvx.constraints.violation import (
-    get_g_grad_x,
-    get_g_grad_u,
     get_g_func,
     get_g_funcs,
+    get_g_grad_u,
+    get_g_grad_x,
 )
 
 
 def make_constraint(
     value: float,
-    idx: int = None,
+    idx: Optional[int] = None,
     nodes=(0, 10),
-    grad_x: float = None,
-    grad_u: float = None,
+    grad_x: Optional[float] = None,
+    grad_u: Optional[float] = None,
     scaling: float = 1.0,
 ) -> CTCSConstraint:
     """Helper to create a CTCSConstraint whose func always returns `value`,
@@ -115,7 +117,8 @@ def test_get_g_funcs_grouping_and_grad_flags():
     # g sums func values 1 + 2 = 3
     assert float(v1.g(None, None, node=5)) == pytest.approx(3.0)
 
-    # because all c1,c2 have grad_f_x, v1.g_grad_x is set (but note code swaps grad_u under the hood)
+    # because all c1,c2 have grad_f_x, v1.g_grad_x is set (but note code swaps
+    # grad_u under the hood)
     assert callable(v1.g_grad_x)
     # get_g_grad_u on [c1,c2] sums their grad_u: 10 + 20 = 30
     assert float(v1.g_grad_x(None, None, node=5)) == pytest.approx(30.0)

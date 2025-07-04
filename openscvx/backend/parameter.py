@@ -3,10 +3,10 @@ from openscvx.backend.expr import Expr
 
 class Parameter(Expr):
     """A class representing a parameter in the optimization problem.
-    
+
     Parameters are symbolic variables that can be used in expressions and constraints.
     They maintain a registry of all created parameters and can be indexed or sliced.
-    
+
     Attributes:
         _registry (dict): Class-level dictionary storing all created parameters.
         name (str): The name of the parameter.
@@ -18,11 +18,11 @@ class Parameter(Expr):
 
     def __init__(self, name, shape=()):
         """Initialize a new Parameter.
-        
+
         Args:
             name (str): The name of the parameter.
             shape (tuple, optional): The shape of the parameter. Defaults to ().
-        
+
         Note:
             The parameter is automatically registered in the class registry if not already present.
         """
@@ -38,7 +38,7 @@ class Parameter(Expr):
     @property
     def shape(self):
         """Get the shape of the parameter.
-        
+
         Returns:
             tuple: The shape of the parameter.
         """
@@ -46,15 +46,15 @@ class Parameter(Expr):
 
     def __getitem__(self, idx):
         """Get a subset of the parameter using indexing or slicing.
-        
+
         Args:
             idx (int or slice): The index or slice to use.
                 - If int: Returns a scalar parameter
                 - If slice: Returns a parameter with shape (length of slice,)
-        
+
         Returns:
             Parameter: A new parameter representing the subset.
-        
+
         Raises:
             TypeError: If idx is neither an int nor a slice.
         """
@@ -70,7 +70,7 @@ class Parameter(Expr):
 
     def __repr__(self):
         """Get a string representation of the parameter.
-        
+
         Returns:
             str: A string showing the parameter name and shape.
         """
@@ -79,7 +79,7 @@ class Parameter(Expr):
     @classmethod
     def get_all(cls):
         """Get all registered parameters.
-        
+
         Returns:
             dict: A dictionary of all registered parameters, with names as keys.
         """
@@ -88,7 +88,7 @@ class Parameter(Expr):
     @classmethod
     def reset(cls):
         """Clear the registry of all parameters.
-        
+
         This method removes all registered parameters from the class registry.
         """
         cls._registry.clear()

@@ -1,33 +1,37 @@
 import numpy as np
+
 from openscvx.backend.variable import Variable
+
 
 class Control(Variable):
     """A class representing the control variables in an optimal control problem.
 
     The Control class extends Variable to handle control-specific properties and supports
-    both true and augmented control dimensions. It provides methods for appending new control
-    variables and accessing subsets of the control vector.
+    both true and augmented control dimensions. It provides methods for appending new
+    control variables and accessing subsets of the control vector.
 
     Attributes:
         name (str): Name of the control variable.
         shape (tuple): Shape of the control variable array.
         min (np.ndarray): Minimum bounds for the control variables. Shape: (n_controls,).
         max (np.ndarray): Maximum bounds for the control variables. Shape: (n_controls,).
-        guess (np.ndarray): Used to initialize SCP and contains the current SCP solution for the control trajectory. Shape: (n_nodes, n_controls).
+        guess (np.ndarray): Used to initialize SCP and contains the current SCP solution for
+            the control trajectory. Shape: (n_nodes, n_controls).
         _true_dim (int): True dimensionality of the control variables.
         _true_slice (slice): Slice for accessing true control variables.
         _augmented_slice (slice): Slice for accessing augmented control variables.
 
     Notes:
-        Attributes prefixed with underscore (_) are for internal use only and should not be accessed directly.
+        Attributes prefixed with underscore (_) are for internal use only and should not be
+        accessed directly.
 
     Example:
-    ```python
-    control = Control("thrust", (3,))
-    control.min = [-1, -1, 0]
-    control.max = [1, 1, 10]
-    control.guess = np.repeat([[0, 0, 10]], 5, axis=0)
-    ```
+        ```python
+        control = Control("thrust", (3,))
+        control.min = [-1, -1, 0]
+        control.max = [1, 1, 10]
+        control.guess = np.repeat([[0, 0, 10]], 5, axis=0)
+        ```
     """
 
     def __init__(self, name, shape):

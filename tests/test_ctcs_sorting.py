@@ -2,10 +2,12 @@ import pytest
 
 from openscvx.augmentation.ctcs import sort_ctcs_constraints
 
+
 class DummyCTCS:
     def __init__(self, nodes=None, idx=None):
         self.nodes = nodes
         self.idx = idx
+
 
 def test_empty_list():
     constraints = []
@@ -14,12 +16,14 @@ def test_empty_list():
     assert intervals == []
     assert count == 0
 
+
 def test_single_constraint_defaults_to_full_horizon():
     c = DummyCTCS()
     sorted_constraints, intervals, count = sort_ctcs_constraints([c], N=10)
     assert count == 1
     assert intervals == [(0, 10)]
     assert c.idx == 0
+
 
 def test_multiple_constraints_same_interval():
     c1 = DummyCTCS()
@@ -28,6 +32,7 @@ def test_multiple_constraints_same_interval():
     assert count == 1
     assert intervals == [(0, 6)]
     assert c1.idx == 0 and c2.idx == 0
+
 
 def test_distinct_intervals_auto_assignment():
     c1 = DummyCTCS(nodes=(0, 3))
@@ -39,6 +44,7 @@ def test_distinct_intervals_auto_assignment():
     assert c1.idx == 0
     assert c2.idx == 1
 
+
 def test_explicit_idx_consistency():
     c1 = DummyCTCS(nodes=(1, 4), idx=5)
     c2 = DummyCTCS(nodes=(1, 4), idx=5)
@@ -47,11 +53,13 @@ def test_explicit_idx_consistency():
     assert intervals == [(1, 4)]
     assert c1.idx == 5 and c2.idx == 5
 
+
 def test_explicit_idx_inconsistency_raises():
     c1 = DummyCTCS(nodes=(1, 4), idx=2)
     c2 = DummyCTCS(nodes=(2, 5), idx=2)
     with pytest.raises(ValueError):
         sort_ctcs_constraints([c1, c2], N=10)
+
 
 def test_mixed_manual_and_auto_assignment():
     c1 = DummyCTCS(nodes=(0, 3), idx=1)

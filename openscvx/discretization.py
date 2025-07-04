@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from openscvx.dynamics import Dynamics
-from openscvx.integrators import solve_ivp_rk45, solve_ivp_diffrax
+from openscvx.integrators import solve_ivp_diffrax, solve_ivp_rk45
 
 
 def dVdt(
@@ -17,13 +17,13 @@ def dVdt(
     n_u: int,
     N: int,
     dis_type: str,
-    **params
+    **params,
 ) -> jnp.ndarray:
     """Compute the time derivative of the augmented state vector.
-    
+
     This function computes the time derivative of the augmented state vector V,
     which includes the state, state transition matrix, and control influence matrix.
-    
+
     Args:
         tau (float): Current normalized time in [0,1].
         V (jnp.ndarray): Augmented state vector.
@@ -37,12 +37,12 @@ def dVdt(
         N (int): Number of nodes in trajectory.
         dis_type (str): Discretization type ("ZOH" or "FOH").
         **params: Additional parameters passed to state_dot, A, and B.
-        
+
     Returns:
         jnp.ndarray: Time derivative of augmented state vector.
     """
     # Define the nodes
-    nodes = jnp.arange(0, N-1)
+    nodes = jnp.arange(0, N - 1)
 
     # Define indices for slicing the augmented state vector
     i0 = 0
@@ -94,10 +94,20 @@ def dVdt(
     # fmt: off
     dVdt = jnp.zeros_like(V)
     dVdt = dVdt.at[:, i0:i1].set(F)
-    dVdt = dVdt.at[:, i1:i2].set(jnp.matmul(sdfdx, V[:, i1:i2].reshape(-1, n_x, n_x)).reshape(-1, n_x * n_x))
-    dVdt = dVdt.at[:, i2:i3].set((jnp.matmul(sdfdx, V[:, i2:i3].reshape(-1, n_x, n_u)) + dfdu * alpha).reshape(-1, n_x * n_u))
-    dVdt = dVdt.at[:, i3:i4].set((jnp.matmul(sdfdx, V[:, i3:i4].reshape(-1, n_x, n_u)) + dfdu * beta).reshape(-1, n_x * n_u))
-    dVdt = dVdt.at[:, i4:i5].set((jnp.matmul(sdfdx, V[:, i4:i5].reshape(-1, n_x)[..., None]).squeeze(-1) + z).reshape(-1, n_x))
+    dVdt = dVdt.at[:, i1:i2].set(
+        jnp.matmul(sdfdx, V[:, i1:i2].reshape(-1, n_x, n_x)).reshape(-1, n_x * n_x)
+    )
+    dVdt = dVdt.at[:, i2:i3].set(
+        (jnp.matmul(sdfdx, V[:, i2:i3].reshape(-1, n_x, n_u)) + dfdu * alpha).reshape(-1, n_x * n_u)
+    )
+    dVdt = dVdt.at[:, i3:i4].set(
+        (jnp.matmul(sdfdx, V[:, i3:i4].reshape(-1, n_x, n_u)) + dfdu * beta).reshape(-1, n_x * n_u)
+    )
+    dVdt = dVdt.at[:, i4:i5].set(
+        (
+            jnp.matmul(sdfdx, V[:, i4:i5].reshape(-1, n_x)[..., None]).squeeze(-1) + z
+        ).reshape(-1, n_x)
+    )
     # fmt: on
 
     return dVdt.reshape(-1)
@@ -118,13 +128,13 @@ def calculate_discretization(
     rtol,
     atol,
     dis_type: str,
-    **kwargs
+    **kwargs,
 ):
     """Calculate the discretized system matrices.
-    
+
     This function computes the discretized system matrices (A_bar, B_bar, C_bar)
     and defect vector (z_bar) using numerical integration.
-    
+
     Args:
         x: State trajectory.
         u: Control trajectory.
@@ -141,7 +151,7 @@ def calculate_discretization(
         atol (float): Absolute tolerance for integration.
         dis_type (str): Discretization type ("ZOH" or "FOH").
         **kwargs: Additional parameters passed to state_dot, A, and B.
-        
+
     Returns:
         tuple: (A_bar, B_bar, C_bar, z_bar, Vmulti) where:
             - A_bar: Discretized state transition matrix
@@ -160,9 +170,7 @@ def calculate_discretization(
     # Initial augmented state
     V0 = jnp.zeros((N - 1, i5))
     V0 = V0.at[:, :n_x].set(x[:-1].astype(float))
-    V0 = V0.at[:, n_x:n_x + n_x * n_x].set(
-        jnp.eye(n_x).reshape(1, -1).repeat(N - 1, axis=0)
-    )
+    V0 = V0.at[:, n_x : n_x + n_x * n_x].set(jnp.eye(n_x).reshape(1, -1).repeat(N - 1, axis=0))
 
     # Choose integrator
     integrator_args = dict(
@@ -175,7 +183,7 @@ def calculate_discretization(
         n_u=n_u,
         N=N,
         dis_type=dis_type,
-        **kwargs  # <-- adds parameter values with names
+        **kwargs,  # <-- adds parameter values with names
     )
 
     # Define dVdt wrapper using named arguments
@@ -206,9 +214,27 @@ def calculate_discretization(
     Vend = sol[-1].T.reshape(-1, i5)
     Vmulti = sol.T
 
-    A_bar = Vend[:, i1:i2].reshape(N - 1, n_x, n_x).transpose(1, 2, 0).reshape(n_x * n_x, -1, order='F').T
-    B_bar = Vend[:, i2:i3].reshape(N - 1, n_x, n_u).transpose(1, 2, 0).reshape(n_x * n_u, -1, order='F').T
-    C_bar = Vend[:, i3:i4].reshape(N - 1, n_x, n_u).transpose(1, 2, 0).reshape(n_x * n_u, -1, order='F').T
+    A_bar = (
+        Vend[:, i1:i2]
+        .reshape(N - 1, n_x, n_x)
+        .transpose(1, 2, 0)
+        .reshape(n_x * n_x, -1, order="F")
+        .T
+    )
+    B_bar = (
+        Vend[:, i2:i3]
+        .reshape(N - 1, n_x, n_u)
+        .transpose(1, 2, 0)
+        .reshape(n_x * n_u, -1, order="F")
+        .T
+    )
+    C_bar = (
+        Vend[:, i3:i4]
+        .reshape(N - 1, n_x, n_u)
+        .transpose(1, 2, 0)
+        .reshape(n_x * n_u, -1, order="F")
+        .T
+    )
     z_bar = Vend[:, i4:i5]
 
     return A_bar, B_bar, C_bar, z_bar, Vmulti
@@ -216,15 +242,15 @@ def calculate_discretization(
 
 def get_discretization_solver(dyn: Dynamics, settings, param_map):
     """Create a discretization solver function.
-    
+
     This function creates a solver that computes the discretized system matrices
     using the specified dynamics and settings.
-    
+
     Args:
         dyn (Dynamics): System dynamics object.
         settings: Configuration settings for discretization.
         param_map (dict): Mapping of parameter names to values.
-        
+
     Returns:
         callable: A function that computes the discretized system matrices.
     """
@@ -243,5 +269,5 @@ def get_discretization_solver(dyn: Dynamics, settings, param_map):
         rtol=settings.dis.rtol,
         atol=settings.dis.atol,
         dis_type=settings.dis.dis_type,
-        **dict(zip(param_map.keys(), params))  # <--- Named keyword args
+        **dict(zip(param_map.keys(), params)),  # <--- Named keyword args
     )

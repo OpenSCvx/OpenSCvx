@@ -1,8 +1,7 @@
-from typing import List
-
 from openscvx.constraints.ctcs import CTCSConstraint
 
-def sort_ctcs_constraints(constraints_ctcs: List[CTCSConstraint], N: int):        
+
+def sort_ctcs_constraints(constraints_ctcs: list[CTCSConstraint], N: int):
     idx_to_nodes: dict[int, tuple] = {}
     next_idx = 0
     for c in constraints_ctcs:
@@ -34,11 +33,15 @@ def sort_ctcs_constraints(constraints_ctcs: List[CTCSConstraint], N: int):
                 c.idx = next_idx
                 idx_to_nodes[next_idx] = key
                 next_idx += 1
-    
+
     # Extract your intervals in ascending‐idx order
-    ordered_ids       = sorted(idx_to_nodes.keys())
-    node_intervals    = [ idx_to_nodes[i] for i in ordered_ids ]
-    { ident: pos for pos, ident in enumerate(ordered_ids) }
+    ordered_ids = sorted(idx_to_nodes.keys())
+    node_intervals = [idx_to_nodes[i] for i in ordered_ids]
+    {ident: pos for pos, ident in enumerate(ordered_ids)}
     num_augmented_states = len(ordered_ids)
 
-    return constraints_ctcs, node_intervals, num_augmented_states,
+    return (
+        constraints_ctcs,
+        node_intervals,
+        num_augmented_states,
+    )

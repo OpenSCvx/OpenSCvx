@@ -1,21 +1,21 @@
 import os
 import sys
 
-from stljax.formula import Predicate, Or
 import jax.numpy as jnp
 import numpy as np
+from stljax.formula import Or, Predicate
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
-from openscvx.trajoptproblem import TrajOptProblem  # noqa: E402
-from openscvx.dynamics import dynamics  # noqa: E402
-from openscvx.constraints import ctcs  # noqa: E402
-from openscvx.backend.state import State, Free, Minimize  # noqa: E402
-from openscvx.backend.parameter import Parameter  # noqa: E402
-from openscvx.backend.control import Control  # noqa: E402
-from examples.plotting import plot_dubins_car_disjoint  # noqa: E402
+from examples.plotting import plot_dubins_car_disjoint
+from openscvx.backend.control import Control
+from openscvx.backend.parameter import Parameter
+from openscvx.backend.state import Free, Minimize, State
+from openscvx.constraints import ctcs
+from openscvx.dynamics import dynamics
+from openscvx.trajoptproblem import TrajOptProblem
 
 # NOTE: This example requires the 'stljax' package.
 # You can install it via pip:
@@ -26,12 +26,12 @@ total_time = 4.0  # Total simulation time
 x = State("x", shape=(4,))
 u = Control("u", shape=(2,))
 # Set bounds on state
-x.min = np.array([-5., -5., -2 * jnp.pi,  0])
-x.max = np.array([ 5.,  5.,  2 * jnp.pi, 10])
+x.min = np.array([-5.0, -5.0, -2 * jnp.pi, 0])
+x.max = np.array([5.0, 5.0, 2 * jnp.pi, 10])
 # Set initial, final, and guess for state trajectory using symbolic boundary expressions
 x.initial = np.array([0, -2, 0, 0])
-x.final   = np.array([0, 2, Free(0), Minimize(total_time)])
-x.guess   = np.linspace([0, -2, 0, 0], [0, 2, 0, total_time], n)
+x.final = np.array([0, 2, Free(0), Minimize(total_time)])
+x.guess = np.linspace([0, -2, 0, 0], [0, 2, 0, total_time], n)
 # Set bounds on control
 u.min = np.array([0, -5])
 u.max = np.array([10, 5])
@@ -46,22 +46,30 @@ wp1_radius.value = 0.5
 wp1_center.value = np.array([-2.1, 0.0])  # Center of the wp 1
 wp2_radius.value = 0.5
 wp2_center.value = np.array([1.9, 0.0])  # Center of the wp 2
+
+
 # Define STL predicates for each waypoint (positive inside, negative outside)
 def pred_wp1(x_):
-    return (wp1_radius.value - jnp.linalg.norm(x_[:2] - wp1_center.value))
+    return wp1_radius.value - jnp.linalg.norm(x_[:2] - wp1_center.value)
+
+
 def pred_wp2(x_):
-    return (wp2_radius.value - jnp.linalg.norm(x_[:2] - wp2_center.value))
+    return wp2_radius.value - jnp.linalg.norm(x_[:2] - wp2_center.value)
+
+
 # STL predicates
-wp1_pred = Predicate('wp1', pred_wp1)
-wp2_pred = Predicate('wp2', pred_wp2)
+wp1_pred = Predicate("wp1", pred_wp1)
+wp2_pred = Predicate("wp2", pred_wp2)
 # Logical OR: in wp1 or wp2
 phi = Or(wp1_pred, wp2_pred)
 # Remove visit_wp_OR and replace the first constraint with stljax-based version
 constraints = [
-    ctcs(lambda x_, u_: -phi(x_), nodes=(3,5)),
+    ctcs(lambda x_, u_: -phi(x_), nodes=(3, 5)),
     ctcs(lambda x_, u_: x_ - x.true.max),
     ctcs(lambda x_, u_: x.true.min - x_),
 ]
+
+
 # Define dynamics
 @dynamics
 def dynamics_fn(x_, u_):
@@ -71,6 +79,8 @@ def dynamics_fn(x_, u_):
     x_dot = jnp.asarray([rx_dot, ry_dot, theta_dot])
     t_dot = 1
     return jnp.hstack([x_dot, t_dot])
+
+
 # Build the problem
 problem = TrajOptProblem(
     dynamics=dynamics_fn,
@@ -89,12 +99,12 @@ problem.settings.scp.w_tr = 1e0
 problem.settings.scp.lam_cost = 1e-1
 problem.settings.scp.lam_vc = 6e2
 problem.settings.scp.uniform_time_grid = True
-plotting_dict = dict(
-    wp1_radius = wp1_radius.value,
-    wp1_center = wp1_center.value,
-    wp2_radius = wp2_radius.value,
-    wp2_center = wp2_center.value
-)
+plotting_dict = {
+    "wp1_radius": wp1_radius.value,
+    "wp1_center": wp1_center.value,
+    "wp2_radius": wp2_radius.value,
+    "wp2_center": wp2_center.value,
+}
 if __name__ == "__main__":
     problem.initialize()
     results = problem.solve()

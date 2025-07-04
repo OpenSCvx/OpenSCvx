@@ -8,39 +8,56 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
-from openscvx.trajoptproblem import TrajOptProblem  # noqa: E402
-from openscvx.dynamics import dynamics  # noqa: E402
-from openscvx.constraints import ctcs, nodal  # noqa: E402
-from openscvx.utils import qdcm, SSMP, SSM, generate_orthogonal_unit_vectors  # noqa: E402
-from openscvx.backend.state import State, Free, Minimize  # noqa: E402
-from openscvx.backend.parameter import Parameter  # noqa: E402
-from openscvx.backend.control import Control  # noqa: E402
-
-from examples.plotting import plot_animation  # noqa: E402
-
+from examples.plotting import plot_animation
+from openscvx.backend.control import Control
+from openscvx.backend.parameter import Parameter
+from openscvx.backend.state import Free, Minimize, State
+from openscvx.constraints import ctcs, nodal
+from openscvx.dynamics import dynamics
+from openscvx.trajoptproblem import TrajOptProblem
+from openscvx.utils import (
+    SSM,
+    SSMP,
+    generate_orthogonal_unit_vectors,
+    qdcm,
+)
 
 n = 6
 total_time = 4.0  # Total time for the simulation
 
 x = State("x", shape=(14,))  # State variable with 14 dimensions
 
-x.max = np.array([200., 10, 20, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100])
-x.min = np.array(
-    [-200., -100, 0, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0]
+x.max = np.array([200.0, 10, 20, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100])
+x.min = np.array([-200.0, -100, 0, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0])
+
+x.initial = np.array(
+    [10.0, 0, 2, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0]
+)
+x.final = np.array(
+    [
+        -10.0,
+        0,
+        2,
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(1),
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(0),
+        Free(0),
+        Minimize(total_time),
+    ]
 )
 
-x.initial = np.array([10., 0, 2, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0])
-x.final = np.array([-10., 0, 2, Free(0), Free(0), Free(0), Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), Minimize(total_time)])
-
 u = Control("u", shape=(6,))  # Control variable with 6 dimensions
-u.max=np.array(
-    [0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562]
-)  # Upper Bound on the controls
-u.min=np.array(
-    [0, 0, 0, -18.665, -18.665, -0.55562]
-)  # Lower Bound on the controls
-initial_control = np.array([0., 0., 50., 0., 0., 0.])
+u.max = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])  # Upper Bound on the controls
+u.min = np.array([0, 0, 0, -18.665, -18.665, -0.55562])  # Lower Bound on the controls
+initial_control = np.array([0.0, 0.0, 50.0, 0.0, 0.0, 0.0])
 u.guess = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
+
 
 @dynamics
 def dynamics(x_, u_):
@@ -66,9 +83,11 @@ def dynamics(x_, u_):
     t_dot = 1
     return jnp.hstack([r_dot, v_dot, q_dot, w_dot, t_dot])
 
+
 def g_obs(x_, u_, center, A):
     value = 1 - (x_[:3] - center).T @ A @ (x_[:3] - center)
     return value
+
 
 A_obs = []
 radius = []
@@ -94,9 +113,30 @@ for _ in obstacle_centers:
     A_obs.append(ax @ np.diag(rad**2) @ ax.T)
 
 constraints = []
-constraints.append(nodal(lambda x_, u_, obs_center_1_=obs_center_1, A=A_obs[0]: g_obs(x_, u_, obs_center_1_.value, A), convex=False))
-constraints.append(nodal(lambda x_, u_, obs_center_2_=obs_center_2, A=A_obs[1]: g_obs(x_, u_, obs_center_2_.value, A), convex=False))
-constraints.append(nodal(lambda x_, u_, obs_center_3_=obs_center_3, A=A_obs[2]: g_obs(x_, u_, obs_center_3_.value, A), convex=False))
+constraints.append(
+    nodal(
+        lambda x_, u_, obs_center_1_=obs_center_1, A=A_obs[0]: g_obs(
+            x_, u_, obs_center_1_.value, A
+        ),
+        convex=False,
+    )
+)
+constraints.append(
+    nodal(
+        lambda x_, u_, obs_center_2_=obs_center_2, A=A_obs[1]: g_obs(
+            x_, u_, obs_center_2_.value, A
+        ),
+        convex=False,
+    )
+)
+constraints.append(
+    nodal(
+        lambda x_, u_, obs_center_3_=obs_center_3, A=A_obs[2]: g_obs(
+            x_, u_, obs_center_3_.value, A
+        ),
+        convex=False,
+    )
+)
 constraints.append(ctcs(lambda x_, u_: x_ - x.true.max))
 constraints.append(ctcs(lambda x_, u_: x.true.min - x_))
 
@@ -108,20 +148,20 @@ problem = TrajOptProblem(
     u=u,
     params=Parameter.get_all(),
     constraints=constraints,
-    idx_time=len(x.max)-1,
+    idx_time=len(x.max) - 1,
     N=n,
 )
 
 problem.settings.prp.dt = 0.01
-problem.settings.scp.lam_vb = 1E0
+problem.settings.scp.lam_vb = 1e0
 problem.settings.scp.cost_drop = 4  # SCP iteration to relax minimal final time objective
 problem.settings.scp.cost_relax = 0.5  # Minimal Time Relaxation Factor
 
-plotting_dict = dict(
-    obstacles_centers=obstacle_centers,
-    obstacles_axes=axes,
-    obstacles_radii=radius,
-)
+plotting_dict = {
+    "obstacles_centers": obstacle_centers,
+    "obstacles_axes": axes,
+    "obstacles_radii": radius,
+}
 
 if __name__ == "__main__":
     problem.initialize()

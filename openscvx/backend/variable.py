@@ -2,6 +2,7 @@ import numpy as np
 
 from openscvx.backend.expr import Expr
 
+
 class Variable(Expr):
     """A base class for variables in an optimal control problem.
 
@@ -62,7 +63,10 @@ class Variable(Expr):
         """
         arr = np.asarray(arr, dtype=float)
         if arr.ndim != 1 or arr.shape[0] != self.shape[0]:
-            raise ValueError(f"{self.__class__.__name__} min must be 1D with shape ({self.shape[0]},), got {arr.shape}")
+            raise ValueError(
+                f"{self.__class__.__name__} min must be 1D with shape ({self.shape[0]},), got"
+                f" {arr.shape}"
+            )
         self._min = arr
 
     @property
@@ -86,7 +90,10 @@ class Variable(Expr):
         """
         arr = np.asarray(arr, dtype=float)
         if arr.ndim != 1 or arr.shape[0] != self.shape[0]:
-            raise ValueError(f"{self.__class__.__name__} max must be 1D with shape ({self.shape[0]},), got {arr.shape}")
+            raise ValueError(
+                f"{self.__class__.__name__} max must be 1D with shape ({self.shape[0]},), got"
+                f" {arr.shape}"
+            )
         self._max = arr
 
     @property
@@ -110,9 +117,15 @@ class Variable(Expr):
         """
         arr = np.asarray(arr)
         if arr.ndim != 2:
-            raise ValueError(f"Guess must be a 2D array of shape (n_guess_points, {self.shape[0]}), got shape {arr.shape}")
+            raise ValueError(
+                f"Guess must be a 2D array of shape (n_guess_points, {self.shape[0]}), got shape"
+                f" {arr.shape}"
+            )
         if arr.shape[1] != self.shape[0]:
-            raise ValueError(f"Guess must have second dimension equal to variable dimension {self.shape[0]}, got {arr.shape[1]}")
+            raise ValueError(
+                f"Guess must have second dimension equal to variable dimension {self.shape[0]}, got"
+                f" {arr.shape[1]}"
+            )
         self._guess = arr
 
     def append(self, other=None, *, min=-np.inf, max=np.inf, guess=0.0):
@@ -124,6 +137,7 @@ class Variable(Expr):
             max (float, optional): Maximum bound for new variable. Defaults to np.inf
             guess (float, optional): Initial guess for new variable. Defaults to 0.0
         """
+
         def process_array(val, is_guess=False):
             """Process input array to ensure correct shape and type.
 
@@ -149,7 +163,9 @@ class Variable(Expr):
                 self._max = np.concatenate([self._max, process_array(other._max)], axis=0)
 
             if self._guess is not None and other._guess is not None:
-                self._guess = np.concatenate([self._guess, process_array(other._guess, is_guess=True)], axis=1)
+                self._guess = np.concatenate(
+                    [self._guess, process_array(other._guess, is_guess=True)], axis=1
+                )
 
         else:
             self._shape = (self.shape[0] + 1,)

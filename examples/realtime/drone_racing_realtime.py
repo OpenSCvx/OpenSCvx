@@ -1,28 +1,51 @@
-import sys
 import os
-
-from PyQt5.QtCore import QTimer, pyqtSignal, QObject, Qt
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QGridLayout, QLineEdit, QScrollArea, QPushButton, QCheckBox, QGroupBox
-from pyqtgraph import Vector
-from pyqtgraph.opengl import GLViewWidget
-import numpy as np
-import pyqtgraph.opengl as gl
+import sys
 import threading
 import time
+
+import numpy as np
+import pyqtgraph.opengl as gl
+from PyQt5.QtCore import QObject, Qt, QTimer, pyqtSignal
+from PyQt5.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
+from pyqtgraph import Vector
+from pyqtgraph.opengl import GLViewWidget
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
-from examples.drone.drone_racing import problem, gate_center_params, A_gate_param, A_gate_c_params, initial_gate_centers, gen_vertices  # noqa: E402
+from examples.drone.drone_racing import (
+    A_gate_c_params,
+    A_gate_param,
+    gate_center_params,
+    gen_vertices,
+    initial_gate_centers,
+    problem,
+)
 
 # Add the OpenSCvx path
 # Import the drone racing problem and parameters
 problem.initialize()
+
+
 class OptimizationWorker(QObject):
     finished = pyqtSignal()
     results_ready = pyqtSignal(dict)
     metrics_updated = pyqtSignal(dict)
+
     def __init__(self):
         super().__init__()
         self.running = False
@@ -30,6 +53,7 @@ class OptimizationWorker(QObject):
         self.gate_center_params = gate_center_params
         self.A_gate_param = A_gate_param
         self.A_gate_c_params = A_gate_c_params
+
     def update_gate_position(self, gate_idx, x, y, z):
         if 0 <= gate_idx < len(self.gate_center_params):
             # User input now represents the actual center position (no offset needed)
@@ -38,6 +62,7 @@ class OptimizationWorker(QObject):
             self.gate_center_params[gate_idx].value = new_center
             # Update A_gate_c parameter with the new center
             self.A_gate_c_params[gate_idx].value = self.A_gate_param.value @ new_center
+
     def run_optimization(self):
         self.running = True
         iteration = 0
@@ -47,27 +72,30 @@ class OptimizationWorker(QObject):
                 results = self.problem.step()
                 solve_time = time.time() - start_time
                 # Add timing information to results
-                results['iter'] = self.problem.scp_k - 1
-                results['J_tr'] = self.problem.scp_J_tr
-                results['J_vb'] = self.problem.scp_J_vb
-                results['J_vc'] = self.problem.scp_J_vc
-                results['solve_time'] = solve_time * 1000  # Convert to milliseconds
+                results["iter"] = self.problem.scp_k - 1
+                results["J_tr"] = self.problem.scp_J_tr
+                results["J_vb"] = self.problem.scp_J_vb
+                results["J_vc"] = self.problem.scp_J_vc
+                results["solve_time"] = solve_time * 1000  # Convert to milliseconds
                 # Get timing from the print queue (emitted data) if available
                 try:
-                    if hasattr(self.problem, 'print_queue') and not self.problem.print_queue.empty():
+                    if (
+                        hasattr(self.problem, "print_queue")
+                        and not self.problem.print_queue.empty()
+                    ):
                         # Get the latest emitted data
                         emitted_data = self.problem.print_queue.get_nowait()
-                        results['dis_time'] = emitted_data.get('dis_time', 0.0)
-                        results['prob_stat'] = emitted_data.get('prob_stat', '--')
-                        results['cost'] = emitted_data.get('cost', 0.0)
+                        results["dis_time"] = emitted_data.get("dis_time", 0.0)
+                        results["prob_stat"] = emitted_data.get("prob_stat", "--")
+                        results["cost"] = emitted_data.get("cost", 0.0)
                     else:
-                        results['dis_time'] = 0.0
-                        results['prob_stat'] = '--'
-                        results['cost'] = results.get('cost', 0.0)
-                except Exception:  # noqa: E722
-                    results['dis_time'] = 0.0
-                    results['prob_stat'] = '--'
-                    results['cost'] = results.get('cost', 0.0)
+                        results["dis_time"] = 0.0
+                        results["prob_stat"] = "--"
+                        results["cost"] = results.get("cost", 0.0)
+                except Exception:
+                    results["dis_time"] = 0.0
+                    results["prob_stat"] = "--"
+                    results["cost"] = results.get("cost", 0.0)
                 # Update vertices for visualization
                 radii = np.array([2.5, 1e-4, 2.5])
                 vertices = []
@@ -77,18 +105,20 @@ class OptimizationWorker(QObject):
                         vertices.append(gen_vertices(center, radii))
                     else:
                         vertices.append([])
-                results.update({
-                    'vertices': vertices,
-                    'gate_center_params': self.gate_center_params,
-                    'A_gate_param': self.A_gate_param
-                })
+                results.update(
+                    {
+                        "vertices": vertices,
+                        "gate_center_params": self.gate_center_params,
+                        "A_gate_param": self.A_gate_param,
+                    }
+                )
                 self.results_ready.emit(results)
                 # Emit metrics for compatibility
                 metrics = {
-                    'iteration': iteration,
-                    'objective': results.get('cost', 0.0),
-                    'solve_time': solve_time,
-                    'status': results.get('prob_stat', 'Unknown')
+                    "iteration": iteration,
+                    "objective": results.get("cost", 0.0),
+                    "solve_time": solve_time,
+                    "status": results.get("prob_stat", "Unknown"),
                 }
                 self.metrics_updated.emit(metrics)
                 iteration += 1
@@ -97,12 +127,16 @@ class OptimizationWorker(QObject):
                 print(f"Optimization error: {e}")
                 time.sleep(1.0)
         self.finished.emit()
+
+
 class DraggableGLViewWidget(GLViewWidget):
     """Custom GLViewWidget that supports manual camera interaction"""
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.manual_camera_interaction = False
         self.camera_interaction_timer = None
+
     def mousePressEvent(self, event):
         # User is interacting with camera - disable auto-adjustment temporarily
         self.manual_camera_interaction = True
@@ -112,24 +146,28 @@ class DraggableGLViewWidget(GLViewWidget):
         self.camera_interaction_timer.timeout.connect(self.re_enable_auto_camera)
         self.camera_interaction_timer.start(2000)  # Re-enable after 2 seconds
         # Update status label
-        if hasattr(self.parent(), 'camera_status_label'):
+        if hasattr(self.parent(), "camera_status_label"):
             self.parent().camera_status_label.setText("Camera: Manual control (2s)")
             self.parent().camera_status_label.setStyleSheet("font-size: 10px; color: #ff6600;")
         super().mousePressEvent(event)
+
     def re_enable_auto_camera(self):
         """Re-enable auto camera adjustment after manual interaction"""
         self.manual_camera_interaction = False
         if self.camera_interaction_timer:
             self.camera_interaction_timer.stop()
         # Update status label
-        if hasattr(self.parent(), 'camera_status_label'):
+        if hasattr(self.parent(), "camera_status_label"):
             self.parent().camera_status_label.setText("Camera: Auto-adjust enabled")
             self.parent().camera_status_label.setStyleSheet("font-size: 10px; color: #666;")
+
     def mouseMoveEvent(self, event):
         # Only handle camera interaction, no gate dragging
         super().mouseMoveEvent(event)
+
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
+
     def wheelEvent(self, event):
         # Disable auto-camera during zoom
         self.manual_camera_interaction = True
@@ -139,10 +177,12 @@ class DraggableGLViewWidget(GLViewWidget):
         self.camera_interaction_timer.timeout.connect(self.re_enable_auto_camera)
         self.camera_interaction_timer.start(2000)
         # Update status label
-        if hasattr(self.parent(), 'camera_status_label'):
+        if hasattr(self.parent(), "camera_status_label"):
             self.parent().camera_status_label.setText("Camera: Manual control (2s)")
             self.parent().camera_status_label.setStyleSheet("font-size: 10px; color: #ff6600;")
         super().wheelEvent(event)
+
+
 class DroneRacingGUI(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -158,6 +198,7 @@ class DroneRacingGUI(QMainWindow):
         # Setup the problem and start optimization
         # self.worker.setup_problem()
         self.worker_thread.start()
+
     def setup_gui(self):
         """Set up the GUI layout"""
         central_widget = QWidget()
@@ -180,14 +221,24 @@ class DroneRacingGUI(QMainWindow):
         self.j_vb_label = QLabel("J_vb: 0.00E+00")
         self.j_vc_label = QLabel("J_vc: 0.00E+00")
         self.objective_label = QLabel("Objective: 0.00E+00")
-        self.lam_cost_display_label = QLabel(f"λ_cost: {self.worker.problem.settings.scp.lam_cost:.2E}")
+        self.lam_cost_display_label = QLabel(
+            f"λ_cost: {self.worker.problem.settings.scp.lam_cost:.2E}"
+        )
         self.dis_time_label = QLabel("Dis Time: 0.0ms")
         self.solve_time_label = QLabel("Solve Time: 0.0ms")
         self.status_label = QLabel("Status: --")
         # Style the labels
-        for label in [self.iter_label, self.j_tr_label, self.j_vb_label, self.j_vc_label, 
-                     self.objective_label, self.lam_cost_display_label, self.dis_time_label, 
-                     self.solve_time_label, self.status_label]:
+        for label in [
+            self.iter_label,
+            self.j_tr_label,
+            self.j_vb_label,
+            self.j_vc_label,
+            self.objective_label,
+            self.lam_cost_display_label,
+            self.dis_time_label,
+            self.solve_time_label,
+            self.status_label,
+        ]:
             label.setStyleSheet("font-family: monospace; font-size: 11px; padding: 2px;")
             metrics_layout.addWidget(label)
         left_layout.addWidget(metrics_group)
@@ -200,7 +251,9 @@ class DroneRacingGUI(QMainWindow):
         self.lam_cost_input = QLineEdit()
         self.lam_cost_input.setText(f"{self.worker.problem.settings.scp.lam_cost:.2E}")
         self.lam_cost_input.setFixedWidth(80)
-        self.lam_cost_input.returnPressed.connect(lambda: self.on_lam_cost_changed(self.lam_cost_input))
+        self.lam_cost_input.returnPressed.connect(
+            lambda: self.on_lam_cost_changed(self.lam_cost_input)
+        )
         lam_cost_label = QLabel("λ_cost:")
         lam_cost_label.setAlignment(Qt.AlignLeft)
         lam_cost_layout.addWidget(self.lam_cost_input)
@@ -262,15 +315,21 @@ class DroneRacingGUI(QMainWindow):
             # Show actual center position (with offset) to user
             actual_center = self.worker.gate_center_params[i].value
             x_input.setText(str(actual_center[0]))
-            x_input.editingFinished.connect(lambda gate_idx=i, field=x_input: self.update_gate_x_text(gate_idx, field))
+            x_input.editingFinished.connect(
+                lambda gate_idx=i, field=x_input: self.update_gate_x_text(gate_idx, field)
+            )
             y_input = QLineEdit()
             y_input.setFixedWidth(60)
             y_input.setText(str(actual_center[1]))
-            y_input.editingFinished.connect(lambda gate_idx=i, field=y_input: self.update_gate_y_text(gate_idx, field))
+            y_input.editingFinished.connect(
+                lambda gate_idx=i, field=y_input: self.update_gate_y_text(gate_idx, field)
+            )
             z_input = QLineEdit()
             z_input.setFixedWidth(60)
             z_input.setText(str(actual_center[2]))
-            z_input.editingFinished.connect(lambda gate_idx=i, field=z_input: self.update_gate_z_text(gate_idx, field))
+            z_input.editingFinished.connect(
+                lambda gate_idx=i, field=z_input: self.update_gate_z_text(gate_idx, field)
+            )
             gate_control_layout.addWidget(QLabel("X:"), 1, 0)
             gate_control_layout.addWidget(x_input, 1, 1)
             gate_control_layout.addWidget(QLabel("Y:"), 2, 0)
@@ -291,7 +350,7 @@ class DroneRacingGUI(QMainWindow):
         self.gl_widget = DraggableGLViewWidget()
         self.gl_widget.setCameraPosition(distance=150, elevation=30, azimuth=45)
         # Set the camera center separately
-        self.gl_widget.opts['center'] = Vector(100, -50, 20)
+        self.gl_widget.opts["center"] = Vector(100, -50, 20)
         # Add grid
         grid = gl.GLGridItem()
         grid.setSize(200, 100)  # Match the fixed bounds: x (0,200), y (-100,0)
@@ -307,6 +366,7 @@ class DroneRacingGUI(QMainWindow):
             self.gl_widget.addItem(gate_plot)
             self.gate_plots.append(gate_plot)
         layout.addWidget(self.gl_widget, 3)
+
     def update_gate_x_text(self, gate_idx, field):
         try:
             value = float(field.text())
@@ -314,6 +374,7 @@ class DroneRacingGUI(QMainWindow):
             self.worker.update_gate_position(gate_idx, value, current_pos[1], current_pos[2])
         except Exception as e:
             print(f"Invalid X input for gate {gate_idx}: {e}")
+
     def update_gate_y_text(self, gate_idx, field):
         try:
             value = float(field.text())
@@ -321,6 +382,7 @@ class DroneRacingGUI(QMainWindow):
             self.worker.update_gate_position(gate_idx, current_pos[0], value, current_pos[2])
         except Exception as e:
             print(f"Invalid Y input for gate {gate_idx}: {e}")
+
     def update_gate_z_text(self, gate_idx, field):
         try:
             value = float(field.text())
@@ -328,15 +390,16 @@ class DroneRacingGUI(QMainWindow):
             self.worker.update_gate_position(gate_idx, current_pos[0], current_pos[1], value)
         except Exception as e:
             print(f"Invalid Z input for gate {gate_idx}: {e}")
+
     def update_visualization(self, results):
         """Update the 3D visualization with new results"""
         try:
             # Update optimization metrics display
             self.update_optimization_metrics(results)
             # Trajectory extraction
-            if 'V_multi_shoot' in results:
+            if "V_multi_shoot" in results:
                 try:
-                    V_multi_shoot = np.array(results['V_multi_shoot'])
+                    V_multi_shoot = np.array(results["V_multi_shoot"])
                     n_x = self.worker.problem.settings.sim.n_states
                     n_u = self.worker.problem.settings.sim.n_controls
                     i1 = n_x
@@ -359,8 +422,8 @@ class DroneRacingGUI(QMainWindow):
                 except Exception as e:
                     print(f"Trajectory extraction error: {e}")
             # Gate plotting (always runs)
-            if 'vertices' in results:
-                for i, vertices in enumerate(results['vertices']):
+            if "vertices" in results:
+                for i, vertices in enumerate(results["vertices"]):
                     if i < len(self.gate_plots) and vertices is not None and len(vertices) >= 4:
                         try:
                             # Plot a line through the vertices of the gate
@@ -372,11 +435,15 @@ class DroneRacingGUI(QMainWindow):
                         self.gate_plots[i].setData(pos=np.zeros((0, 3)))
         except Exception as e:
             print(f"Error in update_visualization: {e}")
+
     def adjust_camera_to_trajectory(self, trajectory):
         """Automatically adjust camera to fit trajectory bounds with fixed x,y bounds"""
         try:
             # Skip auto-adjustment if user is manually interacting with camera
-            if hasattr(self.gl_widget, 'manual_camera_interaction') and self.gl_widget.manual_camera_interaction:
+            if (
+                hasattr(self.gl_widget, "manual_camera_interaction")
+                and self.gl_widget.manual_camera_interaction
+            ):
                 return
             if trajectory is None or len(trajectory) == 0:
                 return
@@ -399,23 +466,20 @@ class DroneRacingGUI(QMainWindow):
             # Set camera distance based on the largest dimension
             distance = max_size * 1.2
             # Update camera position
-            self.gl_widget.setCameraPosition(
-                distance=distance,
-                elevation=30,
-                azimuth=45
-            )
+            self.gl_widget.setCameraPosition(distance=distance, elevation=30, azimuth=45)
             # Set the camera center separately
-            self.gl_widget.opts['center'] = Vector(center[0], center[1], center[2])
+            self.gl_widget.opts["center"] = Vector(center[0], center[1], center[2])
             # Update grid size to match the fixed bounds
             grid_size_x = size_x
             grid_size_y = size_y
             grid_spacing = 20  # Fixed spacing for better readability
             # Update the grid
-            if hasattr(self, 'grid_item'):
+            if hasattr(self, "grid_item"):
                 self.grid_item.setSize(grid_size_x, grid_size_y)
                 self.grid_item.setSpacing(grid_spacing, grid_spacing)
         except Exception as e:
             print(f"Error adjusting camera: {e}")
+
     def on_lam_cost_changed(self, input_widget):
         """Handle lambda cost input changes"""
         # Extract the new value from the input widget
@@ -428,6 +492,7 @@ class DroneRacingGUI(QMainWindow):
             input_widget.setText(f"{lam_cost_value:.2E}")
         except ValueError:
             print("Invalid input. Please enter a valid number.")
+
     def on_lam_tr_changed(self, input_widget):
         """Handle lambda trust region input changes"""
         # Extract the new value from the input widget
@@ -440,56 +505,67 @@ class DroneRacingGUI(QMainWindow):
             input_widget.setText(f"{lam_tr_value:.2E}")
         except ValueError:
             print("Invalid input. Please enter a valid number.")
+
     def update_optimization_metrics(self, results):
         """Update the optimization metrics display"""
         if results is None:
             return
         # Extract metrics from results
-        iter_num = results.get('iter', 0)
-        j_tr = results.get('J_tr', 0.0)
-        j_vb = results.get('J_vb', 0.0)
-        j_vc = results.get('J_vc', 0.0)
-        cost = results.get('cost', 0.0)
-        status = results.get('prob_stat', '--')
+        iter_num = results.get("iter", 0)
+        j_tr = results.get("J_tr", 0.0)
+        j_vb = results.get("J_vb", 0.0)
+        j_vc = results.get("J_vc", 0.0)
+        cost = results.get("cost", 0.0)
+        status = results.get("prob_stat", "--")
         # Get timing information
-        dis_time = results.get('dis_time', 0.0)
-        solve_time = results.get('solve_time', 0.0)
+        dis_time = results.get("dis_time", 0.0)
+        solve_time = results.get("solve_time", 0.0)
         # Update labels
         self.iter_label.setText(f"Iteration: {iter_num}")
         self.j_tr_label.setText(f"J_tr: {j_tr:.2E}")
         self.j_vb_label.setText(f"J_vb: {j_vb:.2E}")
         self.j_vc_label.setText(f"J_vc: {j_vc:.2E}")
         self.objective_label.setText(f"Objective: {cost:.2E}")
-        self.lam_cost_display_label.setText(f"λ_cost: {self.worker.problem.settings.scp.lam_cost:.2E}")
+        self.lam_cost_display_label.setText(
+            f"λ_cost: {self.worker.problem.settings.scp.lam_cost:.2E}"
+        )
         self.dis_time_label.setText(f"Dis Time: {dis_time:.1f}ms")
         self.solve_time_label.setText(f"Solve Time: {solve_time:.1f}ms")
         self.status_label.setText(f"Status: {status}")
+
     def update_metrics(self, metrics):
         """Update the metrics display - kept for compatibility"""
         # This method is kept for compatibility but the main update is done in update_optimization_metrics
         pass
+
     def reset_gate_positions(self):
         """Reset gate positions to their original values"""
         for i in range(10):
             original_center = initial_gate_centers[i]
-            self.worker.update_gate_position(i, original_center[0], original_center[1], original_center[2])
+            self.worker.update_gate_position(
+                i, original_center[0], original_center[1], original_center[2]
+            )
             # Update text inputs
             if i < len(self.gate_controls):
                 x_input, y_input, z_input = self.gate_controls[i]
                 x_input.setText(f"{original_center[0]:.2f}")
                 y_input.setText(f"{original_center[1]:.2f}")
                 z_input.setText(f"{original_center[2]:.2f}")
+
     def reset_camera_view(self):
         """Reset the camera view to default"""
         self.gl_widget.setCameraPosition(distance=150, elevation=30, azimuth=45)
+
     def closeEvent(self, event):
         """Clean up when closing the window"""
         self.worker.running = False
         if self.worker_thread.is_alive():
             self.worker_thread.join()
         event.accept()
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = DroneRacingGUI()
     window.show()
-    sys.exit(app.exec_()) 
+    sys.exit(app.exec_())

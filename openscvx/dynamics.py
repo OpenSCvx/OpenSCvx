@@ -8,8 +8,10 @@ import jax.numpy as jnp
 class Dynamics:
     """
     Dataclass to hold a system dynamics function and (optionally) its gradients.
-    This class is intended to be instantiated using the `dynamics` decorator wrapped around a function defining the system dynamics.
-    Both the dynamics and optional gradients should be composed of `jax` primitives to enable efficient computation.
+    This class is intended to be instantiated using the `dynamics` decorator
+    wrapped around a function defining the system dynamics. Both the dynamics
+    and optional gradients should be composed of `jax` primitives to enable
+    efficient computation.
 
     Usage examples:
 
@@ -26,7 +28,8 @@ class Dynamics:
         return x_ + u_
     ```
 
-    Or, if a more lambda-function-style is desired, the function can be directly wrapped:
+    Or, if a more lambda-function-style is desired, the function can be
+    directly wrapped:
 
     ```python
     dyn = dynamics(lambda x_, u_: x_ + u_)
@@ -35,7 +38,11 @@ class Dynamics:
     ---
     **Using Parameters in Dynamics**
 
-    You can use symbolic `Parameter` objects in your dynamics function to represent tunable or environment-dependent values. **The argument names for parameters must match the parameter name with an underscore suffix** (e.g., `I_sp_` for a parameter named `I_sp`). This is required for the parameter mapping to work correctly.
+    You can use symbolic `Parameter` objects in your dynamics function to
+    represent tunable or environment-dependent values. **The argument names
+    for parameters must match the parameter name with an underscore suffix**
+    (e.g., `I_sp_` for a parameter named `I_sp`). This is required for the
+    parameter mapping to work correctly.
 
     Example (3DoF rocket landing):
 
@@ -67,7 +74,10 @@ class Dynamics:
     ---
     **Using Parameters in Nodal Constraints**
 
-    You can also use symbolic `Parameter` objects in nodal constraints. As with dynamics, the argument names for parameters in the constraint function must match the parameter name with an underscore suffix (e.g., `g_` for a parameter named `g`).
+    You can also use symbolic `Parameter` objects in nodal constraints. As
+    with dynamics, the argument names for parameters in the constraint
+    function must match the parameter name with an underscore suffix
+    (e.g., `g_` for a parameter named `g`).
 
     Example:
 
@@ -85,23 +95,32 @@ class Dynamics:
         return x_[5] + g_ * x_[7]  # e.g., vz + g * t <= 0 at final node
     ```
 
-    When building your problem, collect all parameters with `Parameter.get_all()` and pass them to your problem setup.
+    When building your problem, collect all parameters with
+    `Parameter.get_all()` and pass them to your problem setup.
 
     Args:
         f (Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
-            Function defining the continuous time nonlinear system dynamics as x_dot = f(x, u, ...params).
+            Function defining the continuous time nonlinear system dynamics
+            as x_dot = f(x, u, ...params).
             - x: 1D array (state at a single node), shape (n_x,)
             - u: 1D array (control at a single node), shape (n_u,)
-            - Additional parameters: passed as keyword arguments with names matching the parameter name plus an underscore (e.g., g_ for Parameter('g')).
-            If you want to use parameters, include them as extra arguments with the underscore naming convention.
-            If you use vectorized integration or batch evaluation, x and u may be 2D arrays (N, n_x) and (N, n_u).
+            - Additional parameters: passed as keyword arguments with names
+              matching the parameter name plus an underscore (e.g., g_ for
+              Parameter('g')).
+            If you want to use parameters, include them as extra arguments
+            with the underscore naming convention.
+            If you use vectorized integration or batch evaluation, x and u
+            may be 2D arrays (N, n_x) and (N, n_u).
         A (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
-            Jacobian of `f` w.r.t. `x`. If not specified, will be calculated using `jax.jacfwd`.
+            Jacobian of `f` w.r.t. `x`. If not specified, will be calculated
+            using `jax.jacfwd`.
         B (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
-            Jacobian of `f` w.r.t. `u`. If not specified, will be calculated using `jax.jacfwd`.
+            Jacobian of `f` w.r.t. `u`. If not specified, will be calculated
+            using `jax.jacfwd`.
 
     Returns:
-        Dynamics: A dataclass bundling the system dynamics function and Jacobians.
+        Dynamics: A dataclass bundling the system dynamics function and
+        Jacobians.
     """
 
     f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
@@ -116,9 +135,11 @@ def dynamics(
     B: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
 ) -> Union[Callable, Dynamics]:
     """
-    Decorator that wraps a function defining the system dynamics as a `Dynamics` object.
-    You may optionally specify the system gradients w.r.t. `x`, `u` if desired, if not specified they will be calculated using `jax.jacfwd`.
-    Note: the dynamics as well as the optional gradients should be composed of `jax` primitives to enable efficient computation.
+    Decorator that wraps a function defining the system dynamics as a
+    `Dynamics` object. You may optionally specify the system gradients
+    w.r.t. `x`, `u` if desired, if not specified they will be calculated
+    using `jax.jacfwd`. Note: the dynamics as well as the optional gradients
+    should be composed of `jax` primitives to enable efficient computation.
 
     This decorator may be used with or without arguments:
 
@@ -134,7 +155,8 @@ def dynamics(
     def f(x, u): ...
     ```
 
-    or, if a more lambda-function-style is desired, the function can be direclty wrapped
+    or, if a more lambda-function-style is desired, the function can be
+    directly wrapped
 
     ```
     dyn = dynamics(f(x,u))
@@ -151,8 +173,9 @@ def dynamics(
 
     Returns:
         Union[Callable, Dynamics]
-            A decorator if called without a function, or a `Dynamics` dataclass bundling system dynamics function
-            and Jacobians when applied to a function.
+            A decorator if called without a function, or a `Dynamics`
+            dataclass bundling system dynamics function and Jacobians
+            when applied to a function.
 
     Examples:
         >>> @dynamics
@@ -163,8 +186,9 @@ def dynamics(
     """
 
     def decorator(f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
-        # Had to unwrap to ensure arguments are visible downstream. Originally wrapped so name, doc, signature stay on f
-        wrapped = f 
+        # Had to unwrap to ensure arguments are visible downstream.
+        # Originally wrapped so name, doc, signature stay on f
+        wrapped = f
         return Dynamics(
             f=wrapped,
             A=A,

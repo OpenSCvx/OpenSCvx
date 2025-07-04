@@ -1,6 +1,8 @@
-import pytest
 import types
+
 import jax.numpy as jnp
+import pytest
+
 from openscvx.constraints.ctcs import CTCSConstraint, ctcs
 
 
@@ -70,8 +72,10 @@ def test_decorator_sets_attributes_and_type():
 
 def test_custom_penalty_callable():
     """Allow passing a custom callable as `penalty`."""
+
     def custom_pen(x):
         return x * 2.0
+
     values = jnp.array([1.0, 2.0, 3.0])
 
     @ctcs(nodes=(0, 5), penalty=custom_pen)
@@ -85,6 +89,7 @@ def test_custom_penalty_callable():
 
 def test_default_grad_attrs_none():
     """By default, grad_f_x and grad_f_u should be None."""
+
     @ctcs(nodes=(0, 5))
     def f(x, u):
         return jnp.array([0.0])
@@ -95,6 +100,7 @@ def test_default_grad_attrs_none():
 
 def test_grad_functions_wrapped_and_callable():
     """Passing grad_f_x and grad_f_u should wrap them to accept (x, u, node)."""
+
     def base_func(x, u):
         return x + u
 
@@ -132,6 +138,7 @@ def test_scaling_argument_applies_correctly():
     @ctcs(nodes=(0, 5), penalty="squared_relu", scaling=3.0)
     def f(x, u):
         return jnp.array([2.0])
+
     # squared relu of 2.0 is 4.0, times scaling 3.0 is 12.0
     result = f(jnp.zeros(1), jnp.zeros(1), node=2)
     assert float(result) == pytest.approx(12.0)

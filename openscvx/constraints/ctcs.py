@@ -1,25 +1,29 @@
+import functools
+import inspect
 from dataclasses import dataclass
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable, Optional, Union
 
 import jax.numpy as jnp
 from jax.lax import cond
-import functools
-import inspect
 
-from openscvx.backend.state import State, Variable
 from openscvx.backend.control import Control
+from openscvx.backend.state import State, Variable
 
-# TODO: (norrisg) Unclear if should specify behavior for `idx`, `jacfwd` behavior for Jacobians, etc. since that logic is handled elsewhere and could change
+# TODO: (norrisg) Unclear if should specify behavior for `idx`, `jacfwd`
+# behavior for Jacobians, etc. since that logic is handled elsewhere and
+# could change
+
 
 @dataclass
 class CTCSConstraint:
     """
-    Dataclass for continuous-time constraint satisfaction (CTCS) constraints over a trajectory interval.
-    
+    Dataclass for continuous-time constraint satisfaction (CTCS) constraints
+    over a trajectory interval.
+
     A `CTCSConstraint` wraps a residual function `func(x, u)`, applies a
     pointwise `penalty` to its outputs, and accumulates the penalized sum
     only within a specified node interval [nodes[0], nodes[1]).
-    
+
     CTCS constraints are used for continuous-time constraints that need to be satisfied
     over trajectory intervals rather than at specific nodes. The constraint function
     should return residuals where positive values indicate constraint violations.
@@ -49,14 +53,18 @@ class CTCSConstraint:
     ```
 
     Args:
-        func (Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]): 
-            Function computing constraint residuals g(x, u). 
+        func (Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
+            Function computing constraint residuals g(x, u).
             - x: 1D array (state at a single node), shape (n_x,)
             - u: 1D array (control at a single node), shape (n_u,)
-            - Additional parameters: passed as keyword arguments with names matching the parameter name plus an underscore (e.g., g_ for Parameter('g')).
-            Should return positive values for constraint violations (g(x,u) > 0 indicates violation).
-            If you want to use parameters, include them as extra arguments with the underscore naming convention.
-        penalty (Callable[[jnp.ndarray], jnp.ndarray]): 
+            - Additional parameters: passed as keyword arguments with names
+              matching the parameter name plus an underscore (e.g., g_ for
+              Parameter('g')).
+            Should return positive values for constraint violations
+            (g(x,u) > 0 indicates violation).
+            If you want to use parameters, include them as extra arguments
+            with the underscore naming convention.
+        penalty (Callable[[jnp.ndarray], jnp.ndarray]):
             Penalty function applied elementwise to g's output. Used to calculate and penalize
             constraint violation during state augmentation. Common penalties include:
             - "squared_relu": max(0, x)² (default)
@@ -65,7 +73,7 @@ class CTCSConstraint:
         nodes (Optional[Tuple[int, int]]):
             Half-open interval (start, end) of node indices where this constraint is active.
             If None, the penalty applies at every node.
-        idx (Optional[int]): 
+        idx (Optional[int]):
             Optional index used to group CTCS constraints. Used during automatic state augmentation.
             All CTCS constraints with the same index must be active over the same `nodes` interval
         grad_f_x (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
@@ -77,9 +85,10 @@ class CTCSConstraint:
         scaling (float):
             Scaling factor to apply to the penalized sum.
     """
+
     func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]  # takes (x_expr, u_expr, *param_exprs)
     penalty: Callable[[jnp.ndarray], jnp.ndarray]
-    nodes: Optional[Tuple[int, int]] = None
+    nodes: Optional[tuple[int, int]] = None
     idx: Optional[int] = None
     grad_f_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
     grad_f_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
@@ -128,9 +137,13 @@ class CTCSConstraint:
         }
 
         return cond(
-            jnp.all((self.nodes[0] <= node) & (node < self.nodes[1]))
-            if self.nodes is not None else True,
-            lambda _: self.scaling * jnp.sum(self.penalty(self.func(x_expr, u_expr, **filtered_params))),
+            (
+                jnp.all((self.nodes[0] <= node) & (node < self.nodes[1]))
+                if self.nodes is not None
+                else True
+            ),
+            lambda _: self.scaling
+            * jnp.sum(self.penalty(self.func(x_expr, u_expr, **filtered_params))),
             lambda _: 0.0,
             operand=None,
         )
@@ -140,7 +153,7 @@ def ctcs(
     _func: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
     *,
     penalty: Union[str, Callable[[jnp.ndarray], jnp.ndarray]] = "squared_relu",
-    nodes: Optional[Tuple[int, int]] = None,
+    nodes: Optional[tuple[int, int]] = None,
     idx: Optional[int] = None,
     grad_f_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
     grad_f_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
@@ -201,15 +214,22 @@ def ctcs(
     """
     # prepare penalty function once
     if penalty == "squared_relu":
+
         def pen(x):
             return jnp.maximum(0, x) ** 2
+
     elif penalty == "huber":
         delta = 0.25
-        def pen(x): return jnp.where(x < delta, 0.5 * x**2, x - 0.5 * delta)
+
+        def pen(x):
+            return jnp.where(x < delta, 0.5 * x**2, x - 0.5 * delta)
+
     elif penalty == "smooth_relu":
         c = 1e-8
+
         def pen(x):
             return (jnp.maximum(0, x) ** 2 + c**2) ** 0.5 - c
+
     elif callable(penalty):
         pen = penalty
     else:

@@ -1,29 +1,52 @@
-import sys
 import os
-
-from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QSlider, QLabel, QGroupBox, QLineEdit
-import numpy as np
+import sys
 import threading
 import time
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
-from drone.obstacle_avoidance_realtime_test import (  # noqa: E402
-    obs_center_1, obs_center_2, obs_center_3, problem, plotting_dict
+import numpy as np
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import (
+    QApplication,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QSlider,
+    QVBoxLayout,
+    QWidget,
 )
-from openscvx.utils import generate_orthogonal_unit_vectors  # noqa: E402
+
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+
+from drone.obstacle_avoidance_realtime_test import (
+    obs_center_1,
+    obs_center_2,
+    obs_center_3,
+    plotting_dict,
+    problem,
+)
+
+from openscvx.utils import generate_orthogonal_unit_vectors
 
 # Import PyQtGraph OpenGL modules
 try:
-    from pyqtgraph.opengl import GLViewWidget, GLGridItem, GLScatterPlotItem, GLMeshItem, MeshData
+    from pyqtgraph.opengl import (
+        GLGridItem,
+        GLMeshItem,
+        GLScatterPlotItem,
+        GLViewWidget,
+        MeshData,
+    )
+
     HAS_OPENGL = True
 except ImportError:
     print("PyQtGraph OpenGL not available, falling back to 2D")
     HAS_OPENGL = False
-running = {'stop': False}
-latest_results = {'results': None}
+running = {"stop": False}
+latest_results = {"results": None}
 new_result_event = threading.Event()
+
+
 class Obstacle3DPlotWidget(QWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -63,6 +86,7 @@ class Obstacle3DPlotWidget(QWidget):
             # Fallback to 2D
             label = QLabel("3D OpenGL not available")
             layout.addWidget(label)
+
     def create_control_panel(self):
         """Create the control panel with sliders for each obstacle"""
         self.control_panel = QWidget()
@@ -87,7 +111,17 @@ class Obstacle3DPlotWidget(QWidget):
         self.solve_time_label = QLabel("Solve Time: 0.0ms")
         self.status_label = QLabel("Status: --")
         # Style the labels
-        for label in [self.iter_label, self.j_tr_label, self.j_vb_label, self.j_vc_label, self.objective_label, self.lam_cost_display_label, self.dis_time_label, self.solve_time_label, self.status_label]:
+        for label in [
+            self.iter_label,
+            self.j_tr_label,
+            self.j_vb_label,
+            self.j_vc_label,
+            self.objective_label,
+            self.lam_cost_display_label,
+            self.dis_time_label,
+            self.solve_time_label,
+            self.status_label,
+        ]:
             label.setStyleSheet("font-family: monospace; font-size: 11px; padding: 2px;")
             metrics_layout.addWidget(label)
         control_layout.addWidget(metrics_group)
@@ -127,7 +161,7 @@ class Obstacle3DPlotWidget(QWidget):
             obs_group.setLayout(obs_layout)
             # X, Y, Z sliders
             sliders = []
-            for j, coord in enumerate(['X', 'Y', 'Z']):
+            for j, coord in enumerate(["X", "Y", "Z"]):
                 slider_layout = QHBoxLayout()
                 label = QLabel(f"{coord}:")
                 slider = QSlider(Qt.Horizontal)
@@ -135,37 +169,43 @@ class Obstacle3DPlotWidget(QWidget):
                 slider.setValue(0)
                 value_label = QLabel("0.00")
                 # Connect slider to update function
-                slider.valueChanged.connect(lambda val, obs=i, axis=j, label=value_label: self.on_slider_changed(val, obs, axis, label))
+                slider.valueChanged.connect(
+                    lambda val, obs=i, axis=j, label=value_label: self.on_slider_changed(
+                        val, obs, axis, label
+                    )
+                )
                 slider_layout.addWidget(label)
                 slider_layout.addWidget(slider)
                 slider_layout.addWidget(value_label)
                 obs_layout.addLayout(slider_layout)
                 sliders.append((slider, value_label))
             # Store sliders for this obstacle
-            setattr(self, f'obs_{i}_sliders', sliders)
+            setattr(self, f"obs_{i}_sliders", sliders)
             control_layout.addWidget(obs_group)
         control_layout.addStretch()
+
     def create_obstacle_ellipsoids(self):
         if not HAS_OPENGL:
             return
-        for i, (ax, rad) in enumerate(zip(self.ellipsoid_axes, self.ellipsoid_radii)):
+        for _i, (ax, rad) in enumerate(zip(self.ellipsoid_axes, self.ellipsoid_radii)):
             # Create main ellipsoid
             mesh = MeshData.sphere(rows=20, cols=20, radius=1.0)
             verts = mesh.vertexes()
-            verts = verts * 1/(rad)  # scale to ellipsoid
+            verts = verts * 1 / (rad)  # scale to ellipsoid
             verts = verts @ ax.T  # rotate by axes
             mesh.setVertexes(verts)
             ellipsoid = GLMeshItem(
                 meshdata=mesh,
                 color=(0, 1, 0, 0.3),  # RGBA, green, transparent
-                shader='shaded',
-                smooth=True
+                shader="shaded",
+                smooth=True,
             )
-            ellipsoid.setGLOptions('translucent')  # Enable transparency
+            ellipsoid.setGLOptions("translucent")  # Enable transparency
             # Set initial position using translate
             ellipsoid.translate(0, 0, 0)
             self.obs_ellipsoids.append(ellipsoid)
             self.view.addItem(ellipsoid)
+
     def on_slider_changed(self, value, obstacle_idx, axis, label):
         """Handle slider value changes"""
         # Convert slider value (-100 to 100) to world coordinates (-5 to 5)
@@ -184,6 +224,7 @@ class Obstacle3DPlotWidget(QWidget):
         self.update_obstacle_position(obstacle_idx)
         # Update label
         label.setText(f"{world_value:.2f}")
+
     def update_obstacle_position(self, obstacle_idx):
         """Update obstacle position in 3D view"""
         if not HAS_OPENGL:
@@ -194,16 +235,18 @@ class Obstacle3DPlotWidget(QWidget):
         ellipsoid = self.obs_ellipsoids[obstacle_idx]
         ellipsoid.resetTransform()
         ellipsoid.translate(center[0], center[1], center[2])
+
     def update_slider_values(self, obstacle_idx):
         """Update slider values to match current obstacle position"""
         centers = [obs_center_1.value, obs_center_2.value, obs_center_3.value]
         center = centers[obstacle_idx]
-        sliders = getattr(self, f'obs_{obstacle_idx}_sliders')
+        sliders = getattr(self, f"obs_{obstacle_idx}_sliders")
         for i, (slider, label) in enumerate(sliders):
             # Convert world coordinates to slider values
             slider_value = int(center[i] / 0.05)
             slider.setValue(slider_value)
             label.setText(f"{center[i]:.2f}")
+
     def on_lam_cost_changed(self, input_widget):
         """Handle lambda cost input changes"""
         # Extract the new value from the input widget
@@ -216,6 +259,7 @@ class Obstacle3DPlotWidget(QWidget):
             input_widget.setText(f"{lam_cost_value:.2E}")
         except ValueError:
             print("Invalid input. Please enter a valid number.")
+
     def on_lam_tr_changed(self, input_widget):
         """Handle lambda trust region input changes"""
         # Extract the new value from the input widget
@@ -228,20 +272,21 @@ class Obstacle3DPlotWidget(QWidget):
             input_widget.setText(f"{lam_tr_value:.2E}")
         except ValueError:
             print("Invalid input. Please enter a valid number.")
+
     def update_optimization_metrics(self, results):
         """Update the optimization metrics display"""
         if results is None:
             return
         # Extract metrics from results
-        iter_num = results.get('iter', 0)
-        j_tr = results.get('J_tr', 0.0)
-        j_vb = results.get('J_vb', 0.0)
-        j_vc = results.get('J_vc', 0.0)
-        cost = results.get('cost', 0.0)
-        status = results.get('prob_stat', '--')
+        iter_num = results.get("iter", 0)
+        j_tr = results.get("J_tr", 0.0)
+        j_vb = results.get("J_vb", 0.0)
+        j_vc = results.get("J_vc", 0.0)
+        cost = results.get("cost", 0.0)
+        status = results.get("prob_stat", "--")
         # Get timing information (these would need to be tracked separately)
-        dis_time = results.get('dis_time', 0.0)
-        solve_time = results.get('solve_time', 0.0)
+        dis_time = results.get("dis_time", 0.0)
+        solve_time = results.get("solve_time", 0.0)
         # Update labels
         self.iter_label.setText(f"Iteration: {iter_num}")
         self.j_tr_label.setText(f"J_tr: {j_tr:.2e}")
@@ -252,54 +297,59 @@ class Obstacle3DPlotWidget(QWidget):
         self.dis_time_label.setText(f"Dis Time: {dis_time:.1f}ms")
         self.solve_time_label.setText(f"Solve Time: {solve_time:.1f}ms")
         self.status_label.setText(f"Status: {status}")
+
     def keyPressEvent(self, event):
         """Handle keyboard shortcuts"""
         if event.key() == Qt.Key_Escape:
             self.close()
         else:
             super().keyPressEvent(event)
+
+
 def optimization_loop():
     problem.initialize()
     try:
-        while not running['stop']:
+        while not running["stop"]:
             # Warm start: set guess to last solution if available
-            if latest_results['results'] is not None:
-                problem.settings.sim.x.guess = latest_results['results']['x'].guess
-                problem.settings.sim.u.guess = latest_results['results']['u'].guess
+            if latest_results["results"] is not None:
+                problem.settings.sim.x.guess = latest_results["results"]["x"].guess
+                problem.settings.sim.u.guess = latest_results["results"]["u"].guess
             # Perform a single SCP step
             results = problem.step()
             # Add timing information to results
-            results['iter'] = problem.scp_k - 1
-            results['J_tr'] = problem.scp_J_tr
-            results['J_vb'] = problem.scp_J_vb
-            results['J_vc'] = problem.scp_J_vc
+            results["iter"] = problem.scp_k - 1
+            results["J_tr"] = problem.scp_J_tr
+            results["J_vb"] = problem.scp_J_vb
+            results["J_vc"] = problem.scp_J_vc
             # Get timing from the print queue (emitted data)
             try:
-                if hasattr(problem, 'print_queue') and not problem.print_queue.empty():
+                if hasattr(problem, "print_queue") and not problem.print_queue.empty():
                     # Get the latest emitted data
                     emitted_data = problem.print_queue.get_nowait()
-                    results['dis_time'] = emitted_data.get('dis_time', 0.0)
-                    results['solve_time'] = emitted_data.get('subprop_time', 0.0)
-                    results['prob_stat'] = emitted_data.get('prob_stat', '--')
-                    results['cost'] = emitted_data.get('cost', 0.0)
+                    results["dis_time"] = emitted_data.get("dis_time", 0.0)
+                    results["solve_time"] = emitted_data.get("subprop_time", 0.0)
+                    results["prob_stat"] = emitted_data.get("prob_stat", "--")
+                    results["cost"] = emitted_data.get("cost", 0.0)
                 else:
-                    results['dis_time'] = 0.0
-                    results['solve_time'] = 0.0
-                    results['prob_stat'] = '--'
-                    results['cost'] = 0.0
+                    results["dis_time"] = 0.0
+                    results["solve_time"] = 0.0
+                    results["prob_stat"] = "--"
+                    results["cost"] = 0.0
             except Exception:
-                results['dis_time'] = 0.0
-                results['solve_time'] = 0.0
-                results['prob_stat'] = '--'
-                results['cost'] = 0.0
+                results["dis_time"] = 0.0
+                results["solve_time"] = 0.0
+                results["prob_stat"] = "--"
+                results["cost"] = 0.0
             # Optionally skip post_process for speed
             # results = problem.post_process(results)
             results.update(plotting_dict)
-            latest_results['results'] = results
+            latest_results["results"] = results
             new_result_event.set()
     except KeyboardInterrupt:
-        running['stop'] = True
+        running["stop"] = True
         print("Stopped by user.")
+
+
 def plot_thread_func():
     # Initialize PyQtGraph
     app = QApplication.instance()
@@ -308,7 +358,7 @@ def plot_thread_func():
     print(f"Creating plot window... OpenGL available: {HAS_OPENGL}")
     # Create 3D plot window
     plot_widget = Obstacle3DPlotWidget()
-    plot_widget.setWindowTitle('3D Obstacle Avoidance Real-time Trajectory')
+    plot_widget.setWindowTitle("3D Obstacle Avoidance Real-time Trajectory")
     plot_widget.resize(800, 600)  # Set explicit size
     plot_widget.show()
     print("Plot window created and shown")
@@ -319,10 +369,11 @@ def plot_thread_func():
     time.sleep(0.1)
     # Update timer
     timer = QTimer()
+
     def update_plot():
-        if latest_results['results'] is not None:
+        if latest_results["results"] is not None:
             try:
-                V_multi_shoot = np.array(latest_results['results']['V_multi_shoot'])
+                V_multi_shoot = np.array(latest_results["results"]["V_multi_shoot"])
                 # Extract 3D position data (first 3 elements of state)
                 n_x = problem.settings.sim.n_states
                 n_u = problem.settings.sim.n_controls
@@ -350,28 +401,37 @@ def plot_thread_func():
                         # 2D fallback - plot X vs Y
                         plot_widget.traj_curve.setData(full_traj[:, 0], full_traj[:, 1])
                         # Update obstacle positions in 2D
-                        plot_widget.obs_scatters[0].setData([obs_center_1.value[0]], [obs_center_1.value[1]])
-                        plot_widget.obs_scatters[1].setData([obs_center_2.value[0]], [obs_center_2.value[1]])
-                        plot_widget.obs_scatters[2].setData([obs_center_3.value[0]], [obs_center_3.value[1]])
+                        plot_widget.obs_scatters[0].setData(
+                            [obs_center_1.value[0]], [obs_center_1.value[1]]
+                        )
+                        plot_widget.obs_scatters[1].setData(
+                            [obs_center_2.value[0]], [obs_center_2.value[1]]
+                        )
+                        plot_widget.obs_scatters[2].setData(
+                            [obs_center_3.value[0]], [obs_center_3.value[1]]
+                        )
                 # Update optimization metrics display
-                plot_widget.update_optimization_metrics(latest_results['results'])
+                plot_widget.update_optimization_metrics(latest_results["results"])
             except Exception as e:
                 print(f"Plot update error: {e}")
-                if 'x' in latest_results['results']:
-                    x_traj = latest_results['results']['x'].guess
+                if "x" in latest_results["results"]:
+                    x_traj = latest_results["results"]["x"].guess
                     if HAS_OPENGL:
                         plot_widget.traj_scatter.setData(pos=x_traj[:, :3])
                     else:
                         plot_widget.traj_curve.setData(x_traj[:, 0], x_traj[:, 1])
+
     timer.timeout.connect(update_plot)
     timer.start(50)  # Update every 50ms
     print("Starting Qt event loop...")
     # Start the Qt event loop
     app.exec_()
+
+
 if __name__ == "__main__":
     # Start optimization thread
     opt_thread = threading.Thread(target=optimization_loop)
     opt_thread.daemon = True
     opt_thread.start()
     # Start plotting in main thread (this will block and run the Qt event loop)
-    plot_thread_func() 
+    plot_thread_func()
