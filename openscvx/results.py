@@ -10,10 +10,36 @@ from openscvx.backend.state import State
 @dataclass
 class OptimizationResults:
     """
-    Class to hold optimization results from the SCP solver.
-
-    This class replaces the dictionary-based results structure with a more
-    structured and type-safe approach.
+    Structured container for optimization results from the Successive Convexification (SCP) solver.
+    
+    This class provides a type-safe and organized way to store and access optimization results,
+    replacing the previous dictionary-based approach. It includes core optimization data,
+    iteration history for convergence analysis, post-processing results, and flexible
+    storage for plotting and application-specific data.
+    
+    Attributes:
+        converged (bool): Whether the optimization successfully converged
+        t_final (float): Final time of the optimized trajectory
+        u (Control): Optimized control trajectory at discretization nodes
+        x (State): Optimized state trajectory at discretization nodes
+        
+        # SCP Iteration History (for convergence analysis)
+        x_history (list[np.ndarray]): State trajectories from each SCP iteration
+        u_history (list[np.ndarray]): Control trajectories from each SCP iteration
+        discretization_history (list[np.ndarray]): Time discretization from each iteration
+        J_tr_history (list[np.ndarray]): Trust region cost history
+        J_vb_history (list[np.ndarray]): Virtual buffer cost history
+        J_vc_history (list[np.ndarray]): Virtual control cost history
+        
+        # Post-processing Results (added by propagate_trajectory_results)
+        t_full (Optional[np.ndarray]): Full time grid for interpolated trajectory
+        x_full (Optional[np.ndarray]): Interpolated state trajectory on full time grid
+        u_full (Optional[np.ndarray]): Interpolated control trajectory on full time grid
+        cost (Optional[float]): Total cost of the optimized trajectory
+        ctcs_violation (Optional[np.ndarray]): Continuous-time constraint violations
+        
+        # User-defined Data
+        plotting_data (dict[str, Any]): Flexible storage for plotting and application data
     """
 
     # Core optimization results
