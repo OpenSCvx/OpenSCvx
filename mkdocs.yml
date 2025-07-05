@@ -102,6 +102,8 @@ extra:
   social:
     - icon: fontawesome/brands/chrome
       link: https://haynec.github.io/
+
+
    
 # Extensions
 markdown_extensions:

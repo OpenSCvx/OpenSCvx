@@ -2,6 +2,9 @@
 
 OpenSCvx is a JAX-based Python library for trajectory optimization using Successive Convexification (SCvx). It provides a simple interface for formulating and solving trajectory optimization problems with continuous-time constraint satisfaction.
 
+!!! danger "Important"
+    The library is currently in beta testing. Please report any issues on the GitHub repository.
+
 ## Key Features
 
 - **JAX-based**: Automatic differentiation, vectorization, and compilation
@@ -104,6 +107,45 @@ For setting up a local development environment, we recommend using Conda to mana
     pip install -e ".[gui,cvxpygen]"
     ```
 </details>
+
+## Quick Example
+
+Here's a simple example to get you started with OpenSCvx:
+
+```python
+import openscvx as ocvx
+import jax.numpy as jnp
+
+# Create a simple trajectory optimization problem
+problem = ocvx.TrajOptProblem()
+
+# Add state variables
+x = problem.add_state("x", dim=3)
+v = problem.add_state("v", dim=3)
+
+# Add control variables
+u = problem.add_control("u", dim=3)
+
+# Define dynamics
+def dynamics(x, v, u):
+    return v, u
+
+problem.set_dynamics(dynamics)
+
+# Add constraints
+problem.add_constraint(x[0] >= 0)  # Keep x position positive
+problem.add_constraint(jnp.linalg.norm(u) <= 1.0)  # Control magnitude limit
+
+# Set initial and final conditions
+problem.set_initial_condition(x, [0, 0, 0])
+problem.set_final_condition(x, [10, 0, 0])
+
+# Solve the problem
+result = problem.solve()
+```
+
+!!! note "Note"
+    This is a basic example. For more complex problems, see the [Examples](examples.md) section.
 
 ## Next Steps
 
