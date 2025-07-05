@@ -113,35 +113,63 @@ For setting up a local development environment, we recommend using Conda to mana
 Here's a simple example to get you started with OpenSCvx:
 
 ```python
-import openscvx as ocvx
+import numpy as np
 import jax.numpy as jnp
+from openscvx.backend.state import State, Minimize
+from openscvx.backend.control import Control
+from openscvx.dynamics import dynamics
+from openscvx.trajoptproblem import TrajOptProblem
 
-# Create a simple trajectory optimization problem
-problem = ocvx.TrajOptProblem()
+# Define state variables (position x, y and time)
+x = State("x", shape=(3,))
 
-# Add state variables
-x = problem.add_state("x", dim=3)
-v = problem.add_state("v", dim=3)
+# Define control variables (velocity in x, y directions)
+u = Control("u", shape=(2,))
 
-# Add control variables
-u = problem.add_control("u", dim=3)
-
-# Define dynamics
-def dynamics(x, v, u):
-    return v, u
-
-problem.set_dynamics(dynamics)
-
-# Add constraints
-problem.add_constraint(x[0] >= 0)  # Keep x position positive
-problem.add_constraint(jnp.linalg.norm(u) <= 1.0)  # Control magnitude limit
+# Set bounds on state
+x.min = np.array([-10.0, -10.0, 0])
+x.max = np.array([10.0, 10.0, 5.0])
 
 # Set initial and final conditions
-problem.set_initial_condition(x, [0, 0, 0])
-problem.set_final_condition(x, [10, 0, 0])
+x.initial = np.array([0, 0, 0])
+x.final = np.array([5, 5, Minimize(5.0)])
+
+# Set initial guess for state trajectory
+x.guess = np.linspace([0, 0, 0], [5, 5, 5.0], 20)
+
+# Set bounds on control
+u.min = np.array([-2, -2])
+u.max = np.array([2, 2])
+
+# Set initial control guess
+u.guess = np.repeat(np.expand_dims(np.array([1, 1]), axis=0), 20, axis=0)
+
+# Define dynamics (simple integrator)
+@dynamics
+def dynamics_fn(x_, u_):
+    rx_dot = u_[0]  # x velocity
+    ry_dot = u_[1]  # y velocity
+    t_dot = 1       # time derivative
+    return jnp.array([rx_dot, ry_dot, t_dot])
+
+# Create and solve the problem
+problem = TrajOptProblem(
+    dynamics=dynamics_fn,
+    x=x,
+    u=u,
+    idx_time=2,  # Index of time variable in state vector
+    N=20,
+)
 
 # Solve the problem
+problem.initialize()
 result = problem.solve()
+result = problem.post_process(result)
+
+# Access results
+print(f"Optimal cost: {result.cost}")
+print(f"Final position: {result.x_full[-1, :2]}")
+print(f"Total time: {result.x_full[-1, 2]}")
 ```
 
 !!! note "Note"
