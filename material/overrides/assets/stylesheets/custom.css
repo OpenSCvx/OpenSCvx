@@ -991,4 +991,106 @@ html {
   padding-left: 0 !important;
   padding-right: 0 !important;
   overflow-x: auto !important;
+}
+
+/* --- OpenSCvx: Subtle shadow effect on hover for code and admonition blocks --- */
+.md-content__inner .md-typeset pre:hover {
+  box-shadow: 0 6px 24px 0 rgba(0,0,0,0.10), 0 1.5px 6px 0 rgba(0,0,0,0.08) !important;
+  z-index: 2;
+}
+
+.md-content__inner .md-typeset .admonition:hover,
+.md-content__inner .md-typeset details:hover {
+  box-shadow: 0 6px 24px 0 rgba(0,0,0,0.10), 0 1.5px 6px 0 rgba(0,0,0,0.08) !important;
+  z-index: 2;
+}
+
+/* --- OpenSCvx: Remove previous box-shadow and add visible shadow on hover --- */
+.md-content__inner .md-typeset pre,
+.md-content__inner .md-typeset .admonition,
+.md-content__inner .md-typeset details {
+  box-shadow: none !important;
+  transition: box-shadow 0.3s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+
+.md-content__inner .md-typeset pre:hover,
+.md-content__inner .md-typeset .admonition:hover,
+.md-content__inner .md-typeset details:hover {
+  box-shadow: 0 8px 32px 0 rgba(0,0,0,0.18), 0 2px 8px 0 rgba(0,0,0,0.12) !important;
+  z-index: 2;
+}
+
+/* --- OpenSCvx: Force shadow on hover for all code blocks, including .highlight --- */
+.md-content__inner .md-typeset pre:hover,
+.md-content__inner .md-typeset .highlight:hover,
+.md-content__inner .md-typeset .highlight pre:hover {
+  box-shadow: 0 8px 32px 0 rgba(0,0,0,0.18), 0 2px 8px 0 rgba(0,0,0,0.12) !important;
+  z-index: 2;
+}
+
+/* --- OpenSCvx: Subtle shadow on hover for all code blocks --- */
+pre:hover, code:hover, .highlight:hover, .highlight pre:hover {
+  box-shadow: 0 8px 32px 0 rgba(0,0,0,0.14), 0 2px 8px 0 rgba(0,0,0,0.10) !important;
+  background: inherit !important;
+  background-color: inherit !important;
+}
+
+/* --- OpenSCvx: Nuke ALL overlays and pseudo-elements for code blocks on hover --- */
+pre:hover::before, pre:hover::after,
+code:hover::before, code:hover::after,
+.highlight:hover::before, .highlight:hover::after,
+.md-typeset .highlight:hover::before, .md-typeset .highlight:hover::after,
+.md-typeset pre:hover::before, .md-typeset pre:hover::after,
+.md-typeset code:hover::before, .md-typeset code:hover::after,
+.md-typeset .highlight pre:hover::before, .md-typeset .highlight pre:hover::after,
+.md-typeset .highlight code:hover::before, .md-typeset .highlight code:hover::after,
+.md-content__inner pre:hover::before, .md-content__inner pre:hover::after,
+.md-content__inner code:hover::before, .md-content__inner code:hover::after,
+.md-content__inner .highlight:hover::before, .md-content__inner .highlight:hover::after,
+.md-content__inner .highlight pre:hover::before, .md-content__inner .highlight pre:hover::after,
+.md-content__inner .highlight code:hover::before, .md-content__inner .highlight code:hover::after {
+  display: none !important;
+  background: none !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  content: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  z-index: -1 !important;
+}
+
+/* --- OpenSCvx: Remove ALL box-shadows and backgrounds from code block wrappers and pseudo-elements --- */
+pre, pre *, code, code *, .highlight, .highlight *,
+.md-typeset pre, .md-typeset pre *,
+.md-typeset .highlight, .md-typeset .highlight *,
+.md-content__inner pre, .md-content__inner pre *,
+.md-content__inner .highlight, .md-content__inner .highlight * {
+  box-shadow: none !important;
+  background: inherit !important;
+  background-color: inherit !important;
+}
+
+pre::before, pre::after, code::before, code::after,
+.highlight::before, .highlight::after,
+.md-typeset pre::before, .md-typeset pre::after,
+.md-typeset .highlight::before, .md-typeset .highlight::after,
+.md-content__inner pre::before, .md-content__inner pre::after,
+.md-content__inner .highlight::before, .md-content__inner .highlight::after {
+  display: none !important;
+  background: none !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  content: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  z-index: -1 !important;
+}
+
+/* --- OpenSCvx: Use theme-aware background for code blocks (supports dark and light) --- */
+pre, code, .highlight, .md-typeset pre, .md-typeset code, .md-typeset .highlight,
+.md-content__inner pre, .md-content__inner code, .md-content__inner .highlight {
+  background: var(--md-code-bg-color) !important;
+  background-color: var(--md-code-bg-color) !important;
 } 
