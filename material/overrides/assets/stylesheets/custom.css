@@ -955,4 +955,40 @@ html {
   background: var(--md-accent-fg-color);
   color: var(--md-accent-bg-color);
   transform: scale(1.05);
+}
+
+/* --- OpenSCvx: Only pre gets scroll/width, .highlight is transparent --- */
+.md-content__inner .md-typeset pre {
+  max-width: 100% !important;
+  width: auto !important;
+  box-sizing: border-box !important;
+  overflow-x: auto !important;
+  white-space: pre !important;
+  word-wrap: normal !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+.md-typeset .highlight,
+.md-typeset .highlight pre {
+  background: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+
+/* --- OpenSCvx: Super-specific selector for admonition/details width --- */
+.md-content__inner > .md-typeset > .admonition,
+.md-content__inner > .md-typeset > details,
+.md-content__inner .admonition,
+.md-content__inner details {
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  overflow-x: auto !important;
 } 

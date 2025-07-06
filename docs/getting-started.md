@@ -142,7 +142,9 @@ u.min = np.array([-2, -2])
 u.max = np.array([2, 2])
 
 # Set initial control guess
-u.guess = np.repeat(np.expand_dims(np.array([1, 1]), axis=0), 20, axis=0)
+u.guess = np.repeat(
+    np.expand_dims(np.array([1, 1]), axis=0), 20, axis=0
+)
 
 # Define dynamics (simple integrator)
 @dynamics

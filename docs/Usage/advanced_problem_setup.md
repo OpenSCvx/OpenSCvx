@@ -110,7 +110,11 @@ Or provide a custom penalty function:
 
 ```python
 # True Huber function with delta=0.25
-huber = lambda x: jnp.where(jnp.abs(x) <= 0.25, 0.5 * x**2, 0.25 * (jnp.abs(x) - 0.5 * 0.25))
+huber = lambda x: jnp.where(
+    jnp.abs(x) <= 0.25, 
+    0.5 * x**2, 
+    0.25 * (jnp.abs(x) - 0.5 * 0.25)
+)
 @ctcs(penalty=huber)
 def g(x_, u_):
     return jnp.linalg.norm(x_[:2]) - 1.0
@@ -197,7 +201,7 @@ For an inequality constraint using the definition ($g(\cdot) \leq 0$) that you w
 
 ```python
 
-@ctcs(lambda x, u: jnp.linalg.norm(x-r_c) - r_min)
+@ctcs(lambda x, u: jnp.linalg.norm(x - r_c) - r_min)
 
 ```
 !!! Note
@@ -222,7 +226,10 @@ These can be set using the `penalty` flag. For example, if I want to use the hub
 If you want to set your own penalty function, then you can provide a lambda function as follows 
 
 ```python
-@ctcs(lambda x, u: jnp.linalg.norm(x-r_c) - r_min, penalty=lambda x:  jnp.maximum(0, x)**2)
+@ctcs(
+    lambda x, u: jnp.linalg.norm(x - r_c) - r_min, 
+    penalty=lambda x: jnp.maximum(0, x)**2
+)
 ```
 
 #### Node Specific Regions

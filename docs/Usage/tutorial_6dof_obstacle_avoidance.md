@@ -51,14 +51,24 @@ Create a State object and configure its properties:
 x = State("x", shape=(14,))
 
 # Set bounds
-x.max = np.array([200.0, 100, 50, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100])
-x.min = np.array([-200.0, -100, 15, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0])
+x.max = np.array([
+    200.0, 100, 50, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100
+])
+x.min = np.array([
+    -200.0, -100, 15, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0
+])
 
 # Set initial conditions (some states are free, others are fixed)
-x.initial = np.array([10.0, 0, 20, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0])
+x.initial = np.array([
+    10.0, 0, 20, 0, 0, 0, Free(1), Free(0), Free(0), 
+    Free(0), Free(0), Free(0), Free(0), 0
+])
 
 # Set final conditions (most states are free, time is minimized)
-x.final = np.array([10.0, 0, 20, Free(0), Free(0), Free(0), Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), Minimize(total_time)])
+x.final = np.array([
+    10.0, 0, 20, Free(0), Free(0), Free(0), Free(1), 
+    Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), Minimize(total_time)
+])
 
 # Set initial guess for SCP
 x.guess = np.linspace(x.initial, x.final, n)
@@ -72,12 +82,18 @@ Create a Control object and configure its properties:
 u = Control("u", shape=(6,))
 
 # Set bounds
-u.max = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])
-u.min = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])
+u.max = np.array([
+    0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562
+])
+u.min = np.array([
+    0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562
+])
 
 # Set initial guess for SCP
 initial_control = np.array([0.0, 0, 10, 0, 0, 0])
-u.guess = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
+u.guess = np.repeat(
+    np.expand_dims(initial_control, axis=0), n, axis=0
+)
 ```
 
 ## Dynamics

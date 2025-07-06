@@ -251,6 +251,24 @@
     }
   }
 
+  // Code blocks with horizontal scrolling
+  pre {
+    overflow-x: auto;
+    white-space: pre;
+    word-wrap: normal;
+    
+    // Ensure code blocks don't break on mobile
+    code {
+      white-space: pre;
+      word-wrap: normal;
+    }
+  }
+
+  // Inline code
+  code {
+    white-space: nowrap;
+  }
+
   // Social card
   .mdx-social {
     position: relative;
@@ -320,4 +338,29 @@
       }
     }
   }
+}
+
+// --- OpenSCvx: Restrict code block width to text column and enable horizontal scroll ---
+.md-typeset pre, 
+.md-typeset pre > code {
+  max-width: 100%;
+  width: auto;
+  box-sizing: border-box;
+  overflow-x: auto;
+  white-space: pre;
+  word-wrap: normal;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.md-content__inner .md-typeset pre,
+.md-content__inner .md-typeset pre > code {
+  max-width: 100%;
+  width: auto;
+  box-sizing: border-box;
+  overflow-x: auto;
+  white-space: pre;
+  word-wrap: normal;
+  margin-left: 0;
+  margin-right: 0;
 }

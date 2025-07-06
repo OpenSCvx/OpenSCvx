@@ -21,7 +21,9 @@ x.initial = np.array([value1, Free(guess2), Fix(value3), Minimize(guess4)])
 x.final = np.array([value1, Free(guess2), Maximize(guess3), Minimize(guess4)])
 
 # Set initial guess for SCP (shape: (n_nodes, n_states))
-x.guess = np.linspace(initial_values, final_values, n_nodes)
+x.guess = np.linspace(
+    initial_values, final_values, n_nodes
+)
 ```
 
 The boundary condition options are:
@@ -45,7 +47,10 @@ u.min = np.array([min_values_for_each_control])
 u.max = np.array([max_values_for_each_control])
 
 # Set initial guess for SCP (shape: (n_nodes, n_controls))
-u.guess = np.repeat(np.expand_dims(initial_control, axis=0), n_nodes, axis=0)
+u.guess = np.repeat(
+    np.expand_dims(initial_control, axis=0), 
+    n_nodes, axis=0
+)
 ```
 
 ## Dynamics
@@ -112,8 +117,10 @@ obs_center.value = np.array([1.0, 2.0])
 obs_radius.value = 0.5
 
 # Use in constraints
-constraints.append(ctcs(lambda x_, u_, obs_center_, obs_radius_: 
-                       obs_radius_ - jnp.linalg.norm(x_[:2] - obs_center_)))
+constraints.append(
+    ctcs(lambda x_, u_, obs_center_, obs_radius_: 
+         obs_radius_ - jnp.linalg.norm(x_[:2] - obs_center_))
+)
 ```
 
 ## Initial Guess
