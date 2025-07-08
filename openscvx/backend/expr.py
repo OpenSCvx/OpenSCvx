@@ -1,4 +1,4 @@
-from typing import Union, Callable
+from typing import Callable, Union
 
 import numpy as np
 
@@ -9,7 +9,6 @@ class Expr:
 
     Note: This class is currently not being used.
     """
-
 
     def __le__(self, other):
         return Constraint(self, to_expr(other), op="<=")

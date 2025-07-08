@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from openscvx.backend.expr import Add, Mul, MatMul, Neg, Constant, Constraint, to_expr, traverse
+from openscvx.backend.expr import Add, Constant, Constraint, MatMul, Mul, Neg, to_expr, traverse
 from openscvx.backend.variable import Variable
 
 
