@@ -110,12 +110,11 @@ class Literal(Expr):
         return []
 
 
-def to_expr(obj):
-    """Convert an object to an expression."""
-    if isinstance(obj, Expr):
-        return obj
-    return Literal(obj)
-
+# def to_expr(obj):
+#     """Convert an object to an expression."""
+#     if isinstance(obj, Expr):
+#         return obj
+#     return Literal(obj)
 
 
 class Constant(Expr):
