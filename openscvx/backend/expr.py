@@ -138,3 +138,6 @@ class Constraint(Expr):
 
     def __repr__(self):
         return f"({self.lhs!r} {self.op} {self.rhs!r})"
+
+    def children(self):
+        return [self.lhs, self.rhs]
