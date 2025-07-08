@@ -47,10 +47,12 @@ class Expr:
 def to_expr(x: Union[Expr, float, int, np.ndarray]) -> Expr:
     return x if isinstance(x, Expr) else Constant(np.array(x))
 
+
 def traverse(expr: Expr, visit: Callable[[Expr], None]):
     visit(expr)
     for child in expr.children():
         traverse(child, visit)
+
 
 class Add(Expr):
     def __init__(self, left, right):
@@ -59,7 +61,7 @@ class Add(Expr):
 
     def children(self):
         return [self.left, self.right]
-    
+
     def __repr__(self):
         return f"({self.left!r} + {self.right!r})"
 
@@ -71,7 +73,7 @@ class Mul(Expr):
 
     def children(self):
         return [self.left, self.right]
-    
+
     def __repr__(self):
         return f"({self.left!r} * {self.right!r})"
 
@@ -83,7 +85,7 @@ class MatMul(Expr):
 
     def children(self):
         return [self.left, self.right]
-    
+
     def __repr__(self):
         return f"({self.left!r} * {self.right!r})"
 
@@ -94,7 +96,7 @@ class Neg(Expr):
 
     def children(self):
         return [self.operand]
-    
+
     def __repr__(self):
         return f"( - {self.operand!r})"
 
