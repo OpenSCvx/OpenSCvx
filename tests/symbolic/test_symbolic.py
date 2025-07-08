@@ -1,10 +1,7 @@
 import numpy as np
 import pytest
 
-from openscvx.backend.expr import (
-    Add, Mul, MatMul, Neg, Constant, Constraint,
-    to_expr, traverse
-)
+from openscvx.backend.expr import Add, Mul, MatMul, Neg, Constant, Constraint, to_expr, traverse
 from openscvx.backend.variable import Variable
 
 
@@ -79,7 +76,7 @@ def test_constraint_creation_and_children():
 def test_pretty_print_tree_structure():
     # build a nested tree: -( (a + b) * c )
     a, b, c = Constant(1), Constant(2), Constant(3)
-    tree = -( (a + b) * c )
+    tree = -((a + b) * c)
     p = tree.pretty()
     # Should indent like:
     # Neg
@@ -101,6 +98,7 @@ def test_traverse_visits_all_nodes_in_preorder():
     a, b, c = Constant(1), Constant(2), Constant(3)
     expr = Add(a, Mul(b, c))
     visited = []
+
     def visit(node):
         visited.append(type(node).__name__)
 
@@ -110,10 +108,13 @@ def test_traverse_visits_all_nodes_in_preorder():
     assert visited == ["Add", "Constant", "Mul", "Constant", "Constant"]
 
 
-@pytest.mark.parametrize("shape_a, shape_b", [
-    ((2,), (2,)),    # vector + vector
-    ((2, 2), (2, 2)),# matrix + matrix
-])
+@pytest.mark.parametrize(
+    "shape_a, shape_b",
+    [
+        ((2,), (2,)),  # vector + vector
+        ((2, 2), (2, 2)),  # matrix + matrix
+    ],
+)
 def test_elementwise_addition_children_for_arrays(shape_a, shape_b):
     A = Constant(np.ones(shape_a))
     B = Constant(np.full(shape_b, 2.0))
