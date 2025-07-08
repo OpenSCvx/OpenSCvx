@@ -71,6 +71,9 @@ class Mul(Expr):
 
     def children(self):
         return [self.left, self.right]
+    
+    def __repr__(self):
+        return f"({self.left!r} * {self.right!r})"
 
 
 class MatMul(Expr):
@@ -80,6 +83,9 @@ class MatMul(Expr):
 
     def children(self):
         return [self.left, self.right]
+    
+    def __repr__(self):
+        return f"({self.left!r} * {self.right!r})"
 
 
 class Neg(Expr):
@@ -88,6 +94,9 @@ class Neg(Expr):
 
     def children(self):
         return [self.operand]
+    
+    def __repr__(self):
+        return f"( - {self.operand!r})"
 
 
 class Literal(Expr):
