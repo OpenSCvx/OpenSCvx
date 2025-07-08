@@ -41,7 +41,7 @@ def test_basic_arithmetic_nodes_and_children_repr():
     # repr should nest correctly
     assert repr(add) == "(Const(2) + Const(3))"
     assert repr(mul) == "(Const(2) * Const(3))"
-    assert "Neg" in neg.pretty()
+    assert repr(neg) == "(-Const(2))"
 
 
 def test_matmul_vector_and_matrix():
@@ -55,7 +55,6 @@ def test_matmul_vector_and_matrix():
     assert children[0] is M and children[1] is v
 
     # repr should reflect operator
-    r = repr(mm)
     assert "MatMul" in mm.pretty()  # tree form contains the node name
     assert "(" in repr(mm) and "@" not in repr(mm)  # repr is Python‐safe
 

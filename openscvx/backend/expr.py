@@ -97,7 +97,7 @@ class Neg(Expr):
         return [self.operand]
 
     def __repr__(self):
-        return f"( - {self.operand!r})"
+        return f"(-{self.operand!r})"
 
 
 class Literal(Expr):
