@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 
 from openscvx.backend.expr import Add, Constant, MatMul, Mul, Neg
+from openscvx.backend.lower import lower_to_jax
 from openscvx.backend.lowerers.jax import JaxLowerer
 from openscvx.backend.variable import Variable
 
@@ -85,3 +86,43 @@ def test_jax_lower_neg_and_composite():
 
     expected = -((full_x[0:2] + full_x[2:4]) * jnp.array([1.0, 1.0]))
     assert jnp.allclose(out, expected)
+
+def test_lower_to_jax_constant_produces_callable():
+    c = Constant(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    fns = lower_to_jax([c])
+    assert isinstance(fns, list) and len(fns) == 1
+    fn = fns[0]
+    out = fn(None, None)
+    assert isinstance(out, jnp.ndarray)
+    assert out.shape == (2, 2)
+    assert jnp.allclose(out, jnp.array([[1.0, 2.0], [3.0, 4.0]]))
+
+
+def test_lower_to_jax_add_with_slices():
+    full_x = jnp.arange(6.0)
+    a = Variable("a", (3,))
+    a._slice = slice(0, 3)
+    b = Variable("b", (3,))
+    b._slice = slice(3, 6)
+    expr = Add(a, b)
+
+    [fn] = lower_to_jax([expr])
+    out = fn(full_x, None)
+    expected = full_x[0:3] + full_x[3:6]
+    assert jnp.allclose(out, expected)
+
+
+def test_lower_to_jax_multiple_exprs_returns_in_order():
+    full_x = jnp.array([10.0, 20.0, 30.0])
+    # expr1: constant, expr2: identity of x
+    c = Constant(np.array([1.0, 2.0, 3.0]))
+    x = Variable("x", (3,))
+    x._slice = slice(0, 3)
+    exprs = [c, x]
+
+    fns = lower_to_jax(exprs)
+    assert len(fns) == 2
+
+    f_const, f_x = fns
+    assert jnp.allclose(f_const(full_x, None), jnp.array([1.0, 2.0, 3.0]))
+    assert jnp.allclose(f_x(full_x, None), full_x)
