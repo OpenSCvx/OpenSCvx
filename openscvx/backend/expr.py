@@ -22,6 +22,20 @@ class Expr:
     def __add__(self, other):
         return Add(self, to_expr(other))
 
+    def __sub__(self, other):
+        return Sub(self, to_expr(other))
+
+    def __rsub__(self, other):
+        # e.g. 5 - a  ⇒ Sub(Constant(5), a)
+        return Sub(to_expr(other), self)
+
+    def __truediv__(self, other):
+        return Div(self, to_expr(other))
+
+    def __rtruediv__(self, other):
+        # e.g. 10 / a
+        return Div(to_expr(other), self)
+
     def __mul__(self, other):
         return Mul(self, to_expr(other))
 
@@ -65,6 +79,18 @@ class Add(Expr):
         return f"({self.left!r} + {self.right!r})"
 
 
+class Sub(Expr):
+    def __init__(self, left, right):
+        self.left = left
+        self.right = right
+
+    def children(self):
+        return [self.left, self.right]
+
+    def __repr__(self):
+        return f"({self.left!r} - {self.right!r})"
+
+
 class Mul(Expr):
     def __init__(self, left, right):
         self.left = left
@@ -75,6 +101,18 @@ class Mul(Expr):
 
     def __repr__(self):
         return f"({self.left!r} * {self.right!r})"
+
+
+class Div(Expr):
+    def __init__(self, left, right):
+        self.left = left
+        self.right = right
+
+    def children(self):
+        return [self.left, self.right]
+
+    def __repr__(self):
+        return f"({self.left!r} / {self.right!r})"
 
 
 class MatMul(Expr):

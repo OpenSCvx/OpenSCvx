@@ -46,10 +46,20 @@ class JaxLowerer:  # openscvx/backend/lowerers/jax.py
         fR = lower(node.right, self)
         return lambda x, u: fL(x, u) + fR(x, u)
 
+    def visit_sub(self, node: Add):
+        fL = lower(node.left, self)
+        fR = lower(node.right, self)
+        return lambda x, u: fL(x, u) - fR(x, u)
+
     def visit_mul(self, node: Mul):
         fL = lower(node.left, self)
         fR = lower(node.right, self)
         return lambda x, u: fL(x, u) * fR(x, u)
+
+    def visit_div(self, node: Mul):
+        fL = lower(node.left, self)
+        fR = lower(node.right, self)
+        return lambda x, u: fL(x, u) / fR(x, u)
 
     def visit_matmul(self, node: MatMul):
         fL = lower(node.left, self)

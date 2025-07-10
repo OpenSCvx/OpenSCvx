@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from openscvx.backend.control import Control
-from openscvx.backend.expr import Add, Constant, MatMul, Mul, Neg
+from openscvx.backend.expr import Add, Constant, Div, MatMul, Mul, Neg, Sub
 from openscvx.backend.lower import lower_to_jax
 from openscvx.backend.lowerers.jax import JaxLowerer
 from openscvx.backend.state import State
@@ -74,6 +74,26 @@ def test_jax_lower_add_and_mul_of_slices():
 
     assert jnp.allclose(res_add, x[0:3] + x[3:6])
     assert jnp.allclose(res_mul, x[0:3] * x[3:6])
+
+def test_jax_lower_sub_and_div_of_slices():
+    x = jnp.arange(8.0)
+    u = jnp.arange(8.0) * 3.0
+    a = State("a", (3,))
+    a._slice = slice(0, 3)
+    b = Control("b", (3,))
+    b._slice = slice(0, 3)
+    c = Constant(2.0)
+    expr_sub = Sub(a, b)
+    expr_div = Div(a, c)
+
+    jl = JaxLowerer()
+    f_res_sub = jl.visit_sub(expr_sub)
+    res_sub = f_res_sub(x, u)
+    f_res_div = jl.visit_div(expr_div)
+    res_div = f_res_div(x, u)
+
+    assert jnp.allclose(res_sub, x[0:3] - u[0:3])
+    assert jnp.allclose(res_div, x[0:3] / c.value)
 
 
 def test_jax_lower_matmul_vector_matrix():

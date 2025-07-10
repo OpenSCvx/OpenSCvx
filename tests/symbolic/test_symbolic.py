@@ -1,7 +1,18 @@
 import numpy as np
 import pytest
 
-from openscvx.backend.expr import Add, Constant, Constraint, MatMul, Mul, Neg, to_expr, traverse
+from openscvx.backend.expr import (
+    Add,
+    Constant,
+    Constraint,
+    Div,
+    MatMul,
+    Mul,
+    Neg,
+    Sub,
+    to_expr,
+    traverse,
+)
 from openscvx.backend.variable import Variable
 
 
@@ -25,22 +36,30 @@ def test_to_expr_wraps_numbers_and_arrays():
 def test_basic_arithmetic_nodes_and_children_repr():
     a, b = Constant(2), Constant(3)
     add = a + b
+    sub = a - b
     mul = a * b
+    div = a / b
     neg = -a
 
     # types
     assert isinstance(add, Add)
+    assert isinstance(sub, Sub)
     assert isinstance(mul, Mul)
+    assert isinstance(div, Div)
     assert isinstance(neg, Neg)
 
     # children
     assert add.children() == [a, b]
+    assert sub.children() == [a, b]
     assert mul.children() == [a, b]
+    assert div.children() == [a, b]
     assert neg.children() == [a]
 
     # repr should nest correctly
     assert repr(add) == "(Const(2) + Const(3))"
+    assert repr(sub) == "(Const(2) - Const(3))"
     assert repr(mul) == "(Const(2) * Const(3))"
+    assert repr(div) == "(Const(2) / Const(3))"
     assert repr(neg) == "(-Const(2))"
 
 
