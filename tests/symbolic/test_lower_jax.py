@@ -2,10 +2,11 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from openscvx.backend.control import Control
 from openscvx.backend.expr import Add, Constant, MatMul, Mul, Neg
 from openscvx.backend.lower import lower_to_jax
 from openscvx.backend.lowerers.jax import JaxLowerer
-from openscvx.backend.variable import Variable
+from openscvx.backend.state import State
 
 
 def test_jax_lower_constant():
@@ -18,30 +19,49 @@ def test_jax_lower_constant():
     assert jnp.allclose(out, jnp.array([[1, 2], [3, 4]]))
 
 
-def test_jax_lower_variable_without_slice_raises():
-    v = Variable("v", (3,))
+def test_jax_lower_state_without_slice_raises():
+    s = State("s", (3,))
     jl = JaxLowerer()
     with pytest.raises(ValueError):
-        jl.visit_variable(v)
+        jl.visit_state(s)
 
 
-def test_jax_lower_variable_with_slice():
-    x = jnp.arange(10.0)
-    v = Variable("v", (4,))
-    v._slice = slice(2, 6)
+def test_jax_lower_control_without_slice_raises():
+    c = Control("c", (2,))
     jl = JaxLowerer()
-    f = jl.visit_variable(v)
+    with pytest.raises(ValueError):
+        jl.visit_control(c)
+
+
+def test_jax_lower_state_with_slice():
+    x = jnp.arange(10.0)
+    s = State("s", (4,))
+    s._slice = slice(2, 6)
+    jl = JaxLowerer()
+    f = jl.visit_state(s)
     out = f(x, None)
     assert isinstance(out, jnp.ndarray)
     assert out.shape == (4,)
     assert jnp.allclose(out, x[2:6])
 
 
+def test_jax_lower_control_with_slice():
+    u = jnp.arange(8.0)
+    c = Control("c", (3,))
+    c._slice = slice(5, 8)
+    jl = JaxLowerer()
+    f = jl.visit_control(c)
+    out = f(None, u)
+    assert isinstance(out, jnp.ndarray)
+    assert out.shape == (3,)
+    assert jnp.allclose(out, u[5:8])
+
+
 def test_jax_lower_add_and_mul_of_slices():
     x = jnp.arange(8.0)
-    a = Variable("a", (3,))
+    a = State("a", (3,))
     a._slice = slice(0, 3)
-    b = Variable("b", (3,))
+    b = State("b", (3,))
     b._slice = slice(3, 6)
     expr_add = Add(a, b)
     expr_mul = Mul(a, b)
@@ -72,20 +92,22 @@ def test_jax_lower_matmul_vector_matrix():
 
 def test_jax_lower_neg_and_composite():
     x = jnp.arange(6.0)
-    a = Variable("a", (2,))
+    u = jnp.arange(6.0) * 3
+    a = State("a", (2,))
     a._slice = slice(0, 2)
-    b = Variable("b", (2,))
-    b._slice = slice(2, 4)
+    b = Control("b", (2,))
+    b._slice = slice(0, 2)
     c = Constant(np.array([1.0, 1.0]))
 
     # expr = -((a + b) * c)
     expr = Neg(Mul(Add(a, b), c))
     jl = JaxLowerer()
     f = jl.visit_neg(expr)
-    out = f(x, None)
+    out = f(x, u)
 
-    expected = -((x[0:2] + x[2:4]) * jnp.array([1.0, 1.0]))
+    expected = -((x[0:2] + u[0:2]) * jnp.array([1.0, 1.0]))
     assert jnp.allclose(out, expected)
+
 
 def test_lower_to_jax_constant_produces_callable():
     c = Constant(np.array([[1.0, 2.0], [3.0, 4.0]]))
@@ -100,9 +122,9 @@ def test_lower_to_jax_constant_produces_callable():
 
 def test_lower_to_jax_add_with_slices():
     x = jnp.arange(6.0)
-    a = Variable("a", (3,))
+    a = State("a", (3,))
     a._slice = slice(0, 3)
-    b = Variable("b", (3,))
+    b = State("b", (3,))
     b._slice = slice(3, 6)
     expr = Add(a, b)
 
@@ -114,9 +136,10 @@ def test_lower_to_jax_add_with_slices():
 
 def test_lower_to_jax_multiple_exprs_returns_in_order():
     x = jnp.array([10.0, 20.0, 30.0])
+    u = jnp.array([1.0, 2.0, 3.0])
     # expr1: constant, expr2: identity of x
     c = Constant(np.array([1.0, 2.0, 3.0]))
-    v = Variable("x", (3,))
+    v = State("v", (3,))
     v._slice = slice(0, 3)
     exprs = [c, v]
 
@@ -125,4 +148,4 @@ def test_lower_to_jax_multiple_exprs_returns_in_order():
 
     f_const, f_x = fns
     assert jnp.allclose(f_const(x, None), jnp.array([1.0, 2.0, 3.0]))
-    assert jnp.allclose(f_x(x, None), x)
+    assert jnp.allclose(f_x(x, u), x)

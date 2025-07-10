@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 
+from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     Add,
     Constant,
@@ -9,7 +10,7 @@ from openscvx.backend.expr import (
     Mul,
     Neg,
 )
-from openscvx.backend.variable import Variable
+from openscvx.backend.state import State
 
 # openscvx/backend/lowerers/jax.py
 
@@ -28,12 +29,17 @@ class JaxLowerer:  # openscvx/backend/lowerers/jax.py
         value = jnp.array(node.value)
         return lambda x, u: value
 
-    def visit_variable(self, node: Variable):
+    def visit_state(self, node: State):
         sl = node._slice
         if sl is None:
-            raise ValueError(f"Variable {node.name!r} has no slice assigned")
-        # you could detect state vs control here if you keep separate maps
+            raise ValueError(f"State {node.name!r} has no slice assigned")
         return lambda x, u: x[sl]
+
+    def visit_control(self, node: Control):
+        sl = node._slice
+        if sl is None:
+            raise ValueError(f"Control {node.name!r} has no slice assigned")
+        return lambda x, u: u[sl]
 
     def visit_add(self, node: Add):
         fL = lower(node.left, self)
