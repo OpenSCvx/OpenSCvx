@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     Add,
     Constant,
@@ -14,6 +15,7 @@ from openscvx.backend.expr import (
     to_expr,
     traverse,
 )
+from openscvx.backend.state import State
 from openscvx.backend.variable import Variable
 
 
@@ -32,6 +34,14 @@ def test_to_expr_wraps_numbers_and_arrays():
     # passing through an Expr unchanged
     a = Constant(np.array([1.0, 2.0]))
     assert to_expr(a) is a
+
+def test_to_expr_passes_variables_through():
+    v = Variable("v", (1,))
+    x = State("x", (1,))
+    u = Control("u", (1,))
+    assert to_expr(v) is v
+    assert to_expr(x) is x
+    assert to_expr(u) is u
 
 
 def test_basic_arithmetic_nodes_and_children_repr():
