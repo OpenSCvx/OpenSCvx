@@ -4,8 +4,9 @@ import pytest
 from openscvx.backend.expr import (
     Add,
     Constant,
-    Constraint,
     Div,
+    Equality,
+    Inequality,
     MatMul,
     Mul,
     Neg,
@@ -78,17 +79,43 @@ def test_matmul_vector_and_matrix():
     assert "(" in repr(mm) and "@" not in repr(mm)  # repr is Python‐safe
 
 
-def test_constraint_creation_and_children():
+def test_equality_creation_and_children():
     x = Variable("x", shape=(3,))
     # build lhs ≤ rhs
-    c = x <= np.array([0.0, 1.0, 2.0])
+    c = x == np.array([0.0, 1.0, 2.0])
 
-    assert isinstance(c, Constraint)
+    assert isinstance(c, Equality)
     # children are exactly the Expr on each side
     lhs, rhs = c.children()
     assert lhs is x
     assert isinstance(rhs, Constant)
-    assert c.op == "<="
+    assert repr(c) == "Var('x') == Const(array([0., 1., 2.]))"
+
+
+def test_inequality_creation_and_children():
+    x = Variable("x", shape=(3,))
+    # build lhs ≤ rhs
+    c = x <= np.array([0.0, 1.0, 2.0])
+
+    assert isinstance(c, Inequality)
+    # children are exactly the Expr on each side
+    lhs, rhs = c.children()
+    assert lhs is x
+    assert isinstance(rhs, Constant)
+    assert repr(c) == "Var('x') <= Const(array([0., 1., 2.]))"
+
+
+def test_inequality_reverse_creation_and_children():
+    x = Variable("x", shape=(3,))
+    # build lhs ≤ rhs
+    c = x >= np.array([0.0, 1.0, 2.0])
+
+    assert isinstance(c, Inequality)
+    # children are exactly the Expr on each side
+    lhs, rhs = c.children()
+    assert rhs is x
+    assert isinstance(lhs, Constant)
+    assert repr(c) == "Const(array([0., 1., 2.])) <= Var('x')"
 
 
 def test_pretty_print_tree_structure():
@@ -154,12 +181,12 @@ def test_combined_ops_produce_correct_constraint_tree():
     z = Variable("z", (3,))
 
     # note: MatMul between two 3-vectors is allowed at AST level
-    expr = (x + y) @ z >= 5
+    expr = (x + y) @ z <= 5
     # root is Constraint
-    assert isinstance(expr, Constraint)
+    assert isinstance(expr, Inequality)
     # check tree structure via pretty()
     p = expr.pretty().splitlines()
-    assert p[0].strip().startswith("Constraint")
+    assert p[0].strip().startswith("Inequality")
     # next line is MatMul
     assert "MatMul" in p[1]
 

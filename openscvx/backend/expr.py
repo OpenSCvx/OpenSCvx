@@ -11,13 +11,13 @@ class Expr:
     """
 
     def __le__(self, other):
-        return Constraint(self, to_expr(other), op="<=")
+        return Inequality(self, to_expr(other))
 
     def __ge__(self, other):
-        return Constraint(self, to_expr(other), op=">=")
+        return Inequality(to_expr(other), self)
 
     def __eq__(self, other):
-        return Constraint(self, to_expr(other), op="==")
+        return Equality(self, to_expr(other))
 
     def __add__(self, other):
         return Add(self, to_expr(other))
@@ -165,15 +165,23 @@ class Constant(Expr):
 
 class Constraint(Expr):
     """
-    A comparison node.  op is one of '<=', '>=', or '=='.
+    Abstract base for all constraints.
     """
-
-    def __init__(self, lhs: Expr, rhs: Expr, op: str):
-        assert op in ("<=", ">=", "=="), f"Invalid op {op}"
-        self.lhs, self.rhs, self.op = lhs, rhs, op
-
-    def __repr__(self):
-        return f"({self.lhs!r} {self.op} {self.rhs!r})"
+    def __init__(self, lhs: Expr, rhs: Expr):
+        self.lhs = lhs
+        self.rhs = rhs
 
     def children(self):
         return [self.lhs, self.rhs]
+
+
+class Equality(Constraint):
+    """Represents lhs == rhs."""
+    def __repr__(self):
+        return f"{self.lhs!r} == {self.rhs!r}"
+
+
+class Inequality(Constraint):
+    """Represents lhs <= rhs"""
+    def __repr__(self):
+        return f"{self.lhs!r} <= {self.rhs!r}"
