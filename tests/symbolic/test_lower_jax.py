@@ -149,6 +149,7 @@ def test_lower_to_jax_add_with_slices():
     b._slice = slice(3, 6)
     expr = Add(a, b)
 
+    # TODO: (norrisg) make it so you don't have to make everything into lists
     [fn] = lower_to_jax([expr])
     out = fn(x, None)
     expected = x[0:3] + x[3:6]
