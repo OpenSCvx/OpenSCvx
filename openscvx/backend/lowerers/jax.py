@@ -13,8 +13,6 @@ from openscvx.backend.expr import (
 )
 from openscvx.backend.state import State
 
-# openscvx/backend/lowerers/jax.py
-
 
 def lower(expr: Expr, lowerer: "JaxLowerer"):
     """
@@ -24,7 +22,7 @@ def lower(expr: Expr, lowerer: "JaxLowerer"):
     return method(expr)
 
 
-class JaxLowerer:  # openscvx/backend/lowerers/jax.py
+class JaxLowerer:
     def visit_constant(self, node: Constant):
         # capture the constant value once
         value = jnp.array(node.value)

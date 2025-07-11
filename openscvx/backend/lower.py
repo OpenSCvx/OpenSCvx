@@ -1,6 +1,4 @@
-# openscvx/backend/lower.py
-
-from typing import Any, Sequence
+from typing import Any, Sequence, Union
 
 from openscvx.backend.expr import Expr
 
@@ -19,13 +17,15 @@ def lower(expr: Expr, lowerer: Any):
 # --- Convenience wrappers for common backends ---
 
 
-def lower_to_jax(
-    exprs: Sequence[Expr],
-):
+def lower_to_jax(exprs: Union[Expr, Sequence[Expr]]) -> Union[callable, list[callable]]:
     """
-    Lower one or more Exprs into callable JAX functions (x,u)->...
+    If `exprs` is a single Expr, returns a single callable.
+    Otherwise (a list/tuple of Exprs), returns a list of callables.
     """
     from openscvx.backend.lowerers.jax import JaxLowerer
 
     jl = JaxLowerer()
-    return [lower(expr, jl) for expr in exprs]
+    if isinstance(exprs, Expr):
+        return lower(exprs, jl)
+    fns = [lower(e, jl) for e in exprs]
+    return fns

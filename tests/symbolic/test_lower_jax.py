@@ -149,8 +149,7 @@ def test_lower_to_jax_add_with_slices():
     b._slice = slice(3, 6)
     expr = Add(a, b)
 
-    # TODO: (norrisg) make it so you don't have to make everything into lists
-    [fn] = lower_to_jax([expr])
+    fn = lower_to_jax(expr)
     out = fn(x, None)
     expected = x[0:3] + x[3:6]
     assert jnp.allclose(out, expected)
@@ -182,7 +181,7 @@ def test_concat_simple():
     c = Constant(9.0)
     expr = Concat(a, b, c)
 
-    [fn] = lower_to_jax([expr])
+    fn = lower_to_jax(expr)
     out = fn(x, None)
     expected = jnp.concatenate([x[0:2], x[2:4], jnp.array([9.0])], axis=0)
     assert jnp.allclose(out, expected)
@@ -206,7 +205,7 @@ def test_lower_to_jax_double_integrator():
     vel_dot = acc / m + Constant(np.array([0.0, 0.0, g]))
 
     dynamics_expr = Concat(pos_dot, vel_dot)
-    [fn] = lower_to_jax([dynamics_expr])
+    fn = lower_to_jax(dynamics_expr)
     xdot = fn(x, u)
 
     expected = jnp.concatenate([x[3:6], u / m + jnp.array([0.0, 0.0, g])], axis=0)
