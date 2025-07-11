@@ -179,7 +179,7 @@ def test_concat_simple():
     a._slice = slice(0, 2)
     b = State("b", (2,))
     b._slice = slice(2, 4)
-    c = Constant(np.array([9.0]))
+    c = Constant(9.0)
     expr = Concat(a, b, c)
 
     [fn] = lower_to_jax([expr])

@@ -72,10 +72,15 @@ class JaxLowerer:  # openscvx/backend/lowerers/jax.py
         return lambda x, u: -fO(x, u)
 
     def visit_concat(self, node: Concat):
-        # lower each child into its own function
+        # lower each child
         fn_list = [lower(child, self) for child in node.exprs]
-        # return one lambda that runs them all and stacks
-        return lambda x, u: jnp.concatenate([fn(x, u) for fn in fn_list], axis=0)
+
+        # wrapper that promotes scalars to 1-D and concatenates
+        def concat_fn(x, u):
+            parts = [jnp.atleast_1d(fn(x, u)) for fn in fn_list]
+            return jnp.concatenate(parts, axis=0)
+
+        return concat_fn
 
     def visit_constraint(self, node: Constraint):
         fL = lower(node.lhs, self)
