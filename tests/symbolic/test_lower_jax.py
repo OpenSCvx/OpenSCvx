@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from openscvx.backend.control import Control
-from openscvx.backend.expr import Add, Constant, Div, MatMul, Mul, Neg, Sub
+from openscvx.backend.expr import Add, Concat, Constant, Div, MatMul, Mul, Neg, Sub
 from openscvx.backend.lower import lower_to_jax
 from openscvx.backend.lowerers.jax import JaxLowerer
 from openscvx.backend.state import State
@@ -173,9 +173,27 @@ def test_lower_to_jax_multiple_exprs_returns_in_order():
     assert jnp.allclose(f_x(x, u), x)
 
 
+def test_concat_simple():
+    x = jnp.arange(5.0)
+    a = State("a", (2,))
+    a._slice = slice(0, 2)
+    b = State("b", (2,))
+    b._slice = slice(2, 4)
+    c = Constant(np.array([9.0]))
+    expr = Concat(a, b, c)
+
+    [fn] = lower_to_jax([expr])
+    out = fn(x, None)
+    expected = jnp.concatenate([x[0:2], x[2:4], jnp.array([9.0])], axis=0)
+    assert jnp.allclose(out, expected)
+    assert out.shape == (5,)
+
+
 def test_lower_to_jax_double_integrator():
     x = jnp.array([0.0, 0.0, 0.0, -1.0, -1.0, -1.0])
     u = jnp.array([1.0, 1.0, 1.0])
+    g = 9.81
+    m = 1.0
     pos = State("pos", (3,))
     pos._slice = slice(0, 3)
     vel = State("vel", (3,))
@@ -184,11 +202,14 @@ def test_lower_to_jax_double_integrator():
     acc = Control("acc", (3,))
     acc._slice = slice(0, 3)
 
-    # TODO: (norrisg) need to come up with better way to concatenate dynamics into single expression
     pos_dot = vel
-    vel_dot = acc
+    vel_dot = acc / m + Constant(np.array([0.0, 0.0, g]))
 
-    [fn_pos_dot] = lower_to_jax([pos_dot])
-    [fn_vel_dot] = lower_to_jax([vel_dot])
-    assert jnp.allclose(fn_pos_dot(x, u), x[3:6])
-    assert jnp.allclose(fn_vel_dot(x, u), u[0:3])
+    dynamics_expr = Concat(pos_dot, vel_dot)
+    [fn] = lower_to_jax([dynamics_expr])
+    xdot = fn(x, u)
+
+    expected = jnp.concatenate([x[3:6], u / m + jnp.array([0.0, 0.0, g])], axis=0)
+
+    assert jnp.allclose(xdot, expected)
+    assert xdot.shape == (6,)

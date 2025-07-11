@@ -138,6 +138,23 @@ class Neg(Expr):
         return f"(-{self.operand!r})"
 
 
+class Concat(Expr):
+    """
+    Concatenate a sequence of Exprs into one long vector.
+    """
+
+    def __init__(self, *exprs: Expr):
+        # wrap raw values as Constant if needed
+        self.exprs = [to_expr(e) for e in exprs]
+
+    def children(self):
+        return list(self.exprs)
+
+    def __repr__(self):
+        inner = ", ".join(repr(e) for e in self.exprs)
+        return f"Concat({inner})"
+
+
 class Literal(Expr):
     """Represents a literal value in an expression."""
 
@@ -167,6 +184,7 @@ class Constraint(Expr):
     """
     Abstract base for all constraints.
     """
+
     def __init__(self, lhs: Expr, rhs: Expr):
         self.lhs = lhs
         self.rhs = rhs
@@ -177,11 +195,13 @@ class Constraint(Expr):
 
 class Equality(Constraint):
     """Represents lhs == rhs."""
+
     def __repr__(self):
         return f"{self.lhs!r} == {self.rhs!r}"
 
 
 class Inequality(Constraint):
     """Represents lhs <= rhs"""
+
     def __repr__(self):
         return f"{self.lhs!r} <= {self.rhs!r}"

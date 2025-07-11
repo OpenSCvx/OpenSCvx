@@ -3,6 +3,7 @@ import jax.numpy as jnp
 from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     Add,
+    Concat,
     Constant,
     Constraint,
     Expr,
@@ -69,6 +70,12 @@ class JaxLowerer:  # openscvx/backend/lowerers/jax.py
     def visit_neg(self, node: Neg):
         fO = lower(node.operand, self)
         return lambda x, u: -fO(x, u)
+
+    def visit_concat(self, node: Concat):
+        # lower each child into its own function
+        fn_list = [lower(child, self) for child in node.exprs]
+        # return one lambda that runs them all and stacks
+        return lambda x, u: jnp.concatenate([fn(x, u) for fn in fn_list], axis=0)
 
     def visit_constraint(self, node: Constraint):
         fL = lower(node.lhs, self)
