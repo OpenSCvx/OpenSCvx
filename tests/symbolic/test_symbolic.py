@@ -35,6 +35,7 @@ def test_to_expr_wraps_numbers_and_arrays():
     a = Constant(np.array([1.0, 2.0]))
     assert to_expr(a) is a
 
+
 def test_to_expr_passes_variables_through():
     v = Variable("v", (1,))
     x = State("x", (1,))
