@@ -75,6 +75,7 @@ def test_jax_lower_add_and_mul_of_slices():
     assert jnp.allclose(res_add, x[0:3] + x[3:6])
     assert jnp.allclose(res_mul, x[0:3] * x[3:6])
 
+
 def test_jax_lower_sub_and_div_of_slices():
     x = jnp.arange(8.0)
     u = jnp.arange(8.0) * 3.0
@@ -169,3 +170,24 @@ def test_lower_to_jax_multiple_exprs_returns_in_order():
     f_const, f_x = fns
     assert jnp.allclose(f_const(x, None), jnp.array([1.0, 2.0, 3.0]))
     assert jnp.allclose(f_x(x, u), x)
+
+
+def test_lower_to_jax_double_integrator():
+    x = jnp.array([0.0, 0.0, 0.0, -1.0, -1.0, -1.0])
+    u = jnp.array([1.0, 1.0, 1.0])
+    pos = State("pos", (3,))
+    pos._slice = slice(0, 3)
+    vel = State("vel", (3,))
+    vel._slice = slice(3, 6)
+
+    acc = Control("acc", (3,))
+    acc._slice = slice(0, 3)
+
+    # TODO: (norrisg) need to come up with better way to concatenate dynamics into single expression
+    pos_dot = vel
+    vel_dot = acc
+
+    [fn_pos_dot] = lower_to_jax([pos_dot])
+    [fn_vel_dot] = lower_to_jax([vel_dot])
+    assert jnp.allclose(fn_pos_dot(x, u), x[3:6])
+    assert jnp.allclose(fn_vel_dot(x, u), u[0:3])
