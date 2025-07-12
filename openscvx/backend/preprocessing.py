@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Iterable, Set
 
 import numpy as np
 
@@ -6,6 +6,38 @@ from openscvx.backend.control import Control
 from openscvx.backend.expr import Expr, traverse
 from openscvx.backend.state import State
 
+def validate_variable_names(
+    exprs: Iterable[Expr],
+    *,
+    reserved_prefix: str = "_",
+    reserved_names: Set[str] = None
+) -> None:
+    """
+    1) Ensure all State/Control names are unique.
+    2) Ensure no user-supplied name starts with `reserved_prefix`.
+    3) Ensure no name collides with `reserved_names` if given.
+    Raises ValueError on any violation.
+    """
+    seen = set()
+    reserved = set(reserved_names or ())
+    def visitor(node):
+        if isinstance(node, (State, Control)):
+            name = node.name
+            # 1) uniqueness
+            if name in seen:
+                raise ValueError(f"Duplicate variable name: {name!r}")
+            # 2) no user-underscore
+            if name.startswith(reserved_prefix):
+                raise ValueError(
+                    f"Variable name {name!r} is reserved (cannot start with {reserved_prefix!r})"
+                )
+            # 3) no collision with explicit reserved set
+            if name in reserved:
+                raise ValueError(f"Variable name {name!r} collides with reserved name")
+            seen.add(name)
+
+    for e in exprs:
+        traverse(e, visitor)
 
 def collect_and_assign_slices(exprs: Iterable[Expr], *, start_index: int = 0):
     # 1) collect all State/Control nodes

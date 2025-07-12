@@ -2,9 +2,31 @@ import pytest
 
 from openscvx.backend.control import Control
 from openscvx.backend.expr import Add, Constant
-from openscvx.backend.preprocessing import collect_and_assign_slices
+from openscvx.backend.preprocessing import collect_and_assign_slices, validate_variable_names
 from openscvx.backend.state import State
 
+
+def test_unique_names_passes():
+    a = State("a",(2,))
+    b = State("b",(2,))
+    c = Control("c",(1,))
+    validate_variable_names([Add(a,b), c])  # no error
+
+def test_duplicate_names_raises():
+    a1 = State("x",(2,))
+    a2 = State("x",(3,))
+    with pytest.raises(ValueError):
+        validate_variable_names([a1, a2])
+
+def test_reserved_prefix_raises():
+    bad = State("_hidden",(1,))
+    with pytest.raises(ValueError):
+        validate_variable_names([bad])
+
+def test_reserved_names_collision():
+    s = State("foo",(1,))
+    with pytest.raises(ValueError):
+        validate_variable_names([s], reserved_names={"foo", "bar"})
 
 def test_collect_single_state():
     x = State("x", (4,))
