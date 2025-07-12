@@ -237,3 +237,33 @@ def test_index_and_slice():
 
     assert out_slice.shape == (2,)
     assert jnp.allclose(out_slice, x[1:3])
+
+
+def test_lower_to_jax_double_integrator_indexed():
+    # numeric inputs
+    x_jax = jnp.array([0.0, 0.0, 0.0, -1.0, -1.0, -1.0])
+    u_jax = jnp.array([1.0, 1.0, 1.0])
+    g = 9.81
+    m = 1.0
+
+    # one 6-vector state
+    x = State("x", (6,))
+    x._slice = slice(0, 6)
+
+    # 3-vector control
+    u = Control("u", (3,))
+    u._slice = slice(0, 3)
+
+    pos_dot = x[3:6]
+    vel_dot = u / m + Constant(np.array([0.0, 0.0, g]))
+    dynamics_expr = Concat(pos_dot, vel_dot)
+
+    # lower and execute
+    fn = lower_to_jax(dynamics_expr)
+    xdot = fn(x_jax, u_jax)
+
+    # expected by hand
+    expected = jnp.concatenate([x_jax[3:6], u_jax / m + jnp.array([0.0, 0.0, g])], axis=0)
+
+    assert jnp.allclose(xdot, expected)
+    assert xdot.shape == (6,)
