@@ -7,6 +7,7 @@ from openscvx.backend.expr import (
     Constant,
     Constraint,
     Expr,
+    Index,
     MatMul,
     Mul,
     Neg,
@@ -68,6 +69,12 @@ class JaxLowerer:
     def visit_neg(self, node: Neg):
         fO = lower(node.operand, self)
         return lambda x, u: -fO(x, u)
+
+    def visit_index(self, node: Index):
+        # lower the “base” expr into a fn(x,u), then index it
+        f_base = lower(node.base, self)
+        idx = node.index
+        return lambda x, u: jnp.atleast_1d(f_base(x, u))[idx]
 
     def visit_concat(self, node: Concat):
         # lower each child

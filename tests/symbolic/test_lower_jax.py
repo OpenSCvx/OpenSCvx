@@ -212,3 +212,28 @@ def test_lower_to_jax_double_integrator():
 
     assert jnp.allclose(xdot, expected)
     assert xdot.shape == (6,)
+
+
+def test_index_and_slice():
+    # make a 4-vector state
+    x = jnp.array([10.0, 20.0, 30.0, 40.0])
+    s = State("s", (4,))
+    s._slice = slice(0, 4)
+
+    # index it and slice it
+    expr_elem = s[2]
+    expr_slice = s[1:3]
+
+    # lower → callables
+    fn_elem = lower_to_jax(expr_elem)
+    fn_slice = lower_to_jax(expr_slice)
+
+    # check results
+    out_elem = fn_elem(x, None)
+    out_slice = fn_slice(x, None)
+
+    assert out_elem.shape == () or out_elem.shape == ()  # scalar or 0-D
+    assert out_elem == x[2]
+
+    assert out_slice.shape == (2,)
+    assert jnp.allclose(out_slice, x[1:3])

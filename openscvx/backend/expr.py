@@ -45,6 +45,9 @@ class Expr:
     def __neg__(self):
         return Neg(self)
 
+    def __getitem__(self, idx):
+        return Index(self, idx)
+
     def children(self):
         return []
 
@@ -136,6 +139,20 @@ class Neg(Expr):
 
     def __repr__(self):
         return f"(-{self.operand!r})"
+
+
+class Index(Expr):
+    """Expr that means “take this Expr and index/slice it.”"""
+
+    def __init__(self, base: Expr, index: Union[int, slice, tuple]):
+        self.base = base
+        self.index = index
+
+    def children(self):
+        return [self.base]
+
+    def __repr__(self):
+        return f"{self.base!r}[{self.index!r}]"
 
 
 class Concat(Expr):
