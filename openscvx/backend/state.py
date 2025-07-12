@@ -429,9 +429,9 @@ class State(Variable):
             self.append(temp_state, augmented=augmented)
 
     # TODO: (norrisg) fix this so that can still nicely access min/max limits
-    # Arguably this was already mesy since user needed to magically know to write `x.true.max` 
+    # Arguably this was already mesy since user needed to magically know to write `x.true.max`
     # instead of just `x.max` while writing constraints
-    # 
+    #
     # def __getitem__(self, idx):
     #     """Get a subset of the state variables.
 
