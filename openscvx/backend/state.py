@@ -428,41 +428,45 @@ class State(Variable):
             temp_state.final = final
             self.append(temp_state, augmented=augmented)
 
-    def __getitem__(self, idx):
-        """Get a subset of the state variables.
+    # TODO: (norrisg) fix this so that can still nicely access min/max limits
+    # Arguably this was already mesy since user needed to magically know to write `x.true.max` 
+    # instead of just `x.max` while writing constraints
+    # 
+    # def __getitem__(self, idx):
+    #     """Get a subset of the state variables.
 
-        Args:
-            idx: Index or slice to select state variables
+    #     Args:
+    #         idx: Index or slice to select state variables
 
-        Returns:
-            State: A new State object containing the selected variables
-        """
-        new_state = super().__getitem__(idx)
-        new_state.__class__ = State
+    #     Returns:
+    #         State: A new State object containing the selected variables
+    #     """
+    #     new_state = super().__getitem__(idx)
+    #     new_state.__class__ = State
 
-        def slice_attr(attr):
-            if attr is None:
-                return None
-            if attr.ndim == 2 and attr.shape[1] == self.shape[0]:
-                return attr[:, idx]
-            return attr[idx]
+    #     def slice_attr(attr):
+    #         if attr is None:
+    #             return None
+    #         if attr.ndim == 2 and attr.shape[1] == self.shape[0]:
+    #             return attr[:, idx]
+    #         return attr[idx]
 
-        new_state._initial = slice_attr(self._initial)
-        new_state.initial_type = slice_attr(self.initial_type)
-        new_state._final = slice_attr(self._final)
-        new_state.final_type = slice_attr(self.final_type)
+    #     new_state._initial = slice_attr(self._initial)
+    #     new_state.initial_type = slice_attr(self.initial_type)
+    #     new_state._final = slice_attr(self._final)
+    #     new_state.final_type = slice_attr(self.final_type)
 
-        if isinstance(idx, slice):
-            selected = np.arange(self.shape[0])[idx]
-        elif isinstance(idx, (list, np.ndarray)):
-            selected = np.array(idx)
-        else:
-            selected = np.array([idx])
+    #     if isinstance(idx, slice):
+    #         selected = np.arange(self.shape[0])[idx]
+    #     elif isinstance(idx, (list, np.ndarray)):
+    #         selected = np.array(idx)
+    #     else:
+    #         selected = np.array([idx])
 
-        new_state._true_dim = np.sum(selected < self._true_dim)
-        new_state._update_slices()
+    #     new_state._true_dim = np.sum(selected < self._true_dim)
+    #     new_state._update_slices()
 
-        return new_state
+    #     return new_state
 
     def __repr__(self):
         """String representation of the State object.
