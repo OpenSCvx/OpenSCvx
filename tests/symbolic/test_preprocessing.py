@@ -7,26 +7,30 @@ from openscvx.backend.state import State
 
 
 def test_unique_names_passes():
-    a = State("a",(2,))
-    b = State("b",(2,))
-    c = Control("c",(1,))
-    validate_variable_names([Add(a,b), c])  # no error
+    a = State("a", (2,))
+    b = State("b", (2,))
+    c = Control("c", (1,))
+    validate_variable_names([Add(a, b), c])  # no error
+
 
 def test_duplicate_names_raises():
-    a1 = State("x",(2,))
-    a2 = State("x",(3,))
+    a1 = State("x", (2,))
+    a2 = State("x", (3,))
     with pytest.raises(ValueError):
         validate_variable_names([a1, a2])
 
+
 def test_reserved_prefix_raises():
-    bad = State("_hidden",(1,))
+    bad = State("_hidden", (1,))
     with pytest.raises(ValueError):
         validate_variable_names([bad])
 
+
 def test_reserved_names_collision():
-    s = State("foo",(1,))
+    s = State("foo", (1,))
     with pytest.raises(ValueError):
         validate_variable_names([s], reserved_names={"foo", "bar"})
+
 
 def test_collect_single_state():
     x = State("x", (4,))
@@ -65,6 +69,20 @@ def test_states_and_controls_independent_offsets():
     assert s2._slice == slice(2, 3)
     # controls: offset resets to zero
     assert c1._slice == slice(0, 2)
+
+
+def test_manual_slice_shape_mismatch_raises():
+    # Create a State of dimension 3, but give it a slice of length 2
+    s = State("s", (3,))
+    s._slice = slice(0, 2)
+
+    with pytest.raises(ValueError) as excinfo:
+        collect_and_assign_slices([s])
+
+    msg = str(excinfo.value)
+    assert "Manual slice for 's'" in msg
+    assert "length 2" in msg
+    assert "(3,)" in msg
 
 
 def test_idempotent_on_repeat_calls():

@@ -6,11 +6,9 @@ from openscvx.backend.control import Control
 from openscvx.backend.expr import Expr, traverse
 from openscvx.backend.state import State
 
+
 def validate_variable_names(
-    exprs: Iterable[Expr],
-    *,
-    reserved_prefix: str = "_",
-    reserved_names: Set[str] = None
+    exprs: Iterable[Expr], *, reserved_prefix: str = "_", reserved_names: Set[str] = None
 ) -> None:
     """
     1) Ensure all State/Control names are unique.
@@ -20,6 +18,7 @@ def validate_variable_names(
     """
     seen = set()
     reserved = set(reserved_names or ())
+
     def visitor(node):
         if isinstance(node, (State, Control)):
             name = node.name
@@ -38,6 +37,7 @@ def validate_variable_names(
 
     for e in exprs:
         traverse(e, visitor)
+
 
 def collect_and_assign_slices(exprs: Iterable[Expr], *, start_index: int = 0):
     # 1) collect all State/Control nodes
@@ -60,6 +60,15 @@ def collect_and_assign_slices(exprs: Iterable[Expr], *, start_index: int = 0):
         auto = [v for v in vars_list if v._slice is None]
 
         if manual:
+            # 1) shape‐match check
+            for v in manual:
+                dim = int(np.prod(v.shape))
+                sl = v._slice
+                if (sl.stop - sl.start) != dim:
+                    raise ValueError(
+                        f"Manual slice for {v.name!r} is length {sl.stop - sl.start}, "
+                        f"but variable has shape {v.shape} (dim {dim})"
+                    )
             # sort by the start of their slices
             manual.sort(key=lambda v: v._slice.start)
             # 2a) must start at 0
