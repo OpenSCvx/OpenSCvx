@@ -12,15 +12,8 @@ from openscvx.backend.expr import (
     Mul,
     Neg,
 )
+from openscvx.backend.lower import lower
 from openscvx.backend.state import State
-
-
-def lower(expr: Expr, lowerer: "JaxLowerer"):
-    """
-    Look up `lowerer.visit_<nodename>` and call it.
-    """
-    method = getattr(lowerer, f"visit_{expr.__class__.__name__.lower()}")
-    return method(expr)
 
 
 class JaxLowerer:
