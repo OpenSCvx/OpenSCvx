@@ -1,8 +1,13 @@
+import jax.numpy as jnp
 import pytest
 
 from openscvx.backend.control import Control
 from openscvx.backend.expr import Add, Constant
-from openscvx.backend.preprocessing import collect_and_assign_slices, validate_variable_names
+from openscvx.backend.preprocessing import (
+    collect_and_assign_slices,
+    validate_constraints_at_root,
+    validate_variable_names,
+)
 from openscvx.backend.state import State
 
 
@@ -118,3 +123,26 @@ def test_invalid_manual_slice_assignment_gaps():
     b._slice = slice(3, 5)
     with pytest.raises(ValueError):
         collect_and_assign_slices([Add(a, b)])
+
+
+def test_root_constraint_passes():
+    # a == 5  is a top‐level constraint → OK
+    a = Constant(jnp.array([1.0, 2.0]))
+    c1 = a == 5
+    c2 = a <= jnp.array([3.0, 4.0])
+    # should not raise
+    validate_constraints_at_root(c1)
+    validate_constraints_at_root(c2)
+
+
+def test_nested_constraint_raises():
+    # Add(a, (b == 3))  nests a constraint under Add → should error
+    a = Constant(jnp.array([1.0, 2.0]))
+    b = Constant(jnp.array([3.0, 4.0]))
+    nested = Add(a, b == 3)
+
+    with pytest.raises(ValueError) as exc:
+        validate_constraints_at_root(nested)
+    msg = str(exc.value)
+    assert "Nested Constraint found at depth 1" in msg
+    assert "constraints must only appear as top‐level roots" in msg

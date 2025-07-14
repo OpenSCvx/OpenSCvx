@@ -1,9 +1,9 @@
-from typing import Iterable, Set
+from typing import Callable, Iterable, Set, Union
 
 import numpy as np
 
 from openscvx.backend.control import Control
-from openscvx.backend.expr import Expr, traverse
+from openscvx.backend.expr import Constraint, Expr, traverse
 from openscvx.backend.state import State
 
 
@@ -97,3 +97,29 @@ def collect_and_assign_slices(exprs: Iterable[Expr], *, start_index: int = 0):
     # run separately on states (x) and controls (u)
     assign(states, start_index)
     assign(controls, start_index)
+
+
+def _traverse_with_depth(expr: Expr, visit: Callable[[Expr, int], None], depth: int = 0):
+    visit(expr, depth)
+    for child in expr.children():
+        _traverse_with_depth(child, visit, depth + 1)
+
+
+def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
+    """
+    Raise ValueError if any Constraint is found at depth>0.
+    Accepts a single Expr or a list of Exprs.
+    """
+    # normalize to list
+    expr_list = exprs if isinstance(exprs, (list, tuple)) else [exprs]
+
+    for expr in expr_list:
+
+        def visit(node: Expr, depth: int):
+            if depth > 0 and isinstance(node, Constraint):
+                raise ValueError(
+                    f"Nested Constraint found at depth {depth!r}: {node!r}; "
+                    "constraints must only appear as top‐level roots"
+                )
+
+        _traverse_with_depth(expr, visit, depth=0)
