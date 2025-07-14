@@ -3,10 +3,34 @@ import numpy as np
 import pytest
 
 from openscvx.backend.control import Control
-from openscvx.backend.expr import Add, Concat, Constant, Div, MatMul, Mul, Neg, Sub
-from openscvx.backend.lower import lower_to_jax
+from openscvx.backend.expr import Add, Concat, Constant, Div, Expr, MatMul, Mul, Neg, Sub
+from openscvx.backend.lower import lower, lower_to_jax
 from openscvx.backend.lowerers.jax import JaxLowerer
 from openscvx.backend.state import State
+
+
+class UnregisteredExpr(Expr):
+    pass
+
+
+def test_jaxlowerer_raises_when_no_visitor_registered():
+    jl = JaxLowerer()
+    node = UnregisteredExpr()
+    with pytest.raises(NotImplementedError) as excinfo:
+        # this should internally call dispatch() and fail
+        jl.lower(node)
+
+    msg = str(excinfo.value)
+    assert "JaxLowerer" in msg, "should mention the lowerer class name"
+    assert "UnregisteredExpr" in msg, "should mention the Expr subclass name"
+
+
+def test_top_level_lower_raises_for_unregistered_expr():
+    jl = JaxLowerer()
+    node = UnregisteredExpr()
+    # our top-level lower() simply forwards to jl.lower(...)
+    with pytest.raises(NotImplementedError):
+        lower(node, jl)
 
 
 def test_jax_lower_constant():
