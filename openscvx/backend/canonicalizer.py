@@ -147,7 +147,5 @@ class Canonicalizer:
 
     @visitor(Constraint)
     def visit_constraint(self, node: Constraint) -> Expr:
-        lhs = self.canonicalize(node.lhs)
-        rhs = self.canonicalize(node.rhs)
-        # rebuild the same concrete subclass (Equality or Inequality)
-        return node.__class__(lhs, rhs)
+        diff = Sub(node.lhs, node.rhs)
+        return node.__class__(self.canonicalize(diff), Constant(np.array(0)))

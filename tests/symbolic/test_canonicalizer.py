@@ -97,8 +97,8 @@ def test_concat_and_index_recurse():
 
 
 def test_constraint_recursion_and_type():
-    # test an inequality and equality
-    lhs = Add(to_expr(2), to_expr(3))  # will fold to Constant(5)
+    # test an inequality and equality on two equal constants 2+3 == 5
+    lhs = Add(to_expr(3), to_expr(3))  # will fold to Constant(5)
     rhs = to_expr(5)
     ineq = lhs <= rhs
     eq = lhs == rhs
@@ -107,9 +107,9 @@ def test_constraint_recursion_and_type():
     eq_c = canonicalize(eq)
 
     assert isinstance(ineq_c, Inequality)
-    assert isinstance(ineq_c.lhs, Constant) and ineq_c.lhs.value == 5
-    assert isinstance(ineq_c.rhs, Constant) and ineq_c.rhs.value == 5
+    assert isinstance(ineq_c.lhs, Constant) and ineq_c.lhs.value == 1
+    assert isinstance(ineq_c.rhs, Constant) and ineq_c.rhs.value == 0
 
     assert isinstance(eq_c, Equality)
-    assert isinstance(eq_c.lhs, Constant) and eq_c.lhs.value == 5
-    assert isinstance(eq_c.rhs, Constant) and eq_c.rhs.value == 5
+    assert isinstance(eq_c.lhs, Constant) and eq_c.lhs.value == 1
+    assert isinstance(eq_c.rhs, Constant) and eq_c.rhs.value == 0
