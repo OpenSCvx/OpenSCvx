@@ -15,7 +15,7 @@ from openscvx.backend.expr import (
     Sub,
 )
 
-_VISITORS: Dict[Type[Expr], Callable] = {}
+_CANON_VISITORS: Dict[Type[Expr], Callable] = {}
 
 
 def canonicalize(expr: Expr) -> Expr:
@@ -30,14 +30,14 @@ def canonicalize(expr: Expr) -> Expr:
 
 def visitor(expr_cls: Type[Expr]):
     def register(fn: Callable[[Any, Expr], Expr]):
-        _VISITORS[expr_cls] = fn
+        _CANON_VISITORS[expr_cls] = fn
         return fn
 
     return register
 
 
 def dispatch(canon: "Canonicalizer", expr: Expr) -> Expr:
-    fn = _VISITORS.get(type(expr))
+    fn = _CANON_VISITORS.get(type(expr))
     if fn is None:
         # by default, just recurse into children and rebuild
         rebuilt_children = [canon.canonicalize(child) for child in expr.children()]
@@ -149,5 +149,5 @@ class Canonicalizer:
     def visit_constraint(self, node: Constraint) -> Expr:
         lhs = self.canonicalize(node.lhs)
         rhs = self.canonicalize(node.rhs)
-        # preserve the operator stored on node.op
+        # rebuild the same concrete subclass (Equality or Inequality)
         return node.__class__(lhs, rhs)

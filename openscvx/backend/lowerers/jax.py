@@ -18,19 +18,19 @@ from openscvx.backend.expr import (
 )
 from openscvx.backend.state import State
 
-_VISITORS: Dict[Type[Expr], Callable] = {}
+_JAX_VISITORS: Dict[Type[Expr], Callable] = {}
 
 
 def visitor(expr_cls: Type[Expr]):
     def register(fn: Callable[[Any, Expr], Callable]):
-        _VISITORS[expr_cls] = fn
+        _JAX_VISITORS[expr_cls] = fn
         return fn
 
     return register
 
 
 def dispatch(lowerer: Any, expr: Expr):
-    fn = _VISITORS.get(type(expr))
+    fn = _JAX_VISITORS.get(type(expr))
     if fn is None:
         raise NotImplementedError(
             f"{lowerer.__class__.__name__!r} has no visitor for {type(expr).__name__}"
