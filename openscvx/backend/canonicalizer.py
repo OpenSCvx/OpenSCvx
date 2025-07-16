@@ -122,11 +122,11 @@ class Canonicalizer:
 
     @visitor(Div)
     def visit_div(self, node: Div) -> Expr:
-        l = self.canonicalize(node.left)
-        r = self.canonicalize(node.right)
-        if isinstance(l, Constant) and isinstance(r, Constant):
-            return Constant(l.value / r.value)
-        return Div(l, r)
+        lhs = self.canonicalize(node.left)
+        rhs = self.canonicalize(node.right)
+        if isinstance(lhs, Constant) and isinstance(rhs, Constant):
+            return Constant(lhs.value / rhs.value)
+        return Div(lhs, rhs)
 
     @visitor(Neg)
     def visit_neg(self, node: Neg) -> Expr:

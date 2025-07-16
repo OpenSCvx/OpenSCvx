@@ -7,6 +7,8 @@ from openscvx.backend.expr import Constraint, Expr, traverse
 from openscvx.backend.state import State
 
 
+# TODO: (norrisg) allow `traverse` to take a list of visitors, that way we can combine steps
+# TODO: (norrisg) add shape checking as a preprocessing step
 def validate_variable_names(
     exprs: Iterable[Expr], *, reserved_prefix: str = "_", reserved_names: Set[str] = None
 ) -> None:

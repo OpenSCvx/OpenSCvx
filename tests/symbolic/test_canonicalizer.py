@@ -1,6 +1,3 @@
-import numpy as np
-import pytest
-
 from openscvx.backend.canonicalizer import canonicalize
 from openscvx.backend.expr import (
     Add,
