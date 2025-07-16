@@ -204,3 +204,27 @@ def test_combined_ops_produce_correct_constraint_tree():
     # children of the constraint:
     assert isinstance(expr.lhs, MatMul)
     assert isinstance(expr.rhs, Constant)
+
+
+def test_binary_ops_accept_many_terms():
+    a, b, c, d = Constant(5), Constant(3), Constant(1), Constant(2)
+    add = Add(a, b, c, d)
+    sub = Sub(a, b, c, d)
+    mul = Mul(a, b, c, d)
+
+    assert add.children() == [a, b, c, d]
+    assert sub.children() == [a, b, c, d]
+    assert mul.children() == [a, b, c, d]
+
+    assert repr(add) == "(Const(5) + Const(3) + Const(1) + Const(2))"
+    assert repr(sub) == "(Const(5) - Const(3) - Const(1) - Const(2))"
+    assert repr(mul) == "(Const(5) * Const(3) * Const(1) * Const(2))"
+
+
+def test_binary_ops_requires_at_least_two_terms():
+    with pytest.raises(ValueError):
+        Add(Constant(1))
+    with pytest.raises(ValueError):
+        Sub(Constant(5))
+    with pytest.raises(ValueError):
+        Mul(Constant(2))

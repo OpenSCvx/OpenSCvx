@@ -71,39 +71,45 @@ def traverse(expr: Expr, visit: Callable[[Expr], None]):
 
 
 class Add(Expr):
-    def __init__(self, left, right):
-        self.left = left
-        self.right = right
+    def __init__(self, *args):
+        if len(args) < 2:
+            raise ValueError("Add requires two or more operands")
+        self.terms = [to_expr(a) for a in args]
 
     def children(self):
-        return [self.left, self.right]
+        return list(self.terms)
 
     def __repr__(self):
-        return f"({self.left!r} + {self.right!r})"
+        inner = " + ".join(repr(e) for e in self.terms)
+        return f"({inner})"
 
 
 class Sub(Expr):
-    def __init__(self, left, right):
-        self.left = left
-        self.right = right
+    def __init__(self, *args):
+        if len(args) < 2:
+            raise ValueError("Sub requires two or more operands")
+        self.terms = [to_expr(a) for a in args]
 
     def children(self):
-        return [self.left, self.right]
+        return list(self.terms)
 
     def __repr__(self):
-        return f"({self.left!r} - {self.right!r})"
+        inner = " - ".join(repr(e) for e in self.terms)
+        return f"({inner})"
 
 
 class Mul(Expr):
-    def __init__(self, left, right):
-        self.left = left
-        self.right = right
+    def __init__(self, *args):
+        if len(args) < 2:
+            raise ValueError("Mul requires two or more operands")
+        self.factors = [to_expr(a) for a in args]
 
     def children(self):
-        return [self.left, self.right]
+        return list(self.factors)
 
     def __repr__(self):
-        return f"({self.left!r} * {self.right!r})"
+        inner = " * ".join(repr(e) for e in self.factors)
+        return f"({inner})"
 
 
 class Div(Expr):
