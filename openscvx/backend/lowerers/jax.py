@@ -76,15 +76,9 @@ class JaxLowerer:
 
     @visitor(Sub)
     def visit_sub(self, node: Sub):
-        fs = [self.lower(term) for term in node.terms]
-
-        def fn(x, u):
-            acc = fs[0](x, u)
-            for f in fs[1:]:
-                acc = acc - f(x, u)
-            return acc
-
-        return fn
+        fL = self.lower(node.left)
+        fR = self.lower(node.right)
+        return lambda x, u: fL(x, u) - fR(x, u)
 
     @visitor(Mul)
     def visit_mul(self, node: Mul):

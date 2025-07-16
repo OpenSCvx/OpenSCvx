@@ -85,17 +85,15 @@ class Add(Expr):
 
 
 class Sub(Expr):
-    def __init__(self, *args):
-        if len(args) < 2:
-            raise ValueError("Sub requires two or more operands")
-        self.terms = [to_expr(a) for a in args]
+    def __init__(self, left, right):
+        self.left = left
+        self.right = right
 
     def children(self):
-        return list(self.terms)
+        return [self.left, self.right]
 
     def __repr__(self):
-        inner = " - ".join(repr(e) for e in self.terms)
-        return f"({inner})"
+        return f"({self.left!r} - {self.right!r})"
 
 
 class Mul(Expr):
