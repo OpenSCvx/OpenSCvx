@@ -1,11 +1,13 @@
 import jax.numpy as jnp
+import numpy as np
 import pytest
 
 from openscvx.backend.control import Control
-from openscvx.backend.expr import Add, Constant
+from openscvx.backend.expr import Add, Concat, Constant, Div, Index, MatMul, Mul, Sub
 from openscvx.backend.preprocessing import (
     collect_and_assign_slices,
     validate_constraints_at_root,
+    validate_shapes,
     validate_variable_names,
 )
 from openscvx.backend.state import State
@@ -146,3 +148,113 @@ def test_nested_constraint_raises():
     msg = str(exc.value)
     assert "Nested Constraint found at depth 1" in msg
     assert "constraints must only appear as top‐level roots" in msg
+
+
+def test_add_same_shape_passes():
+    a = Constant(np.zeros((2, 3)))
+    b = Constant(np.ones((2, 3)))
+    validate_shapes(a + b)
+
+
+def test_add_shape_mismatch_raises():
+    a = Constant(np.zeros((2, 3)))
+    b = Constant(np.ones((3, 2)))
+    with pytest.raises(ValueError):
+        validate_shapes(a + b)
+
+
+def test_sub_same_shape_passes():
+    a = Constant(np.zeros((4,)))
+    b = Constant(np.ones((4,)))
+    validate_shapes(a - b)
+
+
+def test_sub_shape_mismatch_raises():
+    a = Constant(np.zeros((4,)))
+    b = Constant(np.ones((5,)))
+    with pytest.raises(ValueError):
+        validate_shapes(a - b)
+
+
+def test_mul_same_shape_passes():
+    a = Constant(np.zeros((2, 2)))
+    b = Constant(np.ones((2, 2)))
+    validate_shapes(a * b)
+
+
+def test_mul_shape_mismatch_raises():
+    a = Constant(np.zeros((2, 2)))
+    b = Constant(np.ones((2, 3)))
+    with pytest.raises(ValueError):
+        validate_shapes(a * b)
+
+
+def test_div_array_by_scalar_passes():
+    a = Constant(np.zeros((3,)))
+    b = Constant(np.array(2.0))
+    validate_shapes(a / b)
+
+
+def test_div_shape_mismatch_raises():
+    a = Constant(np.zeros((3,)))
+    b = Constant(np.zeros((2,)))
+    with pytest.raises(ValueError):
+        validate_shapes(a / b)
+
+
+def test_matmul_ok():
+    a = Constant(np.zeros((4, 5)))
+    b = Constant(np.zeros((5, 2)))
+    validate_shapes(a @ b)
+
+
+def test_matmul_incompatible_raises():
+    a = Constant(np.zeros((4, 5)))
+    b = Constant(np.zeros((4, 2)))
+    with pytest.raises(ValueError):
+        validate_shapes(a @ b)
+
+
+def test_concat_1d_passes():
+    a = Constant(np.zeros((2,)))
+    b = Constant(np.ones((3,)))
+    validate_shapes(Concat(a, b))
+
+
+def test_concat_rank_mismatch_raises():
+    a = Constant(np.zeros((2, 2)))
+    b = Constant(np.ones((3, 2, 1)))
+    with pytest.raises(ValueError):
+        validate_shapes(Concat(a, b))
+
+
+def test_concat_nonzero_axes_mismatch_raises():
+    a = Constant(np.zeros((2, 3)))
+    b = Constant(np.ones((3, 4)))
+    # shapes (2,3) vs (3,4) agree on rank but not on axis>0
+    with pytest.raises(ValueError):
+        validate_shapes(Concat(a, b))
+
+
+def test_index_valid_passes():
+    a = Constant(np.zeros((5,)))
+    validate_shapes(a[2:4])
+
+
+def test_index_out_of_bounds_raises():
+    a = Constant(np.zeros((3,)))
+    with pytest.raises(ValueError):
+        validate_shapes(a[5])
+
+
+def test_constraint_same_shape_passes():
+    a = Constant(np.zeros((2,)))
+    c = a <= np.ones((2,))
+    validate_shapes(c)
+
+
+def test_constraint_shape_mismatch_raises():
+    a = Constant(np.zeros((2,)))
+    c = a == np.zeros((3,))
+    with pytest.raises(ValueError):
+        validate_shapes(c)

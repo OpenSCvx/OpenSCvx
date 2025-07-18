@@ -1,9 +1,21 @@
-from typing import Callable, Iterable, Set, Union
+from typing import Callable, Dict, Iterable, Set, Type, Union
 
 import numpy as np
 
 from openscvx.backend.control import Control
-from openscvx.backend.expr import Constraint, Expr, traverse
+from openscvx.backend.expr import (
+    Add,
+    Concat,
+    Constant,
+    Constraint,
+    Div,
+    Expr,
+    Index,
+    MatMul,
+    Mul,
+    Sub,
+    traverse,
+)
 from openscvx.backend.state import State
 
 
@@ -125,3 +137,102 @@ def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
                 )
 
         _traverse_with_depth(expr, visit, depth=0)
+
+
+_SHAPE_VISITORS: Dict[Type[Expr], Callable[[Expr], tuple[int, ...]]] = {}
+
+
+def validate_shapes(exprs):
+    exprs = exprs if isinstance(exprs, (list, tuple)) else [exprs]
+    for e in exprs:
+        dispatch(e)  # will raise ValueError if anything’s wrong
+
+
+def visitor(expr_cls: Type[Expr]):
+    def register(fn: Callable[[Expr], tuple[int, ...]]):
+        _SHAPE_VISITORS[expr_cls] = fn
+        return fn
+
+    return register
+
+
+def dispatch(expr: Expr) -> tuple[int, ...]:
+    fn = _SHAPE_VISITORS.get(type(expr))
+    if fn is None:
+        raise NotImplementedError(f"No shape rule for {type(expr).__name__}")
+    return fn(expr)
+
+
+@visitor(Constant)
+def _(c: Constant):
+    return c.value.shape
+
+
+@visitor(Add)
+def _(node: Add):
+    shapes = [dispatch(t) for t in node.terms]
+    if any(s != shapes[0] for s in shapes[1:]):
+        raise ValueError(f"Add shapes mismatch: {shapes}")
+    return shapes[0]
+
+
+@visitor(Sub)
+def _(node: Sub):
+    L, R = dispatch(node.left), dispatch(node.right)
+    if L != R:
+        raise ValueError(f"Sub shapes differ: {L} vs {R}")
+    return L
+
+
+@visitor(Mul)
+def _(node: Mul):
+    shapes = [dispatch(f) for f in node.factors]
+    if any(s != shapes[0] for s in shapes[1:]):
+        raise ValueError(f"Mul shapes mismatch: {shapes}")
+    return shapes[0]
+
+
+@visitor(Div)
+def _(node: Div):
+    L, R = dispatch(node.left), dispatch(node.right)
+    if L != R:
+        raise ValueError(f"Div shapes differ: {L} vs {R}")
+    return L
+
+
+@visitor(MatMul)
+def _(node: MatMul):
+    L, R = dispatch(node.left), dispatch(node.right)
+    if len(L) < 2 or len(R) < 2 or L[-1] != R[-2]:
+        raise ValueError(f"MatMul incompatible: {L} @ {R}")
+    return L[:-1] + (R[-1],)
+
+
+@visitor(Concat)
+def _(node: Concat):
+    shapes = [dispatch(e) for e in node.exprs]
+    rank = len(shapes[0])
+    if any(len(s) != rank for s in shapes):
+        raise ValueError(f"Concat rank mismatch: {shapes}")
+    if any(s[1:] != shapes[0][1:] for s in shapes[1:]):
+        raise ValueError(f"Concat non-0 dims differ: {shapes}")
+    return (sum(s[0] for s in shapes),) + shapes[0][1:]
+
+
+@visitor(Index)
+def _(node: Index):
+    base_shape = dispatch(node.base)
+    dummy = np.zeros(base_shape)
+    try:
+        result = dummy[node.index]
+    except Exception as e:
+        raise ValueError(f"Bad index {node.index} for shape {base_shape}") from e
+    return result.shape
+
+
+@visitor(Constraint)
+def _(node: Constraint):
+    L, R = dispatch(node.lhs), dispatch(node.rhs)
+    if L != R:
+        raise ValueError(f"Constraint shapes differ: {L} vs {R}")
+    return ()  # constraints don’t yield a “value shape”
