@@ -9,8 +9,10 @@ from openscvx.backend.expr import (
     Constant,
     Constraint,
     Div,
+    Equality,
     Expr,
     Index,
+    Inequality,
     MatMul,
     Mul,
     Sub,
@@ -230,7 +232,8 @@ def _(node: Index):
     return result.shape
 
 
-@visitor(Constraint)
+@visitor(Equality)
+@visitor(Inequality)
 def _(node: Constraint):
     L, R = dispatch(node.lhs), dispatch(node.rhs)
     if L != R:
