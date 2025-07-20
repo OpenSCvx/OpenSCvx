@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from openscvx.backend.control import Control
-from openscvx.backend.expr import Add, Concat, Constant, Div, Index, MatMul, Mul, Sub
+from openscvx.backend.expr import Add, Concat, Constant
 from openscvx.backend.preprocessing import (
     collect_and_assign_slices,
     validate_constraints_at_root,
@@ -247,13 +247,30 @@ def test_index_out_of_bounds_raises():
         validate_shapes(a[5])
 
 
-def test_constraint_same_shape_passes():
-    a = Constant(np.zeros((2,)))
-    c = a <= np.ones((2,))
+def test_constraint_zero_dim_scalar_passes():
+    # a true scalar (shape=()) on both sides
+    a = Constant(np.array(2.5))
+    c = a == 1.0
     validate_shapes(c)
 
 
+def test_constraint_length1_array_passes():
+    # 1-element arrays count as “scalar”
+    b = Constant(np.array([7.0]))
+    c = b <= np.ones((1,))
+    validate_shapes(c)
+
+
+def test_constraint_vector_raises():
+    # length-2 vector is not allowed
+    a = Constant(np.zeros((2,)))
+    c = a <= np.ones((2,))
+    with pytest.raises(ValueError):
+        validate_shapes(c)
+
+
 def test_constraint_shape_mismatch_raises():
+    # mismatched lengths still error out
     a = Constant(np.zeros((2,)))
     c = a == np.zeros((3,))
     with pytest.raises(ValueError):

@@ -220,8 +220,25 @@ def _(node: Index):
 
 @visitor(Equality)
 @visitor(Inequality)
-def _(node: Constraint):
-    L, R = dispatch(node.lhs), dispatch(node.rhs)
-    if L != R:
-        raise ValueError(f"Constraint shapes differ: {L} vs {R}")
-    return ()  # constraints don’t yield a “value shape”
+def _(node: Constraint) -> tuple[int, ...]:
+    # 1) get the two operand shapes
+    L_shape = dispatch(node.lhs)
+    R_shape = dispatch(node.rhs)
+
+    # 2) figure out their broadcasted shape (or error if incompatible)
+    try:
+        out_shape = np.broadcast_shapes(L_shape, R_shape)
+    except ValueError as e:
+        op = type(node).__name__
+        raise ValueError(f"{op} not broadcastable: {L_shape} vs {R_shape}") from e
+
+    # 3) ensure that broadcast result is “scalar” in the sense that total size == 1
+    total_size = int(np.prod(out_shape))
+    if total_size != 1:
+        op = type(node).__name__
+        raise ValueError(
+            f"{op} must be scalar-valued (total size==1), but got broadcast shape {out_shape}"
+        )
+
+    # 4) return () as usual
+    return ()
