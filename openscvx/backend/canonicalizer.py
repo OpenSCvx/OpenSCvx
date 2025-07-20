@@ -6,10 +6,11 @@ from openscvx.backend.expr import (
     Add,
     Concat,
     Constant,
-    Constraint,
     Div,
+    Equality,
     Expr,
     Index,
+    Inequality,
     Mul,
     Neg,
     Sub,
@@ -145,7 +146,14 @@ class Canonicalizer:
         base = self.canonicalize(node.base)
         return Index(base, node.index)
 
-    @visitor(Constraint)
-    def visit_constraint(self, node: Constraint) -> Expr:
+    @visitor(Inequality)
+    def visit_inequality(self, node: Inequality) -> Expr:
         diff = Sub(node.lhs, node.rhs)
-        return node.__class__(self.canonicalize(diff), Constant(np.array(0)))
+        canon_diff = self.canonicalize(diff)
+        return Inequality(canon_diff, Constant(np.array(0)))
+
+    @visitor(Equality)
+    def visit_equality(self, node: Equality) -> Expr:
+        diff = Sub(node.lhs, node.rhs)
+        canon_diff = self.canonicalize(diff)
+        return Equality(canon_diff, Constant(np.array(0)))

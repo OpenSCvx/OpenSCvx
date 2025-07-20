@@ -97,8 +97,8 @@ def test_concat_and_index_recurse():
 
 
 def test_constraint_recursion_and_type():
-    # test an inequality and equality on two equal constants 2+3 == 5
-    lhs = Add(to_expr(3), to_expr(3))  # will fold to Constant(5)
+    # test an inequality and equality on two equal constants 3+3 == 6
+    lhs = Add(to_expr(3), to_expr(3))  # will fold to Constant(6)
     rhs = to_expr(5)
     ineq = lhs <= rhs
     eq = lhs == rhs
