@@ -165,41 +165,27 @@ def dispatch(expr: Expr) -> tuple[int, ...]:
     return fn(expr)
 
 
+def _broadcast_shape_for(node: Expr) -> tuple[int, ...]:
+    # gather all child shapes
+    shapes = [dispatch(child) for child in node.children()]
+    try:
+        return np.broadcast_shapes(*shapes)
+    except ValueError as e:
+        op = type(node).__name__
+        raise ValueError(f"{op} shapes not broadcastable: {shapes}") from e
+
+
 @visitor(Constant)
 def _(c: Constant):
     return c.value.shape
 
 
 @visitor(Add)
-def _(node: Add):
-    shapes = [dispatch(t) for t in node.terms]
-    if any(s != shapes[0] for s in shapes[1:]):
-        raise ValueError(f"Add shapes mismatch: {shapes}")
-    return shapes[0]
-
-
 @visitor(Sub)
-def _(node: Sub):
-    L, R = dispatch(node.left), dispatch(node.right)
-    if L != R:
-        raise ValueError(f"Sub shapes differ: {L} vs {R}")
-    return L
-
-
 @visitor(Mul)
-def _(node: Mul):
-    shapes = [dispatch(f) for f in node.factors]
-    if any(s != shapes[0] for s in shapes[1:]):
-        raise ValueError(f"Mul shapes mismatch: {shapes}")
-    return shapes[0]
-
-
 @visitor(Div)
-def _(node: Div):
-    L, R = dispatch(node.left), dispatch(node.right)
-    if L != R:
-        raise ValueError(f"Div shapes differ: {L} vs {R}")
-    return L
+def _(node: Expr) -> tuple[int, ...]:
+    return _broadcast_shape_for(node)
 
 
 @visitor(MatMul)
