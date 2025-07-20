@@ -22,7 +22,6 @@ from openscvx.backend.state import State
 
 
 # TODO: (norrisg) allow `traverse` to take a list of visitors, that way we can combine steps
-# TODO: (norrisg) add shape checking as a preprocessing step
 def validate_variable_names(
     exprs: Iterable[Expr], *, reserved_prefix: str = "_", reserved_names: Set[str] = None
 ) -> None:
@@ -176,7 +175,7 @@ def _broadcast_shape_for(node: Expr) -> tuple[int, ...]:
 
 
 @visitor(Constant)
-def _(c: Constant):
+def visit_constant(c: Constant):
     return c.value.shape
 
 
@@ -184,12 +183,12 @@ def _(c: Constant):
 @visitor(Sub)
 @visitor(Mul)
 @visitor(Div)
-def _(node: Expr) -> tuple[int, ...]:
+def visit_binary_op(node: Expr) -> tuple[int, ...]:
     return _broadcast_shape_for(node)
 
 
 @visitor(MatMul)
-def _(node: MatMul):
+def visit_matmul(node: MatMul):
     L, R = dispatch(node.left), dispatch(node.right)
     if len(L) < 2 or len(R) < 2 or L[-1] != R[-2]:
         raise ValueError(f"MatMul incompatible: {L} @ {R}")
@@ -197,7 +196,7 @@ def _(node: MatMul):
 
 
 @visitor(Concat)
-def _(node: Concat):
+def visit_concat(node: Concat):
     shapes = [dispatch(e) for e in node.exprs]
     rank = len(shapes[0])
     if any(len(s) != rank for s in shapes):
@@ -208,7 +207,7 @@ def _(node: Concat):
 
 
 @visitor(Index)
-def _(node: Index):
+def visit_index(node: Index):
     base_shape = dispatch(node.base)
     dummy = np.zeros(base_shape)
     try:
@@ -220,7 +219,7 @@ def _(node: Index):
 
 @visitor(Equality)
 @visitor(Inequality)
-def _(node: Constraint) -> tuple[int, ...]:
+def visit_constraint(node: Constraint) -> tuple[int, ...]:
     # 1) get the two operand shapes
     L_shape = dispatch(node.lhs)
     R_shape = dispatch(node.rhs)
