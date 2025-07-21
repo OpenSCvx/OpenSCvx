@@ -136,7 +136,7 @@ class JaxLowerer:
         return lambda x, u: jnp.sin(fO)
 
     @visitor(Cos)
-    def visit_sin(self, node: Sin):
+    def visit_cos(self, node: Cos):
         fO = self.lower(node.operand)
         return lambda x, u: jnp.cos(fO)
 
