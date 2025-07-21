@@ -8,12 +8,14 @@ from openscvx.backend.expr import (
     Concat,
     Constant,
     Constraint,
+    Cos,
     Div,
     Expr,
     Index,
     MatMul,
     Mul,
     Neg,
+    Sin,
     Sub,
 )
 from openscvx.backend.state import State
@@ -127,6 +129,16 @@ class JaxLowerer:
             return jnp.concatenate(parts, axis=0)
 
         return concat_fn
+
+    @visitor(Sin)
+    def visit_sin(self, node: Sin):
+        fO = self.lower(node.operand)
+        return lambda x, u: jnp.sin(fO)
+
+    @visitor(Cos)
+    def visit_sin(self, node: Sin):
+        fO = self.lower(node.operand)
+        return lambda x, u: jnp.cos(fO)
 
     @visitor(Constraint)
     def visit_constraint(self, node: Constraint):

@@ -22,6 +22,9 @@ class Expr:
     def __add__(self, other):
         return Add(self, to_expr(other))
 
+    def __radd__(self, other):
+        return Add(to_expr(other), self)
+
     def __sub__(self, other):
         return Sub(self, to_expr(other))
 
@@ -38,6 +41,9 @@ class Expr:
 
     def __mul__(self, other):
         return Mul(self, to_expr(other))
+
+    def __rmul__(self, other):
+        return Mul(to_expr(other), self)
 
     def __matmul__(self, other):
         return MatMul(self, to_expr(other))
@@ -174,6 +180,28 @@ class Concat(Expr):
     def __repr__(self):
         inner = ", ".join(repr(e) for e in self.exprs)
         return f"Concat({inner})"
+
+
+class Sin(Expr):
+    def __init__(self, operand):
+        self.operand = operand
+
+    def children(self):
+        return [self.operand]
+
+    def __repr__(self):
+        return f"(sin{self.operand!r})"
+
+
+class Cos(Expr):
+    def __init__(self, operand):
+        self.operand = operand
+
+    def children(self):
+        return [self.operand]
+
+    def __repr__(self):
+        return f"(sin{self.operand!r})"
 
 
 class Literal(Expr):
