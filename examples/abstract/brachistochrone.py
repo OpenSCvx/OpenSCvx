@@ -13,6 +13,8 @@ from examples.plotting import (
     plot_brachistochrone_velocity,
 )
 from openscvx.backend.control import Control
+from openscvx.backend.expr import Concat, Constant, Cos, Sin
+from openscvx.backend.lower import lower_to_jax
 from openscvx.backend.state import Free, Minimize, State
 from openscvx.constraints import ctcs
 from openscvx.dynamics import dynamics
@@ -39,24 +41,29 @@ u.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(
 g = 9.81
 
 
-@dynamics
-def dynamics(x_, u_):
-    # Ensure the control is within bounds
-    u_ = jnp.clip(u_, u.min, u.max)
+x._slice = slice(0, 4)
+u._slice = slice(0, 1)
 
-    x_dot = x_[2] * jnp.sin(u_[0])
-    y_dot = -x_[2] * jnp.cos(u_[0])
-    v_dot = g * jnp.cos(u_[0])
+x_dot = x[2] * Sin(u[0])
+y_dot = -x[2] * Cos(u[0])
+v_dot = g * Cos(u[0])
+t_dot = 1
 
-    t_dot = 1
-    return jnp.hstack([x_dot, y_dot, v_dot, t_dot])
+dyn_expr = Concat(x_dot, y_dot, v_dot, t_dot)
+dyn_fn = lower_to_jax(dyn_expr)
+dyn = dynamics(dyn_fn)
 
 
-constraints = [ctcs(lambda x_, u_: x_ - x.true.max), ctcs(lambda x_, u_: x.true.min - x_)]
+expr_max = x - Constant(np.array([x.max]))
+expr_min = Constant(np.array([x.min])) - x
+fns = lower_to_jax([expr_max, expr_min])
+
+constraints = [ctcs(fn) for fn in fns]
+# constraints = [ctcs(lambda x_, u_: x_ - x.true.max), ctcs(lambda x_, u_: x.true.min - x_)]
 
 
 problem = TrajOptProblem(
-    dynamics=dynamics,
+    dynamics=dyn,
     x=x,
     u=u,
     idx_time=3,  # Index of time variable in state vector
