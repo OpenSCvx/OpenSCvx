@@ -57,6 +57,7 @@ constraints_expr = [x - Constant(np.array([x.max])), Constant(np.array([x.min]))
 all_exprs = [dyn_expr, constraints_expr[0], constraints_expr[1]]
 validate_variable_names(all_exprs)
 collect_and_assign_slices(all_exprs)
+validate_shapes(all_exprs)
 
 dyn_fn = lower_to_jax(dyn_expr)
 fns = lower_to_jax(constraints_expr)
