@@ -90,29 +90,29 @@ class Control(Variable):
         """
         return self[self._augmented_slice]
 
-    def __getitem__(self, idx):
-        """Get a subset of the control variables.
+    # def __getitem__(self, idx):
+    #     """Get a subset of the control variables.
 
-        Args:
-            idx: Index or slice to select control variables
+    #     Args:
+    #         idx: Index or slice to select control variables
 
-        Returns:
-            Control: A new Control object containing the selected variables
-        """
-        new_ctrl = super().__getitem__(idx)
-        new_ctrl.__class__ = Control
+    #     Returns:
+    #         Control: A new Control object containing the selected variables
+    #     """
+    #     new_ctrl = super().__getitem__(idx)
+    #     new_ctrl.__class__ = Control
 
-        if isinstance(idx, slice):
-            selected = np.arange(self.shape[0])[idx]
-        elif isinstance(idx, (list, np.ndarray)):
-            selected = np.array(idx)
-        else:
-            selected = np.array([idx])
+    #     if isinstance(idx, slice):
+    #         selected = np.arange(self.shape[0])[idx]
+    #     elif isinstance(idx, (list, np.ndarray)):
+    #         selected = np.array(idx)
+    #     else:
+    #         selected = np.array([idx])
 
-        new_ctrl._true_dim = np.sum(selected < self._true_dim)
-        new_ctrl._update_slices()
+    #     new_ctrl._true_dim = np.sum(selected < self._true_dim)
+    #     new_ctrl._update_slices()
 
-        return new_ctrl
+    #     return new_ctrl
 
     def __repr__(self):
         """String representation of the Control object.
