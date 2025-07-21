@@ -8,6 +8,7 @@ from openscvx.backend.expr import (
     Concat,
     Constant,
     Constraint,
+    Cos,
     Div,
     Equality,
     Expr,
@@ -15,10 +16,13 @@ from openscvx.backend.expr import (
     Inequality,
     MatMul,
     Mul,
+    Neg,
+    Sin,
     Sub,
     traverse,
 )
 from openscvx.backend.state import State
+from openscvx.backend.variable import Variable
 
 
 # TODO: (norrisg) allow `traverse` to take a list of visitors, that way we can combine steps
@@ -192,6 +196,12 @@ def visit_constant(c: Constant):
     return c.value.shape
 
 
+@visitor(State)
+@visitor(Control)
+def visit_variable(v: Variable):
+    return v.shape
+
+
 @visitor(Add)
 @visitor(Sub)
 @visitor(Mul)
@@ -211,6 +221,7 @@ def visit_matmul(node: MatMul):
 @visitor(Concat)
 def visit_concat(node: Concat):
     shapes = [dispatch(e) for e in node.exprs]
+    shapes = [(1,) if len(s) == 0 else s for s in shapes]
     rank = len(shapes[0])
     if any(len(s) != rank for s in shapes):
         raise ValueError(f"Concat rank mismatch: {shapes}")
@@ -228,6 +239,21 @@ def visit_index(node: Index):
     except Exception as e:
         raise ValueError(f"Bad index {node.index} for shape {base_shape}") from e
     return result.shape
+
+
+@visitor(Neg)
+def visit_neg(node: Neg) -> tuple[int, ...]:
+    return dispatch(node.operand)
+
+
+@visitor(Sin)
+def visit_sin(node: Sin):
+    return dispatch(node.operand)
+
+
+@visitor(Cos)
+def visit_cos(node: Cos):
+    return dispatch(node.operand)
 
 
 @visitor(Equality)
