@@ -27,6 +27,24 @@ def test_duplicate_names_raises():
         validate_variable_names([a1, a2])
 
 
+def test_repeated_same_state_across_exprs_passes():
+    # same State instance appears in two different expressions → no error
+    x = State("x", (2,))
+    expr1 = Add(x, Constant(np.zeros((2,))))
+    expr2 = Constant(np.ones((2,))) - x
+    # should not raise
+    validate_variable_names([expr1, expr2])
+
+
+def test_two_distinct_instances_same_name_raises():
+    # two *different* State objects with the same .name → error
+    x1 = State("x", (2,))
+    x2 = State("x", (2,))
+    with pytest.raises(ValueError) as exc:
+        validate_variable_names([x1, x2])
+    assert "Duplicate variable name" in str(exc.value)
+
+
 def test_reserved_prefix_raises():
     bad = State("_hidden", (1,))
     with pytest.raises(ValueError):

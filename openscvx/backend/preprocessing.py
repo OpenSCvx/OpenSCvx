@@ -26,29 +26,42 @@ def validate_variable_names(
     exprs: Iterable[Expr], *, reserved_prefix: str = "_", reserved_names: Set[str] = None
 ) -> None:
     """
-    1) Ensure all State/Control names are unique.
-    2) Ensure no user-supplied name starts with `reserved_prefix`.
+    1) Ensure all State/Control names are unique *across distinct variables*.
+    2) Ensure no user‐supplied name starts with `reserved_prefix`.
     3) Ensure no name collides with `reserved_names` if given.
     Raises ValueError on any violation.
     """
-    seen = set()
+    seen_names = set()
+    seen_ids = set()
     reserved = set(reserved_names or ())
 
     def visitor(node):
-        if isinstance(node, (State, Control)):
-            name = node.name
-            # 1) uniqueness
-            if name in seen:
-                raise ValueError(f"Duplicate variable name: {name!r}")
-            # 2) no user-underscore
-            if name.startswith(reserved_prefix):
-                raise ValueError(
-                    f"Variable name {name!r} is reserved (cannot start with {reserved_prefix!r})"
-                )
-            # 3) no collision with explicit reserved set
-            if name in reserved:
-                raise ValueError(f"Variable name {name!r} collides with reserved name")
-            seen.add(name)
+        if not isinstance(node, (State, Control)):
+            return
+
+        node_id = id(node)
+        if node_id in seen_ids:
+            # we already checked this exact object
+            return
+
+        name = node.name
+
+        # 1) uniqueness across *different* variables
+        if name in seen_names:
+            raise ValueError(f"Duplicate variable name: {name!r}")
+
+        # 2) no leading underscore
+        if name.startswith(reserved_prefix):
+            raise ValueError(
+                f"Variable name {name!r} is reserved (cannot start with {reserved_prefix!r})"
+            )
+
+        # 3) no collision with explicit reserved set
+        if name in reserved:
+            raise ValueError(f"Variable name {name!r} collides with reserved name")
+
+        seen_names.add(name)
+        seen_ids.add(node_id)
 
     for e in exprs:
         traverse(e, visitor)
