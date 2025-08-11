@@ -205,14 +205,14 @@ class Cos(Expr):
         return f"(sin{self.operand!r})"
 
 
-class Literal(Expr):
-    """Represents a literal value in an expression."""
+# class Literal(Expr):
+#     """Represents a literal value in an expression."""
 
-    def __init__(self, value):
-        self.value = value
+#     def __init__(self, value):
+#         self.value = value
 
-    def children(self):
-        return []
+#     def children(self):
+#         return []
 
 
 # def to_expr(obj):
