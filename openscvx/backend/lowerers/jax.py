@@ -11,11 +11,15 @@ from openscvx.backend.expr import (
     Cos,
     Div,
     Expr,
+    Huber,
     Index,
     MatMul,
     Mul,
     Neg,
+    PositivePart,
     Sin,
+    SmoothReLU,
+    Square,
     Sub,
 )
 from openscvx.backend.state import State
@@ -151,3 +155,30 @@ class JaxLowerer:
             return lambda x, u: fL(x, u) >= fR(x, u)
         else:  # "=="
             return lambda x, u: fL(x, u) == fR(x, u)
+
+    @visitor(PositivePart)
+    def visit_pos(self, node):
+        f = self.lower(node.x)
+        return lambda x, u: jnp.maximum(f(x, u), 0.0)
+
+    @visitor(Square)
+    def visit_square(self, node):
+        f = self.lower(node.x)
+        return lambda x, u: f(x, u) * f(x, u)
+
+    @visitor(Huber)
+    def visit_huber(self, node):
+        f = self.lower(node.x)
+        delta = node.delta
+        return lambda x, u: jnp.where(
+            jnp.abs(f(x, u)) <= delta,
+            0.5 * f(x, u) ** 2,
+            delta * (jnp.abs(f(x, u)) - 0.5 * delta),
+        )
+
+    @visitor(SmoothReLU)
+    def visit_srelu(self, node):
+        f = self.lower(node.x)
+        c = node.c
+        # smooth_relu(pos(x)) = sqrt(pos(x)^2 + c^2) - c ; here f already includes pos inside node
+        return lambda x, u: jnp.sqrt(jnp.maximum(f(x, u), 0.0) ** 2 + c**2) - c
