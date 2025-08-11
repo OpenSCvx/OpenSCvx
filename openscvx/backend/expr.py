@@ -1,4 +1,5 @@
-from typing import Callable, Union
+from dataclasses import dataclass
+from typing import Callable, Literal, Optional, Tuple, Union
 
 import numpy as np
 
@@ -254,3 +255,85 @@ class Inequality(Constraint):
 
     def __repr__(self):
         return f"{self.lhs!r} <= {self.rhs!r}"
+
+
+# CTCS STUFF
+# TODO: (norrisg) move to a separate location
+
+PenaltyKind = Literal["squared_relu", "huber", "smooth_relu"]
+
+
+@dataclass(frozen=True)
+class CTCSInfo:
+    penalty: PenaltyKind = "squared_relu"
+    delta: float = 0.25  # for huber
+    c: float = 1e-8  # for smooth_relu
+    scaling: float = 1.0
+    check_at_nodes: bool = True
+    nodes: Optional[Tuple[int, int]] = None  # keep as metadata for your integrator
+    idx: Optional[int] = None
+
+
+class CTCS(Expr):
+    def __init__(self, constraint: Constraint, info: Optional[CTCSInfo] = None):
+        if not isinstance(constraint, Constraint):
+            raise TypeError("CTCS must wrap a Constraint")
+        self.constraint = constraint
+        self.info = info or CTCSInfo()
+
+    def children(self):
+        return [self.constraint]
+
+    def __repr__(self):
+        return f"CTCS({self.constraint!r}, info={self.info})"
+
+
+def ctcs(c: Constraint, **kwargs) -> CTCS:
+    return CTCS(c, CTCSInfo(**kwargs))
+
+
+# TODO: (norrisg) move to more permanent location
+class PositivePart(Expr):  # pos(x) = max(x, 0)
+    def __init__(self, x):
+        self.x = to_expr(x)
+
+    def children(self):
+        return [self.x]
+
+    def __repr__(self):
+        return f"pos({self.x!r})"
+
+
+class Square(Expr):
+    def __init__(self, x):
+        self.x = to_expr(x)
+
+    def children(self):
+        return [self.x]
+
+    def __repr__(self):
+        return f"({self.x!r})^2"
+
+
+class Huber(Expr):  # symmetric Huber on its input
+    def __init__(self, x, delta: float = 0.25):
+        self.x = to_expr(x)
+        self.delta = float(delta)
+
+    def children(self):
+        return [self.x]
+
+    def __repr__(self):
+        return f"huber({self.x!r}; delta={self.delta})"
+
+
+class SmoothReLU(Expr):  # sqrt(pos(x)^2 + c^2) - c
+    def __init__(self, x, c: float = 1e-8):
+        self.x = to_expr(x)
+        self.c = float(c)
+
+    def children(self):
+        return [self.x]
+
+    def __repr__(self):
+        return f"smooth_relu({self.x!r}; c={self.c})"
