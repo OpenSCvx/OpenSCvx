@@ -260,40 +260,10 @@ class Inequality(Constraint):
 # CTCS STUFF
 # TODO: (norrisg) move to a separate location
 
-PenaltyKind = Literal["squared_relu", "huber", "smooth_relu"]
+# Penalty function building blocks
+class PositivePart(Expr):
+    """pos(x) = max(x, 0)"""
 
-
-@dataclass(frozen=True)
-class CTCSInfo:
-    penalty: PenaltyKind = "squared_relu"
-    delta: float = 0.25  # for huber
-    c: float = 1e-8  # for smooth_relu
-    scaling: float = 1.0
-    check_at_nodes: bool = True
-    nodes: Optional[Tuple[int, int]] = None  # keep as metadata for your integrator
-    idx: Optional[int] = None
-
-
-class CTCS(Expr):
-    def __init__(self, constraint: Constraint, info: Optional[CTCSInfo] = None):
-        if not isinstance(constraint, Constraint):
-            raise TypeError("CTCS must wrap a Constraint")
-        self.constraint = constraint
-        self.info = info or CTCSInfo()
-
-    def children(self):
-        return [self.constraint]
-
-    def __repr__(self):
-        return f"CTCS({self.constraint!r}, info={self.info})"
-
-
-def ctcs(c: Constraint, **kwargs) -> CTCS:
-    return CTCS(c, CTCSInfo(**kwargs))
-
-
-# TODO: (norrisg) move to more permanent location
-class PositivePart(Expr):  # pos(x) = max(x, 0)
     def __init__(self, x):
         self.x = to_expr(x)
 
@@ -305,6 +275,8 @@ class PositivePart(Expr):  # pos(x) = max(x, 0)
 
 
 class Square(Expr):
+    """x^2"""
+
     def __init__(self, x):
         self.x = to_expr(x)
 
@@ -315,7 +287,9 @@ class Square(Expr):
         return f"({self.x!r})^2"
 
 
-class Huber(Expr):  # symmetric Huber on its input
+class Huber(Expr):
+    """Huber penalty function"""
+
     def __init__(self, x, delta: float = 0.25):
         self.x = to_expr(x)
         self.delta = float(delta)
@@ -324,10 +298,12 @@ class Huber(Expr):  # symmetric Huber on its input
         return [self.x]
 
     def __repr__(self):
-        return f"huber({self.x!r}; delta={self.delta})"
+        return f"huber({self.x!r}, delta={self.delta})"
 
 
-class SmoothReLU(Expr):  # sqrt(pos(x)^2 + c^2) - c
+class SmoothReLU(Expr):
+    """sqrt(max(x, 0)^2 + c^2) - c"""
+
     def __init__(self, x, c: float = 1e-8):
         self.x = to_expr(x)
         self.c = float(c)
@@ -336,19 +312,50 @@ class SmoothReLU(Expr):  # sqrt(pos(x)^2 + c^2) - c
         return [self.x]
 
     def __repr__(self):
-        return f"smooth_relu({self.x!r}; c={self.c})"
+        return f"smooth_relu({self.x!r}, c={self.c})"
 
 
-# TODO: (norrisg) move these functions into separate `augmentation` step that occurs after
-# preprocessing, canonicalization
-def _penalty_expr(lhs: Expr, info: CTCSInfo) -> Expr:
-    if info.penalty == "squared_relu":
-        return Square(PositivePart(lhs))
-    if info.penalty == "huber":
-        return Huber(PositivePart(lhs), delta=info.delta)
-    if info.penalty == "smooth_relu":
-        return SmoothReLU(lhs, c=info.c)  # SmoothReLU uses pos(lhs) internally
-    raise ValueError(f"Unknown penalty {info.penalty!r}")
+# CTCS constraint wrapper
+class CTCS(Expr):
+    """
+    Marks a constraint for continuous-time constraint satisfaction.
+
+    The constraint's left-hand side will be wrapped in a penalty function
+    during lowering/compilation.
+    """
+
+    def __init__(self, constraint: Constraint, penalty: str = "squared_relu"):
+        if not isinstance(constraint, Constraint):
+            raise TypeError("CTCS must wrap a Constraint")
+        self.constraint = constraint
+        self.penalty = penalty
+
+    def children(self):
+        return [self.constraint]
+
+    def __repr__(self):
+        return f"CTCS({self.constraint!r}, penalty={self.penalty!r})"
+
+    def penalty_expr(self) -> Expr:
+        """
+        Build the penalty expression for this CTCS constraint.
+        This transforms the constraint's LHS into a penalized expression.
+        """
+        lhs = self.constraint.lhs
+
+        if self.penalty == "squared_relu":
+            return Square(PositivePart(lhs))
+        elif self.penalty == "huber":
+            return Huber(PositivePart(lhs))
+        elif self.penalty == "smooth_relu":
+            return SmoothReLU(lhs)
+        else:
+            raise ValueError(f"Unknown penalty {self.penalty!r}")
+
+
+def ctcs(constraint: Constraint, penalty: str = "squared_relu") -> CTCS:
+    """Helper function to create CTCS constraints."""
+    return CTCS(constraint, penalty)
 
 
 def augment_dynamics_with_ctcs(
@@ -372,10 +379,10 @@ def augment_dynamics_with_ctcs(
     # to their idx and node grouping
     for w in constraints_ctcs:
         lhs = w.constraint.lhs
-        g = _penalty_expr(lhs, w.info)
-        if w.info.scaling != 1.0:
-            g = Mul(Constant(np.array(w.info.scaling)), g)
-        state_aug.append(g)
+        # g = _penalty_expr(lhs, w.info)
+        # if w.info.scaling != 1.0:
+        #     g = Mul(Constant(np.array(w.info.scaling)), g)
+        # state_aug.append(g)
         if w.info.check_at_nodes:
             node_checks.append(w.constraint)
 

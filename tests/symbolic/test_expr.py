@@ -3,6 +3,7 @@ import pytest
 
 from openscvx.backend.control import Control
 from openscvx.backend.expr import (
+    CTCS,
     Add,
     Constant,
     Div,
@@ -12,6 +13,7 @@ from openscvx.backend.expr import (
     Mul,
     Neg,
     Sub,
+    ctcs,
     to_expr,
     traverse,
 )
@@ -223,3 +225,219 @@ def test_add_mul_requires_at_least_two_terms():
         Add(Constant(1))
     with pytest.raises(ValueError):
         Mul(Constant(2))
+
+
+# TODO: (norrisg) should be moved to separate ctcs testing file
+
+
+def test_ctcs_wraps_constraint():
+    """CTCS should wrap a Constraint object."""
+    x = Variable("x", shape=(3,))
+    constraint = x <= 1.0
+
+    ctcs_constraint = CTCS(constraint)
+
+    assert isinstance(ctcs_constraint, CTCS)
+    assert ctcs_constraint.constraint is constraint
+    assert ctcs_constraint.penalty == "squared_relu"  # default
+
+
+def test_ctcs_requires_constraint():
+    """CTCS should only accept Constraint objects."""
+    x = Variable("x", shape=(3,))
+    not_a_constraint = x + 1.0
+
+    with pytest.raises(TypeError, match="CTCS must wrap a Constraint"):
+        CTCS(not_a_constraint)
+
+
+def test_ctcs_with_different_penalties():
+    """CTCS should accept different penalty types."""
+    x = Variable("x", shape=(3,))
+    constraint = x >= 0.0
+
+    ctcs_squared = CTCS(constraint, penalty="squared_relu")
+    ctcs_huber = CTCS(constraint, penalty="huber")
+    ctcs_smooth = CTCS(constraint, penalty="smooth_relu")
+
+    assert ctcs_squared.penalty == "squared_relu"
+    assert ctcs_huber.penalty == "huber"
+    assert ctcs_smooth.penalty == "smooth_relu"
+
+
+def test_ctcs_helper_function():
+    """The ctcs() helper should create CTCS objects."""
+    x = Variable("x", shape=(2,))
+    constraint = x == np.array([1.0, 2.0])
+
+    # Default penalty
+    ctcs1 = ctcs(constraint)
+    assert isinstance(ctcs1, CTCS)
+    assert ctcs1.constraint is constraint
+    assert ctcs1.penalty == "squared_relu"
+
+    # Custom penalty
+    ctcs2 = ctcs(constraint, penalty="huber")
+    assert ctcs2.penalty == "huber"
+
+
+def test_ctcs_children():
+    """CTCS should return its constraint as its only child."""
+    x = Variable("x", shape=(3,))
+    constraint = x <= 5.0
+    ctcs_constraint = CTCS(constraint)
+
+    children = ctcs_constraint.children()
+    assert len(children) == 1
+    assert children[0] is constraint
+
+
+def test_ctcs_repr():
+    """CTCS should have a readable representation."""
+    x = Variable("x", shape=(3,))
+    constraint = x <= 1.5
+
+    ctcs_default = CTCS(constraint)
+    assert repr(ctcs_default) == "CTCS(Var('x') <= Const(array(1.5)), penalty='squared_relu')"
+
+    ctcs_huber = CTCS(constraint, penalty="huber")
+    assert repr(ctcs_huber) == "CTCS(Var('x') <= Const(array(1.5)), penalty='huber')"
+
+
+def test_ctcs_traversal():
+    """CTCS should be traversable like other expressions."""
+    x = Variable("x", shape=(2,))
+    y = Variable("y", shape=(2,))
+
+    # Create a CTCS constraint with some arithmetic
+    constraint = (x + y) <= 10.0
+    ctcs_constraint = CTCS(constraint)
+
+    visited = []
+
+    def visit(node):
+        visited.append(type(node).__name__)
+
+    traverse(ctcs_constraint, visit)
+
+    # Should visit CTCS -> Inequality -> Add -> Variable -> Variable -> Constant
+    assert visited[0] == "CTCS"
+    assert visited[1] == "Inequality"
+    assert visited[2] == "Add"
+    assert "Variable" in visited
+    assert "Constant" in visited
+
+
+def test_ctcs_with_equality_constraint():
+    """CTCS should work with Equality constraints."""
+    x = Variable("x", shape=(3,))
+    constraint = x == np.zeros(3)
+
+    ctcs_constraint = ctcs(constraint, penalty="smooth_relu")
+
+    assert isinstance(ctcs_constraint.constraint, Equality)
+    assert ctcs_constraint.penalty == "smooth_relu"
+
+
+def test_multiple_ctcs_constraints():
+    """Should be able to create multiple CTCS constraints."""
+    x = Variable("x", shape=(2,))
+    u = Variable("u", shape=(1,))
+
+    # Different constraints with different penalties
+    c1 = ctcs(x <= 1.0, penalty="squared_relu")
+    c2 = ctcs(x >= -1.0, penalty="huber")
+    c3 = ctcs(u == 0.0, penalty="smooth_relu")
+
+    assert c1.penalty == "squared_relu"
+    assert c2.penalty == "huber"
+    assert c3.penalty == "smooth_relu"
+
+    # Verify they wrap different constraints
+    assert isinstance(c1.constraint, Inequality)
+    assert isinstance(c2.constraint, Inequality)
+    assert isinstance(c3.constraint, Equality)
+
+
+def test_ctcs_pretty_print():
+    """CTCS should integrate with pretty printing."""
+    x = Variable("x", shape=(2,))
+    constraint = x <= 5.0
+    ctcs_constraint = CTCS(constraint)
+
+    pretty = ctcs_constraint.pretty()
+    lines = pretty.splitlines()
+
+    assert lines[0].strip() == "CTCS"
+    assert "Inequality" in lines[1]
+    # Should show the tree structure
+    assert "Variable" in pretty
+    assert "Constant" in pretty
+
+
+def test_penalty_expressions():
+    """Test the penalty expression building blocks."""
+    from openscvx.backend.expr import Huber, PositivePart, SmoothReLU, Square
+
+    x = Variable("x", shape=(1,))
+
+    # PositivePart
+    pos = PositivePart(x)
+    assert repr(pos) == "pos(Var('x'))"
+    assert pos.children() == [x]
+
+    # Square
+    sq = Square(x)
+    assert repr(sq) == "(Var('x'))^2"
+    assert sq.children() == [x]
+
+    # Huber
+    hub = Huber(x, delta=0.5)
+    assert repr(hub) == "huber(Var('x'), delta=0.5)"
+    assert hub.delta == 0.5
+    assert hub.children() == [x]
+
+    # SmoothReLU
+    smooth = SmoothReLU(x, c=1e-6)
+    assert repr(smooth) == "smooth_relu(Var('x'), c=1e-06)"
+    assert smooth.c == 1e-6
+    assert smooth.children() == [x]
+
+
+def test_ctcs_penalty_expr_method():
+    """Test building penalty expressions from CTCS constraints."""
+    from openscvx.backend.expr import Huber, PositivePart, SmoothReLU, Square
+
+    x = Variable("x", shape=(2,))
+    constraint = x <= 1.0
+
+    # squared_relu penalty
+    ctcs1 = CTCS(constraint, penalty="squared_relu")
+    penalty1 = ctcs1.penalty_expr()
+    assert isinstance(penalty1, Square)
+    assert isinstance(penalty1.x, PositivePart)
+    assert penalty1.x.x is constraint.lhs
+
+    # huber penalty
+    ctcs2 = CTCS(constraint, penalty="huber")
+    penalty2 = ctcs2.penalty_expr()
+    assert isinstance(penalty2, Huber)
+    assert isinstance(penalty2.x, PositivePart)
+    assert penalty2.x.x is constraint.lhs
+
+    # smooth_relu penalty
+    ctcs3 = CTCS(constraint, penalty="smooth_relu")
+    penalty3 = ctcs3.penalty_expr()
+    assert isinstance(penalty3, SmoothReLU)
+    assert penalty3.x is constraint.lhs
+
+
+def test_ctcs_unknown_penalty():
+    """CTCS should raise error for unknown penalty types."""
+    x = Variable("x", shape=(1,))
+    constraint = x <= 0.0
+
+    ctcs_constraint = CTCS(constraint, penalty="unknown")
+
+    with pytest.raises(ValueError, match="Unknown penalty"):
+        ctcs_constraint.penalty_expr()
