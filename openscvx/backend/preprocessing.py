@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Iterable, Set, Type, Union
+from typing import Callable, Dict, Iterable, Set, Tuple, Type, Union
 
 import numpy as np
 
@@ -71,7 +71,9 @@ def validate_variable_names(
         traverse(e, visitor)
 
 
-def collect_and_assign_slices(exprs: Iterable[Expr], *, start_index: int = 0):
+def collect_and_assign_slices(
+    exprs: Iterable[Expr], *, start_index: int = 0
+) -> Tuple[list[State], list[Control]]:
     # 1) collect all State/Control nodes
     states, controls = [], []
 
@@ -130,6 +132,9 @@ def collect_and_assign_slices(exprs: Iterable[Expr], *, start_index: int = 0):
     assign(states, start_index)
     assign(controls, start_index)
 
+    # Return the collected variables
+    return states, controls
+
 
 def _traverse_with_depth(expr: Expr, visit: Callable[[Expr, int], None], depth: int = 0):
     visit(expr, depth)
@@ -163,7 +168,7 @@ _SHAPE_VISITORS: Dict[Type[Expr], Callable[[Expr], tuple[int, ...]]] = {}
 def validate_shapes(exprs):
     exprs = exprs if isinstance(exprs, (list, tuple)) else [exprs]
     for e in exprs:
-        dispatch(e)  # will raise ValueError if anything’s wrong
+        dispatch(e)  # will raise ValueError if anything's wrong
 
 
 def visitor(expr_cls: Type[Expr]):
@@ -270,7 +275,7 @@ def visit_constraint(node: Constraint) -> tuple[int, ...]:
         op = type(node).__name__
         raise ValueError(f"{op} not broadcastable: {L_shape} vs {R_shape}") from e
 
-    # 3) ensure that broadcast result is “scalar” in the sense that total size == 1
+    # 3) ensure that broadcast result is "scalar" in the sense that total size == 1
     total_size = int(np.prod(out_shape))
     if total_size != 1:
         op = type(node).__name__

@@ -60,26 +60,37 @@ def test_reserved_names_collision():
 def test_collect_single_state():
     x = State("x", (4,))
     expr = Add(x, Constant(1.0))
-    collect_and_assign_slices([expr])
+    states, controls = collect_and_assign_slices([expr])
     assert x._slice == slice(0, 4)
+    assert len(states) == 1
+    assert states[0] is x
+    assert len(controls) == 0
 
 
 def test_collect_multiple_states_preserves_order():
     a = State("a", (2,))
     b = State("b", (3,))
-    collect_and_assign_slices([Add(a, b)])
+    states, controls = collect_and_assign_slices([Add(a, b)])
     assert slice(0, 2, None) == slice(0, 2)
     assert a._slice == slice(0, 2)
     assert b._slice == slice(2, 5)
+    assert len(states) == 2
+    assert states[0] is a
+    assert states[1] is b
+    assert len(controls) == 0
 
 
 def test_collect_states_and_controls_separate_namespaces():
     s1 = State("s1", (2,))
     c1 = Control("c1", (3,))
-    collect_and_assign_slices([Add(s1, c1)])
+    states, controls = collect_and_assign_slices([Add(s1, c1)])
     # states live in x; controls live in u
     assert s1._slice == slice(0, 2)
     assert c1._slice == slice(0, 3)
+    assert len(states) == 1
+    assert states[0] is s1
+    assert len(controls) == 1
+    assert controls[0] is c1
 
 
 def test_states_and_controls_independent_offsets():
@@ -88,12 +99,18 @@ def test_states_and_controls_independent_offsets():
     s2 = State("s2", (1,))
     c1 = Control("c1", (2,))
     exprs = [Add(s1, s2), Add(c1, Constant(0.0))]
-    collect_and_assign_slices(exprs)
+    states, controls = collect_and_assign_slices(exprs)
     # states: offsets 0→2, 2→3
     assert s1._slice == slice(0, 2)
     assert s2._slice == slice(2, 3)
     # controls: offset resets to zero
     assert c1._slice == slice(0, 2)
+    # verify collected variables
+    assert len(states) == 2
+    assert s1 in states
+    assert s2 in states
+    assert len(controls) == 1
+    assert controls[0] is c1
 
 
 def test_manual_slice_shape_mismatch_raises():
@@ -112,19 +129,26 @@ def test_manual_slice_shape_mismatch_raises():
 
 def test_idempotent_on_repeat_calls():
     s = State("s", (3,))
-    collect_and_assign_slices([Add(s, Constant(0.0))])
+    states1, controls1 = collect_and_assign_slices([Add(s, Constant(0.0))])
     first = s._slice
-    collect_and_assign_slices([Add(s, Constant(0.0))])
+    states2, controls2 = collect_and_assign_slices([Add(s, Constant(0.0))])
     assert s._slice is first
+    # Same state should be collected each time
+    assert len(states1) == len(states2) == 1
+    assert states1[0] is s
+    assert states2[0] is s
 
 
 def test_manual_slice_assignment():
     s = State("s", (2,))
     s._slice = slice(0, 2)
     t = State("t", (3,))  # left to auto-assign
-    collect_and_assign_slices([Add(s, t)])
+    states, controls = collect_and_assign_slices([Add(s, t)])
     assert s._slice == slice(0, 2)
     assert t._slice == slice(2, 5)
+    assert len(states) == 2
+    assert s in states
+    assert t in states
 
 
 def test_invalid_manual_slice_assignment_nonzero_start():
@@ -143,6 +167,43 @@ def test_invalid_manual_slice_assignment_gaps():
     b._slice = slice(3, 5)
     with pytest.raises(ValueError):
         collect_and_assign_slices([Add(a, b)])
+
+
+def test_collect_no_duplicates():
+    # Test that the same variable appearing multiple times is only collected once
+    x = State("x", (2,))
+    y = State("y", (3,))
+    # x appears in multiple places
+    expr1 = Add(x, y)
+    expr2 = Add(x, Constant(1.0))
+    expr3 = x * 2.0
+
+    states, controls = collect_and_assign_slices([expr1, expr2, expr3])
+
+    # x should only appear once in the states list
+    assert len(states) == 2
+    # Use identity checks since __eq__ is overloaded for creating constraints
+    assert any(s is x for s in states)
+    assert any(s is y for s in states)
+    # Count using identity
+    assert sum(1 for s in states if s is x) == 1  # x appears exactly once
+    assert sum(1 for s in states if s is y) == 1  # y appears exactly once
+    assert len(controls) == 0
+
+
+def test_collect_empty_expressions():
+    # Test collecting from empty expression list
+    states, controls = collect_and_assign_slices([])
+    assert len(states) == 0
+    assert len(controls) == 0
+
+
+def test_collect_only_constants():
+    # Test collecting from expressions with no variables
+    expr = Add(Constant(1.0), Constant(2.0))
+    states, controls = collect_and_assign_slices([expr])
+    assert len(states) == 0
+    assert len(controls) == 0
 
 
 def test_root_constraint_passes():
@@ -273,7 +334,7 @@ def test_constraint_zero_dim_scalar_passes():
 
 
 def test_constraint_length1_array_passes():
-    # 1-element arrays count as “scalar”
+    # 1-element arrays count as "scalar"
     b = Constant(np.array([7.0]))
     c = b <= np.ones((1,))
     validate_shapes(c)
