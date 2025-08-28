@@ -1,5 +1,4 @@
-from dataclasses import dataclass
-from typing import Callable, List, Literal, Optional, Tuple, Union
+from typing import Callable, Union
 
 import numpy as np
 
@@ -260,6 +259,7 @@ class Inequality(Constraint):
 # CTCS STUFF
 # TODO: (norrisg) move to a separate location
 
+
 # Penalty function building blocks
 class PositivePart(Expr):
     """pos(x) = max(x, 0)"""
@@ -356,40 +356,3 @@ class CTCS(Expr):
 def ctcs(constraint: Constraint, penalty: str = "squared_relu") -> CTCS:
     """Helper function to create CTCS constraints."""
     return CTCS(constraint, penalty)
-
-
-def augment_dynamics_with_ctcs(
-    xdot: Expr, constraints: List[Expr]
-) -> tuple[Expr, List[Constraint]]:
-    constraints_ctcs: List[CTCS] = []
-    constraints_nodal: List[Constraint] = []
-
-    for e in constraints:
-        if isinstance(e, CTCS):
-            constraints_ctcs.append(e)
-        elif isinstance(e, Constraint):
-            constraints_nodal.append(e)
-        else:
-            raise ValueError(f"Constraints must be `Constraint` or `CTCS`, got {e}")
-
-    state_aug: List[Expr] = []
-    node_checks: List[Constraint] = []
-
-    # TODO: (norrisg) fix this so that state_aug are also added to the list of `Variable`s according
-    # to their idx and node grouping
-    for w in constraints_ctcs:
-        lhs = w.constraint.lhs
-        # g = _penalty_expr(lhs, w.info)
-        # if w.info.scaling != 1.0:
-        #     g = Mul(Constant(np.array(w.info.scaling)), g)
-        # state_aug.append(g)
-        if w.info.check_at_nodes:
-            node_checks.append(w.constraint)
-
-    # non-CTCS constraints are always checked at nodes
-    for c in constraints_nodal:
-        if all(c is not w.constraint for w in constraints_ctcs):
-            node_checks.append(c)
-
-    xdot_aug = Concat(xdot, *state_aug) if state_aug else xdot
-    return xdot_aug, node_checks
