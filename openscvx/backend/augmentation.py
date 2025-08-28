@@ -42,6 +42,7 @@ def augment_dynamics_with_ctcs(
     penalty_exprs: List[Expr] = []
     augmented_states: List[State] = []
 
+    # TODO: (norrisg) fix s.t. combines ctcs penalties where possible
     for i, ctcs in enumerate(constraints_ctcs):
         # Create the penalty expression for this constraint
         penalty_expr = ctcs.penalty_expr()
