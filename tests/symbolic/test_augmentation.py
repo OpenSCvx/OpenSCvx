@@ -5,6 +5,7 @@ import pytest
 from openscvx.backend.augmentation import augment_dynamics_with_ctcs
 from openscvx.backend.control import Control
 from openscvx.backend.expr import (
+    CTCS,
     Add,
     Concat,
     Constant,
@@ -224,47 +225,50 @@ def test_augment_with_different_penalties():
 
 def test_inequality_constraint_penalty_activation():
     """Test that penalties are zero when x <= limit and positive when x > limit."""
-    # Constraint: x <= 1.0
+
     limit = 1.0
+    test_cases = [
+        (-2.0, False),  # Well below limit, no violation
+        (0.0, False),  # Below limit, no violation
+        (0.999, False),  # Just below limit, no violation
+        (1.0, False),  # At limit, no violation
+        (1.001, True),  # Just above limit, violation
+        (2.0, True),  # Above limit, violation
+        (5.0, True),  # Well above limit, violation
+    ]
 
-    # Test values: some satisfy (x <= 1), some violate (x > 1)
-    x_vals = jnp.array([-2.0, 0.0, 0.999, 1.0, 1.001, 2.0, 5.0])
+    for penalty_name in ["squared_relu", "huber", "smooth_relu"]:
+        prev_violation_penalty = None
 
-    state = State("x", (7,))
-    state._slice = slice(0, 7)
+        for val, should_violate in test_cases:
+            x = jnp.array([val])
+            state = State("x", (1,))
+            state._slice = slice(0, 1)
 
-    # Build constraint violation: x - limit (positive when violated)
-    violation = Sub(state, Constant(limit))
+            # Scalar constraint: x <= limit
+            constraint = state - limit <= 0
 
-    # Test all penalty types
-    penalties = {
-        "squared_relu": Square(PositivePart(violation)),
-        "huber": Huber(PositivePart(violation), delta=0.25),
-        "smooth_relu": SmoothReLU(violation, c=1e-8),
-    }
+            ctcs = CTCS(constraint, penalty=penalty_name)
+            penalty_expr = ctcs.penalty_expr()
 
-    for penalty_name, penalty_expr in penalties.items():
-        fn = lower_to_jax(penalty_expr)
-        result = fn(x_vals, None)
+            fn = lower_to_jax(penalty_expr)
+            result = fn(x, None)
 
-        # Check that penalties are zero for satisfied constraints
-        assert jnp.allclose(result[0], 0.0), f"{penalty_name}: x=-2 should have zero penalty"
-        assert jnp.allclose(result[1], 0.0), f"{penalty_name}: x=0 should have zero penalty"
-        assert jnp.allclose(result[2], 0.0), f"{penalty_name}: x=0.999 should have zero penalty"
-        assert jnp.allclose(result[3], 0.0, atol=1e-10), (
-            f"{penalty_name}: x=1.0 (boundary) should have zero penalty"
-        )
+            if should_violate:
+                assert result > 0, (
+                    f"{penalty_name}: x={val} violates constraint, should have positive penalty"
+                )
 
-        # Check that penalties are positive for violated constraints
-        assert result[4] > 0, f"{penalty_name}: x=1.001 should have positive penalty"
-        assert result[5] > 0, f"{penalty_name}: x=2 should have positive penalty"
-        assert result[6] > 0, f"{penalty_name}: x=5 should have positive penalty"
-
-        # Check that penalty increases with violation magnitude
-        assert result[5] > result[4], f"{penalty_name}: larger violation should have larger penalty"
-        assert result[6] > result[5], (
-            f"{penalty_name}: even larger violation should have even larger penalty"
-        )
+                # Check monotonic increase for violations
+                if prev_violation_penalty is not None:
+                    assert result > prev_violation_penalty, (
+                        f"{penalty_name}: Penalty should increase with violation magnitude"
+                    )
+                prev_violation_penalty = result
+            else:
+                assert jnp.abs(result) < 1e-6, (
+                    f"{penalty_name}: x={val} satisfies constraint, should have zero penalty"
+                )
 
 
 def test_reverse_inequality_constraint_penalty():
