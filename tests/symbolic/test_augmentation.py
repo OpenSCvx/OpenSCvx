@@ -1,3 +1,4 @@
+import jax.numpy as jnp
 import numpy as np
 import pytest
 
@@ -7,10 +8,14 @@ from openscvx.backend.expr import (
     Add,
     Concat,
     Constant,
+    Huber,
     PositivePart,
+    SmoothReLU,
     Square,
+    Sub,
     ctcs,
 )
+from openscvx.backend.lower import lower_to_jax
 from openscvx.backend.state import State
 
 
@@ -215,3 +220,254 @@ def test_augment_with_different_penalties():
 
     # Each penalty expression should be different based on the penalty type
     # (The actual structure validation would depend on the penalty implementations)
+
+
+def test_inequality_constraint_penalty_activation():
+    """Test that penalties are zero when x <= limit and positive when x > limit."""
+    # Constraint: x <= 1.0
+    limit = 1.0
+
+    # Test values: some satisfy (x <= 1), some violate (x > 1)
+    x_vals = jnp.array([-2.0, 0.0, 0.999, 1.0, 1.001, 2.0, 5.0])
+
+    state = State("x", (7,))
+    state._slice = slice(0, 7)
+
+    # Build constraint violation: x - limit (positive when violated)
+    violation = Sub(state, Constant(limit))
+
+    # Test all penalty types
+    penalties = {
+        "squared_relu": Square(PositivePart(violation)),
+        "huber": Huber(PositivePart(violation), delta=0.25),
+        "smooth_relu": SmoothReLU(violation, c=1e-8),
+    }
+
+    for penalty_name, penalty_expr in penalties.items():
+        fn = lower_to_jax(penalty_expr)
+        result = fn(x_vals, None)
+
+        # Check that penalties are zero for satisfied constraints
+        assert jnp.allclose(result[0], 0.0), f"{penalty_name}: x=-2 should have zero penalty"
+        assert jnp.allclose(result[1], 0.0), f"{penalty_name}: x=0 should have zero penalty"
+        assert jnp.allclose(result[2], 0.0), f"{penalty_name}: x=0.999 should have zero penalty"
+        assert jnp.allclose(result[3], 0.0, atol=1e-10), (
+            f"{penalty_name}: x=1.0 (boundary) should have zero penalty"
+        )
+
+        # Check that penalties are positive for violated constraints
+        assert result[4] > 0, f"{penalty_name}: x=1.001 should have positive penalty"
+        assert result[5] > 0, f"{penalty_name}: x=2 should have positive penalty"
+        assert result[6] > 0, f"{penalty_name}: x=5 should have positive penalty"
+
+        # Check that penalty increases with violation magnitude
+        assert result[5] > result[4], f"{penalty_name}: larger violation should have larger penalty"
+        assert result[6] > result[5], (
+            f"{penalty_name}: even larger violation should have even larger penalty"
+        )
+
+
+def test_reverse_inequality_constraint_penalty():
+    """Test penalties for x >= limit (satisfied when x >= limit)."""
+    # Constraint: x >= 2.0, equivalent to 2.0 <= x
+    limit = 2.0
+
+    x_vals = jnp.array([0.0, 1.0, 1.999, 2.0, 2.001, 3.0, 5.0])
+
+    state = State("x", (7,))
+    state._slice = slice(0, 7)
+
+    # Build constraint violation: limit - x (positive when x < limit)
+    violation = Sub(Constant(limit), state)
+
+    # Test with squared ReLU penalty
+    penalty = Square(PositivePart(violation))
+    fn = lower_to_jax(penalty)
+    result = fn(x_vals, None)
+
+    # Violated constraints (x < 2.0) should have positive penalty
+    assert result[0] > 0, "x=0 violates x>=2, should have positive penalty"
+    assert result[1] > 0, "x=1 violates x>=2, should have positive penalty"
+    assert result[2] > 0, "x=1.999 violates x>=2, should have positive penalty"
+
+    # Satisfied constraints (x >= 2.0) should have zero penalty
+    assert jnp.allclose(result[3], 0.0, atol=1e-10), (
+        "x=2.0 satisfies x>=2, should have zero penalty"
+    )
+    assert jnp.allclose(result[4], 0.0), "x=2.001 satisfies x>=2, should have zero penalty"
+    assert jnp.allclose(result[5], 0.0), "x=3 satisfies x>=2, should have zero penalty"
+    assert jnp.allclose(result[6], 0.0), "x=5 satisfies x>=2, should have zero penalty"
+
+
+def test_box_constraint_penalties():
+    """Test penalties for box constraints: lower <= x <= upper."""
+    lower = 1.0
+    upper = 3.0
+
+    # Test values spanning the range
+    x_vals = jnp.array([0.0, 0.5, 1.0, 2.0, 3.0, 3.5, 4.0])
+
+    state = State("x", (7,))
+    state._slice = slice(0, 7)
+
+    # Lower bound violation: lower - x (positive when x < lower)
+    lower_violation = Sub(Constant(lower), state)
+    lower_penalty = Square(PositivePart(lower_violation))
+
+    # Upper bound violation: x - upper (positive when x > upper)
+    upper_violation = Sub(state, Constant(upper))
+    upper_penalty = Square(PositivePart(upper_violation))
+
+    fn_lower = lower_to_jax(lower_penalty)
+    fn_upper = lower_to_jax(upper_penalty)
+
+    result_lower = fn_lower(x_vals, None)
+    result_upper = fn_upper(x_vals, None)
+
+    # Test lower bound
+    assert result_lower[0] > 0, "x=0 violates lower bound"
+    assert result_lower[1] > 0, "x=0.5 violates lower bound"
+    assert jnp.allclose(result_lower[2], 0.0, atol=1e-10), "x=1.0 at lower bound"
+    assert jnp.allclose(result_lower[3], 0.0), "x=2.0 within bounds"
+    assert jnp.allclose(result_lower[4], 0.0), "x=3.0 at upper bound"
+
+    # Test upper bound
+    assert jnp.allclose(result_upper[2], 0.0), "x=1.0 at lower bound"
+    assert jnp.allclose(result_upper[3], 0.0), "x=2.0 within bounds"
+    assert jnp.allclose(result_upper[4], 0.0, atol=1e-10), "x=3.0 at upper bound"
+    assert result_upper[5] > 0, "x=3.5 violates upper bound"
+    assert result_upper[6] > 0, "x=4.0 violates upper bound"
+
+    # Total penalty (sum of both)
+    total_penalty = result_lower + result_upper
+
+    # Only values within [1, 3] should have zero total penalty
+    assert total_penalty[0] > 0, "x=0 outside bounds"
+    assert total_penalty[1] > 0, "x=0.5 outside bounds"
+    assert jnp.allclose(total_penalty[2], 0.0, atol=1e-10), "x=1.0 on boundary"
+    assert jnp.allclose(total_penalty[3], 0.0), "x=2.0 inside bounds"
+    assert jnp.allclose(total_penalty[4], 0.0, atol=1e-10), "x=3.0 on boundary"
+    assert total_penalty[5] > 0, "x=3.5 outside bounds"
+    assert total_penalty[6] > 0, "x=4.0 outside bounds"
+
+
+def test_norm_constraint_penalty():
+    """Test penalty for ||x|| <= r constraint."""
+    radius = 2.0
+
+    # Test 2D points at various distances from origin
+    points = np.array(
+        [
+            [0.0, 0.0],  # Inside, distance = 0
+            [1.0, 0.0],  # Inside, distance = 1
+            [1.4, 1.4],  # Inside, distance ≈ 1.98
+            [2.0, 0.0],  # On boundary, distance = 2
+            [1.5, 1.5],  # Outside, distance ≈ 2.12
+            [3.0, 0.0],  # Outside, distance = 3
+            [3.0, 4.0],  # Outside, distance = 5
+        ]
+    )
+
+    state = State("x", (2,))
+    state._slice = slice(0, 2)
+
+    # For each point, compute ||x||^2 - r^2 (positive when violated)
+    results = []
+    for point in points:
+        x_vals = jnp.array(point)
+
+        # Build constraint violation: ||x||^2 - r^2
+        x_squared = Square(state)  # Element-wise square
+        norm_squared = x_squared[0] + x_squared[1]  # Sum to get ||x||^2
+        violation = Sub(norm_squared, Constant(radius**2))
+
+        penalty = Square(PositivePart(violation))
+        fn = lower_to_jax(penalty)
+        result = fn(x_vals, None)
+        results.append(result)
+
+    # Points inside or on the circle should have zero penalty
+    assert jnp.allclose(results[0], 0.0), "Origin should have zero penalty"
+    assert jnp.allclose(results[1], 0.0), "Point at distance 1 should have zero penalty"
+    assert jnp.allclose(results[2], 0.0, atol=1e-6), (
+        "Point at distance ~1.98 should have zero penalty"
+    )
+    assert jnp.allclose(results[3], 0.0, atol=1e-10), "Point on boundary should have zero penalty"
+
+    # Points outside the circle should have positive penalty
+    assert results[4] > 0, "Point at distance ~2.12 should have positive penalty"
+    assert results[5] > 0, "Point at distance 3 should have positive penalty"
+    assert results[6] > 0, "Point at distance 5 should have positive penalty"
+
+    # Penalty should increase with distance from boundary
+    assert results[6] > results[5] > results[4], "Penalty should increase with violation"
+
+
+def test_penalty_gradients_at_boundary():
+    """Test that penalties have correct gradient behavior at constraint boundaries."""
+    # Test points very close to constraint boundary x <= 1.0
+    x_vals = jnp.array([0.9999, 0.99999, 1.0, 1.00001, 1.0001])
+
+    state = State("x", (5,))
+    state._slice = slice(0, 5)
+
+    violation = Sub(state, Constant(1.0))
+
+    # Squared ReLU has a sharp transition at the boundary
+    squared_penalty = Square(PositivePart(violation))
+    fn_squared = lower_to_jax(squared_penalty)
+    result_squared = fn_squared(x_vals, None)
+
+    # Should be exactly zero below boundary, positive above
+    assert jnp.allclose(result_squared[0], 0.0)
+    assert jnp.allclose(result_squared[1], 0.0)
+    assert jnp.allclose(result_squared[2], 0.0, atol=1e-12)
+    assert result_squared[3] > 0
+    assert result_squared[4] > 0
+
+    # SmoothReLU should have smooth transition
+    smooth_penalty = SmoothReLU(violation, c=1e-4)
+    fn_smooth = lower_to_jax(smooth_penalty)
+    result_smooth = fn_smooth(x_vals, None)
+
+    # Should be approximately zero below, smoothly increasing above
+    assert jnp.allclose(result_smooth[0], 0.0, atol=1e-8)
+    assert jnp.allclose(result_smooth[1], 0.0, atol=1e-8)
+    assert jnp.allclose(result_smooth[2], 0.0, atol=1e-8)
+    assert result_smooth[3] > 0
+    assert result_smooth[4] > result_smooth[3]
+
+
+def test_equality_constraint_penalty():
+    """Test penalties for equality constraints x == target."""
+    target = 2.0
+
+    # Test values around the target
+    x_vals = jnp.array([0.0, 1.0, 1.9, 2.0, 2.1, 3.0, 4.0])
+
+    state = State("x", (7,))
+    state._slice = slice(0, 7)
+
+    # For equality, we need to penalize |x - target|
+    # This requires penalties on both positive and negative deviations
+    deviation = Sub(state, Constant(target))
+
+    # Test with Huber penalty (naturally handles both sides)
+    penalty = Huber(deviation, delta=0.5)
+    fn = lower_to_jax(penalty)
+    result = fn(x_vals, None)
+
+    # Only x == target should have zero penalty
+    assert result[0] > 0, "x=0 != 2 should have positive penalty"
+    assert result[1] > 0, "x=1 != 2 should have positive penalty"
+    assert result[2] > 0, "x=1.9 != 2 should have positive penalty"
+    assert jnp.allclose(result[3], 0.0, atol=1e-10), "x=2 == 2 should have zero penalty"
+    assert result[4] > 0, "x=2.1 != 2 should have positive penalty"
+    assert result[5] > 0, "x=3 != 2 should have positive penalty"
+    assert result[6] > 0, "x=4 != 2 should have positive penalty"
+
+    # Penalty should increase with distance from target
+    assert result[0] > result[1], "Farther from target should have higher penalty"
+    assert result[1] > result[2], "Closer to target should have lower penalty"
+    assert result[4] < result[5], "Farther from target should have higher penalty"
+    assert result[5] < result[6], "Even farther should have even higher penalty"
