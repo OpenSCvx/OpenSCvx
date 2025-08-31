@@ -137,12 +137,12 @@ class JaxLowerer:
     @visitor(Sin)
     def visit_sin(self, node: Sin):
         fO = self.lower(node.operand)
-        return lambda x, u: jnp.sin(fO)
+        return lambda x, u: jnp.sin(fO(x, u))
 
     @visitor(Cos)
     def visit_cos(self, node: Cos):
         fO = self.lower(node.operand)
-        return lambda x, u: jnp.cos(fO)
+        return lambda x, u: jnp.cos(fO(x, u))
 
     @visitor(Constraint)
     def visit_constraint(self, node: Constraint):
