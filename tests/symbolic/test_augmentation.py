@@ -17,7 +17,7 @@ from openscvx.backend.expr import (
     ctcs,
 )
 from openscvx.backend.lower import lower_to_jax
-from openscvx.backend.state import State
+from openscvx.backend.state import State, Variable
 
 
 def test_augment_no_constraints():
@@ -65,14 +65,17 @@ def test_augment_single_ctcs_constraint():
 
     xdot_aug, states_aug, node_constraints = augment_dynamics_with_ctcs(xdot, states, [constraint])
 
-    # Should have augmented dynamics and new state
+    # Should have augmented dynamics and new Variable
     assert isinstance(xdot_aug, Concat)
     assert len(states_aug) == 2  # original + 1 augmented
     assert states_aug[0] is x
-    assert isinstance(states_aug[1], State)
-    assert states_aug[1].name == "_ctcs_aug_0"
+    assert isinstance(states_aug[1], Variable)
+    assert states_aug[1].name == "ctcs_aug"
     assert states_aug[1].shape == (1,)
-    assert len(node_constraints) == 0
+
+    # Should include the underlying constraint in node checks
+    assert len(node_constraints) == 1
+    assert node_constraints[0] is constraint.constraint
 
 
 def test_augment_multiple_ctcs_constraints():
@@ -88,17 +91,25 @@ def test_augment_multiple_ctcs_constraints():
 
     xdot_aug, states_aug, node_constraints = augment_dynamics_with_ctcs(xdot, states, [c1, c2, c3])
 
-    # Should have 3 augmented states
+    # Should have 1 augmented Variable (all penalties summed together)
     assert isinstance(xdot_aug, Concat)
-    assert len(states_aug) == 4  # original + 3 augmented
+    assert len(states_aug) == 2  # original + 1 augmented Variable
     assert states_aug[0] is x
 
-    # Check augmented state names
-    for i in range(3):
-        assert states_aug[i + 1].name == f"_ctcs_aug_{i}"
-        assert states_aug[i + 1].shape == (1,)
+    # Check augmented Variable
+    assert isinstance(states_aug[1], Variable)
+    assert states_aug[1].name == "ctcs_aug"
+    assert states_aug[1].shape == (1,)
 
-    assert len(node_constraints) == 0
+    # The augmented Variable should have an Add expression combining all penalties
+    assert hasattr(states_aug[1], "expr")
+    assert isinstance(states_aug[1].expr, Add)
+
+    # Should include all underlying constraints in node checks
+    assert len(node_constraints) == 3
+    assert c1.constraint in node_constraints
+    assert c2.constraint in node_constraints
+    assert c3.constraint in node_constraints
 
 
 def test_augment_mixed_constraints():
@@ -118,38 +129,24 @@ def test_augment_mixed_constraints():
         xdot, states, [c1, c2, c3, c4]
     )
 
-    # Should have 2 augmented states (for 2 CTCS constraints)
+    # Should have 1 augmented Variable (for 2 CTCS constraints summed together)
     assert isinstance(xdot_aug, Concat)
-    assert len(states_aug) == 4  # 2 original + 2 augmented
+    assert len(states_aug) == 3  # 2 original + 1 augmented
 
     # Check original states are preserved
     assert states_aug[0] is x
     assert states_aug[1] is y
 
-    # Check augmented states
-    assert states_aug[2].name == "_ctcs_aug_0"
-    assert states_aug[3].name == "_ctcs_aug_1"
+    # Check augmented Variable
+    assert isinstance(states_aug[2], Variable)
+    assert states_aug[2].name == "ctcs_aug"
 
-    # Check nodal constraints (only regular ones)
-    assert len(node_constraints) == 2
-    assert c2 in node_constraints
-    assert c4 in node_constraints
-
-
-def test_augment_preserves_state_list_reference():
-    """Test that the states list is modified in-place."""
-    x = State("x", (2,))
-    xdot = x * 0.1
-    states = [x]
-    original_list = states  # Keep reference to original list
-
-    constraint = ctcs(x[0] <= 1.0)
-
-    xdot_aug, states_aug, _ = augment_dynamics_with_ctcs(xdot, states, [constraint])
-
-    # The returned states should be the same list object
-    assert states_aug is original_list
-    assert len(original_list) == 2  # Modified in-place
+    # Check nodal constraints (regular ones + underlying CTCS constraints)
+    assert len(node_constraints) == 4
+    assert c2 in node_constraints  # Regular constraint
+    assert c4 in node_constraints  # Regular constraint
+    assert c1.constraint in node_constraints  # Underlying CTCS constraint
+    assert c3.constraint in node_constraints  # Underlying CTCS constraint
 
 
 def test_augment_penalty_expression_structure():
@@ -161,16 +158,54 @@ def test_augment_penalty_expression_structure():
     # Create CTCS with squared_relu penalty
     constraint = ctcs(x <= 1.0, penalty="squared_relu")
 
-    xdot_aug, _, _ = augment_dynamics_with_ctcs(xdot, states, [constraint])
+    xdot_aug, states_aug, _ = augment_dynamics_with_ctcs(xdot, states, [constraint])
 
     # Check structure of augmented dynamics
     assert isinstance(xdot_aug, Concat)
     assert len(xdot_aug.exprs) == 2
 
-    # The second expression should be the penalty
+    # The second expression should be the penalty (stored in the Variable as well)
     penalty_expr = xdot_aug.exprs[1]
     assert isinstance(penalty_expr, Square)
     assert isinstance(penalty_expr.x, PositivePart)
+
+    # The Variable should store the same expression
+    aug_var = states_aug[1]
+    assert aug_var.expr is penalty_expr
+
+
+def test_augment_single_penalty_no_add():
+    """Test that single penalty doesn't create unnecessary Add expression."""
+    x = State("x", (1,))
+    xdot = x
+    states = [x]
+
+    constraint = ctcs(x <= 1.0, penalty="squared_relu")
+
+    xdot_aug, states_aug, _ = augment_dynamics_with_ctcs(xdot, states, [constraint])
+
+    # Single penalty should not be wrapped in Add
+    aug_var = states_aug[1]
+    penalty_expr = aug_var.expr
+    assert isinstance(penalty_expr, Square)  # Direct penalty, not Add
+
+
+def test_augment_multiple_penalties_create_add():
+    """Test that multiple penalties create an Add expression."""
+    x = State("x", (2,))
+    xdot = x
+    states = [x]
+
+    c1 = ctcs(x[0] <= 1.0, penalty="squared_relu")
+    c2 = ctcs(x[1] <= 2.0, penalty="huber")
+
+    xdot_aug, states_aug, _ = augment_dynamics_with_ctcs(xdot, states, [c1, c2])
+
+    # Multiple penalties should be wrapped in Add
+    aug_var = states_aug[1]
+    penalty_expr = aug_var.expr
+    assert isinstance(penalty_expr, Add)
+    assert len(penalty_expr.terms) == 2
 
 
 def test_augment_invalid_constraint_type_raises():
@@ -198,13 +233,14 @@ def test_augment_empty_states_list():
 
     xdot_aug, states_aug, _ = augment_dynamics_with_ctcs(xdot, states, [constraint])
 
-    # Should create one augmented state
+    # Should create one augmented Variable
     assert len(states_aug) == 1
-    assert states_aug[0].name == "_ctcs_aug_0"
+    assert isinstance(states_aug[0], Variable)
+    assert states_aug[0].name == "ctcs_aug"
 
 
 def test_augment_with_different_penalties():
-    """Test that different penalty types are correctly applied."""
+    """Test that different penalty types are correctly applied and summed."""
     x = State("x", (1,))
     xdot = x
     states = [x]
@@ -214,13 +250,15 @@ def test_augment_with_different_penalties():
 
     xdot_aug, states_aug, _ = augment_dynamics_with_ctcs(xdot, states, constraints)
 
-    # Should have 3 augmented states with appropriate penalties
-    assert len(states_aug) == 4
+    # Should have 1 augmented Variable with summed penalties
+    assert len(states_aug) == 2
     assert isinstance(xdot_aug, Concat)
-    assert len(xdot_aug.exprs) == 4  # original + 3 penalties
+    assert len(xdot_aug.exprs) == 2  # original + summed penalties
 
-    # Each penalty expression should be different based on the penalty type
-    # (The actual structure validation would depend on the penalty implementations)
+    # The penalty expression should be an Add combining all penalties
+    aug_var = states_aug[1]
+    assert isinstance(aug_var.expr, Add)
+    assert len(aug_var.expr.terms) == 3  # Three penalty terms
 
 
 def test_inequality_constraint_penalty_activation():

@@ -2,6 +2,7 @@ from typing import List, Tuple
 
 from openscvx.backend.expr import (
     CTCS,
+    Add,
     Concat,
     Constraint,
     Expr,
@@ -38,32 +39,59 @@ def augment_dynamics_with_ctcs(
         else:
             raise ValueError(f"Constraints must be `Constraint` or `CTCS`, got {type(c).__name__}")
 
-    # Build augmented dynamics and states
-    penalty_exprs: List[Expr] = []
-    augmented_states: List[State] = []
+    # Build penalty expressions for all CTCS constraints
+    penalty_terms: List[Expr] = []
 
-    # TODO: (norrisg) fix s.t. combines ctcs penalties where possible
-    for i, ctcs in enumerate(constraints_ctcs):
-        # Create the penalty expression for this constraint
+    for ctcs in constraints_ctcs:
+        # Get the penalty expression for this CTCS constraint
         penalty_expr = ctcs.penalty_expr()
-        penalty_exprs.append(penalty_expr)
 
-        # Create a corresponding augmented state variable
-        # Use a reserved prefix to avoid name collisions
-        aug_state = State(f"_ctcs_aug_{i}", shape=(1,))
-        augmented_states.append(aug_state)
+        # TODO: In the future, apply scaling here if ctcs has a scaling attribute
+        # if hasattr(ctcs, 'scaling') and ctcs.scaling != 1.0:
+        #     penalty_expr = Mul(Constant(np.array(ctcs.scaling)), penalty_expr)
 
-    # Update the states list (in-place to maintain references)
-    states.extend(augmented_states)
+        penalty_terms.append(penalty_expr)
 
-    # Build augmented dynamics
-    if penalty_exprs:
-        xdot_aug = Concat(xdot, *penalty_exprs)
+    # Sum all penalty terms into a single augmented state (default behavior)
+    augmented_states = list(states)  # Copy the original states list
+
+    if penalty_terms:
+        # Add all penalty terms together
+        if len(penalty_terms) == 1:
+            augmented_state_expr = penalty_terms[0]
+        else:
+            augmented_state_expr = Add(*penalty_terms)
+
+        # Create a new Variable for the augmented state
+        # TODO: In the future, create multiple variables based on idx grouping
+        from openscvx.backend.state import Variable
+
+        aug_var = Variable("ctcs_aug", shape=(1,))
+        aug_var.expr = augmented_state_expr  # Store the expression in the variable
+        augmented_states.append(aug_var)
+
+        # Concatenate with original dynamics
+        xdot_aug = Concat(xdot, augmented_state_expr)
+
+        # TODO: Future implementation for index-based grouping
+        # When idx is implemented, we would:
+        # 1. Group penalty_terms by ctcs.idx
+        # 2. Sum penalties within each group
+        # 3. Create a Variable for each group
+        # 4. Concatenate each group's sum as a separate augmented state
     else:
         xdot_aug = xdot
 
-    # All regular constraints are checked at nodes
-    # CTCS constraints can optionally also be checked at nodes (future feature)
-    node_constraints = constraints_nodal.copy()
+    # Collect all constraints that should be checked at nodes
+    node_checks: List[Constraint] = []
 
-    return xdot_aug, states, node_constraints
+    # Add the underlying constraints from CTCS (if they should be checked at nodes)
+    for ctcs in constraints_ctcs:
+        # TODO: In the future, check ctcs.check_at_nodes attribute
+        # if getattr(ctcs, 'check_at_nodes', True):
+        node_checks.append(ctcs.constraint)
+
+    # Regular constraints are always checked at nodes
+    node_checks.extend(constraints_nodal)
+
+    return xdot_aug, augmented_states, node_checks
