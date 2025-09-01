@@ -274,7 +274,6 @@ def test_single_dynamics_multiple_states_passes():
     """Test single dynamics expression with multiple states - valid case"""
     x1 = State("pos", (2,))
     x2 = State("vel", (3,))
-    u = Control("thrust", (2,))
 
     # Total state dim = 2 + 3 = 5, dynamics dim = 5 (matches)
     dynamics = Concat(x1, x2)  # shape (5,)
@@ -286,7 +285,6 @@ def test_single_dynamics_multiple_states_passes():
 def test_multiple_dynamics_single_state_passes():
     """Test multiple dynamics expressions with single state - valid case"""
     x = State("pos", (4,))
-    u = Control("thrust", (2,))
 
     # State dim = 4
     dynamics1 = x[:2]  # shape (2,)
