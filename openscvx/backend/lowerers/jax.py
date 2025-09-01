@@ -10,9 +10,11 @@ from openscvx.backend.expr import (
     Constraint,
     Cos,
     Div,
+    Equality,
     Expr,
     Huber,
     Index,
+    Inequality,
     MatMul,
     Mul,
     Neg,
@@ -144,17 +146,13 @@ class JaxLowerer:
         fO = self.lower(node.operand)
         return lambda x, u: jnp.cos(fO(x, u))
 
-    @visitor(Constraint)
+    @visitor(Equality)
+    @visitor(Inequality)
     def visit_constraint(self, node: Constraint):
+        """Lower equality constraint: lhs == rhs or lhs <= rhs becomes lhs - rhs"""
         fL = self.lower(node.lhs)
         fR = self.lower(node.rhs)
-
-        if node.op == "<=":
-            return lambda x, u: fL(x, u) <= fR(x, u)
-        elif node.op == ">=":
-            return lambda x, u: fL(x, u) >= fR(x, u)
-        else:  # "=="
-            return lambda x, u: fL(x, u) == fR(x, u)
+        return lambda x, u: fL(x, u) - fR(x, u)
 
     @visitor(PositivePart)
     def visit_pos(self, node):

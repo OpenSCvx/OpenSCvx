@@ -8,8 +8,10 @@ from openscvx.backend.expr import (
     Concat,
     Constant,
     Div,
+    Equality,
     Expr,
     Huber,
+    Inequality,
     MatMul,
     Mul,
     Neg,
@@ -208,6 +210,85 @@ def test_lower_to_jax_multiple_exprs_returns_in_order():
     f_const, f_x = fns
     assert jnp.allclose(f_const(x, None), jnp.array([1.0, 2.0, 3.0]))
     assert jnp.allclose(f_x(x, u), x)
+
+
+def test_equality_constraint_lowering():
+    """Test that equality constraints are lowered to residual form (lhs - rhs)."""
+    x = jnp.array([1.0, 2.0, 3.0])
+    u = jnp.array([0.5, 1.0, 1.5])
+
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+    control = Control("u", (3,))
+    control._slice = slice(0, 3)
+
+    # Constraint: x == 2*u (should become x - 2*u == 0)
+    lhs = state
+    rhs = Mul(Constant(2.0), control)
+    constraint = Equality(lhs, rhs)
+
+    jl = JaxLowerer()
+    fn = jl.visit_constraint(constraint)
+    residual = fn(x, u)
+
+    # Residual should be lhs - rhs = x - 2*u
+    expected = x - 2.0 * u
+    assert jnp.allclose(residual, expected)
+    assert residual.shape == (3,)
+
+
+def test_inequality_constraint_lowering():
+    """Test that inequality constraints are lowered to residual form (lhs - rhs)."""
+    x = jnp.array([0.5, 1.5, 2.5])
+
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+
+    # Constraint: x <= 2.0 (should become x - 2.0 <= 0)
+    lhs = state
+    rhs = Constant(np.array([2.0, 2.0, 2.0]))
+    constraint = Inequality(lhs, rhs)
+
+    jl = JaxLowerer()
+    fn = jl.visit_constraint(constraint)  # Both use the same visitor
+    residual = fn(x, None)
+
+    # Residual should be lhs - rhs = x - 2.0
+    expected = x - 2.0
+    assert jnp.allclose(residual, expected)
+    assert residual.shape == (3,)
+
+    # Check that residual is negative when constraint is satisfied
+    # and positive when violated
+    assert residual[0] < 0  # 0.5 - 2.0 = -1.5 (satisfied)
+    assert residual[1] < 0  # 1.5 - 2.0 = -0.5 (satisfied)
+    assert residual[2] > 0  # 2.5 - 2.0 = 0.5 (violated)
+
+
+def test_constraint_lowering_with_lower_to_jax():
+    """Test constraint lowering through the top-level lower_to_jax function."""
+    x = jnp.array([1.0, 3.0])
+    u = jnp.array([0.5])
+
+    pos = State("pos", (2,))
+    pos._slice = slice(0, 2)
+    vel = Control("vel", (1,))
+    vel._slice = slice(0, 1)
+
+    # Mixed constraint: pos[0] + 2*vel <= pos[1]
+    # Rearranged: pos[0] + 2*vel - pos[1] <= 0
+    lhs = Add(pos[0], Mul(Constant(2.0), vel))
+    rhs = pos[1]
+    constraint = Inequality(lhs, rhs)
+
+    # Lower using the top-level function
+    fn = lower_to_jax(constraint)
+    residual = fn(x, u)
+
+    # Expected: pos[0] + 2*vel - pos[1] = 1.0 + 2*0.5 - 3.0 = -1.0
+    expected = 1.0 + 2.0 * 0.5 - 3.0
+    assert jnp.allclose(residual, expected)
+    assert residual < 0  # Constraint is satisfied
 
 
 def test_concat_simple():
