@@ -13,7 +13,7 @@ from openscvx.backend.state import State
 
 def augment_dynamics_with_ctcs(
     xdot: Expr, states: List[State], controls: List[Control], constraints: List[Expr]
-) -> Tuple[Expr, List[State], List[Constraint]]:
+) -> Tuple[Expr, List[State], List[Control]]:
     """
     Augment dynamics with continuous-time constraint satisfaction (CTCS).
 
@@ -28,23 +28,22 @@ def augment_dynamics_with_ctcs(
         - Augmented dynamics expression
         - Updated list of states (including augmented states)
         - Updated list of controls (including time dilation)
-        - List of constraints to check at nodes
     """
     constraints_ctcs: List[CTCS] = []
-    constraints_nodal: List[Constraint] = []
+    # constraints_nodal: List[Constraint] = []
 
     # Separate CTCS from regular constraints
     for c in constraints:
         if isinstance(c, CTCS):
             constraints_ctcs.append(c)
         elif isinstance(c, Constraint):
-            constraints_nodal.append(c)
+            pass # constraints_nodal.append(c)
         else:
             raise ValueError(f"Constraints must be `Constraint` or `CTCS`, got {type(c).__name__}")
 
     # Copy the original states and controls lists
-    augmented_states = list(states)
-    augmented_controls = list(controls)
+    states_augmented = list(states)
+    controls_augmented = list(controls)
 
     # Build penalty expressions for all CTCS constraints
     penalty_terms: List[Expr] = []
@@ -70,7 +69,7 @@ def augment_dynamics_with_ctcs(
         # Create a new Variable for the augmented state
         # TODO: In the future, create multiple variables based on idx grouping
         aug_var = State(f"_ctcs_aug_{0}", shape=(1,))
-        augmented_states.append(aug_var)
+        states_augmented.append(aug_var)
 
         # Concatenate with original dynamics
         xdot_aug = Concat(xdot, augmented_state_expr)
@@ -85,18 +84,18 @@ def augment_dynamics_with_ctcs(
         xdot_aug = xdot
 
     time_dilation = Control("_time_dilation", shape=(1,))
-    augmented_controls.append(time_dilation)
+    controls_augmented.append(time_dilation)
 
-    # Collect all constraints that should be checked at nodes
-    node_checks: List[Constraint] = []
+    # # Collect all constraints that should be checked at nodes
+    # node_checks: List[Constraint] = []
 
-    # Add the underlying constraints from CTCS (if they should be checked at nodes)
-    for ctcs in constraints_ctcs:
-        # TODO: In the future, check ctcs.check_at_nodes attribute
-        # if getattr(ctcs, 'check_at_nodes', True):
-        node_checks.append(ctcs.constraint)
+    # # Add the underlying constraints from CTCS (if they should be checked at nodes)
+    # for ctcs in constraints_ctcs:
+    #     # TODO: In the future, check ctcs.check_at_nodes attribute
+    #     # if getattr(ctcs, 'check_at_nodes', True):
+    #     node_checks.append(ctcs.constraint)
 
-    # Regular constraints are always checked at nodes
-    node_checks.extend(constraints_nodal)
+    # # Regular constraints are always checked at nodes
+    # node_checks.extend(constraints_nodal)
 
-    return xdot_aug, augmented_states, augmented_controls, node_checks
+    return xdot_aug, states_augmented, controls_augmented
