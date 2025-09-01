@@ -518,17 +518,23 @@ def test_constraint_length1_array_passes():
     validate_shapes(c)
 
 
-def test_constraint_vector_raises():
-    # length-2 vector is not allowed
+def test_constraint_vector_passes():
+    """Vector constraints should now pass validation (interpreted element-wise)"""
     a = Constant(np.zeros((2,)))
     c = a <= np.ones((2,))
-    with pytest.raises(ValueError):
-        validate_shapes(c)
+    validate_shapes(c)  # Should NOT raise
 
 
 def test_constraint_shape_mismatch_raises():
-    # mismatched lengths still error out
+    """Shape mismatches should still error out"""
     a = Constant(np.zeros((2,)))
     c = a == np.zeros((3,))
     with pytest.raises(ValueError):
         validate_shapes(c)
+
+
+def test_constraint_broadcasting_passes():
+    """Test constraint broadcasting: scalar op vector"""
+    x = State("x", (3,))
+    c = Constant(np.array(0.0)) <= x  # broadcasts to vector constraint
+    validate_shapes(c)

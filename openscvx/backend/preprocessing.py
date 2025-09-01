@@ -350,18 +350,12 @@ def visit_constraint(node: Constraint) -> tuple[int, ...]:
 
     # 2) figure out their broadcasted shape (or error if incompatible)
     try:
-        out_shape = np.broadcast_shapes(L_shape, R_shape)
+        np.broadcast_shapes(L_shape, R_shape)
     except ValueError as e:
         op = type(node).__name__
         raise ValueError(f"{op} not broadcastable: {L_shape} vs {R_shape}") from e
 
-    # 3) ensure that broadcast result is "scalar" in the sense that total size == 1
-    total_size = int(np.prod(out_shape))
-    if total_size != 1:
-        op = type(node).__name__
-        raise ValueError(
-            f"{op} must be scalar-valued (total size==1), but got broadcast shape {out_shape}"
-        )
+    # 3) Allow vector constraints - they're interpreted element-wise
 
     # 4) return () as usual
     return ()
