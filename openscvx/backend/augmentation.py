@@ -1,5 +1,6 @@
 from typing import List, Tuple
 
+from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     CTCS,
     Add,
@@ -11,20 +12,22 @@ from openscvx.backend.state import State
 
 
 def augment_dynamics_with_ctcs(
-    xdot: Expr, states: List[State], constraints: List[Expr]
+    xdot: Expr, states: List[State], controls: List[Control], constraints: List[Expr]
 ) -> Tuple[Expr, List[State], List[Constraint]]:
     """
     Augment dynamics with continuous-time constraint satisfaction (CTCS).
 
     Args:
         xdot: The original dynamics expression
-        states: The list of state variables (will be modified in-place)
+        states: The list of state variables
+        controls: The list of control variables
         constraints: List of constraints (mix of CTCS and regular Constraints)
 
     Returns:
         Tuple of:
         - Augmented dynamics expression
         - Updated list of states (including augmented states)
+        - Updated list of controls (including time dilation)
         - List of constraints to check at nodes
     """
     constraints_ctcs: List[CTCS] = []
@@ -38,6 +41,10 @@ def augment_dynamics_with_ctcs(
             constraints_nodal.append(c)
         else:
             raise ValueError(f"Constraints must be `Constraint` or `CTCS`, got {type(c).__name__}")
+
+    # Copy the original states and controls lists
+    augmented_states = list(states)
+    augmented_controls = list(controls)
 
     # Build penalty expressions for all CTCS constraints
     penalty_terms: List[Expr] = []
@@ -53,8 +60,6 @@ def augment_dynamics_with_ctcs(
         penalty_terms.append(penalty_expr)
 
     # Sum all penalty terms into a single augmented state (default behavior)
-    augmented_states = list(states)  # Copy the original states list
-
     if penalty_terms:
         # Add all penalty terms together
         if len(penalty_terms) == 1:
@@ -65,7 +70,6 @@ def augment_dynamics_with_ctcs(
         # Create a new Variable for the augmented state
         # TODO: In the future, create multiple variables based on idx grouping
         aug_var = State(f"_ctcs_aug_{0}", shape=(1,))
-        aug_var.expr = augmented_state_expr  # Store the expression in the variable
         augmented_states.append(aug_var)
 
         # Concatenate with original dynamics
@@ -80,6 +84,9 @@ def augment_dynamics_with_ctcs(
     else:
         xdot_aug = xdot
 
+    time_dilation = Control("_time_dilation", shape=(1,))
+    augmented_controls.append(time_dilation)
+
     # Collect all constraints that should be checked at nodes
     node_checks: List[Constraint] = []
 
@@ -92,4 +99,4 @@ def augment_dynamics_with_ctcs(
     # Regular constraints are always checked at nodes
     node_checks.extend(constraints_nodal)
 
-    return xdot_aug, augmented_states, node_checks
+    return xdot_aug, augmented_states, augmented_controls, node_checks
