@@ -12,6 +12,7 @@ from examples.plotting import (
     plot_brachistochrone_position,
     plot_brachistochrone_velocity,
 )
+from openscvx.backend.canonicalizer import canonicalize
 from openscvx.backend.control import Control
 from openscvx.backend.expr import Concat, Constant, Cos, Sin
 from openscvx.backend.lower import lower_to_jax
@@ -53,7 +54,14 @@ y_dot = -x[2] * Cos(u[0])
 v_dot = g * Cos(u[0])
 t_dot = 1
 dyn_expr = Concat(x_dot, y_dot, v_dot, t_dot)
-constraint_exprs = [x - Constant(np.array([x.max])), Constant(np.array([x.min])) - x]
+constraint_exprs = [
+    x <= Constant(np.array([x.max])),
+    Constant(np.array([x.min])) <= x,
+]
+
+# Canonicalize all expressions after validation
+dyn_expr = canonicalize(dyn_expr)
+constraint_exprs = [canonicalize(expr) for expr in constraint_exprs]
 
 all_exprs = [dyn_expr] + constraint_exprs
 validate_variable_names(all_exprs)
