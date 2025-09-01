@@ -7,6 +7,7 @@ from openscvx.backend.expr import Add, Concat, Constant
 from openscvx.backend.preprocessing import (
     collect_and_assign_slices,
     validate_constraints_at_root,
+    validate_dynamics_dimension,
     validate_shapes,
     validate_variable_names,
 )
@@ -255,6 +256,157 @@ def test_nested_ctcs_wrapper_raises():
     msg = str(exc.value)
     assert "Nested constraint wrapper found at depth 1" in msg
     assert "constraint wrappers must only appear as top-level roots" in msg
+
+
+def test_single_dynamics_single_state_passes():
+    """Test single dynamics expression with single state - valid case"""
+    x = State("pos", (2,))
+    u = Control("thrust", (2,))
+
+    # State dim = 2, dynamics dim = 2 (matches)
+    dynamics = x + u  # shape (2,)
+
+    # Should not raise
+    validate_dynamics_dimension(dynamics, x)
+
+
+def test_single_dynamics_multiple_states_passes():
+    """Test single dynamics expression with multiple states - valid case"""
+    x1 = State("pos", (2,))
+    x2 = State("vel", (3,))
+    u = Control("thrust", (2,))
+
+    # Total state dim = 2 + 3 = 5, dynamics dim = 5 (matches)
+    dynamics = Concat(x1, x2)  # shape (5,)
+
+    # Should not raise
+    validate_dynamics_dimension(dynamics, [x1, x2])
+
+
+def test_multiple_dynamics_single_state_passes():
+    """Test multiple dynamics expressions with single state - valid case"""
+    x = State("pos", (4,))
+    u = Control("thrust", (2,))
+
+    # State dim = 4
+    dynamics1 = x[:2]  # shape (2,)
+    dynamics2 = x[2:]  # shape (2,)
+    # Combined dynamics dim = 2 + 2 = 4 (matches)
+
+    # Should not raise
+    validate_dynamics_dimension([dynamics1, dynamics2], x)
+
+
+def test_multiple_dynamics_multiple_states_passes():
+    """Test multiple dynamics expressions with multiple states - valid case"""
+    x1 = State("pos", (2,))
+    x2 = State("vel", (2,))
+    u = Control("thrust", (2,))
+
+    # Total state dim = 2 + 2 = 4
+    dynamics1 = x2  # shape (2,)
+    dynamics2 = u  # shape (2,)
+    # Combined dynamics dim = 2 + 2 = 4 (matches)
+
+    # Should not raise
+    validate_dynamics_dimension([dynamics1, dynamics2], [x1, x2])
+
+
+def test_dynamics_dimension_mismatch_raises():
+    """Test dimension mismatch between dynamics and states"""
+    x = State("pos", (3,))
+    u = Control("thrust", (2,))
+
+    # State dim = 3, but dynamics dim = 2 (mismatch!)
+    dynamics = u  # shape (2,)
+
+    with pytest.raises(ValueError) as exc:
+        validate_dynamics_dimension(dynamics, x)
+
+    msg = str(exc.value)
+    assert "dimension mismatch" in msg
+    assert "dynamics has dimension 2" in msg
+    assert "total state dimension is 3" in msg
+
+
+def test_multiple_dynamics_dimension_mismatch_raises():
+    """Test dimension mismatch with multiple dynamics expressions"""
+    x1 = State("pos", (2,))
+    x2 = State("vel", (2,))
+    u = Control("thrust", (2,))
+
+    # Total state dim = 2 + 2 = 4
+    dynamics1 = x1  # shape (2,)
+    dynamics2 = u  # shape (2,)
+    dynamics3 = u[:1]  # shape (1,) - this creates mismatch!
+    # Combined dynamics dim = 2 + 2 + 1 = 5 ≠ 4
+
+    with pytest.raises(ValueError) as exc:
+        validate_dynamics_dimension([dynamics1, dynamics2, dynamics3], [x1, x2])
+
+    msg = str(exc.value)
+    assert "dimension mismatch" in msg
+    assert "combined dimension 5" in msg
+    assert "total state dimension is 4" in msg
+
+
+def test_non_vector_dynamics_raises():
+    """Test that non-1D dynamics expressions raise an error"""
+    x = State("pos", (4,))  # 1D state (flattened)
+    matrix_expr = Constant(np.zeros((2, 2)))  # 2D expression
+
+    with pytest.raises(ValueError) as exc:
+        validate_dynamics_dimension(matrix_expr, x)
+
+    msg = str(exc.value)
+    assert "must be 1-dimensional (vector)" in msg
+    assert "got shape (2, 2)" in msg
+
+
+def test_multiple_dynamics_with_non_vector_raises():
+    """Test that non-1D dynamics in a list raises an error with proper indexing"""
+    x = State("pos", (4,))
+    u = Control("thrust", (2,))
+
+    dynamics1 = u  # shape (2,) - valid vector
+    dynamics2 = Constant(np.zeros((2, 2)))  # shape (2, 2) - invalid!
+
+    with pytest.raises(ValueError) as exc:
+        validate_dynamics_dimension([dynamics1, dynamics2], x)
+
+    msg = str(exc.value)
+    assert "Dynamics expression 1 must be 1-dimensional" in msg
+    assert "got shape (2, 2)" in msg
+
+
+def test_dynamics_from_concat_passes():
+    """Test using Concat to build dynamics expression"""
+    x1 = State("pos", (2,))
+    x2 = State("vel", (3,))
+    u = Control("thrust", (2,))
+
+    # Total state dim = 2 + 3 = 5
+    # Build dynamics using Concat to match
+    dynamics = Concat(x2, u)  # shape (5,) = 3 + 2
+
+    # Should not raise
+    validate_dynamics_dimension(dynamics, [x1, x2])
+
+
+def test_empty_states_list_raises():
+    """Test that empty states list raises appropriate error"""
+    u = Control("thrust", (2,))
+    dynamics = u  # shape (2,)
+
+    # Should work with empty states (total dim = 0)
+    # This might be valid in some edge cases
+    with pytest.raises(ValueError) as exc:
+        validate_dynamics_dimension(dynamics, [])
+
+    msg = str(exc.value)
+    assert "dimension mismatch" in msg
+    assert "dynamics has dimension 2" in msg
+    assert "total state dimension is 0" in msg
 
 
 def test_add_same_shape_passes():

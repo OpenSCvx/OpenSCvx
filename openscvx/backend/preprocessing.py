@@ -187,6 +187,61 @@ def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
         visit(expr, 0)
 
 
+def validate_dynamics_dimension(
+    dynamics_expr: Union[Expr, list[Expr]], states: Union[State, list[State]]
+) -> None:
+    """
+    Validate that dynamics expressions dimension(s) match the total dimension of the given states.
+
+    Args:
+        dynamics_expr: Single dynamics expression or list of dynamics expressions.
+                      Combined, they should represent x_dot = f(x, u, t) for all states.
+        states: Single state variable or list of state variables that the dynamics describe.
+
+    Raises:
+        ValueError: If dimensions don't match or if any dynamics is not a vector
+    """
+    # Normalize inputs to lists
+    dynamics_list = dynamics_expr if isinstance(dynamics_expr, (list, tuple)) else [dynamics_expr]
+    states_list = states if isinstance(states, (list, tuple)) else [states]
+
+    # Calculate total state dimension
+    total_state_dim = sum(int(np.prod(state.shape)) for state in states_list)
+
+    # Validate each dynamics expression and calculate total dynamics dimension
+    total_dynamics_dim = 0
+
+    for i, dyn_expr in enumerate(dynamics_list):
+        # Get the shape of this dynamics expression
+        dynamics_shape = dispatch(dyn_expr)
+
+        # Dynamics should be a 1D vector
+        if len(dynamics_shape) != 1:
+            prefix = f"Dynamics expression {i}" if len(dynamics_list) > 1 else "Dynamics expression"
+            raise ValueError(
+                f"{prefix} must be 1-dimensional (vector), but got shape {dynamics_shape}"
+            )
+
+        total_dynamics_dim += dynamics_shape[0]
+
+    # Check that total dynamics dimension matches total state dimension
+    if total_dynamics_dim != total_state_dim:
+        if len(dynamics_list) == 1:
+            raise ValueError(
+                f"Dynamics dimension mismatch: dynamics has dimension {total_dynamics_dim}, "
+                f"but total state dimension is {total_state_dim}. "
+                f"States: {[(s.name, s.shape) for s in states_list]}"
+            )
+        else:
+            dynamics_dims = [dispatch(dyn)[0] for dyn in dynamics_list]
+            raise ValueError(
+                f"Dynamics dimension mismatch: {len(dynamics_list)} dynamics expressions "
+                f"have combined dimension {total_dynamics_dim} {dynamics_dims}, "
+                f"but total state dimension is {total_state_dim}. "
+                f"States: {[(s.name, s.shape) for s in states_list]}"
+            )
+
+
 _SHAPE_VISITORS: Dict[Type[Expr], Callable[[Expr], tuple[int, ...]]] = {}
 
 
