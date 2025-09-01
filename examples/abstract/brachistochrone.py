@@ -18,6 +18,7 @@ from openscvx.backend.lower import lower_to_jax
 from openscvx.backend.preprocessing import (
     collect_and_assign_slices,
     validate_constraints_at_root,
+    validate_dynamics_dimension,
     validate_shapes,
     validate_variable_names,
 )
@@ -52,15 +53,17 @@ y_dot = -x[2] * Cos(u[0])
 v_dot = g * Cos(u[0])
 t_dot = 1
 dyn_expr = Concat(x_dot, y_dot, v_dot, t_dot)
-constraints_expr = [x - Constant(np.array([x.max])), Constant(np.array([x.min])) - x]
+constraint_exprs = [x - Constant(np.array([x.max])), Constant(np.array([x.min])) - x]
 
-all_exprs = [dyn_expr, constraints_expr[0], constraints_expr[1]]
+all_exprs = [dyn_expr] + constraint_exprs
 validate_variable_names(all_exprs)
 collect_and_assign_slices(all_exprs)
 validate_shapes(all_exprs)
+validate_constraints_at_root(constraint_exprs)
+validate_dynamics_dimension(dyn_expr, x)
 
 dyn_fn = lower_to_jax(dyn_expr)
-fns = lower_to_jax(constraints_expr)
+fns = lower_to_jax(constraint_exprs)
 
 dyn = dynamics(dyn_fn)
 constraints = [ctcs(fn) for fn in fns]
