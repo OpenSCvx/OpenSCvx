@@ -64,9 +64,7 @@ def augment_dynamics_with_ctcs(
 
         # Create a new Variable for the augmented state
         # TODO: In the future, create multiple variables based on idx grouping
-        from openscvx.backend.state import Variable
-
-        aug_var = Variable("ctcs_aug", shape=(1,))
+        aug_var = State(f"_ctcs_aug_{0}", shape=(1,))
         aug_var.expr = augmented_state_expr  # Store the expression in the variable
         augmented_states.append(aug_var)
 

@@ -70,7 +70,7 @@ def test_augment_single_ctcs_constraint():
     assert len(states_aug) == 2  # original + 1 augmented
     assert states_aug[0] is x
     assert isinstance(states_aug[1], Variable)
-    assert states_aug[1].name == "ctcs_aug"
+    assert states_aug[1].name == "_ctcs_aug_0"
     assert states_aug[1].shape == (1,)
 
     # Should include the underlying constraint in node checks
@@ -98,7 +98,7 @@ def test_augment_multiple_ctcs_constraints():
 
     # Check augmented Variable
     assert isinstance(states_aug[1], Variable)
-    assert states_aug[1].name == "ctcs_aug"
+    assert states_aug[1].name == "_ctcs_aug_0"
     assert states_aug[1].shape == (1,)
 
     # The augmented Variable should have an Add expression combining all penalties
@@ -139,7 +139,7 @@ def test_augment_mixed_constraints():
 
     # Check augmented Variable
     assert isinstance(states_aug[2], Variable)
-    assert states_aug[2].name == "ctcs_aug"
+    assert states_aug[2].name == "_ctcs_aug_0"
 
     # Check nodal constraints (regular ones + underlying CTCS constraints)
     assert len(node_constraints) == 4
@@ -236,7 +236,7 @@ def test_augment_empty_states_list():
     # Should create one augmented Variable
     assert len(states_aug) == 1
     assert isinstance(states_aug[0], Variable)
-    assert states_aug[0].name == "ctcs_aug"
+    assert states_aug[0].name == "_ctcs_aug_0"
 
 
 def test_augment_with_different_penalties():
