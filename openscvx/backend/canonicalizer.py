@@ -1,7 +1,8 @@
-from typing import Any, Callable, Dict, Type
+from typing import Any, Callable, Dict, Type, Union
 
 import numpy as np
 
+from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     Add,
     Concat,
@@ -15,6 +16,7 @@ from openscvx.backend.expr import (
     Neg,
     Sub,
 )
+from openscvx.backend.state import State
 
 _CANON_VISITORS: Dict[Type[Expr], Callable] = {}
 
@@ -53,9 +55,11 @@ class Canonicalizer:
     def canonicalize(self, expr: Expr) -> Expr:
         return dispatch(self, expr)
 
+    @visitor(State)
+    @visitor(Control)
     @visitor(Constant)
-    def visit_constant(self, node: Constant) -> Expr:
-        # Constants are already canonical
+    def visit_leaf(self, node: Union[State, Control, Constant]) -> Expr:
+        # leaf nodes are already canonical
         return node
 
     @visitor(Add)
