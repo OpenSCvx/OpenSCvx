@@ -37,7 +37,7 @@ def augment_dynamics_with_ctcs(
         if isinstance(c, CTCS):
             constraints_ctcs.append(c)
         elif isinstance(c, Constraint):
-            pass # constraints_nodal.append(c)
+            pass  # constraints_nodal.append(c)
         else:
             raise ValueError(f"Constraints must be `Constraint` or `CTCS`, got {type(c).__name__}")
 
