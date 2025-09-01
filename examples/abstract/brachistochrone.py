@@ -59,16 +59,17 @@ constraint_exprs = [
     Constant(np.array([x.min])) <= x,
 ]
 
-# Canonicalize all expressions after validation
-dyn_expr = canonicalize(dyn_expr)
-constraint_exprs = [canonicalize(expr) for expr in constraint_exprs]
-
+# Validate expressions
 all_exprs = [dyn_expr] + constraint_exprs
 validate_variable_names(all_exprs)
 collect_and_assign_slices(all_exprs)
 validate_shapes(all_exprs)
 validate_constraints_at_root(constraint_exprs)
 validate_dynamics_dimension(dyn_expr, x)
+
+# Canonicalize all expressions after validation
+dyn_expr = canonicalize(dyn_expr)
+constraint_exprs = [canonicalize(expr) for expr in constraint_exprs]
 
 dyn_fn = lower_to_jax(dyn_expr)
 fns = lower_to_jax(constraint_exprs)
@@ -79,11 +80,11 @@ constraints = [ctcs(fn) for fn in fns]
 
 
 problem = TrajOptProblem(
-    dynamics=dyn,
+    dynamics_fn=dyn,
     x=x,
     u=u,
     idx_time=3,  # Index of time variable in state vector
-    constraints=constraints,
+    constraints_fn=constraints,
     N=n,
     licq_max=1e-8,
 )
