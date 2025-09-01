@@ -144,22 +144,47 @@ def _traverse_with_depth(expr: Expr, visit: Callable[[Expr, int], None], depth: 
 
 def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
     """
-    Raise ValueError if any Constraint is found at depth>0.
+    Raise ValueError if any Constraint or constraint wrapper is found at depth>0.
+    Both raw constraints and constraint wrappers (like CTCS) must only appear
+    at the root level. However, constraints inside constraint wrappers are allowed
+    (e.g., the constraint inside CTCS(x <= 5) is valid).
+
     Accepts a single Expr or a list of Exprs.
     """
+    from openscvx.backend.expr import CTCS  # Import here to avoid circular imports
+
+    # Define constraint wrappers that must also be at root level
+    CONSTRAINT_WRAPPERS = (CTCS,)
+
     # normalize to list
     expr_list = exprs if isinstance(exprs, (list, tuple)) else [exprs]
 
     for expr in expr_list:
 
         def visit(node: Expr, depth: int):
-            if depth > 0 and isinstance(node, Constraint):
-                raise ValueError(
-                    f"Nested Constraint found at depth {depth!r}: {node!r}; "
-                    "constraints must only appear as top‐level roots"
-                )
+            if depth > 0:
+                if isinstance(node, CONSTRAINT_WRAPPERS):
+                    raise ValueError(
+                        f"Nested constraint wrapper found at depth {depth!r}: {node!r}; "
+                        "constraint wrappers must only appear as top-level roots"
+                    )
+                elif isinstance(node, Constraint):
+                    raise ValueError(
+                        f"Nested Constraint found at depth {depth!r}: {node!r}; "
+                        "constraints must only appear as top-level roots"
+                    )
 
-        _traverse_with_depth(expr, visit, depth=0)
+            # If this is a constraint wrapper, don't validate its children
+            # (we allow constraints inside constraint wrappers)
+            if isinstance(node, CONSTRAINT_WRAPPERS):
+                return  # Skip traversing children
+
+            # Otherwise, continue traversing children
+            for child in node.children():
+                visit(child, depth + 1)
+
+        # Start traversal
+        visit(expr, 0)
 
 
 _SHAPE_VISITORS: Dict[Type[Expr], Callable[[Expr], tuple[int, ...]]] = {}

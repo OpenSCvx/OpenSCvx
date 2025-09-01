@@ -226,7 +226,35 @@ def test_nested_constraint_raises():
         validate_constraints_at_root(nested)
     msg = str(exc.value)
     assert "Nested Constraint found at depth 1" in msg
-    assert "constraints must only appear as top‐level roots" in msg
+    assert "constraints must only appear as top-level roots" in msg
+
+
+def test_ctcs_at_root_with_wrapped_constraint_passes():
+    """CTCS(x <= 5) at root level should be valid, even though the constraint is at depth 1"""
+    from openscvx.backend.expr import ctcs
+
+    x = State("x", (1,))
+    constraint = x <= 5
+    wrapped = ctcs(constraint)
+
+    # Should not raise - CTCS at root is OK, and constraint inside CTCS is exempt
+    validate_constraints_at_root(wrapped)
+
+
+def test_nested_ctcs_wrapper_raises():
+    """Add(a, CTCS(x <= 5)) should raise error because CTCS is nested"""
+    from openscvx.backend.expr import ctcs
+
+    a = Constant(np.array([1.0]))
+    x = State("x", (1,))
+    wrapped = ctcs(x <= 5)
+    nested = Add(a, wrapped)
+
+    with pytest.raises(ValueError) as exc:
+        validate_constraints_at_root(nested)
+    msg = str(exc.value)
+    assert "Nested constraint wrapper found at depth 1" in msg
+    assert "constraint wrappers must only appear as top-level roots" in msg
 
 
 def test_add_same_shape_passes():
