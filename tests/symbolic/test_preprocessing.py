@@ -538,3 +538,47 @@ def test_constraint_broadcasting_passes():
     x = State("x", (3,))
     c = Constant(np.array(0.0)) <= x  # broadcasts to vector constraint
     validate_shapes(c)
+
+
+def test_ctcs_basic_shape_validation():
+    """Test basic CTCS shape validation with penalty expression checking"""
+    from openscvx.backend.expr import ctcs
+
+    x = State("x", (3,))
+    constraint = x <= np.ones((3,))
+    wrapped = ctcs(constraint, penalty="squared_relu")
+
+    # Should validate both constraint and penalty expression shapes
+    validate_shapes(wrapped)
+
+
+def test_ctcs_penalty_shape_consistency():
+    """Test that penalty expressions have same shape as constraint LHS"""
+    from openscvx.backend.expr import ctcs
+    from openscvx.backend.preprocessing import dispatch
+
+    x = State("x", (2, 2))  # matrix state
+    constraint = x >= np.zeros((2, 2))
+    wrapped = ctcs(constraint, penalty="huber")
+
+    validate_shapes(wrapped)
+
+    # Penalty should have same shape as constraint LHS
+    penalty_expr = wrapped.penalty_expr()
+    penalty_shape = dispatch(penalty_expr)
+    lhs_shape = dispatch(constraint.lhs)
+    assert penalty_shape == lhs_shape
+
+
+def test_ctcs_constraint_shape_mismatch_raises():
+    """Test that CTCS catches underlying constraint shape mismatches"""
+    from openscvx.backend.expr import ctcs
+
+    x = State("x", (2,))
+    # Create constraint with mismatched shapes
+    constraint = x <= np.ones((3,))  # 2 vs 3 mismatch
+    wrapped = ctcs(constraint)
+
+    # Should raise due to underlying constraint shape mismatch
+    with pytest.raises(ValueError):
+        validate_shapes(wrapped)

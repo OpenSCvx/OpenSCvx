@@ -4,6 +4,7 @@ import numpy as np
 
 from openscvx.backend.control import Control
 from openscvx.backend.expr import (
+    CTCS,
     Add,
     Concat,
     Constant,
@@ -12,12 +13,16 @@ from openscvx.backend.expr import (
     Div,
     Equality,
     Expr,
+    Huber,
     Index,
     Inequality,
     MatMul,
     Mul,
     Neg,
+    PositivePart,
     Sin,
+    SmoothReLU,
+    Square,
     Sub,
     traverse,
 )
@@ -359,3 +364,58 @@ def visit_constraint(node: Constraint) -> tuple[int, ...]:
 
     # 4) return () as usual
     return ()
+
+
+@visitor(CTCS)
+def visit_ctcs(node: CTCS) -> tuple[int, ...]:
+    """
+    CTCS wraps a constraint and transforms it into a penalty expression.
+    The shape of CTCS is the same as its underlying constraint (which is always ()).
+    Also validates that the generated penalty expression has valid shapes.
+    """
+    # First validate the wrapped constraint's shape
+    constraint_shape = dispatch(node.constraint)
+
+    # Also validate the penalty expression that would be generated
+    try:
+        penalty_expr = node.penalty_expr()
+        penalty_shape = dispatch(penalty_expr)
+
+        # The penalty expression should have the same shape as the constraint's LHS
+        # (since penalties operate on the constraint violation)
+        lhs_shape = dispatch(node.constraint.lhs)
+        if penalty_shape != lhs_shape:
+            raise ValueError(
+                f"CTCS penalty expression shape mismatch: "
+                f"penalty has shape {penalty_shape}, but constraint LHS has shape {lhs_shape}"
+            )
+    except Exception as e:
+        # Re-raise with more context about which CTCS node failed
+        raise ValueError(f"CTCS penalty expression validation failed: {e}") from e
+
+    # CTCS transforms constraint to penalty, so it has the same shape as constraint
+    return constraint_shape
+
+
+@visitor(PositivePart)
+def visit_positive_part(node: PositivePart) -> tuple[int, ...]:
+    """pos(x) = max(x, 0) preserves the shape of x"""
+    return dispatch(node.x)
+
+
+@visitor(Square)
+def visit_square(node: Square) -> tuple[int, ...]:
+    """x^2 preserves the shape of x"""
+    return dispatch(node.x)
+
+
+@visitor(Huber)
+def visit_huber(node: Huber) -> tuple[int, ...]:
+    """Huber penalty preserves the shape of x"""
+    return dispatch(node.x)
+
+
+@visitor(SmoothReLU)
+def visit_smooth_relu(node: SmoothReLU) -> tuple[int, ...]:
+    """Smooth ReLU preserves the shape of x"""
+    return dispatch(node.x)
