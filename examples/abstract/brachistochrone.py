@@ -80,11 +80,11 @@ constraints = [ctcs(fn) for fn in fns]
 
 
 problem = TrajOptProblem(
-    dynamics_fn=dyn,
+    dynamics=dyn,
     x=x,
     u=u,
     idx_time=3,  # Index of time variable in state vector
-    constraints_fn=constraints,
+    constraints=constraints,
     N=n,
     licq_max=1e-8,
 )
