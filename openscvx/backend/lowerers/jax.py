@@ -4,6 +4,7 @@ import jax.numpy as jnp
 
 from openscvx.backend.control import Control
 from openscvx.backend.expr import (
+    CTCS,
     Add,
     Concat,
     Constant,
@@ -153,6 +154,13 @@ class JaxLowerer:
         fL = self.lower(node.lhs)
         fR = self.lower(node.rhs)
         return lambda x, u: fL(x, u) - fR(x, u)
+
+    @visitor(CTCS)
+    def visit_ctcs(self, node: CTCS):
+        raise RuntimeError(
+            "CTCS constraint should not be lowered directly. "
+            "It should be processed during augmentation phase."
+        )
 
     @visitor(PositivePart)
     def visit_pos(self, node):

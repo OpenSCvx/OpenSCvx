@@ -4,6 +4,7 @@ import pytest
 
 from openscvx.backend.control import Control
 from openscvx.backend.expr import (
+    CTCS,
     Add,
     Concat,
     Constant,
@@ -689,3 +690,90 @@ def test_penalty_with_control():
     # Expected: [0, 0, 1] since only u[2]=2.0 violates
     expected = jnp.array([0.0, 0.0, 1.0])
     assert jnp.allclose(result, expected)
+
+
+def test_ctcs_constraint_raises_when_lowered_directly():
+    """Test that CTCS constraints raise an error when lowered directly."""
+
+    # Create a simple constraint
+    lhs = Constant(np.array([1.0]))
+    rhs = Constant(np.array([2.0]))
+    constraint = Equality(lhs - rhs, 0)
+
+    # Wrap it in CTCS
+    ctcs_constraint = CTCS(constraint, penalty="squared_relu")
+
+    jl = JaxLowerer()
+
+    # Should raise RuntimeError when trying to lower CTCS directly
+    with pytest.raises(RuntimeError) as excinfo:
+        jl.lower(ctcs_constraint)
+
+    msg = str(excinfo.value)
+    assert "CTCS constraint should not be lowered directly" in msg
+    assert "augmentation phase" in msg
+
+
+def test_ctcs_penalty_expression_can_be_lowered():
+    """Test that the penalty expression from CTCS can be lowered successfully."""
+
+    x = jnp.array([0.5, 1.5, 2.5])
+
+    # Create state variable
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+
+    # Create constraint: x <= 2.0
+    lhs = state
+    rhs = Constant(np.array([2.0, 2.0, 2.0]))
+    constraint = Inequality(lhs - rhs, 0)
+
+    # Wrap in CTCS
+    ctcs_constraint = CTCS(constraint, penalty="squared_relu")
+
+    # Extract the penalty expression (this is what would happen during augmentation)
+    penalty_expr = ctcs_constraint.penalty_expr()
+
+    # The penalty expression should be lowerable
+    jl = JaxLowerer()
+    fn = jl.lower(penalty_expr)
+
+    # Execute the penalty function
+    result = fn(x, None)
+
+    # Expected: Square(PositivePart(x - 2.0)) = [0, 0, 0.25]
+    # Only x[2] = 2.5 violates the constraint x <= 2.0
+    expected = jnp.array([0.0, 0.0, 0.25])
+    assert jnp.allclose(result, expected)
+
+
+def test_ctcs_with_different_penalties():
+    """Test that CTCS penalty expressions work with different penalty types."""
+
+    x = jnp.array([1.0, 2.0, 3.0])
+
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+
+    # Constraint: x <= 1.5 (violations at x[1] and x[2])
+    constraint = Inequality(state - Constant(np.array([1.5, 1.5, 1.5])), np.array([0, 0, 0]))
+
+    # Test different penalty types
+    penalties = ["squared_relu", "huber", "smooth_relu"]
+
+    jl = JaxLowerer()
+
+    for penalty_type in penalties:
+        ctcs_constraint = CTCS(constraint, penalty=penalty_type)
+        penalty_expr = ctcs_constraint.penalty_expr()
+
+        # Should be able to lower without error
+        fn = jl.lower(penalty_expr)
+        result = fn(x, None)
+
+        # All penalties should be zero where constraint is satisfied (x[0] = 1.0 <= 1.5)
+        assert result[0] <= 1e-10  # Essentially zero
+
+        # All penalties should be positive where constraint is violated
+        assert result[1] > 0  # x[1] = 2.0 > 1.5
+        assert result[2] > 0  # x[2] = 3.0 > 1.5
