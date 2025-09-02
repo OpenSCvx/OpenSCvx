@@ -13,7 +13,7 @@ from examples.plotting import (
     plot_brachistochrone_velocity,
 )
 from openscvx.backend.control import Control
-from openscvx.backend.expr import Concat, Constant, Cos, Sin
+from openscvx.backend.expr import Concat, Constant, Cos, Sin, ctcs
 from openscvx.backend.state import Free, Minimize, State
 from openscvx.trajoptproblem import TrajOptProblem
 
@@ -43,8 +43,8 @@ v_dot = g * Cos(u[0])
 t_dot = 1
 dyn_expr = Concat(x_dot, y_dot, v_dot, t_dot)
 constraint_exprs = [
-    x <= Constant(np.array([x.max])),
-    Constant(np.array([x.min])) <= x,
+    ctcs(x <= Constant(np.array([x.max]))),
+    ctcs(Constant(np.array([x.min])) <= x),
 ]
 
 problem = TrajOptProblem(

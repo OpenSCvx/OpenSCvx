@@ -15,6 +15,7 @@ os.environ["EQX_ON_ERROR"] = "nan"
 from openscvx import io
 from openscvx.augmentation.ctcs import sort_ctcs_constraints
 from openscvx.augmentation.dynamics_augmentation import build_augmented_dynamics
+from openscvx.backend.augmentation import augment_dynamics_with_ctcs
 from openscvx.backend.canonicalizer import canonicalize
 from openscvx.backend.control import Control
 from openscvx.backend.expr import CTCS, Constraint, Expr
@@ -121,11 +122,20 @@ class TrajOptProblem:
         dynamics = canonicalize(dynamics)
         constraints = [canonicalize(expr) for expr in constraints]
 
+        # Augment dynamics, states, and controls with CTCS constraints, time dilation
+        dynamics_aug, x_aug, u_aug = augment_dynamics_with_ctcs(dynamics, [x], [u], constraints)
+
+        # TODO: (norrisg) this is somewhat of a hack; using x_aug, u_aug as leaf-node expressions to
+        # assign slices, should probably move into the augmentation functions themselves
+        collect_and_assign_slices(all_exprs + x_aug + u_aug)
+
+        # TODO: (norrisg) allow non-ctcs constraints
         dyn_fn = lower_to_jax(dynamics)
-        fns = lower_to_jax(constraints)
+        # fns = lower_to_jax(constraints)
 
         dynamics_fn = to_dynamics(dyn_fn)
-        constraints_fn = [ctcs(fn) for fn in fns]
+        # constraints_fn = [ctcs(fn) for fn in fns]
+        constraints_fn = []
 
         if params is None:
             params = {}
@@ -137,7 +147,7 @@ class TrajOptProblem:
         if x_prop is None:
             x_prop = deepcopy(x)
 
-        # TODO (norrisg) move this into some augmentation function, if we want to
+        # TODO: (norrisg) move this into some augmentation function, if we want to
         # make this be executed after the init (i.e. within problem.initialize)
         # need to rethink how problem is defined
         constraints_ctcs = []
@@ -158,6 +168,7 @@ class TrajOptProblem:
         )
 
         # Index tracking
+        # TODO: (norrisg) use the `_slice` attribute of the State, Control
         idx_x_true = slice(0, x.shape[0])
         idx_x_true_prop = slice(0, x_prop.shape[0])
         idx_u_true = slice(0, u.shape[0])
