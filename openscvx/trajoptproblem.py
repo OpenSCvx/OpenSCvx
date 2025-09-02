@@ -15,7 +15,17 @@ os.environ["EQX_ON_ERROR"] = "nan"
 from openscvx import io
 from openscvx.augmentation.ctcs import sort_ctcs_constraints
 from openscvx.augmentation.dynamics_augmentation import build_augmented_dynamics
+from openscvx.backend.canonicalizer import canonicalize
 from openscvx.backend.control import Control
+from openscvx.backend.expr import CTCS, Constraint, Expr
+from openscvx.backend.lower import lower_to_jax
+from openscvx.backend.preprocessing import (
+    collect_and_assign_slices,
+    validate_constraints_at_root,
+    validate_dynamics_dimension,
+    validate_shapes,
+    validate_variable_names,
+)
 from openscvx.backend.state import Free, State
 from openscvx.config import (
     Config,
@@ -26,11 +36,12 @@ from openscvx.config import (
     ScpConfig,
     SimConfig,
 )
+from openscvx.constraints import ctcs
 from openscvx.constraints.ctcs import CTCSConstraint
 from openscvx.constraints.nodal import NodalConstraint
 from openscvx.constraints.violation import get_g_funcs
 from openscvx.discretization import get_discretization_solver
-from openscvx.dynamics import Dynamics
+from openscvx.dynamics import dynamics as to_dynamics
 from openscvx.ocp import OptimalControlProblem
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
@@ -46,8 +57,8 @@ if TYPE_CHECKING:
 class TrajOptProblem:
     def __init__(
         self,
-        dynamics: Dynamics,
-        constraints: List[Union[CTCSConstraint, NodalConstraint]],
+        dynamics: Expr,
+        constraints: List[Union[Constraint, CTCS]],
         x: State,
         u: Control,
         N: int,
@@ -98,12 +109,30 @@ class TrajOptProblem:
             None
         """
 
+        # Validate expressions
+        all_exprs = [dynamics] + constraints
+        validate_variable_names(all_exprs)
+        collect_and_assign_slices(all_exprs)
+        validate_shapes(all_exprs)
+        validate_constraints_at_root(constraints)
+        validate_dynamics_dimension(dynamics, x)
+
+        # Canonicalize all expressions after validation
+        dynamics = canonicalize(dynamics)
+        constraints = [canonicalize(expr) for expr in constraints]
+
+        dyn_fn = lower_to_jax(dynamics)
+        fns = lower_to_jax(constraints)
+
+        dynamics_fn = to_dynamics(dyn_fn)
+        constraints_fn = [ctcs(fn) for fn in fns]
+
         if params is None:
             params = {}
         self.params = params
 
         if dynamics_prop is None:
-            dynamics_prop = dynamics
+            dynamics_prop = dynamics_fn
 
         if x_prop is None:
             x_prop = deepcopy(x)
@@ -113,7 +142,7 @@ class TrajOptProblem:
         # need to rethink how problem is defined
         constraints_ctcs = []
         constraints_nodal = []
-        for constraint in constraints:
+        for constraint in constraints_fn:
             if isinstance(constraint, CTCSConstraint):
                 constraints_ctcs.append(constraint)
             elif isinstance(constraint, NodalConstraint):
@@ -210,7 +239,7 @@ class TrajOptProblem:
 
         ctcs_violation_funcs = get_g_funcs(constraints_ctcs)
         self.dynamics_augmented = build_augmented_dynamics(
-            dynamics, ctcs_violation_funcs, idx_x_true, idx_u_true
+            dynamics_fn, ctcs_violation_funcs, idx_x_true, idx_u_true
         )
         self.dynamics_augmented_prop = build_augmented_dynamics(
             dynamics_prop, ctcs_violation_funcs, idx_x_true_prop, idx_u_true

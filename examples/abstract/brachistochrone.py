@@ -12,20 +12,9 @@ from examples.plotting import (
     plot_brachistochrone_position,
     plot_brachistochrone_velocity,
 )
-from openscvx.backend.canonicalizer import canonicalize
 from openscvx.backend.control import Control
 from openscvx.backend.expr import Concat, Constant, Cos, Sin
-from openscvx.backend.lower import lower_to_jax
-from openscvx.backend.preprocessing import (
-    collect_and_assign_slices,
-    validate_constraints_at_root,
-    validate_dynamics_dimension,
-    validate_shapes,
-    validate_variable_names,
-)
 from openscvx.backend.state import Free, Minimize, State
-from openscvx.constraints import ctcs
-from openscvx.dynamics import dynamics
 from openscvx.trajoptproblem import TrajOptProblem
 
 n = 2
@@ -48,7 +37,6 @@ u.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(
 
 g = 9.81
 
-
 x_dot = x[2] * Sin(u[0])
 y_dot = -x[2] * Cos(u[0])
 v_dot = g * Cos(u[0])
@@ -59,32 +47,12 @@ constraint_exprs = [
     Constant(np.array([x.min])) <= x,
 ]
 
-# Validate expressions
-all_exprs = [dyn_expr] + constraint_exprs
-validate_variable_names(all_exprs)
-collect_and_assign_slices(all_exprs)
-validate_shapes(all_exprs)
-validate_constraints_at_root(constraint_exprs)
-validate_dynamics_dimension(dyn_expr, x)
-
-# Canonicalize all expressions after validation
-dyn_expr = canonicalize(dyn_expr)
-constraint_exprs = [canonicalize(expr) for expr in constraint_exprs]
-
-dyn_fn = lower_to_jax(dyn_expr)
-fns = lower_to_jax(constraint_exprs)
-
-dyn = dynamics(dyn_fn)
-constraints = [ctcs(fn) for fn in fns]
-# constraints = [ctcs(lambda x_, u_: x_ - x.true.max), ctcs(lambda x_, u_: x.true.min - x_)]
-
-
 problem = TrajOptProblem(
-    dynamics=dyn,
+    dynamics=dyn_expr,
     x=x,
     u=u,
     idx_time=3,  # Index of time variable in state vector
-    constraints=constraints,
+    constraints=constraint_exprs,
     N=n,
     licq_max=1e-8,
 )
