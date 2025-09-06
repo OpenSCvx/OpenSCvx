@@ -28,6 +28,7 @@ from openscvx.backend.preprocessing import (
     validate_variable_names,
 )
 from openscvx.backend.state import Free, State
+from openscvx.backend.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
 from openscvx.config import (
     Config,
     ConvexSolverConfig,
@@ -129,8 +130,11 @@ class TrajOptProblem:
         # assign slices, should probably move into the augmentation functions themselves
         collect_and_assign_slices(all_exprs + x_aug + u_aug)
 
+        x_unified: UnifiedState = unify_states(x_aug)
+        u_unified: UnifiedControl = unify_controls(u_aug)
+
         # TODO: (norrisg) allow non-ctcs constraints
-        dyn_fn = lower_to_jax(dynamics)
+        dyn_fn = lower_to_jax(dynamics_aug)
         # fns = lower_to_jax(constraints)
 
         dynamics_fn = to_dynamics(dyn_fn)
@@ -145,7 +149,7 @@ class TrajOptProblem:
             dynamics_prop = dynamics_fn
 
         if x_prop is None:
-            x_prop = deepcopy(x)
+            x_prop = deepcopy(x_unified)
 
         # TODO: (norrisg) move this into some augmentation function, if we want to
         # make this be executed after the init (i.e. within problem.initialize)
@@ -167,58 +171,42 @@ class TrajOptProblem:
             constraints_ctcs, N
         )
 
+        # TODO: (norrisg) remvoe this
+        num_augmented_states = 1
+
         # Index tracking
         # TODO: (norrisg) use the `_slice` attribute of the State, Control
-        idx_x_true = slice(0, x.shape[0])
+        idx_x_true = slice(0, x_unified.true.shape[0])
         idx_x_true_prop = slice(0, x_prop.shape[0])
-        idx_u_true = slice(0, u.shape[0])
+        idx_u_true = slice(0, u_unified.true.shape[0])
         idx_constraint_violation = slice(idx_x_true.stop, idx_x_true.stop + num_augmented_states)
         idx_constraint_violation_prop = slice(
             idx_x_true_prop.stop, idx_x_true_prop.stop + num_augmented_states
         )
 
+        # TODO: (norrisg) Hacky! Integrate this nicely into augmentation functions
         idx_time_dilation = slice(idx_u_true.stop, idx_u_true.stop + 1)
+        u_unified.min[idx_time_dilation] = time_dilation_factor_min * x_unified.final[idx_time]
+        u_unified.max[idx_time_dilation] = time_dilation_factor_max * x_unified.final[idx_time]
+        new_col = np.ones((u_unified.guess.shape[0], 1)) * x_unified.final[idx_time]
+        u_unified.guess = np.concatenate([u_unified.guess, new_col], axis=1)
 
         # check that idx_time is in the correct range
-        assert idx_time >= 0 and idx_time < len(x.max), (
+        assert idx_time >= 0 and idx_time < len(x_unified.max), (
             "idx_time must be in the range of the state vector and non-negative"
         )
         idx_time = slice(idx_time, idx_time + 1)
-
-        # Create a new state object for the augmented states
-        if num_augmented_states != 0:
-            y = State(name="y", shape=(num_augmented_states,))
-            y.initial = np.zeros((num_augmented_states,))
-            y.final = np.array([Free(0)] * num_augmented_states)
-            y.guess = np.zeros(
-                (
-                    N,
-                    num_augmented_states,
-                )
-            )
-            y.min = np.zeros((num_augmented_states,))
-            y.max = licq_max * np.ones((num_augmented_states,))
-
-            x.append(y, augmented=True)
-            x_prop.append(y, augmented=True)
-
-        s = Control(name="s", shape=(1,))
-        s.min = np.array([time_dilation_factor_min * x.final[idx_time][0]])
-        s.max = np.array([time_dilation_factor_max * x.final[idx_time][0]])
-        s.guess = np.ones((N, 1)) * x.final[idx_time][0]
-
-        u.append(s, augmented=True)
 
         if dis is None:
             dis = DiscretizationConfig()
 
         if sim is None:
             sim = SimConfig(
-                x=x,
+                x=x_unified,
                 x_prop=x_prop,
-                u=u,
-                total_time=x.initial[idx_time][0],
-                n_states=x.initial.shape[0],
+                u=u_unified,
+                total_time=x_unified.initial[idx_time][0],
+                n_states=x_unified.initial.shape[0],
                 n_states_prop=x_prop.initial.shape[0],
                 idx_x_true=idx_x_true,
                 idx_x_true_prop=idx_x_true_prop,

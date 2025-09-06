@@ -3,8 +3,7 @@ from typing import Callable, Optional
 
 import numpy as np
 
-from openscvx.backend.control import Control
-from openscvx.backend.state import State
+from openscvx.backend.unified import UnifiedControl, UnifiedState
 
 
 def get_affine_scaling_matrices(n, minimum, maximum):
@@ -186,9 +185,9 @@ class SimConfig:
 
     def __init__(
         self,
-        x: State,
-        x_prop: State,
-        u: Control,
+        x: UnifiedState,
+        x_prop: UnifiedState,
+        u: UnifiedControl,
         total_time: float,
         idx_x_true: slice,
         idx_x_true_prop: slice,
