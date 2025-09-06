@@ -24,6 +24,7 @@ from openscvx.backend.expr import (
     SmoothReLU,
     Square,
     Sub,
+    Sum,
     traverse,
 )
 from openscvx.backend.state import State
@@ -320,6 +321,15 @@ def visit_concat(node: Concat):
     return (sum(s[0] for s in shapes),) + shapes[0][1:]
 
 
+@visitor(Sum)
+def visit_sum(node: Sum) -> tuple[int, ...]:
+    """sum() reduces any shape to a scalar"""
+    # Validate that the operand has a valid shape
+    operand_shape = dispatch(node.operand)
+    # Sum always produces a scalar regardless of input shape
+    return ()
+
+
 @visitor(Index)
 def visit_index(node: Index):
     base_shape = dispatch(node.base)
@@ -370,31 +380,27 @@ def visit_constraint(node: Constraint) -> tuple[int, ...]:
 def visit_ctcs(node: CTCS) -> tuple[int, ...]:
     """
     CTCS wraps a constraint and transforms it into a penalty expression.
-    The shape of CTCS is the same as its underlying constraint (which is always ()).
-    Also validates that the generated penalty expression has valid shapes.
+    The penalty expression is always summed, so CTCS always produces a scalar.
     """
     # First validate the wrapped constraint's shape
-    constraint_shape = dispatch(node.constraint)
+    dispatch(node.constraint)
 
     # Also validate the penalty expression that would be generated
     try:
         penalty_expr = node.penalty_expr()
         penalty_shape = dispatch(penalty_expr)
 
-        # The penalty expression should have the same shape as the constraint's LHS
-        # (since penalties operate on the constraint violation)
-        lhs_shape = dispatch(node.constraint.lhs)
-        if penalty_shape != lhs_shape:
+        # The penalty expression should always be scalar due to Sum wrapper
+        if penalty_shape != ():
             raise ValueError(
-                f"CTCS penalty expression shape mismatch: "
-                f"penalty has shape {penalty_shape}, but constraint LHS has shape {lhs_shape}"
+                f"CTCS penalty expression should be scalar, but got shape {penalty_shape}"
             )
     except Exception as e:
         # Re-raise with more context about which CTCS node failed
         raise ValueError(f"CTCS penalty expression validation failed: {e}") from e
 
-    # CTCS transforms constraint to penalty, so it has the same shape as constraint
-    return constraint_shape
+    # CTCS always produces a scalar due to the Sum in penalty_expr
+    return ()
 
 
 @visitor(PositivePart)

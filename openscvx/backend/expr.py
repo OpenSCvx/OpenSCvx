@@ -151,6 +151,19 @@ class Neg(Expr):
         return f"(-{self.operand!r})"
 
 
+class Sum(Expr):
+    """Sum all elements of an expression (reduction operation)"""
+
+    def __init__(self, operand):
+        self.operand = to_expr(operand)
+
+    def children(self):
+        return [self.operand]
+
+    def __repr__(self):
+        return f"sum({self.operand!r})"
+
+
 class Index(Expr):
     """Expr that means “take this Expr and index/slice it.”"""
 
@@ -344,13 +357,15 @@ class CTCS(Expr):
         lhs = self.constraint.lhs
 
         if self.penalty == "squared_relu":
-            return Square(PositivePart(lhs))
+            penalty = Square(PositivePart(lhs))
         elif self.penalty == "huber":
-            return Huber(PositivePart(lhs))
+            penalty = Huber(PositivePart(lhs))
         elif self.penalty == "smooth_relu":
-            return SmoothReLU(lhs)
+            penalty = SmoothReLU(lhs)
         else:
             raise ValueError(f"Unknown penalty {self.penalty!r}")
+
+        return Sum(penalty)
 
 
 def ctcs(constraint: Constraint, penalty: str = "squared_relu") -> CTCS:

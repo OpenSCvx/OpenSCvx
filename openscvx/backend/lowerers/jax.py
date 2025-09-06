@@ -24,6 +24,7 @@ from openscvx.backend.expr import (
     SmoothReLU,
     Square,
     Sub,
+    Sum,
 )
 from openscvx.backend.state import State
 
@@ -117,6 +118,11 @@ class JaxLowerer:
     def visit_neg(self, node: Neg):
         fO = self.lower(node.operand)
         return lambda x, u: -fO(x, u)
+
+    @visitor(Sum)
+    def visit_sum(self, node: Sum):
+        f = self.lower(node.operand)
+        return lambda x, u: jnp.sum(f(x, u))
 
     @visitor(Index)
     def visit_index(self, node: Index):

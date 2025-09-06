@@ -227,6 +227,38 @@ def test_add_mul_requires_at_least_two_terms():
         Mul(Constant(2))
 
 
+def test_sum_node_creation_and_children():
+    """Test Sum node creation and tree structure."""
+    from openscvx.backend.expr import Sum
+
+    x = Variable("x", shape=(3,))
+    sum_expr = Sum(x)
+
+    assert isinstance(sum_expr, Sum)
+    assert sum_expr.children() == [x]
+    assert repr(sum_expr) == "sum(Var('x'))"
+
+
+def test_sum_wraps_constants_and_expressions():
+    """Test Sum node with various input types."""
+    from openscvx.backend.expr import Sum
+
+    # Sum of a constant array
+    arr = np.array([1.0, 2.0, 3.0])
+    sum1 = Sum(arr)
+    assert isinstance(sum1.operand, Constant)
+    assert np.array_equal(sum1.operand.value, arr)
+    assert repr(sum1) == "sum(Const(array([1., 2., 3.])))"
+
+    # Sum of an arithmetic expression
+    x = Variable("x", shape=(2,))
+    y = Variable("y", shape=(2,))
+    sum2 = Sum(x + y)
+    assert isinstance(sum2.operand, Add)
+    assert len(sum2.operand.children()) == 2
+    assert repr(sum2) == "sum((Var('x') + Var('y')))"
+
+
 # TODO: (norrisg) should be moved to separate ctcs testing file
 
 
