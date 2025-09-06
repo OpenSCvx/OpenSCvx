@@ -1,5 +1,7 @@
 from typing import List, Tuple
 
+import numpy as np
+
 from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     CTCS,
@@ -8,7 +10,7 @@ from openscvx.backend.expr import (
     Constraint,
     Expr,
 )
-from openscvx.backend.state import State
+from openscvx.backend.state import Free, State
 
 
 def augment_dynamics_with_ctcs(
@@ -69,6 +71,12 @@ def augment_dynamics_with_ctcs(
         # Create a new Variable for the augmented state
         # TODO: In the future, create multiple variables based on idx grouping
         aug_var = State(f"_ctcs_aug_{0}", shape=(1,))
+        aug_var.initial = np.array([0])
+        aug_var.final = np.array([Free(0)])
+        aug_var.min = np.array([0])
+        # TODO: (norrisg) take `LICQ_max`, `N` as inputs to this function
+        aug_var.max = np.array([1e-8]) # LICQ_MAX
+        aug_var.guess = np.zeros([2, 1])  # N x num augmented states,
         states_augmented.append(aug_var)
 
         # Concatenate with original dynamics
@@ -84,6 +92,7 @@ def augment_dynamics_with_ctcs(
         xdot_aug = xdot
 
     time_dilation = Control("_time_dilation", shape=(1,))
+    # TODO: (norrisg) Construct the min, max, initial, final, guess for time_dilation here
     controls_augmented.append(time_dilation)
 
     # # Collect all constraints that should be checked at nodes
