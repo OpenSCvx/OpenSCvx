@@ -440,8 +440,15 @@ def unify_states(states: List[State], name: str = "unified_state") -> UnifiedSta
             _final_arrays.append(state._final)
         if state.initial_type is not None:
             initial_type_arrays.append(state.initial_type)
+        else:
+            # If initial_type is None, fill with "Free" for this state's dimensions
+            initial_type_arrays.append(np.full(state.shape[0], "Free", dtype=object))
+
         if state.final_type is not None:
             final_type_arrays.append(state.final_type)
+        else:
+            # If final_type is None, fill with "Free" for this state's dimensions
+            final_type_arrays.append(np.full(state.shape[0], "Free", dtype=object))
 
     # Concatenate arrays if they exist
     unified_min = np.concatenate(min_arrays) if min_arrays else None
