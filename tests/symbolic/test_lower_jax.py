@@ -741,10 +741,11 @@ def test_ctcs_penalty_expression_can_be_lowered():
     # Execute the penalty function
     result = fn(x, None)
 
-    # Expected: Square(PositivePart(x - 2.0)) = [0, 0, 0.25]
+    # Expected: Sum(Square(PositivePart(x - 2.0))) = sum([0, 0, 0.25]) = 0.25
     # Only x[2] = 2.5 violates the constraint x <= 2.0
-    expected = jnp.array([0.0, 0.0, 0.25])
+    expected = 0.25  # Scalar result from Sum
     assert jnp.allclose(result, expected)
+    assert result.shape == ()  # Should be scalar
 
 
 def test_ctcs_with_different_penalties():
@@ -770,10 +771,11 @@ def test_ctcs_with_different_penalties():
         # Should be able to lower without error
         fn = jl.lower(penalty_expr)
         result = fn(x, None)
-
-        # All penalties should be zero where constraint is satisfied (x[0] = 1.0 <= 1.5)
-        assert result[0] <= 1e-10  # Essentially zero
-
-        # All penalties should be positive where constraint is violated
-        assert result[1] > 0  # x[1] = 2.0 > 1.5
-        assert result[2] > 0  # x[2] = 3.0 > 1.5
+        # Result should be a scalar (sum of all penalties)
+        assert result.shape == ()  # Should be scalar
+        # Total penalty should be positive since there are violations
+        assert result > 0
+        if penalty_type == "squared_relu":
+            # Expected: 0^2 + 0.5^2 + 1.5^2 = 0 + 0.25 + 2.25 = 2.5
+            expected = 0.25 + 2.25
+            assert jnp.allclose(result, expected, rtol=1e-5)

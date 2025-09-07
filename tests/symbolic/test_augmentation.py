@@ -13,6 +13,7 @@ from openscvx.backend.expr import (
     PositivePart,
     SmoothReLU,
     Square,
+    Sum,
     Sub,
     ctcs,
 )
@@ -178,8 +179,9 @@ def test_augment_penalty_expression_structure():
 
     # The second expression should be the penalty
     penalty_expr = xdot_aug.exprs[1]
-    assert isinstance(penalty_expr, Square)
-    assert isinstance(penalty_expr.x, PositivePart)
+    assert isinstance(penalty_expr, Sum)
+    assert isinstance(penalty_expr.operand, Square)
+    assert isinstance(penalty_expr.operand.x, PositivePart)
 
     # Should have time dilation control
     assert len(controls_aug) == 1
@@ -201,7 +203,7 @@ def test_augment_single_penalty_no_add():
 
     # Single penalty should not be wrapped in Add
     penalty_expr = xdot_aug.exprs[1]
-    assert isinstance(penalty_expr, Square)  # Direct penalty, not Add
+    assert isinstance(penalty_expr, Sum)  # Direct penalty, not Add
 
 
 def test_augment_multiple_penalties_create_add():

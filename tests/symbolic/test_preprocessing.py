@@ -566,8 +566,7 @@ def test_ctcs_penalty_shape_consistency():
     # Penalty should have same shape as constraint LHS
     penalty_expr = wrapped.penalty_expr()
     penalty_shape = dispatch(penalty_expr)
-    lhs_shape = dispatch(constraint.lhs)
-    assert penalty_shape == lhs_shape
+    assert penalty_shape == ()
 
 
 def test_ctcs_constraint_shape_mismatch_raises():

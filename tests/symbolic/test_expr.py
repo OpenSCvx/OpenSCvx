@@ -13,6 +13,7 @@ from openscvx.backend.expr import (
     Mul,
     Neg,
     Sub,
+    Sum,
     ctcs,
     to_expr,
     traverse,
@@ -446,22 +447,23 @@ def test_ctcs_penalty_expr_method():
     # squared_relu penalty
     ctcs1 = CTCS(constraint, penalty="squared_relu")
     penalty1 = ctcs1.penalty_expr()
-    assert isinstance(penalty1, Square)
-    assert isinstance(penalty1.x, PositivePart)
-    assert penalty1.x.x is constraint.lhs
+    assert isinstance(penalty1, Sum)
+    assert isinstance(penalty1.operand, Square)
+    assert isinstance(penalty1.operand.x, PositivePart)
+    assert penalty1.operand.x.x is constraint.lhs
 
     # huber penalty
     ctcs2 = CTCS(constraint, penalty="huber")
     penalty2 = ctcs2.penalty_expr()
-    assert isinstance(penalty2, Huber)
-    assert isinstance(penalty2.x, PositivePart)
-    assert penalty2.x.x is constraint.lhs
+    assert isinstance(penalty2.operand, Huber)
+    assert isinstance(penalty2.operand.x, PositivePart)
+    assert penalty2.operand.x.x is constraint.lhs
 
     # smooth_relu penalty
     ctcs3 = CTCS(constraint, penalty="smooth_relu")
     penalty3 = ctcs3.penalty_expr()
-    assert isinstance(penalty3, SmoothReLU)
-    assert penalty3.x is constraint.lhs
+    assert isinstance(penalty3.operand, SmoothReLU)
+    assert penalty3.operand.x is constraint.lhs
 
 
 def test_ctcs_unknown_penalty():
