@@ -30,7 +30,9 @@ def test_augment_no_constraints():
     controls = []
     N = 1
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(xdot, states, controls, [], N, idx_time=1)
+    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
+        xdot, states, controls, [], N, idx_time=1
+    )
 
     # No augmentation should occur for dynamics, but time dilation should be added
     assert xdot_aug is xdot
@@ -611,8 +613,7 @@ def test_augmented_state_bounds():
     constraint = ctcs(x <= 1.0, penalty="squared_relu")
 
     xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [constraint], N, idx_time=0,
-        licq_min=0.001, licq_max=0.01
+        xdot, states, controls, [constraint], N, idx_time=0, licq_min=0.001, licq_max=0.01
     )
 
     # Check augmented state bounds
@@ -636,17 +637,29 @@ def test_time_dilation_control_bounds():
     constraint = ctcs(x[0] <= 1.0, penalty="squared_relu")
 
     xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [constraint], N, idx_time=1,
-        time_dilation_factor_min=0.5, time_dilation_factor_max=2.5
+        xdot,
+        states,
+        controls,
+        [constraint],
+        N,
+        idx_time=1,
+        time_dilation_factor_min=0.5,
+        time_dilation_factor_max=2.5,
     )
 
     # Check time dilation control bounds
     time_dilation = controls_aug[0]  # should be the only control
     expected_min = 0.5 * 15.0  # min_factor * time_final
     expected_max = 2.5 * 15.0  # max_factor * time_final
-    expected_guess = 15.0      # time_final
+    expected_guess = 15.0  # time_final
 
-    assert time_dilation.min[0] == expected_min, f"Expected min {expected_min}, got {time_dilation.min[0]}"
-    assert time_dilation.max[0] == expected_max, f"Expected max {expected_max}, got {time_dilation.max[0]}"
+    assert time_dilation.min[0] == expected_min, (
+        f"Expected min {expected_min}, got {time_dilation.min[0]}"
+    )
+    assert time_dilation.max[0] == expected_max, (
+        f"Expected max {expected_max}, got {time_dilation.max[0]}"
+    )
     assert time_dilation.guess.shape == (N, 1), "Time dilation guess should have correct shape"
-    assert np.allclose(time_dilation.guess, expected_guess), f"Expected guess {expected_guess}, got {time_dilation.guess}"
+    assert np.allclose(time_dilation.guess, expected_guess), (
+        f"Expected guess {expected_guess}, got {time_dilation.guess}"
+    )

@@ -125,8 +125,13 @@ class TrajOptProblem:
 
         # Augment dynamics, states, and controls with CTCS constraints, time dilation
         dynamics_aug, x_aug, u_aug = augment_dynamics_with_ctcs(
-            dynamics, [x], [u], constraints, N, idx_time,
-            licq_min=licq_min, 
+            dynamics,
+            [x],
+            [u],
+            constraints,
+            N,
+            idx_time,
+            licq_min=licq_min,
             licq_max=licq_max,
             time_dilation_factor_min=time_dilation_factor_min,
             time_dilation_factor_max=time_dilation_factor_max,

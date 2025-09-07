@@ -107,14 +107,14 @@ def augment_dynamics_with_ctcs(
         xdot_aug = xdot
 
     time_dilation = Control("_time_dilation", shape=(1,))
-    
+
     # Set up time dilation bounds and initial guess
     # Get the time value from the main state (assuming states[0] is the main state)
     time_final = states[0].final[idx_time]
     time_dilation.min = np.array([time_dilation_factor_min * time_final])
     time_dilation.max = np.array([time_dilation_factor_max * time_final])
     time_dilation.guess = np.ones([N, 1]) * time_final
-        
+
     controls_augmented.append(time_dilation)
 
     # # Collect all constraints that should be checked at nodes
