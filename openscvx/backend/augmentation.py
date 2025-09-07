@@ -75,7 +75,7 @@ def augment_dynamics_with_ctcs(
         aug_var.final = np.array([Free(0)])
         aug_var.min = np.array([0])
         # TODO: (norrisg) take `LICQ_max`, `N` as inputs to this function
-        aug_var.max = np.array([1e-8]) # LICQ_MAX
+        aug_var.max = np.array([1e-8])  # LICQ_MAX
         aug_var.guess = np.zeros([2, 1])  # N x num augmented states,
         states_augmented.append(aug_var)
 
