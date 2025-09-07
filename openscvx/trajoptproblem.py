@@ -8,13 +8,12 @@ from typing import TYPE_CHECKING, List, Optional, Union
 
 import jax
 import numpy as np
-from jax import export
+from jax import export, jacfwd
 
 os.environ["EQX_ON_ERROR"] = "nan"
 
 from openscvx import io
 from openscvx.augmentation.ctcs import sort_ctcs_constraints
-from openscvx.augmentation.dynamics_augmentation import build_augmented_dynamics
 from openscvx.backend.augmentation import augment_dynamics_with_ctcs
 from openscvx.backend.canonicalizer import canonicalize
 from openscvx.backend.control import Control
@@ -41,8 +40,8 @@ from openscvx.config import (
 from openscvx.constraints import ctcs
 from openscvx.constraints.ctcs import CTCSConstraint
 from openscvx.constraints.nodal import NodalConstraint
-from openscvx.constraints.violation import get_g_funcs
 from openscvx.discretization import get_discretization_solver
+from openscvx.dynamics import Dynamics
 from openscvx.dynamics import dynamics as to_dynamics
 from openscvx.ocp import OptimalControlProblem
 from openscvx.post_processing import propagate_trajectory_results
@@ -243,12 +242,18 @@ class TrajOptProblem:
         sim.constraints_ctcs = constraints_ctcs
         sim.constraints_nodal = constraints_nodal
 
-        ctcs_violation_funcs = get_g_funcs(constraints_ctcs)
-        self.dynamics_augmented = build_augmented_dynamics(
-            dynamics_fn, ctcs_violation_funcs, idx_x_true, idx_u_true
+        # Create dynamics objects from the symbolic augmented dynamics
+        self.dynamics_augmented = Dynamics(
+            f=dyn_fn,
+            A=jacfwd(dyn_fn, argnums=0),
+            B=jacfwd(dyn_fn, argnums=1),
         )
-        self.dynamics_augmented_prop = build_augmented_dynamics(
-            dynamics_prop, ctcs_violation_funcs, idx_x_true_prop, idx_u_true
+        # For propagation, use the same augmented dynamics function
+        # (since CTCS augmentation applies to both discretization and propagation)
+        self.dynamics_augmented_prop = Dynamics(
+            f=dyn_fn,
+            A=jacfwd(dyn_fn, argnums=0),
+            B=jacfwd(dyn_fn, argnums=1),
         )
 
         self.settings = Config(
