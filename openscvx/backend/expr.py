@@ -1,4 +1,4 @@
-from typing import Callable, Union
+from typing import Callable, Optional, Tuple, Union
 
 import numpy as np
 
@@ -337,16 +337,24 @@ class CTCS(Expr):
     during lowering/compilation.
     """
 
-    def __init__(self, constraint: Constraint, penalty: str = "squared_relu"):
+    def __init__(
+        self,
+        constraint: Constraint,
+        penalty: str = "squared_relu",
+        nodes: Optional[Tuple[int, int]] = None,
+    ):
         if not isinstance(constraint, Constraint):
             raise TypeError("CTCS must wrap a Constraint")
         self.constraint = constraint
         self.penalty = penalty
+        self.nodes = nodes  # (start, end) node range or None for all nodes
 
     def children(self):
         return [self.constraint]
 
     def __repr__(self):
+        if self.nodes is not None:
+            return f"CTCS({self.constraint!r}, penalty={self.penalty!r}, nodes={self.nodes})"
         return f"CTCS({self.constraint!r}, penalty={self.penalty!r})"
 
     def penalty_expr(self) -> Expr:
@@ -368,6 +376,8 @@ class CTCS(Expr):
         return Sum(penalty)
 
 
-def ctcs(constraint: Constraint, penalty: str = "squared_relu") -> CTCS:
+def ctcs(
+    constraint: Constraint, penalty: str = "squared_relu", nodes: Optional[Tuple[int, int]] = None
+) -> CTCS:
     """Helper function to create CTCS constraints."""
-    return CTCS(constraint, penalty)
+    return CTCS(constraint, penalty, nodes)

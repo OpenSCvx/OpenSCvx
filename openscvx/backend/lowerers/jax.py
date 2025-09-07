@@ -164,10 +164,30 @@ class JaxLowerer:
 
     @visitor(CTCS)
     def visit_ctcs(self, node: CTCS):
-        raise RuntimeError(
-            "CTCS constraint should not be lowered directly. "
-            "It should be processed during augmentation phase."
-        )
+        # Lower the penalty expression (which includes the constraint residual)
+        penalty_expr_fn = self.lower(node.penalty_expr())
+
+        def ctcs_fn(x, u, **kwargs):
+            # Extract current node from kwargs
+            current_node = kwargs.get("node", 0)
+
+            # Check if constraint is active at this node
+            if node.nodes is not None:
+                start_node, end_node = node.nodes
+                is_active = (start_node <= current_node) & (current_node < end_node)
+
+                # Use jax.lax.cond for conditional evaluation
+                return cond(
+                    is_active,
+                    lambda _: penalty_expr_fn(x, u, **kwargs),
+                    lambda _: 0.0,
+                    operand=None,
+                )
+            else:
+                # Always active if no node range specified
+                return penalty_expr_fn(x, u, **kwargs)
+
+        return ctcs_fn
 
     @visitor(PositivePart)
     def visit_pos(self, node):

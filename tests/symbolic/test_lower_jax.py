@@ -692,26 +692,31 @@ def test_penalty_with_control():
     assert jnp.allclose(result, expected)
 
 
-def test_ctcs_constraint_raises_when_lowered_directly():
-    """Test that CTCS constraints raise an error when lowered directly."""
+def test_ctcs_constraint_can_be_lowered_directly():
+    """Test that CTCS constraints can now be lowered directly with node context."""
+    x = jnp.array([1.0, 2.0, 3.0])
 
-    # Create a simple constraint
-    lhs = Constant(np.array([1.0]))
-    rhs = Constant(np.array([2.0]))
-    constraint = Equality(lhs - rhs, 0)
+    # Create state variable
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
 
-    # Wrap it in CTCS
+    # Create constraint: x <= 2.0
+    lhs = state
+    rhs = Constant(np.array([2.0, 2.0, 2.0]))
+    constraint = Inequality(lhs - rhs, Constant(np.array([0.0, 0.0, 0.0])))
+
+    # Wrap in CTCS
     ctcs_constraint = CTCS(constraint, penalty="squared_relu")
 
     jl = JaxLowerer()
+    fn = jl.lower(ctcs_constraint)
 
-    # Should raise RuntimeError when trying to lower CTCS directly
-    with pytest.raises(RuntimeError) as excinfo:
-        jl.lower(ctcs_constraint)
+    # Should work without node context (always active)
+    result = fn(x, None)
 
-    msg = str(excinfo.value)
-    assert "CTCS constraint should not be lowered directly" in msg
-    assert "augmentation phase" in msg
+    # Expected: sum(max(x - 2, 0)^2) = sum([0, 0, 1]) = 1.0
+    assert jnp.allclose(result, 1.0)
+    assert result.shape == ()  # Should be scalar
 
 
 def test_ctcs_penalty_expression_can_be_lowered():
@@ -779,3 +784,89 @@ def test_ctcs_with_different_penalties():
             # Expected: 0^2 + 0.5^2 + 1.5^2 = 0 + 0.25 + 2.25 = 2.5
             expected = 0.25 + 2.25
             assert jnp.allclose(result, expected, rtol=1e-5)
+
+
+def test_ctcs_with_node_range():
+    """Test that CTCS constraints respect node ranges."""
+    x = jnp.array([3.0])  # Violates constraint x <= 2.0
+
+    state = State("x", (1,))
+    state._slice = slice(0, 1)
+
+    # Constraint: x <= 2.0
+    constraint = Inequality(state - Constant(np.array([2.0])), Constant(np.array([0.0])))
+
+    # CTCS active only between nodes 5-10
+    ctcs_constraint = CTCS(constraint, penalty="squared_relu", nodes=(5, 10))
+
+    jl = JaxLowerer()
+    fn = jl.lower(ctcs_constraint)
+
+    # Test at different nodes
+    result_node_3 = fn(x, None, node=3)  # Before active range
+    result_node_7 = fn(x, None, node=7)  # Within active range
+    result_node_12 = fn(x, None, node=12)  # After active range
+
+    # Should be zero outside active range
+    assert jnp.allclose(result_node_3, 0.0)
+    assert jnp.allclose(result_node_12, 0.0)
+
+    # Should have penalty within active range
+    # Expected: sum(max(3 - 2, 0)^2) = 1.0
+    assert jnp.allclose(result_node_7, 1.0)
+
+
+def test_ctcs_without_node_range_always_active():
+    """Test that CTCS constraints without node range are always active."""
+    x = jnp.array([2.5])  # Violates constraint x <= 2.0
+
+    state = State("x", (1,))
+    state._slice = slice(0, 1)
+
+    # Constraint: x <= 2.0
+    constraint = Inequality(state - Constant(np.array([2.0])), Constant(np.array([0.0])))
+
+    # CTCS without node range (always active)
+    ctcs_constraint = CTCS(constraint, penalty="squared_relu")
+
+    jl = JaxLowerer()
+    fn = jl.lower(ctcs_constraint)
+
+    # Test at different nodes - should always be active
+    result_node_0 = fn(x, None, node=0)
+    result_node_50 = fn(x, None, node=50)
+    result_node_100 = fn(x, None, node=100)
+
+    # Should have same penalty at all nodes
+    # Expected: sum(max(2.5 - 2, 0)^2) = 0.25
+    expected = 0.25
+    assert jnp.allclose(result_node_0, expected)
+    assert jnp.allclose(result_node_50, expected)
+    assert jnp.allclose(result_node_100, expected)
+
+
+def test_ctcs_with_extra_kwargs():
+    """Test that kwargs flow through all expression types."""
+    x = jnp.array([1.0, 2.0, 3.0])
+    u = jnp.array([0.5, 1.0])
+
+    # Create a complex expression involving multiple nodes
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+    control = Control("u", (2,))
+    control._slice = slice(0, 2)
+
+    # Complex expression: (x[0] + x[1]) * u[0] + x[2] / u[1] - 5.0
+    expr = Sub(
+        Add(Mul(Add(state[0], state[1]), control[0]), Div(state[2], control[1])), Constant(5.0)
+    )
+
+    jl = JaxLowerer()
+    fn = jl.lower(expr)
+
+    # Should work with arbitrary kwargs
+    result = fn(x, u, node=10, param1=100, param2="test")
+
+    # Expected: (1 + 2) * 0.5 + 3 / 1.0 - 5.0 = 1.5 + 3.0 - 5.0 = -0.5
+    expected = -0.5
+    assert jnp.allclose(result, expected)
