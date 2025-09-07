@@ -19,8 +19,11 @@ def augment_dynamics_with_ctcs(
     controls: List[Control],
     constraints: List[Expr],
     N,
+    idx_time,
     licq_min=0.0,
     licq_max=1e-4,
+    time_dilation_factor_min=0.3,
+    time_dilation_factor_max=3.0,
 ) -> Tuple[Expr, List[State], List[Control]]:
     """
     Augment dynamics with continuous-time constraint satisfaction (CTCS).
@@ -30,6 +33,12 @@ def augment_dynamics_with_ctcs(
         states: The list of state variables
         controls: The list of control variables
         constraints: List of constraints (mix of CTCS and regular Constraints)
+        N: Number of discretization nodes
+        licq_min: Minimum value for LICQ augmented state
+        licq_max: Maximum value for LICQ augmented state
+        time_dilation_factor_min: Minimum time dilation factor
+        time_dilation_factor_max: Maximum time dilation factor
+        idx_time: Index of time variable in the state vector for time dilation setup
 
     Returns:
         Tuple of:
@@ -97,7 +106,14 @@ def augment_dynamics_with_ctcs(
         xdot_aug = xdot
 
     time_dilation = Control("_time_dilation", shape=(1,))
-    # TODO: (norrisg) Construct the min, max, initial, final, guess for time_dilation here
+    
+    # Set up time dilation bounds and initial guess
+    # Get the time value from the main state (assuming states[0] is the main state)
+    time_final = states[0].final[idx_time]
+    time_dilation.min = np.array([time_dilation_factor_min * time_final])
+    time_dilation.max = np.array([time_dilation_factor_max * time_final])
+    time_dilation.guess = np.ones([N, 1]) * time_final
+        
     controls_augmented.append(time_dilation)
 
     # # Collect all constraints that should be checked at nodes

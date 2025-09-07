@@ -125,7 +125,11 @@ class TrajOptProblem:
 
         # Augment dynamics, states, and controls with CTCS constraints, time dilation
         dynamics_aug, x_aug, u_aug = augment_dynamics_with_ctcs(
-            dynamics, [x], [u], constraints, N, licq_min=licq_min, licq_max=licq_max
+            dynamics, [x], [u], constraints, N, idx_time,
+            licq_min=licq_min, 
+            licq_max=licq_max,
+            time_dilation_factor_min=time_dilation_factor_min,
+            time_dilation_factor_max=time_dilation_factor_max,
         )
 
         # TODO: (norrisg) this is somewhat of a hack; using x_aug, u_aug as leaf-node expressions to
@@ -186,12 +190,8 @@ class TrajOptProblem:
             idx_x_true_prop.stop, idx_x_true_prop.stop + num_augmented_states
         )
 
-        # TODO: (norrisg) Hacky! Integrate this nicely into augmentation functions
+        # Time dilation index for reference
         idx_time_dilation = slice(idx_u_true.stop, idx_u_true.stop + 1)
-        u_unified.min[idx_time_dilation] = time_dilation_factor_min * x_unified.final[idx_time]
-        u_unified.max[idx_time_dilation] = time_dilation_factor_max * x_unified.final[idx_time]
-        new_col = np.ones((u_unified.guess.shape[0], 1)) * x_unified.final[idx_time]
-        u_unified.guess = np.concatenate([u_unified.guess, new_col], axis=1)
 
         # check that idx_time is in the correct range
         assert idx_time >= 0 and idx_time < len(x_unified.max), (
