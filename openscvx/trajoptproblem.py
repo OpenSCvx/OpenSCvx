@@ -124,7 +124,9 @@ class TrajOptProblem:
         constraints = [canonicalize(expr) for expr in constraints]
 
         # Augment dynamics, states, and controls with CTCS constraints, time dilation
-        dynamics_aug, x_aug, u_aug = augment_dynamics_with_ctcs(dynamics, [x], [u], constraints)
+        dynamics_aug, x_aug, u_aug = augment_dynamics_with_ctcs(
+            dynamics, [x], [u], constraints, N, licq_min=licq_min, licq_max=licq_max
+        )
 
         # TODO: (norrisg) this is somewhat of a hack; using x_aug, u_aug as leaf-node expressions to
         # assign slices, should probably move into the augmentation functions themselves

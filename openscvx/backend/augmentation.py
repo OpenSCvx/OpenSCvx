@@ -14,7 +14,13 @@ from openscvx.backend.state import Free, State
 
 
 def augment_dynamics_with_ctcs(
-    xdot: Expr, states: List[State], controls: List[Control], constraints: List[Expr]
+    xdot: Expr,
+    states: List[State],
+    controls: List[Control],
+    constraints: List[Expr],
+    N,
+    licq_min=0.0,
+    licq_max=1e-4,
 ) -> Tuple[Expr, List[State], List[Control]]:
     """
     Augment dynamics with continuous-time constraint satisfaction (CTCS).
@@ -73,10 +79,9 @@ def augment_dynamics_with_ctcs(
         aug_var = State(f"_ctcs_aug_{0}", shape=(1,))
         aug_var.initial = np.array([0])
         aug_var.final = np.array([Free(0)])
-        aug_var.min = np.array([0])
-        # TODO: (norrisg) take `LICQ_max`, `N` as inputs to this function
-        aug_var.max = np.array([1e-8])  # LICQ_MAX
-        aug_var.guess = np.zeros([2, 1])  # N x num augmented states,
+        aug_var.min = np.array([licq_min])
+        aug_var.max = np.array([licq_max])
+        aug_var.guess = np.zeros([N, 1])  # N x num augmented states,
         states_augmented.append(aug_var)
 
         # Concatenate with original dynamics
