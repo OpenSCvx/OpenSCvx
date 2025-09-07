@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from openscvx.backend.augmentation import augment_dynamics_with_ctcs
+from openscvx.backend.augmentation import augment_dynamics_with_ctcs, sort_ctcs_constraints
 from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     CTCS,
@@ -663,3 +663,118 @@ def test_time_dilation_control_bounds():
     assert np.allclose(time_dilation.guess, expected_guess), (
         f"Expected guess {expected_guess}, got {time_dilation.guess}"
     )
+
+
+def test_ctcs_idx_grouping_auto_assignment():
+    """Test automatic idx assignment for constraints without explicit idx."""
+    x = State("x", (2,))
+
+    c1 = ctcs(x[0] <= 1.0, nodes=(0, 5))  # No idx specified
+    c2 = ctcs(x[1] <= 2.0, nodes=(0, 5))  # Same nodes, should get same idx
+    c3 = ctcs(x[0] <= 3.0, nodes=(3, 8))  # Different nodes, should get different idx
+
+    constraints = [c1, c2, c3]
+    sorted_constraints, node_intervals, num_states = sort_ctcs_constraints(constraints, 10)
+
+    # Should have 2 groups: (0,5) and (3,8)
+    assert num_states == 2
+    assert node_intervals == [(0, 5), (3, 8)]
+
+    # c1 and c2 should have same idx (0), c3 should have idx 1
+    assert c1.idx == c2.idx == 0
+    assert c3.idx == 1
+
+
+def test_ctcs_idx_grouping_explicit_assignment():
+    """Test explicit idx assignment and validation."""
+    x = State("x", (2,))
+
+    c1 = ctcs(x[0] <= 1.0, nodes=(0, 5), idx=1)  # Explicit idx
+    c2 = ctcs(x[1] <= 2.0, nodes=(0, 5), idx=1)  # Same nodes, same idx - OK
+    c3 = ctcs(x[0] <= 3.0, nodes=(3, 8), idx=0)  # Different nodes, different idx - OK
+
+    constraints = [c1, c2, c3]
+    sorted_constraints, node_intervals, num_states = sort_ctcs_constraints(constraints, 10)
+
+    # Should have 2 groups with correct ordering
+    assert num_states == 2
+    assert node_intervals == [(3, 8), (0, 5)]  # idx 0, then idx 1
+
+    assert c1.idx == c2.idx == 1
+    assert c3.idx == 0
+
+
+def test_ctcs_idx_grouping_mixed_assignment():
+    """Test mixed explicit and auto idx assignment."""
+    x = State("x", (3,))
+
+    c1 = ctcs(x[0] <= 1.0, nodes=(0, 5))  # Auto - should get idx 0
+    c2 = ctcs(x[1] <= 2.0, nodes=(0, 5), idx=2)  # Explicit idx 2
+    c3 = ctcs(x[2] <= 3.0, nodes=(3, 8))  # Auto - should get idx 1
+
+    constraints = [c1, c2, c3]
+    sorted_constraints, node_intervals, num_states = sort_ctcs_constraints(constraints, 10)
+
+    # Should have 3 groups: auto-assigned 0, auto-assigned 1, explicit 2
+    assert num_states == 3
+    assert node_intervals == [(0, 5), (3, 8), (0, 5)]  # idx 0, 1, 2
+
+    assert c1.idx == 0  # Auto-assigned to same interval as c2
+    assert c2.idx == 2  # Explicit
+    assert c3.idx == 1  # Auto-assigned
+
+
+def test_ctcs_idx_validation_errors():
+    """Test validation errors for invalid idx usage."""
+    x = State("x", (2,))
+
+    # Test: same idx with different node intervals
+    c1 = ctcs(x[0] <= 1.0, nodes=(0, 5), idx=0)
+    c2 = ctcs(x[1] <= 2.0, nodes=(3, 8), idx=0)  # Different nodes, same idx - ERROR
+
+    with pytest.raises(
+        ValueError, match="idx=0 was first used with interval.*but now you gave it interval"
+    ):
+        sort_ctcs_constraints([c1, c2], 10)
+
+    # Test: non-contiguous idx values
+    c3 = ctcs(x[0] <= 1.0, nodes=(0, 5), idx=0)
+    c4 = ctcs(x[1] <= 2.0, nodes=(3, 8), idx=2)  # Gap: missing idx=1
+
+    with pytest.raises(ValueError, match="must form a contiguous block starting from 0"):
+        sort_ctcs_constraints([c3, c4], 10)
+
+
+def test_ctcs_multiple_augmented_states():
+    """Test augmentation creates multiple augmented states for different idx groups."""
+    x = State("x", (2,))
+    x.final = np.array([0.0, 10.0])
+    xdot = x
+    states = [x]
+    controls = []
+    N = 1
+
+    # Create constraints with different node intervals (different idx groups)
+    c1 = ctcs(x[0] <= 1.0, nodes=(0, 5), idx=0)
+    c2 = ctcs(x[1] <= 2.0, nodes=(0, 5), idx=0)  # Same group as c1
+    c3 = ctcs(x[0] <= 3.0, nodes=(3, 8), idx=1)  # Different group
+
+    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
+        xdot, states, controls, [c1, c2, c3], N, idx_time=1
+    )
+
+    # Should have 2 augmented states (for 2 idx groups)
+    assert len(states_aug) == 3  # original + 2 augmented
+    assert states_aug[0] is x
+    assert states_aug[1].name == "_ctcs_aug_0"
+    assert states_aug[2].name == "_ctcs_aug_1"
+
+    # Augmented dynamics should have 3 parts: original + 2 penalty expressions
+    assert isinstance(xdot_aug, Concat)
+    assert len(xdot_aug.exprs) == 3  # original + 2 penalty groups
+
+    # First penalty should be Add (c1 + c2), second should be Sum (c3 only)
+    penalty1 = xdot_aug.exprs[1]  # idx 0 group
+    penalty2 = xdot_aug.exprs[2]  # idx 1 group
+    assert isinstance(penalty1, Add)  # Multiple penalties summed
+    assert isinstance(penalty2, Sum)  # Single penalty
