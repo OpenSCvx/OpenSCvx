@@ -54,7 +54,7 @@ def test_jax_lower_constant():
     const = Constant(np.array([[1.0, 2.0], [3.0, 4.0]]))
     jl = JaxLowerer()
     f = jl.visit_constant(const)
-    out = f(None, None)
+    out = f(None, None, None)
     assert isinstance(out, jnp.ndarray)
     assert out.shape == (2, 2)
     assert jnp.allclose(out, jnp.array([[1, 2], [3, 4]]))
@@ -80,7 +80,7 @@ def test_jax_lower_state_with_slice():
     s._slice = slice(2, 6)
     jl = JaxLowerer()
     f = jl.visit_state(s)
-    out = f(x, None)
+    out = f(x, None, None)
     assert isinstance(out, jnp.ndarray)
     assert out.shape == (4,)
     assert jnp.allclose(out, x[2:6])
@@ -92,7 +92,7 @@ def test_jax_lower_control_with_slice():
     c._slice = slice(5, 8)
     jl = JaxLowerer()
     f = jl.visit_control(c)
-    out = f(None, u)
+    out = f(None, u, None)
     assert isinstance(out, jnp.ndarray)
     assert out.shape == (3,)
     assert jnp.allclose(out, u[5:8])
@@ -109,9 +109,9 @@ def test_jax_lower_add_and_mul_of_slices():
 
     jl = JaxLowerer()
     f_res_add = jl.visit_add(expr_add)
-    res_add = f_res_add(x, None)
+    res_add = f_res_add(x, None, None)
     f_res_mul = jl.visit_mul(expr_mul)
-    res_mul = f_res_mul(x, None)
+    res_mul = f_res_mul(x, None, None)
 
     assert jnp.allclose(res_add, x[0:3] + x[3:6])
     assert jnp.allclose(res_mul, x[0:3] * x[3:6])
@@ -130,9 +130,9 @@ def test_jax_lower_sub_and_div_of_slices():
 
     jl = JaxLowerer()
     f_res_sub = jl.visit_sub(expr_sub)
-    res_sub = f_res_sub(x, u)
+    res_sub = f_res_sub(x, u, None)
     f_res_div = jl.visit_div(expr_div)
-    res_div = f_res_div(x, u)
+    res_div = f_res_div(x, u, None)
 
     assert jnp.allclose(res_sub, x[0:3] - u[0:3])
     assert jnp.allclose(res_div, x[0:3] / c.value)
@@ -146,7 +146,7 @@ def test_jax_lower_matmul_vector_matrix():
 
     jl = JaxLowerer()
     f = jl.visit_matmul(expr)
-    out = f(None, None)
+    out = f(None, None, None)
     assert isinstance(out, jnp.ndarray)
     assert out.shape == (2,)
     assert jnp.allclose(out, jnp.array([3.0, 8.0]))
@@ -165,7 +165,7 @@ def test_jax_lower_neg_and_composite():
     expr = Neg(Mul(Add(a, b), c))
     jl = JaxLowerer()
     f = jl.visit_neg(expr)
-    out = f(x, u)
+    out = f(x, u, None)
 
     expected = -((x[0:2] + u[0:2]) * jnp.array([1.0, 1.0]))
     assert jnp.allclose(out, expected)
@@ -176,7 +176,7 @@ def test_lower_to_jax_constant_produces_callable():
     fns = lower_to_jax([c])
     assert isinstance(fns, list) and len(fns) == 1
     fn = fns[0]
-    out = fn(None, None)
+    out = fn(None, None, None)
     assert isinstance(out, jnp.ndarray)
     assert out.shape == (2, 2)
     assert jnp.allclose(out, jnp.array([[1.0, 2.0], [3.0, 4.0]]))
@@ -191,7 +191,7 @@ def test_lower_to_jax_add_with_slices():
     expr = Add(a, b)
 
     fn = lower_to_jax(expr)
-    out = fn(x, None)
+    out = fn(x, None, None)
     expected = x[0:3] + x[3:6]
     assert jnp.allclose(out, expected)
 
@@ -209,8 +209,8 @@ def test_lower_to_jax_multiple_exprs_returns_in_order():
     assert len(fns) == 2
 
     f_const, f_x = fns
-    assert jnp.allclose(f_const(x, None), jnp.array([1.0, 2.0, 3.0]))
-    assert jnp.allclose(f_x(x, u), x)
+    assert jnp.allclose(f_const(x, None, None), jnp.array([1.0, 2.0, 3.0]))
+    assert jnp.allclose(f_x(x, u, None), x)
 
 
 def test_equality_constraint_lowering():
@@ -230,7 +230,7 @@ def test_equality_constraint_lowering():
 
     jl = JaxLowerer()
     fn = jl.visit_constraint(constraint)
-    residual = fn(x, u)
+    residual = fn(x, u, None)
 
     # Residual should be lhs - rhs = x - 2*u
     expected = x - 2.0 * u
@@ -252,7 +252,7 @@ def test_inequality_constraint_lowering():
 
     jl = JaxLowerer()
     fn = jl.visit_constraint(constraint)  # Both use the same visitor
-    residual = fn(x, None)
+    residual = fn(x, None, None)
 
     # Residual should be lhs - rhs = x - 2.0
     expected = x - 2.0
@@ -284,7 +284,7 @@ def test_constraint_lowering_with_lower_to_jax():
 
     # Lower using the top-level function
     fn = lower_to_jax(constraint)
-    residual = fn(x, u)
+    residual = fn(x, u, None)
 
     # Expected: pos[0] + 2*vel - pos[1] = 1.0 + 2*0.5 - 3.0 = -1.0
     expected = 1.0 + 2.0 * 0.5 - 3.0
@@ -302,7 +302,7 @@ def test_concat_simple():
     expr = Concat(a, b, c)
 
     fn = lower_to_jax(expr)
-    out = fn(x, None)
+    out = fn(x, None, None)
     expected = jnp.concatenate([x[0:2], x[2:4], jnp.array([9.0])], axis=0)
     assert jnp.allclose(out, expected)
     assert out.shape == (5,)
@@ -326,7 +326,7 @@ def test_lower_to_jax_double_integrator():
 
     dynamics_expr = Concat(pos_dot, vel_dot)
     fn = lower_to_jax(dynamics_expr)
-    xdot = fn(x, u)
+    xdot = fn(x, u, None)
 
     expected = jnp.concatenate([x[3:6], u / m + jnp.array([0.0, 0.0, g])], axis=0)
 
@@ -349,8 +349,8 @@ def test_index_and_slice():
     fn_slice = lower_to_jax(expr_slice)
 
     # check results
-    out_elem = fn_elem(x, None)
-    out_slice = fn_slice(x, None)
+    out_elem = fn_elem(x, None, None)
+    out_slice = fn_slice(x, None, None)
 
     assert out_elem.shape == () or out_elem.shape == ()  # scalar or 0-D
     assert out_elem == x[2]
@@ -380,7 +380,7 @@ def test_lower_to_jax_double_integrator_indexed():
 
     # lower and execute
     fn = lower_to_jax(dynamics_expr)
-    xdot = fn(x_jax, u_jax)
+    xdot = fn(x_jax, u_jax, None)
 
     # expected by hand
     expected = jnp.concatenate([x_jax[3:6], u_jax / m + jnp.array([0.0, 0.0, g])], axis=0)
@@ -398,7 +398,7 @@ def test_positive_part_constant():
     expr = PositivePart(Constant(values))
 
     fn = lower_to_jax(expr)
-    result = fn(None, None)
+    result = fn(None, None, None)
 
     expected = np.array([0.0, 0.0, 0.0, 1.0, 2.0])
     assert jnp.allclose(result, expected)
@@ -413,7 +413,7 @@ def test_positive_part_state():
     expr = PositivePart(state)
 
     fn = lower_to_jax(expr)
-    result = fn(x, None)
+    result = fn(x, None, None)
 
     expected = jnp.maximum(x, 0.0)
     assert jnp.allclose(result, expected)
@@ -431,7 +431,7 @@ def test_positive_part_expression():
     expr = PositivePart(Sub(state, threshold))
 
     fn = lower_to_jax(expr)
-    result = fn(x, None)
+    result = fn(x, None, None)
 
     expected = jnp.array([0.0, 0.0, 1.0])  # max(x - 2, 0)
     assert jnp.allclose(result, expected)
@@ -443,7 +443,7 @@ def test_square_constant():
     expr = Square(Constant(values))
 
     fn = lower_to_jax(expr)
-    result = fn(None, None)
+    result = fn(None, None, None)
 
     expected = values**2
     assert jnp.allclose(result, expected)
@@ -458,7 +458,7 @@ def test_square_state():
     expr = Square(state)
 
     fn = lower_to_jax(expr)
-    result = fn(x, None)
+    result = fn(x, None, None)
 
     expected = x * x
     assert jnp.allclose(result, expected)
@@ -475,7 +475,7 @@ def test_squared_relu_pattern():
     expr = Square(PositivePart(state))
 
     fn = lower_to_jax(expr)
-    result = fn(x, None)
+    result = fn(x, None, None)
 
     # Expected: [0, 0, 0, 1, 4]
     expected = jnp.maximum(x, 0.0) ** 2
@@ -490,7 +490,7 @@ def test_huber_constant():
     expr = Huber(Constant(values), delta=delta)
 
     fn = lower_to_jax(expr)
-    result = fn(None, None)
+    result = fn(None, None, None)
 
     # Huber formula:
     # if |x| <= delta: 0.5 * x^2
@@ -511,7 +511,7 @@ def test_huber_state_various_deltas():
     # Test with small delta
     expr_small = Huber(state, delta=0.1)
     fn_small = lower_to_jax(expr_small)
-    result_small = fn_small(x, None)
+    result_small = fn_small(x, None, None)
 
     # Most values should be in the linear region
     expected_small = jnp.where(jnp.abs(x) <= 0.1, 0.5 * x**2, 0.1 * (jnp.abs(x) - 0.5 * 0.1))
@@ -520,7 +520,7 @@ def test_huber_state_various_deltas():
     # Test with large delta
     expr_large = Huber(state, delta=3.0)
     fn_large = lower_to_jax(expr_large)
-    result_large = fn_large(x, None)
+    result_large = fn_large(x, None, None)
 
     # All values should be in the quadratic region
     expected_large = 0.5 * x**2  # Since all |x| <= 3.0
@@ -538,7 +538,7 @@ def test_huber_with_positive_part():
     expr = Huber(PositivePart(state), delta=0.5)
 
     fn = lower_to_jax(expr)
-    result = fn(x, None)
+    result = fn(x, None, None)
 
     # First apply positive part
     pos_x = jnp.maximum(x, 0.0)
@@ -555,7 +555,7 @@ def test_smooth_relu_constant():
     expr = SmoothReLU(Constant(values), c=c)
 
     fn = lower_to_jax(expr)
-    result = fn(None, None)
+    result = fn(None, None, None)
 
     # SmoothReLU: sqrt(max(x, 0)^2 + c^2) - c
     expected = jnp.sqrt(jnp.maximum(values, 0.0) ** 2 + c**2) - c
@@ -572,7 +572,7 @@ def test_smooth_relu_state():
     expr = SmoothReLU(state, c=c)
 
     fn = lower_to_jax(expr)
-    result = fn(x, None)
+    result = fn(x, None, None)
 
     expected = jnp.sqrt(jnp.maximum(x, 0.0) ** 2 + c**2) - c
     assert jnp.allclose(result, expected)
@@ -589,7 +589,7 @@ def test_smooth_relu_approaches_relu():
     expr = SmoothReLU(state, c=1e-12)
 
     fn = lower_to_jax(expr)
-    result = fn(x, None)
+    result = fn(x, None, None)
 
     # Should be very close to max(x, 0)
     expected = jnp.maximum(x, 0.0)
@@ -607,7 +607,7 @@ def test_smooth_relu_differentiability_at_zero():
     expr = SmoothReLU(state, c=c)
 
     fn = lower_to_jax(expr)
-    result = fn(x, None)
+    result = fn(x, None, None)
 
     # At x=0, should equal 0 (since sqrt(c^2) - c = 0)
     assert jnp.abs(result[2]) < 1e-10
@@ -632,7 +632,7 @@ def test_penalty_in_constraint_expression():
     penalty = Square(PositivePart(violation))
 
     fn = lower_to_jax(penalty)
-    result = fn(x, u)
+    result = fn(x, u, None)
 
     # Expected: [0, 0, 0.25] since only x[2]=2.5 violates
     expected = jnp.array([0.0, 0.0, 0.25])
@@ -655,9 +655,9 @@ def test_combined_penalties():
     fn_hub = lower_to_jax(huber_penalty)
     fn_smooth = lower_to_jax(smooth_relu)
 
-    result_sq = fn_sq(x, None)
-    result_hub = fn_hub(x, None)
-    result_smooth = fn_smooth(x, None)
+    result_sq = fn_sq(x, None, None)
+    result_hub = fn_hub(x, None, None)
+    result_smooth = fn_smooth(x, None, None)
 
     # Squared ReLU should be most aggressive for large violations
     assert result_sq[4] > result_hub[4]  # At x=2.0
@@ -685,7 +685,7 @@ def test_penalty_with_control():
     penalty = Square(PositivePart(upper_violation))
 
     fn = lower_to_jax(penalty)
-    result = fn(None, u)
+    result = fn(None, u, None)
 
     # Expected: [0, 0, 1] since only u[2]=2.0 violates
     expected = jnp.array([0.0, 0.0, 1.0])
@@ -712,7 +712,7 @@ def test_ctcs_constraint_can_be_lowered_directly():
     fn = jl.lower(ctcs_constraint)
 
     # Should work without node context (always active)
-    result = fn(x, None)
+    result = fn(x, None, None)
 
     # Expected: sum(max(x - 2, 0)^2) = sum([0, 0, 1]) = 1.0
     assert jnp.allclose(result, 1.0)
@@ -744,7 +744,7 @@ def test_ctcs_penalty_expression_can_be_lowered():
     fn = jl.lower(penalty_expr)
 
     # Execute the penalty function
-    result = fn(x, None)
+    result = fn(x, None, None)
 
     # Expected: Sum(Square(PositivePart(x - 2.0))) = sum([0, 0, 0.25]) = 0.25
     # Only x[2] = 2.5 violates the constraint x <= 2.0
@@ -775,7 +775,7 @@ def test_ctcs_with_different_penalties():
 
         # Should be able to lower without error
         fn = jl.lower(penalty_expr)
-        result = fn(x, None)
+        result = fn(x, None, None)
         # Result should be a scalar (sum of all penalties)
         assert result.shape == ()  # Should be scalar
         # Total penalty should be positive since there are violations
@@ -803,9 +803,9 @@ def test_ctcs_with_node_range():
     fn = jl.lower(ctcs_constraint)
 
     # Test at different nodes
-    result_node_3 = fn(x, None, node=3)  # Before active range
-    result_node_7 = fn(x, None, node=7)  # Within active range
-    result_node_12 = fn(x, None, node=12)  # After active range
+    result_node_3 = fn(x, None, 3)  # Before active range
+    result_node_7 = fn(x, None, 7)  # Within active range
+    result_node_12 = fn(x, None, 12)  # After active range
 
     # Should be zero outside active range
     assert jnp.allclose(result_node_3, 0.0)
@@ -833,9 +833,9 @@ def test_ctcs_without_node_range_always_active():
     fn = jl.lower(ctcs_constraint)
 
     # Test at different nodes - should always be active
-    result_node_0 = fn(x, None, node=0)
-    result_node_50 = fn(x, None, node=50)
-    result_node_100 = fn(x, None, node=100)
+    result_node_0 = fn(x, None, 0)
+    result_node_50 = fn(x, None, 50)
+    result_node_100 = fn(x, None, 100)
 
     # Should have same penalty at all nodes
     # Expected: sum(max(2.5 - 2, 0)^2) = 0.25
