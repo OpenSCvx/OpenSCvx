@@ -86,11 +86,12 @@ def augment_dynamics_with_ctcs(
         # Create a new Variable for the augmented state
         # TODO: In the future, create multiple variables based on idx grouping
         aug_var = State(f"_ctcs_aug_{0}", shape=(1,))
-        aug_var.initial = np.array([0])
+        aug_var.initial = np.array([licq_min])  # Set initial to respect bounds
         aug_var.final = np.array([Free(0)])
         aug_var.min = np.array([licq_min])
         aug_var.max = np.array([licq_max])
-        aug_var.guess = np.zeros([N, 1])  # N x num augmented states,
+        # Set guess to licq_min as well
+        aug_var.guess = np.full([N, 1], licq_min)  # N x num augmented states
         states_augmented.append(aug_var)
 
         # Concatenate with original dynamics

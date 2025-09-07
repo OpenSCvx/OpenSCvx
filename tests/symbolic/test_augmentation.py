@@ -24,12 +24,13 @@ from openscvx.backend.state import State
 def test_augment_no_constraints():
     """Test augmentation with no constraints."""
     x = State("x", (2,))
+    x.final = np.array([0.0, 10.0])  # Add time at index 1
     xdot = Add(x, Constant(np.ones(2)))
     states = [x]
     controls = []
     N = 1
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(xdot, states, controls, [], N)
+    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(xdot, states, controls, [], N, idx_time=1)
 
     # No augmentation should occur for dynamics, but time dilation should be added
     assert xdot_aug is xdot
@@ -43,6 +44,7 @@ def test_augment_no_constraints():
 def test_augment_only_nodal_constraints():
     """Test with only regular (nodal) constraints."""
     x = State("x", (2,))
+    x.final = np.array([0.0, 10.0])  # Add time at index 1
     xdot = Add(x, Constant(np.ones(2)))
     states = [x]
     controls = []
@@ -52,7 +54,7 @@ def test_augment_only_nodal_constraints():
     constraint = x[0] <= 1.0
 
     xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [constraint], N
+        xdot, states, controls, [constraint], N, idx_time=1
     )
 
     # No dynamics augmentation, but time dilation should be added
@@ -65,6 +67,7 @@ def test_augment_only_nodal_constraints():
 def test_augment_single_ctcs_constraint():
     """Test augmentation with a single CTCS constraint."""
     x = State("x", (2,))
+    x.final = np.array([0.0, 10.0])  # Add time at index 1
     u = Control("u", (1,))
     xdot = Add(x, u)
     states = [x]
@@ -75,7 +78,7 @@ def test_augment_single_ctcs_constraint():
     constraint = ctcs(x[0] <= 1.0, penalty="squared_relu")
 
     xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [constraint], N
+        xdot, states, controls, [constraint], N, idx_time=1
     )
 
     # Should have augmented dynamics and new State
@@ -95,6 +98,7 @@ def test_augment_single_ctcs_constraint():
 def test_augment_multiple_ctcs_constraints():
     """Test augmentation with multiple CTCS constraints."""
     x = State("x", (3,))
+    x.final = np.array([0.0, 10.0, 0.0])  # Add time at index 1
     xdot = x * 2.0
     states = [x]
     controls = []
@@ -106,7 +110,7 @@ def test_augment_multiple_ctcs_constraints():
     c3 = ctcs(x[2] == 0.0, penalty="smooth_relu")
 
     xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [c1, c2, c3], N
+        xdot, states, controls, [c1, c2, c3], N, idx_time=1
     )
 
     # Should have 1 augmented State (all penalties summed together)
@@ -131,7 +135,9 @@ def test_augment_multiple_ctcs_constraints():
 def test_augment_mixed_constraints():
     """Test with both CTCS and regular constraints."""
     x = State("x", (2,))
+    x.final = np.array([0.0, 10.0])  # Add time at index 1
     y = State("y", (1,))
+    y.final = np.array([0.0])
     xdot = Concat(x, y)
     states = [x, y]
     controls = []
@@ -144,7 +150,7 @@ def test_augment_mixed_constraints():
     c4 = x[0] + x[1] <= 3.0  # Regular constraint
 
     xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [c1, c2, c3, c4], N
+        xdot, states, controls, [c1, c2, c3, c4], N, idx_time=1
     )
 
     # Should have 1 augmented State (for 2 CTCS constraints summed together)
@@ -167,6 +173,7 @@ def test_augment_mixed_constraints():
 def test_augment_penalty_expression_structure():
     """Test that the penalty expressions are correctly structured."""
     x = State("x", (1,))
+    x.final = np.array([10.0])  # Add time at index 0
     xdot = x
     states = [x]
     controls = []
@@ -176,7 +183,7 @@ def test_augment_penalty_expression_structure():
     constraint = ctcs(x <= 1.0, penalty="squared_relu")
 
     xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [constraint], N
+        xdot, states, controls, [constraint], N, idx_time=0
     )
 
     # Check structure of augmented dynamics
@@ -197,6 +204,7 @@ def test_augment_penalty_expression_structure():
 def test_augment_single_penalty_no_add():
     """Test that single penalty doesn't create unnecessary Add expression."""
     x = State("x", (1,))
+    x.final = np.array([10.0])  # Add time at index 0
     xdot = x
     states = [x]
     controls = []
@@ -205,7 +213,7 @@ def test_augment_single_penalty_no_add():
     constraint = ctcs(x <= 1.0, penalty="squared_relu")
 
     xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [constraint], N
+        xdot, states, controls, [constraint], N, idx_time=0
     )
 
     # Single penalty should not be wrapped in Add
@@ -216,6 +224,7 @@ def test_augment_single_penalty_no_add():
 def test_augment_multiple_penalties_create_add():
     """Test that multiple penalties create an Add expression."""
     x = State("x", (2,))
+    x.final = np.array([0.0, 10.0])  # Add time at index 1
     xdot = x
     states = [x]
     controls = []
@@ -225,7 +234,7 @@ def test_augment_multiple_penalties_create_add():
     c2 = ctcs(x[1] <= 2.0, penalty="huber")
 
     xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [c1, c2], N
+        xdot, states, controls, [c1, c2], N, idx_time=1
     )
 
     # Multiple penalties should be wrapped in Add
@@ -237,6 +246,7 @@ def test_augment_multiple_penalties_create_add():
 def test_augment_invalid_constraint_type_raises():
     """Test that invalid constraint types raise an error."""
     x = State("x", (1,))
+    x.final = np.array([10.0])  # Add time at index 0
     xdot = x
     states = [x]
     controls = []
@@ -246,15 +256,18 @@ def test_augment_invalid_constraint_type_raises():
     invalid = Add(x, Constant(1.0))
 
     with pytest.raises(ValueError) as exc:
-        augment_dynamics_with_ctcs(xdot, states, controls, [invalid], N)
+        augment_dynamics_with_ctcs(xdot, states, controls, [invalid], N, idx_time=0)
 
     assert "Constraints must be `Constraint` or `CTCS`" in str(exc.value)
 
 
 def test_augment_empty_states_list():
     """Test augmentation with empty states list."""
+    # Create a dummy state just for time reference
+    dummy = State("_time", (1,))
+    dummy.final = np.array([10.0])
     xdot = Constant(np.array([1.0, 2.0]))
-    states = []
+    states = [dummy]
     controls = []
     N = 1
 
@@ -262,13 +275,13 @@ def test_augment_empty_states_list():
     constraint = ctcs(Constant(1.0) <= 2.0)
 
     xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [constraint], N
+        xdot, states, controls, [constraint], N, idx_time=0
     )
 
-    # Should create one augmented State
-    assert len(states_aug) == 1
-    assert isinstance(states_aug[0], State)
-    assert states_aug[0].name == "_ctcs_aug_0"
+    # Should create one augmented State (plus the dummy state)
+    assert len(states_aug) == 2
+    assert isinstance(states_aug[1], State)
+    assert states_aug[1].name == "_ctcs_aug_0"
 
     # Should have time dilation control
     assert len(controls_aug) == 1
@@ -278,6 +291,7 @@ def test_augment_empty_states_list():
 def test_augment_with_different_penalties():
     """Test that different penalty types are correctly applied and summed."""
     x = State("x", (1,))
+    x.final = np.array([10.0])  # Add time at index 0
     xdot = x
     states = [x]
     controls = []
@@ -287,7 +301,7 @@ def test_augment_with_different_penalties():
     constraints = [ctcs(x <= float(i), penalty=p) for i, p in enumerate(penalties)]
 
     xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, constraints, N
+        xdot, states, controls, constraints, N, idx_time=0
     )
 
     # Should have 1 augmented State with summed penalties
@@ -308,6 +322,7 @@ def test_augment_with_different_penalties():
 def test_augment_preserves_original_controls():
     """Test that original controls are preserved and time dilation is added."""
     x = State("x", (1,))
+    x.final = np.array([10.0])  # Add time at index 0
     u1 = Control("u1", (2,))
     u2 = Control("u2", (3,))
     xdot = x
@@ -318,7 +333,7 @@ def test_augment_preserves_original_controls():
     constraint = ctcs(x <= 1.0, penalty="squared_relu")
 
     xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [constraint], N
+        xdot, states, controls, [constraint], N, idx_time=0
     )
 
     # Should preserve original controls and add time dilation
@@ -582,3 +597,56 @@ def test_equality_constraint_penalty():
     assert result[1] > result[2], "Closer to target should have lower penalty"
     assert result[4] < result[5], "Farther from target should have higher penalty"
     assert result[5] < result[6], "Even farther should have even higher penalty"
+
+
+def test_augmented_state_bounds():
+    """Test that augmented state has correct min/max bounds."""
+    x = State("x", (1,))
+    x.final = np.array([10.0])
+    xdot = x
+    states = [x]
+    controls = []
+    N = 5
+
+    constraint = ctcs(x <= 1.0, penalty="squared_relu")
+
+    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
+        xdot, states, controls, [constraint], N, idx_time=0,
+        licq_min=0.001, licq_max=0.01
+    )
+
+    # Check augmented state bounds
+    aug_state = states_aug[1]  # second state is the augmented one
+    assert aug_state.min[0] == 0.001, "Augmented state min should match licq_min"
+    assert aug_state.max[0] == 0.01, "Augmented state max should match licq_max"
+    assert aug_state.initial[0] == 0.001, "Augmented state initial should be licq_min"
+    assert aug_state.guess.shape == (N, 1), "Augmented state guess should have correct shape"
+    assert np.allclose(aug_state.guess, 0.001), "Augmented state guess should be licq_min"
+
+
+def test_time_dilation_control_bounds():
+    """Test that time dilation control has correct min/max bounds based on time."""
+    x = State("x", (2,))
+    x.final = np.array([0.0, 15.0])  # time at index 1
+    xdot = x
+    states = [x]
+    controls = []
+    N = 3
+
+    constraint = ctcs(x[0] <= 1.0, penalty="squared_relu")
+
+    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
+        xdot, states, controls, [constraint], N, idx_time=1,
+        time_dilation_factor_min=0.5, time_dilation_factor_max=2.5
+    )
+
+    # Check time dilation control bounds
+    time_dilation = controls_aug[0]  # should be the only control
+    expected_min = 0.5 * 15.0  # min_factor * time_final
+    expected_max = 2.5 * 15.0  # max_factor * time_final
+    expected_guess = 15.0      # time_final
+
+    assert time_dilation.min[0] == expected_min, f"Expected min {expected_min}, got {time_dilation.min[0]}"
+    assert time_dilation.max[0] == expected_max, f"Expected max {expected_max}, got {time_dilation.max[0]}"
+    assert time_dilation.guess.shape == (N, 1), "Time dilation guess should have correct shape"
+    assert np.allclose(time_dilation.guess, expected_guess), f"Expected guess {expected_guess}, got {time_dilation.guess}"
