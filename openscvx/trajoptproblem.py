@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, List, Optional, Union
 
 import jax
 import numpy as np
-from jax import export, jacfwd
+from jax import jacfwd
 
 os.environ["EQX_ON_ERROR"] = "nan"
 
@@ -28,6 +28,12 @@ from openscvx.backend.preprocessing import (
 )
 from openscvx.backend.state import Free, State
 from openscvx.backend.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
+from openscvx.caching import (
+    get_solver_cache_paths,
+    load_or_compile_discretization_solver,
+    load_or_compile_propagation_solver,
+    prime_propagation_solver,
+)
 from openscvx.config import (
     Config,
     ConvexSolverConfig,
@@ -48,7 +54,6 @@ from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
 from openscvx.ptr import PTR_init, PTR_subproblem, format_result
 from openscvx.results import OptimizationResults
-from openscvx.utils import stable_function_hash
 
 if TYPE_CHECKING:
     import cvxpy as cp
@@ -352,8 +357,8 @@ class TrajOptProblem:
         for constraint in self.settings.sim.constraints_ctcs:
             functions_to_hash.append(constraint.func)
 
-        # Get unique source-based hash
-        function_hash = stable_function_hash(
+        # Get cache file paths
+        dis_solver_file, prop_solver_file = get_solver_cache_paths(
             functions_to_hash,
             n_discretization_nodes=self.settings.scp.n,
             dt=self.settings.prp.dt,
@@ -364,100 +369,33 @@ class TrajOptProblem:
             control_min=self.settings.sim.u.min,
         )
 
-        solver_dir = Path(".tmp")
-        solver_dir.mkdir(parents=True, exist_ok=True)
-        dis_solver_file = solver_dir / f"compiled_discretization_solver_{function_hash}.jax"
-        prop_solver_file = solver_dir / f"compiled_propagation_solver_{function_hash}.jax"
+        # Compile the discretization solver
+        self.discretization_solver = load_or_compile_discretization_solver(
+            self.discretization_solver,
+            dis_solver_file,
+            self.params,
+            self.settings.scp.n,
+            self.settings.sim.n_states,
+            self.settings.sim.n_controls,
+            save_compiled=self.settings.sim.save_compiled,
+            debug=self.settings.dev.debug,
+        )
 
-        # Compile the solvers
-        if not self.settings.dev.debug:
-            if self.settings.sim.save_compiled:
-                # Check if the compiled file already exists
-                try:
-                    with open(dis_solver_file, "rb") as f:
-                        serial_dis = f.read()
-                    # Load the compiled code
-                    self.discretization_solver = export.deserialize(serial_dis)
-                    print("✓ Loaded existing discretization solver")
-                except FileNotFoundError:
-                    print("Compiling discretization solver...")
-                    # Extract parameter values and names in order
-                    param_values = [param.value for _, param in self.params.items()]
-
-                    self.discretization_solver = export.export(jax.jit(self.discretization_solver))(
-                        np.ones((self.settings.scp.n, self.settings.sim.n_states)),
-                        np.ones((self.settings.scp.n, self.settings.sim.n_controls)),
-                        *param_values,
-                    )
-                    # Serialize and Save the compiled code in a temp directory
-                    with open(dis_solver_file, "wb") as f:
-                        f.write(self.discretization_solver.serialize())
-                    print("✓ Discretization solver compiled and saved")
-            else:
-                print("Compiling discretization solver (not saving/loading from disk)...")
-                param_values = [param.value for _, param in self.params.items()]
-                self.discretization_solver = export.export(jax.jit(self.discretization_solver))(
-                    np.ones((self.settings.scp.n, self.settings.sim.n_states)),
-                    np.ones((self.settings.scp.n, self.settings.sim.n_controls)),
-                    *param_values,
-                )
-
-        # Compile the discretization solver and save it
+        # Setup propagation solver parameters
         dtau = 1.0 / (self.settings.scp.n - 1)
         dt_max = self.settings.sim.u.max[self.settings.sim.idx_s][0] * dtau
-
         self.settings.prp.max_tau_len = int(dt_max / self.settings.prp.dt) + 2
 
-        # Check if the compiled file already exists
-        if self.settings.sim.save_compiled:
-            try:
-                with open(prop_solver_file, "rb") as f:
-                    serial_prop = f.read()
-                # Load the compiled code
-                self.propagation_solver = export.deserialize(serial_prop)
-                print("✓ Loaded existing propagation solver")
-            except FileNotFoundError:
-                print("Compiling propagation solver...")
-                # Extract parameter values and names in order
-                param_values = [param.value for _, param in self.params.items()]
-
-                propagation_solver = export.export(jax.jit(self.propagation_solver))(
-                    np.ones(self.settings.sim.n_states_prop),  # x_0
-                    (0.0, 0.0),  # time span
-                    np.ones((1, self.settings.sim.n_controls)),  # controls_current
-                    np.ones((1, self.settings.sim.n_controls)),  # controls_next
-                    np.ones((1, 1)),  # tau_0
-                    np.ones((1, 1)).astype("int"),  # segment index
-                    0,  # idx_s_stop
-                    np.ones((self.settings.prp.max_tau_len,)),  # save_time (tau_cur_padded)
-                    np.ones(
-                        (self.settings.prp.max_tau_len,), dtype=bool
-                    ),  # mask_padded (boolean mask)
-                    *param_values,  # additional parameters
-                )
-
-                # Serialize and Save the compiled code in a temp directory
-                self.propagation_solver = propagation_solver
-
-                with open(prop_solver_file, "wb") as f:
-                    f.write(self.propagation_solver.serialize())
-                print("✓ Propagation solver compiled and saved")
-        else:
-            print("Compiling propagation solver (not saving/loading from disk)...")
-            param_values = [param.value for _, param in self.params.items()]
-            propagation_solver = export.export(jax.jit(self.propagation_solver))(
-                np.ones(self.settings.sim.n_states_prop),  # x_0
-                (0.0, 0.0),  # time span
-                np.ones((1, self.settings.sim.n_controls)),  # controls_current
-                np.ones((1, self.settings.sim.n_controls)),  # controls_next
-                np.ones((1, 1)),  # tau_0
-                np.ones((1, 1)).astype("int"),  # segment index
-                0,  # idx_s_stop
-                np.ones((self.settings.prp.max_tau_len,)),  # save_time (tau_cur_padded)
-                np.ones((self.settings.prp.max_tau_len,), dtype=bool),  # mask_padded (boolean mask)
-                *param_values,  # additional parameters
-            )
-            self.propagation_solver = propagation_solver
+        # Compile the propagation solver
+        self.propagation_solver = load_or_compile_propagation_solver(
+            self.propagation_solver,
+            prop_solver_file,
+            self.params,
+            self.settings.sim.n_states_prop,
+            self.settings.sim.n_controls,
+            self.settings.prp.max_tau_len,
+            save_compiled=self.settings.sim.save_compiled,
+        )
 
         # Initialize the PTR loop
         print("Initializing the SCvx Subproblem Solver...")
@@ -482,41 +420,8 @@ class TrajOptProblem:
         self.timing_init = t_f_while - t_0_while
         print("Total Initialization Time: ", self.timing_init)
 
-        # Robust priming call for propagation_solver.call (no debug prints)
-        try:
-            x_0 = np.ones(
-                self.settings.sim.x_prop.initial.shape, dtype=self.settings.sim.x_prop.initial.dtype
-            )
-            tau_grid = (0.0, 1.0)
-            controls_current = np.ones(
-                (1, self.settings.sim.u.shape[0]), dtype=self.settings.sim.u.guess.dtype
-            )
-            controls_next = np.ones(
-                (1, self.settings.sim.u.shape[0]), dtype=self.settings.sim.u.guess.dtype
-            )
-            tau_init = np.array([[0.0]], dtype=np.float64)
-            node = np.array([[0]], dtype=np.int64)
-            idx_s_stop = self.settings.sim.idx_s.stop
-            save_time = np.ones((self.settings.prp.max_tau_len,), dtype=np.float64)
-            mask_padded = np.ones((self.settings.prp.max_tau_len,), dtype=bool)
-            param_values = [
-                np.ones_like(param.value) if hasattr(param.value, "shape") else float(param.value)
-                for _, param in self.params.items()
-            ]
-            self.propagation_solver.call(
-                x_0,
-                tau_grid,
-                controls_current,
-                controls_next,
-                tau_init,
-                node,
-                idx_s_stop,
-                save_time,
-                mask_padded,
-                *param_values,
-            )
-        except Exception as e:
-            print(f"[Initialization] Priming propagation_solver.call failed: {e}")
+        # Prime the propagation solver
+        prime_propagation_solver(self.propagation_solver, self.params, self.settings)
 
         if self.settings.dev.profiling:
             pr.disable()
