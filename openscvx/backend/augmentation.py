@@ -83,6 +83,51 @@ def sort_ctcs_constraints(
     return constraints_ctcs, node_intervals, num_augmented_states
 
 
+def separate_constraints(
+    constraints: List[Expr],
+) -> Tuple[List[CTCS], List[Constraint]]:
+    """
+    Separate CTCS constraints from regular constraints.
+    
+    Args:
+        constraints: List of constraints (mix of CTCS and regular Constraints)
+        
+    Returns:
+        Tuple of:
+        - List of CTCS constraints
+        - List of regular constraints (non-CTCS)
+    """
+    constraints_ctcs: List[CTCS] = []
+    constraints_nodal: List[Constraint] = []
+
+    for c in constraints:
+        if isinstance(c, CTCS):
+            constraints_ctcs.append(c)
+        elif isinstance(c, Constraint):
+            constraints_nodal.append(c)
+        else:
+            raise ValueError(f"Constraints must be `Constraint` or `CTCS`, got {type(c).__name__}")
+    
+    return constraints_ctcs, constraints_nodal
+
+
+def get_nodal_constraints_from_ctcs(constraints_ctcs: List[CTCS]) -> List[Constraint]:
+    """
+    Extract underlying constraints from CTCS constraints that should also be checked nodally.
+    
+    Args:
+        constraints_ctcs: List of CTCS constraint wrappers
+        
+    Returns:
+        List of underlying Constraint objects from CTCS constraints with check_nodally=True
+    """
+    nodal_ctcs = []
+    for ctcs in constraints_ctcs:
+        if ctcs.check_nodally:
+            nodal_ctcs.append(ctcs.constraint)
+    return nodal_ctcs
+
+
 def augment_dynamics_with_ctcs(
     xdot: Expr,
     states: List[State],
@@ -94,7 +139,7 @@ def augment_dynamics_with_ctcs(
     licq_max=1e-4,
     time_dilation_factor_min=0.3,
     time_dilation_factor_max=3.0,
-) -> Tuple[Expr, List[State], List[Control]]:
+) -> Tuple[Expr, List[State], List[Control], List[Constraint]]:
     """
     Augment dynamics with continuous-time constraint satisfaction (CTCS).
 
@@ -115,18 +160,16 @@ def augment_dynamics_with_ctcs(
         - Augmented dynamics expression
         - Updated list of states (including augmented states)
         - Updated list of controls (including time dilation)
+        - All nodal constraints (regular constraints + CTCS constraints with check_nodally=True)
     """
-    constraints_ctcs: List[CTCS] = []
-    # constraints_nodal: List[Constraint] = []
-
     # Separate CTCS from regular constraints
-    for c in constraints:
-        if isinstance(c, CTCS):
-            constraints_ctcs.append(c)
-        elif isinstance(c, Constraint):
-            pass  # constraints_nodal.append(c)
-        else:
-            raise ValueError(f"Constraints must be `Constraint` or `CTCS`, got {type(c).__name__}")
+    constraints_ctcs, constraints_nodal = separate_constraints(constraints)
+    
+    # Get CTCS constraints that should also be checked nodally
+    nodal_from_ctcs = get_nodal_constraints_from_ctcs(constraints_ctcs)
+    
+    # Combine all nodal constraints
+    all_nodal_constraints = constraints_nodal + nodal_from_ctcs
 
     # Copy the original states and controls lists
     states_augmented = list(states)
@@ -190,16 +233,4 @@ def augment_dynamics_with_ctcs(
 
     controls_augmented.append(time_dilation)
 
-    # # Collect all constraints that should be checked at nodes
-    # node_checks: List[Constraint] = []
-
-    # # Add the underlying constraints from CTCS (if they should be checked at nodes)
-    # for ctcs in constraints_ctcs:
-    #     # TODO: In the future, check ctcs.check_at_nodes attribute
-    #     # if getattr(ctcs, 'check_at_nodes', True):
-    #     node_checks.append(ctcs.constraint)
-
-    # # Regular constraints are always checked at nodes
-    # node_checks.extend(constraints_nodal)
-
-    return xdot_aug, states_augmented, controls_augmented
+    return xdot_aug, states_augmented, controls_augmented, all_nodal_constraints

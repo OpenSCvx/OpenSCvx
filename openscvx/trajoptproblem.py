@@ -128,7 +128,7 @@ class TrajOptProblem:
         constraints = [canonicalize(expr) for expr in constraints]
 
         # Augment dynamics, states, and controls with CTCS constraints, time dilation
-        dynamics_aug, x_aug, u_aug = augment_dynamics_with_ctcs(
+        dynamics_aug, x_aug, u_aug, nodal_constraints = augment_dynamics_with_ctcs(
             dynamics,
             [x],
             [u],
