@@ -1,0 +1,264 @@
+from typing import Any, Callable, Dict, Type
+
+import cvxpy as cp
+
+from openscvx.backend.control import Control
+from openscvx.backend.expr import (
+    CTCS,
+    Add,
+    Concat,
+    Constant,
+    Cos,
+    Div,
+    Equality,
+    Expr,
+    Huber,
+    Index,
+    Inequality,
+    MatMul,
+    Mul,
+    Neg,
+    PositivePart,
+    Sin,
+    SmoothReLU,
+    Square,
+    Sub,
+    Sum,
+)
+from openscvx.backend.state import State
+
+_CVXPY_VISITORS: Dict[Type[Expr], Callable] = {}
+
+
+def visitor(expr_cls: Type[Expr]):
+    def register(fn: Callable[[Any, Expr], cp.Expression]):
+        _CVXPY_VISITORS[expr_cls] = fn
+        return fn
+
+    return register
+
+
+def dispatch(lowerer: Any, expr: Expr):
+    fn = _CVXPY_VISITORS.get(type(expr))
+    if fn is None:
+        raise NotImplementedError(
+            f"{lowerer.__class__.__name__!r} has no visitor for {type(expr).__name__}"
+        )
+    return fn(lowerer, expr)
+
+
+class CvxpyLowerer:
+    """
+    Lowers symbolic expressions to CVXPy expressions.
+
+    CVXPy variables must be created externally and passed in during initialization.
+    The lowerer assumes variables are already properly shaped and indexed.
+    """
+
+    def __init__(self, variable_map: Dict[str, cp.Expression] = None):
+        """
+        Initialize the CVXPy lowerer.
+
+        Args:
+            variable_map: Dictionary mapping variable names to CVXPy expressions.
+                         For State/Control objects, keys should match their names.
+        """
+        self.variable_map = variable_map or {}
+
+    def lower(self, expr: Expr) -> cp.Expression:
+        """Lower a symbolic expression to a CVXPy expression."""
+        return dispatch(self, expr)
+
+    def register_variable(self, name: str, cvx_expr: cp.Expression):
+        """Register a CVXPy variable/expression for use in lowering."""
+        self.variable_map[name] = cvx_expr
+
+    @visitor(Constant)
+    def visit_constant(self, node: Constant) -> cp.Expression:
+        return cp.Constant(node.value)
+
+    @visitor(State)
+    def visit_state(self, node: State) -> cp.Expression:
+        if node.name not in self.variable_map:
+            raise ValueError(
+                f"State variable '{node.name}' not found in variable_map. "
+                f"Available: {list(self.variable_map.keys())}"
+            )
+
+        cvx_var = self.variable_map[node.name]
+
+        # If the state has a slice assigned, apply it
+        if node._slice is not None:
+            return cvx_var[node._slice]
+        return cvx_var
+
+    @visitor(Control)
+    def visit_control(self, node: Control) -> cp.Expression:
+        if node.name not in self.variable_map:
+            raise ValueError(
+                f"Control variable '{node.name}' not found in variable_map. "
+                f"Available: {list(self.variable_map.keys())}"
+            )
+
+        cvx_var = self.variable_map[node.name]
+
+        # If the control has a slice assigned, apply it
+        if node._slice is not None:
+            return cvx_var[node._slice]
+        return cvx_var
+
+    @visitor(Add)
+    def visit_add(self, node: Add) -> cp.Expression:
+        terms = [self.lower(term) for term in node.terms]
+        result = terms[0]
+        for term in terms[1:]:
+            result = result + term
+        return result
+
+    @visitor(Sub)
+    def visit_sub(self, node: Sub) -> cp.Expression:
+        left = self.lower(node.left)
+        right = self.lower(node.right)
+        return left - right
+
+    @visitor(Mul)
+    def visit_mul(self, node: Mul) -> cp.Expression:
+        factors = [self.lower(factor) for factor in node.factors]
+        result = factors[0]
+        for factor in factors[1:]:
+            result = result * factor
+        return result
+
+    @visitor(Div)
+    def visit_div(self, node: Div) -> cp.Expression:
+        left = self.lower(node.left)
+        right = self.lower(node.right)
+        return left / right
+
+    @visitor(MatMul)
+    def visit_matmul(self, node: MatMul) -> cp.Expression:
+        left = self.lower(node.left)
+        right = self.lower(node.right)
+        return left @ right
+
+    @visitor(Neg)
+    def visit_neg(self, node: Neg) -> cp.Expression:
+        operand = self.lower(node.operand)
+        return -operand
+
+    @visitor(Sum)
+    def visit_sum(self, node: Sum) -> cp.Expression:
+        operand = self.lower(node.operand)
+        return cp.sum(operand)
+
+    @visitor(Index)
+    def visit_index(self, node: Index) -> cp.Expression:
+        base = self.lower(node.base)
+        return base[node.index]
+
+    @visitor(Concat)
+    def visit_concat(self, node: Concat) -> cp.Expression:
+        exprs = [self.lower(child) for child in node.exprs]
+        # Ensure all expressions are at least 1D for concatenation
+        exprs_1d = []
+        for expr in exprs:
+            if expr.ndim == 0:  # scalar
+                exprs_1d.append(cp.reshape(expr, (1,)))
+            else:
+                exprs_1d.append(expr)
+        return cp.hstack(exprs_1d)
+
+    @visitor(Sin)
+    def visit_sin(self, node: Sin) -> cp.Expression:
+        # CVXPy doesn't support trigonometric functions in DCP form
+        raise NotImplementedError(
+            "Trigonometric functions like Sin are not DCP-compliant in CVXPy. "
+            "Consider using piecewise-linear approximations or handle these constraints "
+            "in the dynamics (JAX) layer instead."
+        )
+
+    @visitor(Cos)
+    def visit_cos(self, node: Cos) -> cp.Expression:
+        # CVXPy doesn't support trigonometric functions in DCP form
+        raise NotImplementedError(
+            "Trigonometric functions like Cos are not DCP-compliant in CVXPy. "
+            "Consider using piecewise-linear approximations or handle these constraints "
+            "in the dynamics (JAX) layer instead."
+        )
+
+    @visitor(Equality)
+    def visit_equality(self, node: Equality) -> cp.Constraint:
+        left = self.lower(node.lhs)
+        right = self.lower(node.rhs)
+        return left == right
+
+    @visitor(Inequality)
+    def visit_inequality(self, node: Inequality) -> cp.Constraint:
+        left = self.lower(node.lhs)
+        right = self.lower(node.rhs)
+        return left <= right
+
+    @visitor(CTCS)
+    def visit_ctcs(self, node: CTCS) -> cp.Expression:
+        raise NotImplementedError(
+            "CTCS constraints are for continuous-time constraint satisfaction and "
+            "should be handled through dynamics augmentation with JAX lowering, "
+            "not CVXPy lowering. CTCS constraints represent non-convex dynamics "
+            "augmentation."
+        )
+
+    @visitor(PositivePart)
+    def visit_pos(self, node: PositivePart) -> cp.Expression:
+        operand = self.lower(node.x)
+        return cp.maximum(operand, 0.0)
+
+    @visitor(Square)
+    def visit_square(self, node: Square) -> cp.Expression:
+        operand = self.lower(node.x)
+        return cp.square(operand)
+
+    @visitor(Huber)
+    def visit_huber(self, node: Huber) -> cp.Expression:
+        operand = self.lower(node.x)
+        return cp.huber(operand, M=node.delta)
+
+    @visitor(SmoothReLU)
+    def visit_srelu(self, node: SmoothReLU) -> cp.Expression:
+        operand = self.lower(node.x)
+        c = node.c
+        # smooth_relu(x) = sqrt(max(x, 0)^2 + c^2) - c
+        pos_part = cp.maximum(operand, 0.0)
+        # For SmoothReLU, we use the 2-norm formulation
+        return cp.sqrt(cp.sum_squares(pos_part) + c**2) - c
+
+
+def lower_to_cvxpy(expr: Expr, variable_map: Dict[str, cp.Expression] = None) -> cp.Expression:
+    """
+    Convenience function to lower a single expression to CVXPy.
+
+    Args:
+        expr: Expression to lower
+        variable_map: Dictionary mapping variable names to CVXPy expressions
+
+    Returns:
+        CVXPy expression or constraint
+
+    Example:
+        >>> import cvxpy as cp
+        >>> from openscvx.backend.expr import *
+        >>> from openscvx.backend.state import State
+        >>>
+        >>> # Create CVXPy variables
+        >>> x_var = cp.Variable((10, 3), name="x")  # 10 time steps, 3 states
+        >>>
+        >>> # Create symbolic state
+        >>> x = State("x", shape=(3,))
+        >>>
+        >>> # Create expression: x + 1
+        >>> expr = x + 1
+        >>>
+        >>> # Lower to CVXPy
+        >>> cvx_expr = lower_to_cvxpy(expr, {"x": x_var})
+    """
+    lowerer = CvxpyLowerer(variable_map)
+    return lowerer.lower(expr)
