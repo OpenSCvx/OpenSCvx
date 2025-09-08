@@ -343,6 +343,7 @@ class CTCS(Expr):
         penalty: str = "squared_relu",
         nodes: Optional[Tuple[int, int]] = None,
         idx: Optional[int] = None,
+        check_nodally: bool = False,
     ):
         if not isinstance(constraint, Constraint):
             raise TypeError("CTCS must wrap a Constraint")
@@ -350,6 +351,7 @@ class CTCS(Expr):
         self.penalty = penalty
         self.nodes = nodes  # (start, end) node range or None for all nodes
         self.idx = idx  # Optional grouping index for multiple augmented states
+        self.check_nodally = check_nodally  # Whether to also enforce this constraint nodally for numerical stability
 
     def children(self):
         return [self.constraint]
@@ -360,6 +362,8 @@ class CTCS(Expr):
             parts.append(f"nodes={self.nodes}")
         if self.idx is not None:
             parts.append(f"idx={self.idx}")
+        if self.check_nodally:
+            parts.append(f"check_nodally={self.check_nodally}")
         return f"CTCS({', '.join(parts)})"
 
     def penalty_expr(self) -> Expr:
@@ -386,6 +390,7 @@ def ctcs(
     penalty: str = "squared_relu",
     nodes: Optional[Tuple[int, int]] = None,
     idx: Optional[int] = None,
+    check_nodally: bool = False,
 ) -> CTCS:
     """Helper function to create CTCS constraints."""
-    return CTCS(constraint, penalty, nodes, idx)
+    return CTCS(constraint, penalty, nodes, idx, check_nodally)
