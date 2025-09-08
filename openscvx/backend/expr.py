@@ -351,7 +351,8 @@ class CTCS(Expr):
         self.penalty = penalty
         self.nodes = nodes  # (start, end) node range or None for all nodes
         self.idx = idx  # Optional grouping index for multiple augmented states
-        self.check_nodally = check_nodally  # Whether to also enforce this constraint nodally for numerical stability
+        # Whether to also enforce this constraint nodally for numerical stability
+        self.check_nodally = check_nodally
 
     def children(self):
         return [self.constraint]
