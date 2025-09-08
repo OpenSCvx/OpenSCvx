@@ -779,11 +779,10 @@ def test_ctcs_idx_grouping_auto_assignment():
     c3 = ctcs(x[0] <= 3.0, nodes=(3, 8))  # Different nodes, should get different idx
 
     constraints = [c1, c2, c3]
-    sorted_constraints, node_intervals, num_states = sort_ctcs_constraints(constraints, 10)
+    sorted_constraints, num_states = sort_ctcs_constraints(constraints, 10)
 
     # Should have 2 groups: (0,5) and (3,8)
     assert num_states == 2
-    assert node_intervals == [(0, 5), (3, 8)]
 
     # c1 and c2 should have same idx (0), c3 should have idx 1
     assert c1.idx == c2.idx == 0
@@ -799,11 +798,10 @@ def test_ctcs_idx_grouping_explicit_assignment():
     c3 = ctcs(x[0] <= 3.0, nodes=(3, 8), idx=0)  # Different nodes, different idx - OK
 
     constraints = [c1, c2, c3]
-    sorted_constraints, node_intervals, num_states = sort_ctcs_constraints(constraints, 10)
+    sorted_constraints, num_states = sort_ctcs_constraints(constraints, 10)
 
     # Should have 2 groups with correct ordering
     assert num_states == 2
-    assert node_intervals == [(3, 8), (0, 5)]  # idx 0, then idx 1
 
     assert c1.idx == c2.idx == 1
     assert c3.idx == 0
@@ -818,11 +816,10 @@ def test_ctcs_idx_grouping_mixed_assignment():
     c3 = ctcs(x[2] <= 3.0, nodes=(3, 8))  # Auto - should get idx 1
 
     constraints = [c1, c2, c3]
-    sorted_constraints, node_intervals, num_states = sort_ctcs_constraints(constraints, 10)
+    sorted_constraints, num_states = sort_ctcs_constraints(constraints, 10)
 
     # Should have 3 groups: auto-assigned 0, auto-assigned 1, explicit 2
     assert num_states == 3
-    assert node_intervals == [(0, 5), (3, 8), (0, 5)]  # idx 0, 1, 2
 
     assert c1.idx == 0  # Auto-assigned to same interval as c2
     assert c2.idx == 2  # Explicit
