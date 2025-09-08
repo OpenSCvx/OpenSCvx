@@ -108,6 +108,8 @@ def separate_constraints(
         else:
             raise ValueError(f"Constraints must be `Constraint` or `CTCS`, got {type(c).__name__}")
 
+    constraints_nodal = constraints_nodal + get_nodal_constraints_from_ctcs(constraints_ctcs)
+
     return constraints_ctcs, constraints_nodal
 
 
@@ -128,58 +130,18 @@ def get_nodal_constraints_from_ctcs(constraints_ctcs: List[CTCS]) -> List[Constr
     return nodal_ctcs
 
 
-def sort_and_separate_constraints(
-    constraints: List[Expr],
-    N: int,
-) -> Tuple[List[CTCS], List[Constraint], List[Tuple[int, int]], int]:
-    """
-    Sort and separate constraints into CTCS and nodal components.
-
-    Args:
-        constraints: List of constraints (mix of CTCS and regular Constraints)
-        N: Number of discretization nodes
-
-    Returns:
-        Tuple of:
-        - List of sorted CTCS constraints with idx assigned
-        - List of all nodal constraints (regular constraints + CTCS constraints with check_nodally=True)
-        - List of node intervals in ascending idx order
-        - Number of augmented states (number of unique idx values)
-    """
-    # Separate CTCS from regular constraints
-    constraints_ctcs, constraints_nodal = separate_constraints(constraints)
-
-    # Get CTCS constraints that should also be checked nodally
-    nodal_from_ctcs = get_nodal_constraints_from_ctcs(constraints_ctcs)
-
-    # Combine all nodal constraints
-    all_nodal_constraints = constraints_nodal + nodal_from_ctcs
-
-    if constraints_ctcs:
-        # Sort and group CTCS constraints by their idx
-        constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(
-            constraints_ctcs, N
-        )
-        return constraints_ctcs, all_nodal_constraints, node_intervals, num_augmented_states
-    else:
-        return [], all_nodal_constraints, [], 0
-
-
 def augment_dynamics_with_ctcs(
     xdot: Expr,
     states: List[State],
     controls: List[Control],
     constraints_ctcs: List[CTCS],
-    nodal_constraints: List[Constraint],
-    node_intervals: List[Tuple[int, int]],
-    num_augmented_states: int,
     N: int,
     idx_time: int,
     licq_min=0.0,
     licq_max=1e-4,
     time_dilation_factor_min=0.3,
     time_dilation_factor_max=3.0,
-) -> Tuple[Expr, List[State], List[Control], List[Constraint]]:
+) -> Tuple[Expr, List[State], List[Control]]:
     """
     Augment dynamics with continuous-time constraint satisfaction (CTCS).
 
@@ -187,10 +149,7 @@ def augment_dynamics_with_ctcs(
         xdot: The original dynamics expression
         states: The list of state variables
         controls: The list of control variables
-        constraints_ctcs: List of sorted CTCS constraints with idx assigned
-        nodal_constraints: List of all nodal constraints
-        node_intervals: List of node intervals in ascending idx order
-        num_augmented_states: Number of augmented states
+        constraints_ctcs: List of CTCS constraints
         N: Number of discretization nodes
         idx_time: Index of time variable in the state vector for time dilation setup
         licq_min: Minimum value for LICQ augmented state
@@ -203,13 +162,17 @@ def augment_dynamics_with_ctcs(
         - Augmented dynamics expression
         - Updated list of states (including augmented states)
         - Updated list of controls (including time dilation)
-        - All nodal constraints
     """
     # Copy the original states and controls lists
     states_augmented = list(states)
     controls_augmented = list(controls)
 
     if constraints_ctcs:
+        # Sort and group CTCS constraints by their idx
+        constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(
+            constraints_ctcs, N
+        )
+
         # Group penalty expressions by idx
         penalty_groups: Dict[int, List[Expr]] = {}
 
@@ -262,4 +225,4 @@ def augment_dynamics_with_ctcs(
 
     controls_augmented.append(time_dilation)
 
-    return xdot_aug, states_augmented, controls_augmented, nodal_constraints
+    return xdot_aug, states_augmented, controls_augmented
