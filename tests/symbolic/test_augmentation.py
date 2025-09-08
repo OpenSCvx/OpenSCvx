@@ -2,7 +2,11 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from openscvx.backend.augmentation import augment_dynamics_with_ctcs, sort_ctcs_constraints
+from openscvx.backend.augmentation import (
+    augment_dynamics_with_ctcs,
+    sort_and_separate_constraints,
+    sort_ctcs_constraints,
+)
 from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     CTCS,
@@ -30,8 +34,21 @@ def test_augment_no_constraints():
     controls = []
     N = 1
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [], N, idx_time=1
+    # Sort and separate constraints first
+    constraints_ctcs, nodal_constraints, node_intervals, num_augmented_states = (
+        sort_and_separate_constraints([], N)
+    )
+
+    xdot_aug, states_aug, controls_aug, _ = augment_dynamics_with_ctcs(
+        xdot,
+        states,
+        controls,
+        constraints_ctcs,
+        nodal_constraints,
+        node_intervals,
+        num_augmented_states,
+        N,
+        idx_time=1,
     )
 
     # No augmentation should occur for dynamics, but time dilation should be added
@@ -55,8 +72,21 @@ def test_augment_only_nodal_constraints():
     # Regular constraint
     constraint = x[0] <= 1.0
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [constraint], N, idx_time=1
+    # Sort and separate constraints first
+    constraints_ctcs, nodal_constraints, node_intervals, num_augmented_states = (
+        sort_and_separate_constraints([constraint], N)
+    )
+
+    xdot_aug, states_aug, controls_aug, _ = augment_dynamics_with_ctcs(
+        xdot,
+        states,
+        controls,
+        constraints_ctcs,
+        nodal_constraints,
+        node_intervals,
+        num_augmented_states,
+        N,
+        idx_time=1,
     )
 
     # No dynamics augmentation, but time dilation should be added
@@ -79,8 +109,21 @@ def test_augment_single_ctcs_constraint():
     # CTCS constraint
     constraint = ctcs(x[0] <= 1.0, penalty="squared_relu")
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [constraint], N, idx_time=1
+    # Sort and separate constraints first
+    constraints_ctcs, nodal_constraints, node_intervals, num_augmented_states = (
+        sort_and_separate_constraints([constraint], N)
+    )
+
+    xdot_aug, states_aug, controls_aug, _ = augment_dynamics_with_ctcs(
+        xdot,
+        states,
+        controls,
+        constraints_ctcs,
+        nodal_constraints,
+        node_intervals,
+        num_augmented_states,
+        N,
+        idx_time=1,
     )
 
     # Should have augmented dynamics and new State
@@ -111,8 +154,21 @@ def test_augment_multiple_ctcs_constraints():
     c2 = ctcs(x[1] >= -1.0, penalty="huber")
     c3 = ctcs(x[2] == 0.0, penalty="smooth_relu")
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [c1, c2, c3], N, idx_time=1
+    # Sort and separate constraints first
+    constraints_ctcs, nodal_constraints, node_intervals, num_augmented_states = (
+        sort_and_separate_constraints([c1, c2, c3], N)
+    )
+
+    xdot_aug, states_aug, controls_aug, _ = augment_dynamics_with_ctcs(
+        xdot,
+        states,
+        controls,
+        constraints_ctcs,
+        nodal_constraints,
+        node_intervals,
+        num_augmented_states,
+        N,
+        idx_time=1,
     )
 
     # Should have 1 augmented State (all penalties summed together)
@@ -151,8 +207,21 @@ def test_augment_mixed_constraints():
     c3 = ctcs(x[1] >= -2.0, penalty="huber")
     c4 = x[0] + x[1] <= 3.0  # Regular constraint
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [c1, c2, c3, c4], N, idx_time=1
+    # Sort and separate constraints first
+    constraints_ctcs, nodal_constraints, node_intervals, num_augmented_states = (
+        sort_and_separate_constraints([c1, c2, c3, c4], N)
+    )
+
+    xdot_aug, states_aug, controls_aug, _ = augment_dynamics_with_ctcs(
+        xdot,
+        states,
+        controls,
+        constraints_ctcs,
+        nodal_constraints,
+        node_intervals,
+        num_augmented_states,
+        N,
+        idx_time=1,
     )
 
     # Should have 1 augmented State (for 2 CTCS constraints summed together)
@@ -184,8 +253,21 @@ def test_augment_penalty_expression_structure():
     # Create CTCS with squared_relu penalty
     constraint = ctcs(x <= 1.0, penalty="squared_relu")
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [constraint], N, idx_time=0
+    # Sort and separate constraints first
+    constraints_ctcs, nodal_constraints, node_intervals, num_augmented_states = (
+        sort_and_separate_constraints([constraint], N)
+    )
+
+    xdot_aug, states_aug, controls_aug, _ = augment_dynamics_with_ctcs(
+        xdot,
+        states,
+        controls,
+        constraints_ctcs,
+        nodal_constraints,
+        node_intervals,
+        num_augmented_states,
+        N,
+        idx_time=0,
     )
 
     # Check structure of augmented dynamics
@@ -214,8 +296,21 @@ def test_augment_single_penalty_no_add():
 
     constraint = ctcs(x <= 1.0, penalty="squared_relu")
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [constraint], N, idx_time=0
+    # Sort and separate constraints first
+    constraints_ctcs, nodal_constraints, node_intervals, num_augmented_states = (
+        sort_and_separate_constraints([constraint], N)
+    )
+
+    xdot_aug, states_aug, controls_aug, _ = augment_dynamics_with_ctcs(
+        xdot,
+        states,
+        controls,
+        constraints_ctcs,
+        nodal_constraints,
+        node_intervals,
+        num_augmented_states,
+        N,
+        idx_time=0,
     )
 
     # Single penalty should not be wrapped in Add
@@ -235,8 +330,21 @@ def test_augment_multiple_penalties_create_add():
     c1 = ctcs(x[0] <= 1.0, penalty="squared_relu")
     c2 = ctcs(x[1] <= 2.0, penalty="huber")
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [c1, c2], N, idx_time=1
+    # Sort and separate constraints first
+    constraints_ctcs, nodal_constraints, node_intervals, num_augmented_states = (
+        sort_and_separate_constraints([c1, c2], N)
+    )
+
+    xdot_aug, states_aug, controls_aug, _ = augment_dynamics_with_ctcs(
+        xdot,
+        states,
+        controls,
+        constraints_ctcs,
+        nodal_constraints,
+        node_intervals,
+        num_augmented_states,
+        N,
+        idx_time=1,
     )
 
     # Multiple penalties should be wrapped in Add
@@ -258,7 +366,7 @@ def test_augment_invalid_constraint_type_raises():
     invalid = Add(x, Constant(1.0))
 
     with pytest.raises(ValueError) as exc:
-        augment_dynamics_with_ctcs(xdot, states, controls, [invalid], N, idx_time=0)
+        sort_and_separate_constraints([invalid], N)
 
     assert "Constraints must be `Constraint` or `CTCS`" in str(exc.value)
 
@@ -276,8 +384,21 @@ def test_augment_empty_states_list():
     # CTCS constraint on a constant (unusual but valid)
     constraint = ctcs(Constant(1.0) <= 2.0)
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [constraint], N, idx_time=0
+    # Sort and separate constraints first
+    constraints_ctcs, nodal_constraints, node_intervals, num_augmented_states = (
+        sort_and_separate_constraints([constraint], N)
+    )
+
+    xdot_aug, states_aug, controls_aug, _ = augment_dynamics_with_ctcs(
+        xdot,
+        states,
+        controls,
+        constraints_ctcs,
+        nodal_constraints,
+        node_intervals,
+        num_augmented_states,
+        N,
+        idx_time=0,
     )
 
     # Should create one augmented State (plus the dummy state)
@@ -302,8 +423,21 @@ def test_augment_with_different_penalties():
     penalties = ["squared_relu", "huber", "smooth_relu"]
     constraints = [ctcs(x <= float(i), penalty=p) for i, p in enumerate(penalties)]
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, constraints, N, idx_time=0
+    # Sort and separate constraints first
+    constraints_ctcs, nodal_constraints, node_intervals, num_augmented_states = (
+        sort_and_separate_constraints(constraints, N)
+    )
+
+    xdot_aug, states_aug, controls_aug, _ = augment_dynamics_with_ctcs(
+        xdot,
+        states,
+        controls,
+        constraints_ctcs,
+        nodal_constraints,
+        node_intervals,
+        num_augmented_states,
+        N,
+        idx_time=0,
     )
 
     # Should have 1 augmented State with summed penalties
@@ -334,8 +468,21 @@ def test_augment_preserves_original_controls():
 
     constraint = ctcs(x <= 1.0, penalty="squared_relu")
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [constraint], N, idx_time=0
+    # Sort and separate constraints first
+    constraints_ctcs, nodal_constraints, node_intervals, num_augmented_states = (
+        sort_and_separate_constraints([constraint], N)
+    )
+
+    xdot_aug, states_aug, controls_aug, _ = augment_dynamics_with_ctcs(
+        xdot,
+        states,
+        controls,
+        constraints_ctcs,
+        nodal_constraints,
+        node_intervals,
+        num_augmented_states,
+        N,
+        idx_time=0,
     )
 
     # Should preserve original controls and add time dilation
@@ -612,8 +759,23 @@ def test_augmented_state_bounds():
 
     constraint = ctcs(x <= 1.0, penalty="squared_relu")
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [constraint], N, idx_time=0, licq_min=0.001, licq_max=0.01
+    # Sort and separate constraints first
+    constraints_ctcs, nodal_constraints, node_intervals, num_augmented_states = (
+        sort_and_separate_constraints([constraint], N)
+    )
+
+    xdot_aug, states_aug, controls_aug, _ = augment_dynamics_with_ctcs(
+        xdot,
+        states,
+        controls,
+        constraints_ctcs,
+        nodal_constraints,
+        node_intervals,
+        num_augmented_states,
+        N,
+        idx_time=0,
+        licq_min=0.001,
+        licq_max=0.01,
     )
 
     # Check augmented state bounds
@@ -636,11 +798,19 @@ def test_time_dilation_control_bounds():
 
     constraint = ctcs(x[0] <= 1.0, penalty="squared_relu")
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
+    # Sort and separate constraints first
+    constraints_ctcs, nodal_constraints, node_intervals, num_augmented_states = (
+        sort_and_separate_constraints([constraint], N)
+    )
+
+    xdot_aug, states_aug, controls_aug, _ = augment_dynamics_with_ctcs(
         xdot,
         states,
         controls,
-        [constraint],
+        constraints_ctcs,
+        nodal_constraints,
+        node_intervals,
+        num_augmented_states,
         N,
         idx_time=1,
         time_dilation_factor_min=0.5,
@@ -759,8 +929,21 @@ def test_ctcs_multiple_augmented_states():
     c2 = ctcs(x[1] <= 2.0, nodes=(0, 5), idx=0)  # Same group as c1
     c3 = ctcs(x[0] <= 3.0, nodes=(3, 8), idx=1)  # Different group
 
-    xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        xdot, states, controls, [c1, c2, c3], N, idx_time=1
+    # Sort and separate constraints first
+    constraints_ctcs, nodal_constraints, node_intervals, num_augmented_states = (
+        sort_and_separate_constraints([c1, c2, c3], N)
+    )
+
+    xdot_aug, states_aug, controls_aug, _ = augment_dynamics_with_ctcs(
+        xdot,
+        states,
+        controls,
+        constraints_ctcs,
+        nodal_constraints,
+        node_intervals,
+        num_augmented_states,
+        N,
+        idx_time=1,
     )
 
     # Should have 2 augmented states (for 2 idx groups)

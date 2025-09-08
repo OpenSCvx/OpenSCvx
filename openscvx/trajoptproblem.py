@@ -14,7 +14,7 @@ os.environ["EQX_ON_ERROR"] = "nan"
 
 from openscvx import io
 from openscvx.augmentation.ctcs import sort_ctcs_constraints
-from openscvx.backend.augmentation import augment_dynamics_with_ctcs
+from openscvx.backend.augmentation import augment_dynamics_with_ctcs, sort_and_separate_constraints
 from openscvx.backend.canonicalizer import canonicalize
 from openscvx.backend.control import Control
 from openscvx.backend.expr import CTCS, Constraint, Expr
@@ -127,12 +127,20 @@ class TrajOptProblem:
         dynamics = canonicalize(dynamics)
         constraints = [canonicalize(expr) for expr in constraints]
 
-        # Augment dynamics, states, and controls with CTCS constraints, time dilation
+        # Sort and separate constraints first
+        constraints_ctcs, nodal_constraints, node_intervals, num_augmented_states = (
+            sort_and_separate_constraints(constraints, N)
+        )
+
+        # Augment dynamics, states, and controls with sorted CTCS constraints, time dilation
         dynamics_aug, x_aug, u_aug, nodal_constraints = augment_dynamics_with_ctcs(
             dynamics,
             [x],
             [u],
-            constraints,
+            constraints_ctcs,
+            nodal_constraints,
+            node_intervals,
+            num_augmented_states,
             N,
             idx_time,
             licq_min=licq_min,
