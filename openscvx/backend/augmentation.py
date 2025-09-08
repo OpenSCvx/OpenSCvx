@@ -167,9 +167,7 @@ def augment_dynamics_with_ctcs(
 
     if constraints_ctcs:
         # Sort and group CTCS constraints by their idx
-        constraints_ctcs, num_augmented_states = sort_ctcs_constraints(
-            constraints_ctcs, N
-        )
+        constraints_ctcs, num_augmented_states = sort_ctcs_constraints(constraints_ctcs, N)
 
         # Group penalty expressions by idx
         penalty_groups: Dict[int, List[Expr]] = {}
