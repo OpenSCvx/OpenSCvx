@@ -76,9 +76,11 @@ def sort_ctcs_constraints(
             f"Got {ordered_ids}, expected {expected_ids}"
         )
 
+    # Extract intervals in ascending idx order
+    node_intervals = [idx_to_nodes[i] for i in ordered_ids]
     num_augmented_states = len(ordered_ids)
 
-    return constraints_ctcs, num_augmented_states
+    return constraints_ctcs, node_intervals, num_augmented_states
 
 
 def separate_constraints(
@@ -167,7 +169,9 @@ def augment_dynamics_with_ctcs(
 
     if constraints_ctcs:
         # Sort and group CTCS constraints by their idx
-        constraints_ctcs, num_augmented_states = sort_ctcs_constraints(constraints_ctcs, N)
+        constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(
+            constraints_ctcs, N
+        )
 
         # Group penalty expressions by idx
         penalty_groups: Dict[int, List[Expr]] = {}
