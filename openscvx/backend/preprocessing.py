@@ -305,9 +305,36 @@ def visit_binary_op(node: Expr) -> tuple[int, ...]:
 @visitor(MatMul)
 def visit_matmul(node: MatMul):
     L, R = dispatch(node.left), dispatch(node.right)
-    if len(L) < 2 or len(R) < 2 or L[-1] != R[-2]:
-        raise ValueError(f"MatMul incompatible: {L} @ {R}")
-    return L[:-1] + (R[-1],)
+
+    # Handle different matmul cases:
+    # Matrix @ Matrix: (m,n) @ (n,k) -> (m,k)
+    # Matrix @ Vector: (m,n) @ (n,) -> (m,)
+    # Vector @ Matrix: (m,) @ (m,n) -> (n,)
+    # Vector @ Vector: (m,) @ (m,) -> ()
+
+    if len(L) == 0 or len(R) == 0:
+        raise ValueError(f"MatMul requires at least 1D operands: {L} @ {R}")
+
+    if len(L) == 1 and len(R) == 1:
+        # Vector @ Vector -> scalar
+        if L[0] != R[0]:
+            raise ValueError(f"MatMul incompatible: {L} @ {R}")
+        return ()
+    elif len(L) == 1:
+        # Vector @ Matrix: (m,) @ (m,n) -> (n,)
+        if len(R) < 2 or L[0] != R[-2]:
+            raise ValueError(f"MatMul incompatible: {L} @ {R}")
+        return R[-1:]
+    elif len(R) == 1:
+        # Matrix @ Vector: (m,n) @ (n,) -> (m,)
+        if len(L) < 2 or L[-1] != R[0]:
+            raise ValueError(f"MatMul incompatible: {L} @ {R}")
+        return L[:-1]
+    else:
+        # Matrix @ Matrix: (...,m,n) @ (...,n,k) -> (...,m,k)
+        if len(L) < 2 or len(R) < 2 or L[-1] != R[-2]:
+            raise ValueError(f"MatMul incompatible: {L} @ {R}")
+        return L[:-1] + (R[-1],)
 
 
 @visitor(Concat)
