@@ -3,7 +3,6 @@ import queue
 import threading
 import time
 from copy import deepcopy
-from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Union
 
 import jax
@@ -13,8 +12,11 @@ from jax import jacfwd
 os.environ["EQX_ON_ERROR"] = "nan"
 
 from openscvx import io
-from openscvx.augmentation.ctcs import sort_ctcs_constraints
-from openscvx.backend.augmentation import augment_dynamics_with_ctcs, separate_constraints
+from openscvx.backend.augmentation import (
+    augment_dynamics_with_ctcs,
+    separate_constraints,
+    sort_ctcs_constraints,
+)
 from openscvx.backend.canonicalizer import canonicalize
 from openscvx.backend.control import Control
 from openscvx.backend.expr import CTCS, Constraint, Expr
@@ -126,8 +128,12 @@ class TrajOptProblem:
         constraints = [canonicalize(expr) for expr in constraints]
 
         # Sort and separate constraints first
-        # TODO: (norrisg) rename `nodal_constraints` to signify that they will be linearized
         constraints_ctcs, constraints_nodal = separate_constraints(constraints)
+
+        # Sort CTCS constraints by their idx to get node_intervals
+        constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(
+            constraints_ctcs, N
+        )
 
         # Augment dynamics, states, and controls with CTCS constraints, time dilation
         dynamics_aug, x_aug, u_aug = augment_dynamics_with_ctcs(
@@ -147,23 +153,14 @@ class TrajOptProblem:
         # assign slices, should probably move into the augmentation functions themselves
         collect_and_assign_slices(all_exprs + x_aug + u_aug)
 
-        x_unified: UnifiedState = unify_states(x_aug)
-        u_unified: UnifiedControl = unify_controls(u_aug)
-
         # TODO: (norrisg) allow non-ctcs constraints
         dyn_fn = lower_to_jax(dynamics_aug)
         constraints_nodal_fns = lower_to_jax(constraints_nodal)
 
         dynamics_fn = to_dynamics(dyn_fn)
-        # Create LoweredConstraint objects with Jacobians computed automatically
-        constraints_nodal = []
-        for fn in constraints_nodal_fns:
-            constraint = LoweredConstraint(
-                func=fn,
-                grad_g_x=jacfwd(fn, argnums=0),
-                grad_g_u=jacfwd(fn, argnums=1),
-            )
-            constraints_nodal.append(constraint)
+
+        x_unified: UnifiedState = unify_states(x_aug)
+        u_unified: UnifiedControl = unify_controls(u_aug)
 
         if params is None:
             params = {}
@@ -174,13 +171,6 @@ class TrajOptProblem:
 
         if x_prop is None:
             x_prop = deepcopy(x_unified)
-
-        constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(
-            constraints_ctcs, N
-        )
-
-        # TODO: (norrisg) remvoe this
-        num_augmented_states = 1
 
         # Index tracking
         # TODO: (norrisg) use the `_slice` attribute of the State, Control
@@ -236,6 +226,16 @@ class TrajOptProblem:
             cvx = ConvexSolverConfig()
         if prp is None:
             prp = PropagationConfig()
+
+        # Create LoweredConstraint objects with Jacobians computed automatically
+        constraints_nodal = []
+        for fn in constraints_nodal_fns:
+            constraint = LoweredConstraint(
+                func=fn,
+                grad_g_x=jacfwd(fn, argnums=0),
+                grad_g_u=jacfwd(fn, argnums=1),
+            )
+            constraints_nodal.append(constraint)
 
         sim.constraints_ctcs = []
         sim.constraints_nodal = constraints_nodal

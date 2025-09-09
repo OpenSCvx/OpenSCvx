@@ -168,12 +168,7 @@ def augment_dynamics_with_ctcs(
     controls_augmented = list(controls)
 
     if constraints_ctcs:
-        # Sort and group CTCS constraints by their idx
-        constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(
-            constraints_ctcs, N
-        )
-
-        # Group penalty expressions by idx
+        # Group penalty expressions by idx (constraints should already be sorted)
         penalty_groups: Dict[int, List[Expr]] = {}
 
         for ctcs in constraints_ctcs:
@@ -197,6 +192,9 @@ def augment_dynamics_with_ctcs(
             else:
                 augmented_state_expr = Add(*penalty_terms)
             augmented_state_exprs.append(augmented_state_expr)
+
+        # Calculate number of augmented states from the penalty groups
+        num_augmented_states = len(penalty_groups)
 
         # Create augmented state variables
         for idx in range(num_augmented_states):
