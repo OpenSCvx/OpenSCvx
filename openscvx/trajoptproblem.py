@@ -43,9 +43,7 @@ from openscvx.config import (
     ScpConfig,
     SimConfig,
 )
-from openscvx.constraints import ctcs
-from openscvx.constraints.ctcs import CTCSConstraint
-from openscvx.constraints.nodal import NodalConstraint
+from openscvx.constraints.lowered import LoweredConstraint
 from openscvx.discretization import get_discretization_solver
 from openscvx.dynamics import Dynamics
 from openscvx.dynamics import dynamics as to_dynamics
@@ -128,7 +126,8 @@ class TrajOptProblem:
         constraints = [canonicalize(expr) for expr in constraints]
 
         # Sort and separate constraints first
-        constraints_ctcs, nodal_constraints = separate_constraints(constraints)
+        # TODO: (norrisg) rename `nodal_constraints` to signify that they will be linearized
+        constraints_ctcs, constraints_nodal = separate_constraints(constraints)
 
         # Augment dynamics, states, and controls with CTCS constraints, time dilation
         dynamics_aug, x_aug, u_aug = augment_dynamics_with_ctcs(
@@ -153,11 +152,18 @@ class TrajOptProblem:
 
         # TODO: (norrisg) allow non-ctcs constraints
         dyn_fn = lower_to_jax(dynamics_aug)
-        # fns = lower_to_jax(constraints)
+        constraints_nodal_fns = lower_to_jax(constraints_nodal)
 
         dynamics_fn = to_dynamics(dyn_fn)
-        # constraints_fn = [ctcs(fn) for fn in fns]
+        # Create LoweredConstraint objects with Jacobians computed automatically
         constraints_fn = []
+        for fn in constraints_nodal_fns:
+            constraint = LoweredConstraint(
+                func=fn,
+                grad_g_x=jacfwd(fn, argnums=0),
+                grad_g_u=jacfwd(fn, argnums=1),
+            )
+            constraints_fn.append(constraint)
 
         if params is None:
             params = {}
@@ -169,21 +175,7 @@ class TrajOptProblem:
         if x_prop is None:
             x_prop = deepcopy(x_unified)
 
-        # TODO: (norrisg) move this into some augmentation function, if we want to
-        # make this be executed after the init (i.e. within problem.initialize)
-        # need to rethink how problem is defined
-        constraints_ctcs = []
-        constraints_nodal = []
-        for constraint in constraints_fn:
-            if isinstance(constraint, CTCSConstraint):
-                constraints_ctcs.append(constraint)
-            elif isinstance(constraint, NodalConstraint):
-                constraints_nodal.append(constraint)
-            else:
-                raise ValueError(
-                    f"Unknown constraint type: {type(constraint)}, All constraints must be"
-                    " decorated with @ctcs or @nodal"
-                )
+        constraints_nodal.extend(constraints_fn)
 
         constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(
             constraints_ctcs, N
@@ -247,7 +239,7 @@ class TrajOptProblem:
         if prp is None:
             prp = PropagationConfig()
 
-        sim.constraints_ctcs = constraints_ctcs
+        sim.constraints_ctcs = []
         sim.constraints_nodal = constraints_nodal
 
         # Create dynamics objects from the symbolic augmented dynamics
