@@ -19,6 +19,7 @@ from openscvx.backend.expr import (
     MatMul,
     Mul,
     Neg,
+    Norm,
     PositivePart,
     Sin,
     SmoothReLU,
@@ -327,6 +328,15 @@ def visit_sum(node: Sum) -> tuple[int, ...]:
     # Validate that the operand has a valid shape
     operand_shape = dispatch(node.operand)
     # Sum always produces a scalar regardless of input shape
+    return ()
+
+
+@visitor(Norm)
+def visit_norm(node: Norm) -> tuple[int, ...]:
+    """norm() reduces any shape to a scalar"""
+    # Validate that the operand has a valid shape
+    operand_shape = dispatch(node.operand)
+    # Norm always produces a scalar regardless of input shape
     return ()
 
 

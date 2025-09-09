@@ -20,6 +20,7 @@ from openscvx.backend.expr import (
     MatMul,
     Mul,
     Neg,
+    Norm,
     PositivePart,
     Sin,
     SmoothReLU,
@@ -126,6 +127,22 @@ class JaxLowerer:
     def visit_sum(self, node: Sum):
         f = self.lower(node.operand)
         return lambda x, u, node, **kwargs: jnp.sum(f(x, u, node, **kwargs))
+
+    @visitor(Norm)
+    def visit_norm(self, node: Norm):
+        f = self.lower(node.operand)
+        ord_val = node.ord
+
+        # Convert string ord values to appropriate JAX values
+        if ord_val == "inf":
+            ord_val = jnp.inf
+        elif ord_val == "-inf":
+            ord_val = -jnp.inf
+        elif ord_val == "fro":
+            # For vectors, Frobenius norm is the same as 2-norm
+            ord_val = None  # Default is 2-norm
+
+        return lambda x, u, node, **kwargs: jnp.linalg.norm(f(x, u, node, **kwargs), ord=ord_val)
 
     @visitor(Index)
     def visit_index(self, node: Index):

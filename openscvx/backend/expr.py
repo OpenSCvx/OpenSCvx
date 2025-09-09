@@ -164,6 +164,20 @@ class Sum(Expr):
         return f"sum({self.operand!r})"
 
 
+class Norm(Expr):
+    """Norm of an expression (reduction operation)"""
+
+    def __init__(self, operand, ord="fro"):
+        self.operand = to_expr(operand)
+        self.ord = ord  # Can be "fro", "inf", 1, 2, etc.
+
+    def children(self):
+        return [self.operand]
+
+    def __repr__(self):
+        return f"norm({self.operand!r}, ord={self.ord!r})"
+
+
 class Index(Expr):
     """Expr that means “take this Expr and index/slice it.”"""
 
