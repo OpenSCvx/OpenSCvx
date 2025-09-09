@@ -1,7 +1,6 @@
 import os
 import sys
 
-import cvxpy as cp
 import jax.numpy as jnp
 import numpy as np
 
@@ -11,9 +10,8 @@ sys.path.append(grandparent_dir)
 
 from examples.plotting import plot_animation_double_integrator
 from openscvx.backend.control import Control
+from openscvx.backend.expr import Concat, Constant, Norm, ctcs
 from openscvx.backend.state import Free, Minimize, State
-from openscvx.constraints import ctcs, nodal
-from openscvx.dynamics import dynamics
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.utils import gen_vertices, rot
 
@@ -76,33 +74,27 @@ for center in gate_centers:
     vertices.append(gen_vertices(center, radii))
 ### End Gate Parameters ###
 
-
-constraints = [
-    ctcs(lambda x_, u_: (x_ - x.true.max)),
-    ctcs(lambda x_, u_: (x.true.min - x_)),
+constraint_exprs = [
+    ctcs(x <= Constant(np.array([x.max]))),
+    ctcs(Constant(np.array([x.min])) <= x),
 ]
 for node, cen in zip(gate_nodes, A_gate_cen):
-    constraints.append(
-        nodal(
-            lambda x_, u_, A=A_gate, c=cen: cp.norm(A @ x_[:3] - c, "inf") <= 1,
-            nodes=[node],
-            convex=True,
-        )
-    )  # use local variables inside the lambda function
+    A_gate_const = Constant(A_gate)
+    c_const = Constant(cen)
+    constraint_exprs.append(
+        ctcs(Norm(A_gate_const @ x[:3] - c_const, ord="inf") <= Constant(np.array([1.0])))
+    )
 
 
-@dynamics
-def dynamics(x_, u_):
-    # Unpack the state and control vectors
-    v = x_[3:6]
+# Create symbolic dynamics
+v = x[3:6]
+f = u[:3]
 
-    f = u_[:3]
-
-    # Compute the time derivatives of the state variables
-    r_dot = v
-    v_dot = (1 / m) * f + jnp.array([0, 0, g_const])
-    t_dot = 1
-    return jnp.hstack([r_dot, v_dot, t_dot])
+# Compute the time derivatives of the state variables
+r_dot = v
+v_dot = (1 / m) * f + Constant(np.array([0, 0, g_const], dtype=np.float64))
+t_dot = Constant(np.array([1.0], dtype=np.float64))
+dyn_expr = Concat(r_dot, v_dot, t_dot)
 
 
 x_bar = np.linspace(x.initial, x.final, n)
@@ -126,10 +118,10 @@ for _ in range(n_gates + 1):
 x.guess = x_bar
 
 problem = TrajOptProblem(
-    dynamics=dynamics,
+    dynamics=dyn_expr,
     x=x,
     u=u,
-    constraints=constraints,
+    constraints=constraint_exprs,
     idx_time=len(x.max) - 1,
     N=n,
 )
