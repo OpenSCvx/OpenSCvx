@@ -156,14 +156,14 @@ class TrajOptProblem:
 
         dynamics_fn = to_dynamics(dyn_fn)
         # Create LoweredConstraint objects with Jacobians computed automatically
-        constraints_fn = []
+        constraints_nodal = []
         for fn in constraints_nodal_fns:
             constraint = LoweredConstraint(
                 func=fn,
                 grad_g_x=jacfwd(fn, argnums=0),
                 grad_g_u=jacfwd(fn, argnums=1),
             )
-            constraints_fn.append(constraint)
+            constraints_nodal.append(constraint)
 
         if params is None:
             params = {}
@@ -174,8 +174,6 @@ class TrajOptProblem:
 
         if x_prop is None:
             x_prop = deepcopy(x_unified)
-
-        constraints_nodal.extend(constraints_fn)
 
         constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(
             constraints_ctcs, N
