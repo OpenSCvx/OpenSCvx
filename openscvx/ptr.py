@@ -237,9 +237,10 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
     id_ncvx = 0
     J_vb_vec = 0
     for constraint in settings.sim.constraints_nodal:
-        if not constraint.convex:
-            J_vb_vec += np.maximum(0, prob.var_dict["nu_vb_" + str(id_ncvx)].value)
-            id_ncvx += 1
+        J_vb_vec += np.maximum(0, prob.var_dict["nu_vb_" + str(id_ncvx)].value)
+        id_ncvx += 1
+    for constraint in settings.sim.constraints_nodal_convex:
+        raise RuntimeError("Failed to handle convex nodal constraints in `ptr`")
     return (
         x_new_guess,
         u_new_guess,
