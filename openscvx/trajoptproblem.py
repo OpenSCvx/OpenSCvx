@@ -230,10 +230,13 @@ class TrajOptProblem:
         # Create LoweredConstraint objects with Jacobians computed automatically
         constraints_nodal = []
         for fn in constraints_nodal_fns:
+            # Apply vectorization to handle (N, n_x) and (N, n_u) inputs
+            # The lowered functions have signature (x, u, node, **kwargs), so we need to handle node
+            # parameter, node is broadcast (same for all),
             constraint = LoweredConstraint(
-                func=fn,
-                grad_g_x=jacfwd(fn, argnums=0),
-                grad_g_u=jacfwd(fn, argnums=1),
+                func=jax.vmap(fn, in_axes=(0, 0, None)),
+                grad_g_x=jax.vmap(jacfwd(fn, argnums=0), in_axes=(0, 0, None)),
+                grad_g_u=jax.vmap(jacfwd(fn, argnums=1), in_axes=(0, 0, None)),
             )
             constraints_nodal.append(constraint)
 
