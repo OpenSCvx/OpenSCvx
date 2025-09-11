@@ -72,21 +72,20 @@ def OptimalControlProblem(settings: Config):
         grad_g_u = []
         nu_vb = []
         for idx_ncvx, constraint in enumerate(settings.sim.constraints_nodal):
-            if not constraint.convex:
-                g.append(cp.Parameter(settings.scp.n, name="g_" + str(idx_ncvx)))
-                grad_g_x.append(
-                    cp.Parameter(
-                        (settings.scp.n, settings.sim.n_states), name="grad_g_x_" + str(idx_ncvx)
-                    )
+            g.append(cp.Parameter(settings.scp.n, name="g_" + str(idx_ncvx)))
+            grad_g_x.append(
+                cp.Parameter(
+                    (settings.scp.n, settings.sim.n_states), name="grad_g_x_" + str(idx_ncvx)
                 )
-                grad_g_u.append(
-                    cp.Parameter(
-                        (settings.scp.n, settings.sim.n_controls), name="grad_g_u_" + str(idx_ncvx)
-                    )
+            )
+            grad_g_u.append(
+                cp.Parameter(
+                    (settings.scp.n, settings.sim.n_controls), name="grad_g_u_" + str(idx_ncvx)
                 )
-                nu_vb.append(
-                    cp.Variable(settings.scp.n, name="nu_vb_" + str(idx_ncvx))
-                )  # Virtual Control for VB
+            )
+            nu_vb.append(
+                cp.Variable(settings.scp.n, name="nu_vb_" + str(idx_ncvx))
+            )  # Virtual Control for VB
 
     # Applying the affine scaling to state and control
     x_nonscaled = []
@@ -101,9 +100,31 @@ def OptimalControlProblem(settings: Config):
     #############
     # CONSTRAINTS
     #############
+
+    # Linearized nodal constraints
     idx_ncvx = 0
     if settings.sim.constraints_nodal:
         for constraint in settings.sim.constraints_nodal:
+            # if constraint.nodes is None:
+            #     nodes = range(settings.scp.n)
+            # else:
+            #     nodes = constraint.nodes
+            nodes = range(settings.scp.n)
+            constr += [
+                (
+                    g[idx_ncvx][node]
+                    + grad_g_x[idx_ncvx][node] @ dx[node]
+                    + grad_g_u[idx_ncvx][node] @ du[node]
+                )
+                == nu_vb[idx_ncvx][node]
+                for node in nodes
+            ]
+            idx_ncvx += 1
+
+    # Convex nodal constraints
+    if settings.sim.constraints_nodal_convex:
+        raise RuntimeError("Tried instantiating 'OptimalControlProblem' without implementing proper support for convex nodal constraints")
+        for constraint in settings.sim.constraints_nodal_convex:
             if constraint.nodes is None:
                 nodes = range(settings.scp.n)
             else:
@@ -114,17 +135,6 @@ def OptimalControlProblem(settings: Config):
             elif constraint.convex:
                 for node in nodes:
                     constr += constraint.get_cvxpy_constraints(x_nonscaled[node], u_nonscaled[node])
-            elif not constraint.convex:
-                constr += [
-                    (
-                        g[idx_ncvx][node]
-                        + grad_g_x[idx_ncvx][node] @ dx[node]
-                        + grad_g_u[idx_ncvx][node] @ du[node]
-                    )
-                    == nu_vb[idx_ncvx][node]
-                    for node in nodes
-                ]
-                idx_ncvx += 1
 
     for i in range(settings.sim.idx_x_true.start, settings.sim.idx_x_true.stop):
         if settings.sim.x.initial_type[i] == "Fix":
@@ -196,9 +206,9 @@ def OptimalControlProblem(settings: Config):
     idx_ncvx = 0
     if settings.sim.constraints_nodal:
         for constraint in settings.sim.constraints_nodal:
-            if not constraint.convex:
-                cost += settings.scp.lam_vb * cp.sum(cp.pos(nu_vb[idx_ncvx]))
-                idx_ncvx += 1
+            # if not constraint.convex:
+            cost += settings.scp.lam_vb * cp.sum(cp.pos(nu_vb[idx_ncvx]))
+            idx_ncvx += 1
 
     for idx, nodes in zip(
         np.arange(settings.sim.idx_y.start, settings.sim.idx_y.stop),

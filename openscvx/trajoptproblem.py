@@ -328,11 +328,10 @@ class TrajOptProblem:
         )
 
         for constraint in self.settings.sim.constraints_nodal:
-            if not constraint.convex:
-                # TODO: (haynec) switch to AOT instead of JIT
-                constraint.g = jax.jit(constraint.g)
-                constraint.grad_g_x = jax.jit(constraint.grad_g_x)
-                constraint.grad_g_u = jax.jit(constraint.grad_g_u)
+            # TODO: (haynec) switch to AOT instead of JIT
+            constraint.func = jax.jit(constraint.func)
+            constraint.grad_g_x = jax.jit(constraint.grad_g_x)
+            constraint.grad_g_u = jax.jit(constraint.grad_g_u)
 
         # Generate solvers and optimal control problem
         self.discretization_solver = get_discretization_solver(
