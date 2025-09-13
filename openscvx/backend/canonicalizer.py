@@ -14,6 +14,7 @@ from openscvx.backend.expr import (
     Inequality,
     Mul,
     Neg,
+    NodalConstraint,
     Sub,
 )
 from openscvx.backend.state import State
@@ -154,10 +155,16 @@ class Canonicalizer:
     def visit_inequality(self, node: Inequality) -> Expr:
         diff = Sub(node.lhs, node.rhs)
         canon_diff = self.canonicalize(diff)
-        return Inequality(canon_diff, Constant(np.array(0)), nodes=node.nodes)
+        return Inequality(canon_diff, Constant(np.array(0)))
 
     @visitor(Equality)
     def visit_equality(self, node: Equality) -> Expr:
         diff = Sub(node.lhs, node.rhs)
         canon_diff = self.canonicalize(diff)
-        return Equality(canon_diff, Constant(np.array(0)), nodes=node.nodes)
+        return Equality(canon_diff, Constant(np.array(0)))
+
+    @visitor(NodalConstraint)
+    def visit_nodal_constraint(self, node: NodalConstraint) -> Expr:
+        # Canonicalize the wrapped constraint and preserve the node specification
+        canon_constraint = self.canonicalize(node.constraint)
+        return NodalConstraint(canon_constraint, node.nodes)

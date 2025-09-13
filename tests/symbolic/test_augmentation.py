@@ -27,7 +27,8 @@ from openscvx.backend.state import State
 
 def test_separate_constraints_empty():
     """Test separate_constraints with no constraints."""
-    constraints_ctcs, constraints_nodal = separate_constraints([])
+    n_nodes = 10
+    constraints_ctcs, constraints_nodal = separate_constraints([], n_nodes)
 
     assert constraints_ctcs == []
     assert constraints_nodal == []
@@ -35,53 +36,65 @@ def test_separate_constraints_empty():
 
 def test_separate_constraints_only_ctcs():
     """Test separate_constraints with only CTCS constraints."""
+    n_nodes = 10
     x = State("x", (1,))
     c1 = ctcs(x <= 1.0, penalty="squared_relu")
     c2 = ctcs(x >= 0.0, penalty="huber", check_nodally=True)
 
-    constraints_ctcs, constraints_nodal = separate_constraints([c1, c2])
+    constraints_ctcs, constraints_nodal = separate_constraints([c1, c2], n_nodes)
 
     assert constraints_ctcs == [c1, c2]
     assert len(constraints_nodal) == 1  # Only c2 should be in nodal (check_nodally=True)
-    assert constraints_nodal[0] == c2.constraint
+    # Should be converted to NodalConstraint
+    assert hasattr(constraints_nodal[0], "constraint")
+    assert constraints_nodal[0].constraint == c2.constraint
 
 
 def test_separate_constraints_only_nodal():
     """Test separate_constraints with only regular constraints."""
+    n_nodes = 10
     x = State("x", (1,))
     c1 = x <= 1.0
     c2 = x >= 0.0
 
-    constraints_ctcs, constraints_nodal = separate_constraints([c1, c2])
+    constraints_ctcs, constraints_nodal = separate_constraints([c1, c2], n_nodes)
 
     assert constraints_ctcs == []
-    assert constraints_nodal == [c1, c2]
+    assert len(constraints_nodal) == 2
+    # Should be converted to NodalConstraint objects
+    assert hasattr(constraints_nodal[0], "constraint")
+    assert hasattr(constraints_nodal[1], "constraint")
+    assert constraints_nodal[0].constraint == c1
+    assert constraints_nodal[1].constraint == c2
 
 
 def test_separate_constraints_mixed():
     """Test separate_constraints with mixed constraint types."""
+    n_nodes = 10
     x = State("x", (1,))
     c1 = ctcs(x <= 1.0, penalty="squared_relu")
     c2 = x >= 0.0  # Regular constraint
     c3 = ctcs(x <= 2.0, penalty="huber", check_nodally=True)
 
-    constraints_ctcs, constraints_nodal = separate_constraints([c1, c2, c3])
+    constraints_ctcs, constraints_nodal = separate_constraints([c1, c2, c3], n_nodes)
 
     assert constraints_ctcs == [c1, c3]
     assert len(constraints_nodal) == 2  # c2 + c3's underlying constraint
-    assert c2 in constraints_nodal
-    assert c3.constraint in constraints_nodal
+    # Should be converted to NodalConstraint objects
+    assert constraints_nodal[0].constraint == c2
+    assert constraints_nodal[1].constraint == c3.constraint
 
 
 def test_separate_constraints_invalid_type():
     """Test separate_constraints with invalid constraint type."""
+    n_nodes = 10
     x = State("x", (1,))
     invalid = Add(x, Constant(1.0))  # Not a constraint
 
     with pytest.raises(ValueError) as exc:
-        separate_constraints([invalid])
+        separate_constraints([invalid], n_nodes)
 
-    assert "Constraints must be `Constraint` or `CTCS`" in str(exc.value)
+    assert "Constraints must be `Constraint`, `NodalConstraint`, or `CTCS`" in str(exc.value)
 
 
 def test_augment_no_ctcs_constraints():

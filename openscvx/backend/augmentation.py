@@ -9,6 +9,7 @@ from openscvx.backend.expr import (
     Concat,
     Constraint,
     Expr,
+    NodalConstraint,
 )
 from openscvx.backend.state import Free, State
 
@@ -84,31 +85,45 @@ def sort_ctcs_constraints(
 
 
 def separate_constraints(
-    constraints: List[Expr],
-) -> Tuple[List[CTCS], List[Constraint]]:
+    constraints: List[Expr], n_nodes: int
+) -> Tuple[List[CTCS], List[NodalConstraint]]:
     """
-    Separate CTCS constraints from regular constraints.
+    Separate CTCS constraints from regular constraints, converting bare constraints
+    to NodalConstraints that apply at all nodes.
 
     Args:
-        constraints: List of constraints (mix of CTCS and regular Constraints)
+        constraints: List of constraints (mix of CTCS, NodalConstraint, and bare Constraints)
+        n_nodes: Total number of nodes in the trajectory
 
     Returns:
         Tuple of:
         - List of CTCS constraints
-        - List of regular constraints (non-CTCS)
+        - List of NodalConstraint objects (including converted bare constraints)
     """
     constraints_ctcs: List[CTCS] = []
-    constraints_nodal: List[Constraint] = []
+    constraints_nodal: List[NodalConstraint] = []
 
     for c in constraints:
         if isinstance(c, CTCS):
             constraints_ctcs.append(c)
-        elif isinstance(c, Constraint):
+        elif isinstance(c, NodalConstraint):
+            # Already a properly formed nodal constraint
             constraints_nodal.append(c)
+        elif isinstance(c, Constraint):
+            # Convert bare constraint to NodalConstraint that applies at all nodes
+            all_nodes = list(range(n_nodes))
+            constraints_nodal.append(NodalConstraint(c, all_nodes))
         else:
-            raise ValueError(f"Constraints must be `Constraint` or `CTCS`, got {type(c).__name__}")
+            raise ValueError(
+                f"Constraints must be `Constraint`, `NodalConstraint`, or `CTCS`, got {type(c).__name__}"
+            )
 
-    constraints_nodal = constraints_nodal + get_nodal_constraints_from_ctcs(constraints_ctcs)
+    # Add nodal constraints from CTCS constraints that have check_nodally=True
+    ctcs_nodal_constraints = get_nodal_constraints_from_ctcs(constraints_ctcs)
+    for constraint in ctcs_nodal_constraints:
+        # These also need to be converted to NodalConstraint (apply at all nodes)
+        all_nodes = list(range(n_nodes))
+        constraints_nodal.append(NodalConstraint(constraint, all_nodes))
 
     return constraints_ctcs, constraints_nodal
 

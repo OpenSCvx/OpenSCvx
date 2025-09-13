@@ -19,6 +19,7 @@ from openscvx.backend.expr import (
     MatMul,
     Mul,
     Neg,
+    NodalConstraint,
     Norm,
     PositivePart,
     Sin,
@@ -152,16 +153,16 @@ def _traverse_with_depth(expr: Expr, visit: Callable[[Expr, int], None], depth: 
 def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
     """
     Raise ValueError if any Constraint or constraint wrapper is found at depth>0.
-    Both raw constraints and constraint wrappers (like CTCS) must only appear
+    Both raw constraints and constraint wrappers (like CTCS, NodalConstraint) must only appear
     at the root level. However, constraints inside constraint wrappers are allowed
     (e.g., the constraint inside CTCS(x <= 5) is valid).
 
     Accepts a single Expr or a list of Exprs.
     """
-    from openscvx.backend.expr import CTCS  # Import here to avoid circular imports
+    from openscvx.backend.expr import CTCS, NodalConstraint  # Import here to avoid circular imports
 
     # Define constraint wrappers that must also be at root level
-    CONSTRAINT_WRAPPERS = (CTCS,)
+    CONSTRAINT_WRAPPERS = (CTCS, NodalConstraint)
 
     # normalize to list
     expr_list = exprs if isinstance(exprs, (list, tuple)) else [exprs]
@@ -197,52 +198,44 @@ def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
 def validate_and_normalize_constraint_nodes(exprs: Union[Expr, list[Expr]], n_nodes: int):
     """
     Validate and normalize constraint nodes specifications.
-    
-    For nodal constraints:
+
+    For NodalConstraint:
     - nodes should be a list of specific node indices: [2, 4, 6, 8]
-    - None is replaced with all nodes: list(range(n_nodes))
-    
+    - Validates all nodes are within range
+
     For CTCS constraints:
-    - nodes should be a tuple of (start, end): (0, 10)  
+    - nodes should be a tuple of (start, end): (0, 10)
     - None is replaced with (0, n_nodes)
     - Validation ensures tuple has exactly 2 elements and start < end
-    
+
     Args:
         exprs: Single expression or list of expressions to validate
         n_nodes: Total number of nodes in the trajectory
-        
+
     Raises:
         ValueError: If node specifications are invalid
     """
-    from openscvx.backend.expr import CTCS  # Import here to avoid circular imports
-    
+    from openscvx.backend.expr import CTCS, NodalConstraint  # Import here to avoid circular imports
+
     # Normalize to list
     expr_list = exprs if isinstance(exprs, (list, tuple)) else [exprs]
-    
+
     for expr in expr_list:
         if isinstance(expr, CTCS):
             # CTCS constraint validation (already done in __init__, but normalize None)
             if expr.nodes is None:
                 expr.nodes = (0, n_nodes)
             elif expr.nodes[0] >= n_nodes or expr.nodes[1] > n_nodes:
-                raise ValueError(f"CTCS node range {expr.nodes} exceeds trajectory length {n_nodes}")
-                
-        elif isinstance(expr, Constraint):
-            # Nodal constraint validation
-            print(expr.nodes)
-            if expr.nodes is None:
-                expr.nodes = list(range(n_nodes))
-            elif isinstance(expr.nodes, (list, tuple)):
-                expr.nodes = list(expr.nodes)  # Ensure it's a list
-                # Validate all nodes are within range
-                for node in expr.nodes:
-                    if not isinstance(node, (int, np.integer)):
-                        raise ValueError(f"Nodal constraint node indices must be integers, got {type(node)}")
-                    if node < 0 or node >= n_nodes:
-                        raise ValueError(f"Nodal constraint node {node} is out of range [0, {n_nodes})")
-            else:
-                raise ValueError(f"Nodal constraint nodes must be a list of integers or None, got {type(expr.nodes)}")
-            print(expr.nodes)
+                raise ValueError(
+                    f"CTCS node range {expr.nodes} exceeds trajectory length {n_nodes}"
+                )
+
+        elif isinstance(expr, NodalConstraint):
+            # NodalConstraint validation - nodes are already validated in __init__
+            # Just need to check they're within trajectory range
+            for node in expr.nodes:
+                if node < 0 or node >= n_nodes:
+                    raise ValueError(f"NodalConstraint node {node} is out of range [0, {n_nodes})")
 
 
 def validate_dynamics_dimension(
@@ -461,6 +454,19 @@ def visit_constraint(node: Constraint) -> tuple[int, ...]:
     # 3) Allow vector constraints - they're interpreted element-wise
 
     # 4) return () as usual
+    return ()
+
+
+@visitor(NodalConstraint)
+def visit_nodal_constraint(node: NodalConstraint) -> tuple[int, ...]:
+    """
+    NodalConstraint wraps a constraint but doesn't change its computational meaning,
+    just specifies where it should be applied. Always produces a scalar.
+    """
+    # Validate the wrapped constraint's shape
+    dispatch(node.constraint)
+
+    # NodalConstraint produces a scalar like any constraint
     return ()
 
 

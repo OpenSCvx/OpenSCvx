@@ -130,7 +130,7 @@ class TrajOptProblem:
         constraints = [canonicalize(expr) for expr in constraints]
 
         # Sort and separate constraints first
-        constraints_ctcs, constraints_nodal = separate_constraints(constraints)
+        constraints_ctcs, constraints_nodal = separate_constraints(constraints, N)
 
         # Sort CTCS constraints by their idx to get node_intervals
         constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(

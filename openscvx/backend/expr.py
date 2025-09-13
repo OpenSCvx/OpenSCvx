@@ -261,13 +261,23 @@ class Constraint(Expr):
     Abstract base for all constraints.
     """
 
-    def __init__(self, lhs: Expr, rhs: Expr, nodes: Optional[Union[list, tuple]] = None):
+    def __init__(self, lhs: Expr, rhs: Expr):
         self.lhs = lhs
         self.rhs = rhs
-        self.nodes = nodes
 
     def children(self):
         return [self.lhs, self.rhs]
+
+    def at(self, nodes: Union[list, tuple]) -> "NodalConstraint":
+        """Apply this constraint only at specific discrete nodes.
+
+        Args:
+            nodes: List of node indices where the constraint should be enforced
+
+        Returns:
+            NodalConstraint wrapping this constraint with node specification
+        """
+        return NodalConstraint(self, list(nodes))
 
 
 class Equality(Constraint):
@@ -282,6 +292,32 @@ class Inequality(Constraint):
 
     def __repr__(self):
         return f"{self.lhs!r} <= {self.rhs!r}"
+
+
+class NodalConstraint(Expr):
+    """
+    Wrapper for constraints that should only be enforced at specific discrete nodes.
+
+    This separates nodal constraint logic from the base Constraint class,
+    providing clean separation of concerns.
+    """
+
+    def __init__(self, constraint: Constraint, nodes: list[int]):
+        if not isinstance(constraint, Constraint):
+            raise TypeError("NodalConstraint must wrap a Constraint")
+        if not isinstance(nodes, list):
+            raise TypeError("nodes must be a list of integers")
+        if not all(isinstance(n, int) for n in nodes):
+            raise TypeError("all node indices must be integers")
+
+        self.constraint = constraint
+        self.nodes = nodes
+
+    def children(self):
+        return [self.constraint]
+
+    def __repr__(self):
+        return f"NodalConstraint({self.constraint!r}, nodes={self.nodes})"
 
 
 # CTCS STUFF
