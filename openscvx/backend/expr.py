@@ -261,9 +261,10 @@ class Constraint(Expr):
     Abstract base for all constraints.
     """
 
-    def __init__(self, lhs: Expr, rhs: Expr):
+    def __init__(self, lhs: Expr, rhs: Expr, nodes: Optional[Union[list, tuple]] = None):
         self.lhs = lhs
         self.rhs = rhs
+        self.nodes = nodes
 
     def children(self):
         return [self.lhs, self.rhs]
@@ -361,6 +362,16 @@ class CTCS(Expr):
     ):
         if not isinstance(constraint, Constraint):
             raise TypeError("CTCS must wrap a Constraint")
+        
+        # Validate nodes parameter for CTCS
+        if nodes is not None:
+            if not isinstance(nodes, tuple) or len(nodes) != 2:
+                raise ValueError("CTCS constraints must specify nodes as a tuple of (start, end) or None for all nodes")
+            if not all(isinstance(n, int) for n in nodes):
+                raise ValueError("CTCS node indices must be integers")
+            if nodes[0] >= nodes[1]:
+                raise ValueError("CTCS node range must have start < end")
+        
         self.constraint = constraint
         self.penalty = penalty
         self.nodes = nodes  # (start, end) node range or None for all nodes

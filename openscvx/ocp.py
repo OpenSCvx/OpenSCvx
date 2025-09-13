@@ -105,11 +105,9 @@ def OptimalControlProblem(settings: Config):
     idx_ncvx = 0
     if settings.sim.constraints_nodal:
         for constraint in settings.sim.constraints_nodal:
-            # if constraint.nodes is None:
-            #     nodes = range(settings.scp.n)
-            # else:
-            #     nodes = constraint.nodes
-            nodes = range(settings.scp.n)
+            # nodes should already be validated and normalized in preprocessing
+            nodes = constraint.nodes
+            print(nodes)
             constr += [
                 (
                     g[idx_ncvx][node]
@@ -125,10 +123,8 @@ def OptimalControlProblem(settings: Config):
     if settings.sim.constraints_nodal_convex:
         raise RuntimeError("Tried instantiating 'OptimalControlProblem' without implementing proper support for convex nodal constraints")
         for constraint in settings.sim.constraints_nodal_convex:
-            if constraint.nodes is None:
-                nodes = range(settings.scp.n)
-            else:
-                nodes = constraint.nodes
+            # nodes should already be validated and normalized in preprocessing
+            nodes = constraint.nodes
 
             if constraint.convex and constraint.vectorized:
                 constr += constraint.get_cvxpy_constraints(x_nonscaled, u_nonscaled)

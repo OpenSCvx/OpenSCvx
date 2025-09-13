@@ -23,6 +23,7 @@ from openscvx.backend.expr import CTCS, Constraint, Expr
 from openscvx.backend.lower import lower_to_jax
 from openscvx.backend.preprocessing import (
     collect_and_assign_slices,
+    validate_and_normalize_constraint_nodes,
     validate_constraints_at_root,
     validate_dynamics_dimension,
     validate_shapes,
@@ -121,6 +122,7 @@ class TrajOptProblem:
         collect_and_assign_slices(all_exprs)
         validate_shapes(all_exprs)
         validate_constraints_at_root(constraints)
+        validate_and_normalize_constraint_nodes(constraints, N)
         validate_dynamics_dimension(dynamics, x)
 
         # Canonicalize all expressions after validation
@@ -228,8 +230,8 @@ class TrajOptProblem:
             prp = PropagationConfig()
 
         # Create LoweredConstraint objects with Jacobians computed automatically
-        constraints_nodal = []
-        for fn in constraints_nodal_fns:
+        lowered_constraints_nodal = []
+        for i, fn in enumerate(constraints_nodal_fns):
             # Apply vectorization to handle (N, n_x) and (N, n_u) inputs
             # The lowered functions have signature (x, u, node, **kwargs), so we need to handle node
             # parameter, node is broadcast (same for all),
@@ -238,10 +240,12 @@ class TrajOptProblem:
                 grad_g_x=jax.vmap(jacfwd(fn, argnums=0), in_axes=(0, 0, None)),
                 grad_g_u=jax.vmap(jacfwd(fn, argnums=1), in_axes=(0, 0, None)),
             )
-            constraints_nodal.append(constraint)
+            # print(f"{i}: {constraints_nodal[i].nodes}")
+            constraint.nodes = constraints_nodal[i].nodes
+            lowered_constraints_nodal.append(constraint)
 
         sim.constraints_ctcs = []
-        sim.constraints_nodal = constraints_nodal
+        sim.constraints_nodal = lowered_constraints_nodal
 
         # Create dynamics objects from the symbolic augmented dynamics
         self.dynamics_augmented = Dynamics(

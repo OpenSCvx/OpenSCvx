@@ -194,6 +194,57 @@ def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
         visit(expr, 0)
 
 
+def validate_and_normalize_constraint_nodes(exprs: Union[Expr, list[Expr]], n_nodes: int):
+    """
+    Validate and normalize constraint nodes specifications.
+    
+    For nodal constraints:
+    - nodes should be a list of specific node indices: [2, 4, 6, 8]
+    - None is replaced with all nodes: list(range(n_nodes))
+    
+    For CTCS constraints:
+    - nodes should be a tuple of (start, end): (0, 10)  
+    - None is replaced with (0, n_nodes)
+    - Validation ensures tuple has exactly 2 elements and start < end
+    
+    Args:
+        exprs: Single expression or list of expressions to validate
+        n_nodes: Total number of nodes in the trajectory
+        
+    Raises:
+        ValueError: If node specifications are invalid
+    """
+    from openscvx.backend.expr import CTCS  # Import here to avoid circular imports
+    
+    # Normalize to list
+    expr_list = exprs if isinstance(exprs, (list, tuple)) else [exprs]
+    
+    for expr in expr_list:
+        if isinstance(expr, CTCS):
+            # CTCS constraint validation (already done in __init__, but normalize None)
+            if expr.nodes is None:
+                expr.nodes = (0, n_nodes)
+            elif expr.nodes[0] >= n_nodes or expr.nodes[1] > n_nodes:
+                raise ValueError(f"CTCS node range {expr.nodes} exceeds trajectory length {n_nodes}")
+                
+        elif isinstance(expr, Constraint):
+            # Nodal constraint validation
+            print(expr.nodes)
+            if expr.nodes is None:
+                expr.nodes = list(range(n_nodes))
+            elif isinstance(expr.nodes, (list, tuple)):
+                expr.nodes = list(expr.nodes)  # Ensure it's a list
+                # Validate all nodes are within range
+                for node in expr.nodes:
+                    if not isinstance(node, (int, np.integer)):
+                        raise ValueError(f"Nodal constraint node indices must be integers, got {type(node)}")
+                    if node < 0 or node >= n_nodes:
+                        raise ValueError(f"Nodal constraint node {node} is out of range [0, {n_nodes})")
+            else:
+                raise ValueError(f"Nodal constraint nodes must be a list of integers or None, got {type(expr.nodes)}")
+            print(expr.nodes)
+
+
 def validate_dynamics_dimension(
     dynamics_expr: Union[Expr, list[Expr]], states: Union[State, list[State]]
 ) -> None:
