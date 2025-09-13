@@ -272,7 +272,9 @@ class SimConfig:
         self.ctcs_node_intervals = ctcs_node_intervals
         self.constraints_ctcs = constraints_ctcs if constraints_ctcs is not None else []
         self.constraints_nodal = constraints_nodal if constraints_nodal is not None else []
-        self.constraints_nodal_convex = constraints_nodal_convex if constraints_nodal_convex is not None else []
+        self.constraints_nodal_convex = (
+            constraints_nodal_convex if constraints_nodal_convex is not None else []
+        )
         self.n_states = n_states
         self.n_states_prop = n_states_prop
         self.n_controls = n_controls

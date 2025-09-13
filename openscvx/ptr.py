@@ -178,9 +178,11 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
             prob.param_dict["grad_g_u_" + str(g_id)].value = np.asarray(
                 constraint.grad_g_u(x.guess, u.guess, 0)
             )
-    
+
     if settings.sim.constraints_nodal_convex:
-        raise RuntimeError("Tried calling 'PTR_subproblem' without implementing proper support for convex nodal constraints")
+        raise RuntimeError(
+            "Tried calling 'PTR_subproblem' without implementing proper support for convex nodal constraints"
+        )
 
     prob.param_dict["w_tr"].value = settings.scp.w_tr
     prob.param_dict["lam_cost"].value = settings.scp.lam_cost

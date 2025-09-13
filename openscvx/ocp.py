@@ -121,7 +121,9 @@ def OptimalControlProblem(settings: Config):
 
     # Convex nodal constraints
     if settings.sim.constraints_nodal_convex:
-        raise RuntimeError("Tried instantiating 'OptimalControlProblem' without implementing proper support for convex nodal constraints")
+        raise RuntimeError(
+            "Tried instantiating 'OptimalControlProblem' without implementing proper support for convex nodal constraints"
+        )
         for constraint in settings.sim.constraints_nodal_convex:
             # nodes should already be validated and normalized in preprocessing
             nodes = constraint.nodes

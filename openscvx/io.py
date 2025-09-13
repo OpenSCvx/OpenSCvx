@@ -67,7 +67,9 @@ def print_problem_summary(settings):
     """
     n_nodal_convex = 0
     for c in settings.sim.constraints_nodal_convex:
-        raise RuntimeError("Tried calling 'print_problem_summary' without implementing proper support for convex nodal constraints")
+        raise RuntimeError(
+            "Tried calling 'print_problem_summary' without implementing proper support for convex nodal constraints"
+        )
         try:
             import cvxpy as cp
 

@@ -73,7 +73,7 @@ problem.settings.scp.lam_cost = 1e0  # Weight on the Minimal Time Objective
 problem.settings.scp.lam_vc = 1e1  # Weight on the Virtual Control Objective
 problem.settings.scp.uniform_time_grid = True
 
-problem.settings.sim.save_compiled=False
+problem.settings.sim.save_compiled = False
 
 plotting_dict = {}
 
