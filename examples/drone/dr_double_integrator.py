@@ -81,9 +81,10 @@ constraint_exprs = [
 for node, cen in zip(gate_nodes, A_gate_cen):
     A_gate_const = Constant(A_gate)
     c_const = Constant(cen)
-    constraint_exprs.append(
-        Norm(A_gate_const @ x[:3] - c_const, ord="inf") <= Constant(np.array([1.0]))
-    )
+    gate_constraint = Norm(A_gate_const @ x[:3] - c_const, ord='inf') <= Constant(np.array([1.0]))
+    # Set nodes parameter to specify this constraint only applies to the specific gate node
+    gate_constraint.nodes = [node]
+    constraint_exprs.append(gate_constraint)
 
 
 # Create symbolic dynamics
