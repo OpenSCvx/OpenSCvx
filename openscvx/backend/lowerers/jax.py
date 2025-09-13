@@ -58,6 +58,10 @@ class JaxLowerer:
     def visit_constant(self, node: Constant):
         # capture the constant value once
         value = jnp.array(node.value)
+        # For scalar constants (single element arrays), squeeze to scalar
+        # This prevents (1,) shapes in constraint residuals
+        if value.size == 1:
+            value = value.squeeze()
         return lambda x, u, node, **kwargs: value
 
     @visitor(State)
