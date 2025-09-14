@@ -870,3 +870,104 @@ def test_ctcs_with_extra_kwargs():
     # Expected: (1 + 2) * 0.5 + 3 / 1.0 - 5.0 = 1.5 + 3.0 - 5.0 = -0.5
     expected = -0.5
     assert jnp.allclose(result, expected)
+
+
+def test_normalized_constants_lower_correctly():
+    """Test that normalized constants work correctly with JAX lowering"""
+
+    jl = JaxLowerer()
+
+    # Test scalar constant that was squeezed from higher dimensions
+    scalar_squeezed = Constant(np.array([[5.0]]))  # (1,1) -> () after squeeze
+    assert scalar_squeezed.value.shape == ()  # Verify normalization happened
+
+    fn_scalar = jl.visit_constant(scalar_squeezed)
+    result_scalar = fn_scalar(None, None, None)
+
+    assert isinstance(result_scalar, jnp.ndarray)
+    assert result_scalar.shape == ()
+    assert jnp.allclose(result_scalar, 5.0)
+
+    # Test vector constant that was squeezed
+    vector_squeezed = Constant(np.array([[1.0, 2.0, 3.0]]))  # (1,3) -> (3,) after squeeze
+    assert vector_squeezed.value.shape == (3,)  # Verify normalization happened
+
+    fn_vector = jl.visit_constant(vector_squeezed)
+    result_vector = fn_vector(None, None, None)
+
+    assert isinstance(result_vector, jnp.ndarray)
+    assert result_vector.shape == (3,)
+    assert jnp.allclose(result_vector, jnp.array([1.0, 2.0, 3.0]))
+
+    # Test matrix that had singleton dimensions removed
+    matrix_squeezed = Constant(
+        np.array([[[[1.0, 2.0]], [[3.0, 4.0]]]])
+    )  # (1,2,1,2) -> (2,2) after squeeze
+    assert matrix_squeezed.value.shape == (2, 2)  # Verify normalization happened
+
+    fn_matrix = jl.visit_constant(matrix_squeezed)
+    result_matrix = fn_matrix(None, None, None)
+
+    assert isinstance(result_matrix, jnp.ndarray)
+    assert result_matrix.shape == (2, 2)
+    assert jnp.allclose(result_matrix, jnp.array([[1.0, 2.0], [3.0, 4.0]]))
+
+
+def test_normalized_constants_in_complex_expressions():
+    """Test that normalized constants work correctly in complex expressions that get lowered"""
+
+    x = jnp.array([1.0, 2.0, 3.0])
+    u = jnp.array([0.5, 1.0])
+
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+    control = Control("u", (2,))
+    control._slice = slice(0, 2)
+
+    # Use constants that were created with extra dimensions and got squeezed
+    scalar_const = Constant(np.array([[2.0]]))  # (1,1) -> () after squeeze
+    vector_const = Constant(np.array([[1.0, 1.0, 1.0]]))  # (1,3) -> (3,) after squeeze
+
+    # Verify normalization happened
+    assert scalar_const.value.shape == ()
+    assert vector_const.value.shape == (3,)
+
+    # Create expression: (x + vector_const) * scalar_const
+    expr = Mul(Add(state, vector_const), scalar_const)
+
+    jl = JaxLowerer()
+    fn = jl.lower(expr)
+    result = fn(x, u, None)
+
+    # Expected: ([1,2,3] + [1,1,1]) * 2 = [2,3,4] * 2 = [4,6,8]
+    expected = jnp.array([4.0, 6.0, 8.0])
+    assert jnp.allclose(result, expected)
+
+
+def test_normalized_constants_preserve_dtype_in_lowering():
+    """Test that JAX lowering preserves dtypes from normalized constants"""
+
+    jl = JaxLowerer()
+
+    # Test different dtypes with normalization
+    int32_const = Constant(np.array([[42]], dtype=np.int32))  # (1,1) -> (), dtype preserved
+    float32_const = Constant(np.array([[3.14]], dtype=np.float32))  # (1,1) -> (), dtype preserved
+
+    # Verify normalization and dtype preservation
+    assert int32_const.value.shape == ()
+    assert float32_const.value.shape == ()
+    assert int32_const.value.dtype == np.int32
+    assert float32_const.value.dtype == np.float32
+
+    # Test lowering
+    fn_int = jl.visit_constant(int32_const)
+    fn_float = jl.visit_constant(float32_const)
+
+    result_int = fn_int(None, None, None)
+    result_float = fn_float(None, None, None)
+
+    # JAX should preserve the dtypes
+    assert result_int.dtype == jnp.int32
+    assert result_float.dtype == jnp.float32
+    assert result_int == 42
+    assert jnp.allclose(result_float, 3.14)
