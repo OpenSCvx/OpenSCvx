@@ -278,17 +278,22 @@ class Constraint(Expr):
             NodalConstraint wrapping this constraint with node specification
         """
         return NodalConstraint(self, list(nodes))
-    
-    def over(self, interval: tuple[int, int], penalty: str = "squared_relu", 
-             idx: Optional[int] = None, check_nodally: bool = False) -> "CTCS":
+
+    def over(
+        self,
+        interval: tuple[int, int],
+        penalty: str = "squared_relu",
+        idx: Optional[int] = None,
+        check_nodally: bool = False,
+    ) -> "CTCS":
         """Apply this constraint over a continuous interval using CTCS.
-        
+
         Args:
             interval: Tuple of (start, end) node indices for the continuous interval
-            penalty: Penalty function type ("squared_relu", "huber", "smooth_relu") 
+            penalty: Penalty function type ("squared_relu", "huber", "smooth_relu")
             idx: Optional grouping index for multiple augmented states
             check_nodally: Whether to also enforce this constraint nodally
-            
+
         Returns:
             CTCS constraint wrapping this constraint with interval specification
         """
@@ -434,18 +439,23 @@ class CTCS(Expr):
 
     def children(self):
         return [self.constraint]
-    
+
     def over(self, interval: tuple[int, int]) -> "CTCS":
         """Set the continuous interval for this CTCS constraint.
-        
+
         Args:
             interval: Tuple of (start, end) node indices for the continuous interval
-            
+
         Returns:
             New CTCS constraint with the specified interval
         """
-        return CTCS(self.constraint, penalty=self.penalty, nodes=interval, 
-                   idx=self.idx, check_nodally=self.check_nodally)
+        return CTCS(
+            self.constraint,
+            penalty=self.penalty,
+            nodes=interval,
+            idx=self.idx,
+            check_nodally=self.check_nodally,
+        )
 
     def __repr__(self):
         parts = [f"{self.constraint!r}", f"penalty={self.penalty!r}"]

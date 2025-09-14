@@ -1,10 +1,10 @@
 from .ctcs import CTCSConstraint, ctcs
-from .lowered import LoweredConstraint
+from .lowered import LoweredNodalConstraint
 from .nodal import NodalConstraint, nodal
 
 __all__ = [
     "CTCSConstraint",
-    "LoweredConstraint",
+    "LoweredNodalConstraint",
     "NodalConstraint",
     "ctcs",
     "nodal",

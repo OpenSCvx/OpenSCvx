@@ -20,6 +20,7 @@ from openscvx.backend.expr import (
     MatMul,
     Mul,
     Neg,
+    NodalConstraint,
     Norm,
     PositivePart,
     Sin,
@@ -240,3 +241,8 @@ class JaxLowerer:
             )
             - c
         )
+
+    @visitor(NodalConstraint)
+    def visit_nodal_constraint(self, node: NodalConstraint):
+        """Lower a NodalConstraint by lowering its underlying constraint."""
+        return self.lower(node.constraint)

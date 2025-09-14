@@ -46,7 +46,7 @@ from openscvx.config import (
     ScpConfig,
     SimConfig,
 )
-from openscvx.constraints.lowered import LoweredConstraint
+from openscvx.constraints.lowered import LoweredNodalConstraint
 from openscvx.discretization import get_discretization_solver
 from openscvx.dynamics import Dynamics
 from openscvx.dynamics import dynamics as to_dynamics
@@ -235,13 +235,12 @@ class TrajOptProblem:
             # Apply vectorization to handle (N, n_x) and (N, n_u) inputs
             # The lowered functions have signature (x, u, node, **kwargs), so we need to handle node
             # parameter, node is broadcast (same for all),
-            constraint = LoweredConstraint(
+            constraint = LoweredNodalConstraint(
                 func=jax.vmap(fn, in_axes=(0, 0, None)),
                 grad_g_x=jax.vmap(jacfwd(fn, argnums=0), in_axes=(0, 0, None)),
                 grad_g_u=jax.vmap(jacfwd(fn, argnums=1), in_axes=(0, 0, None)),
+                nodes=constraints_nodal[i].nodes,
             )
-            # print(f"{i}: {constraints_nodal[i].nodes}")
-            constraint.nodes = constraints_nodal[i].nodes
             lowered_constraints_nodal.append(constraint)
 
         sim.constraints_ctcs = []

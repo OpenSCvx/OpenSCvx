@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 import jax.numpy as jnp
 
@@ -7,7 +7,7 @@ import jax.numpy as jnp
 # TODO: (norrisg) remove this as soon as it is not necessary as a drop in replacement for
 # `NodalConstraint`
 @dataclass
-class LoweredConstraint:
+class LoweredNodalConstraint:
     """
     Dataclass to hold a lowered symbolic constraint function and its jacobians.
 
@@ -19,7 +19,7 @@ class LoweredConstraint:
     and will be linearized for sequential convex programming.
 
     Args:
-        g (Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
+        func (Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
             The lowered constraint function g(x, u, ...params) that returns
             constraint residuals. Should follow g(x, u) <= 0 convention.
             - x: 1D array (state at a single node), shape (n_x,)
@@ -31,8 +31,12 @@ class LoweredConstraint:
 
         grad_g_u (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
             Jacobian of g w.r.t. u. If None, should be computed using jax.jacfwd.
+
+        nodes (Optional[List[int]]): List of node indices where this constraint applies.
+            Set after lowering from NodalConstraint.
     """
 
     func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
     grad_g_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
     grad_g_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
+    nodes: Optional[List[int]] = None
