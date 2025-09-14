@@ -107,7 +107,6 @@ def OptimalControlProblem(settings: Config):
         for constraint in settings.sim.constraints_nodal:
             # nodes should already be validated and normalized in preprocessing
             nodes = constraint.nodes
-            print(nodes)
             constr += [
                 (
                     g[idx_ncvx][node]
