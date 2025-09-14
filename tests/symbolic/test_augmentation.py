@@ -4,6 +4,7 @@ import pytest
 
 from openscvx.backend.augmentation import (
     augment_dynamics_with_ctcs,
+    decompose_vector_nodal_constraints,
     separate_constraints,
     sort_ctcs_constraints,
 )
@@ -14,6 +15,9 @@ from openscvx.backend.expr import (
     Concat,
     Constant,
     Huber,
+    Index,
+    Inequality,
+    NodalConstraint,
     PositivePart,
     SmoothReLU,
     Square,
@@ -832,3 +836,80 @@ def test_ctcs_multiple_augmented_states():
     penalty2 = xdot_aug.exprs[2]  # idx 1 group
     assert isinstance(penalty1, Add)  # Multiple penalties summed
     assert isinstance(penalty2, Sum)  # Single penalty
+
+
+# Tests for vector constraint decomposition
+
+def test_decompose_scalar_constraints_unchanged():
+    """Test that scalar constraints remain unchanged during decomposition."""
+    x = State("x", (3,))
+
+    # Create scalar constraints in canonical form: residual <= 0
+    constraint1 = Inequality(Sub(Index(x, 0), Constant(1.0)), Constant(0))
+    constraint2 = Inequality(Sub(Constant(0.0), Index(x, 1)), Constant(0))
+
+    nodal1 = NodalConstraint(constraint1, [0, 1])
+    nodal2 = NodalConstraint(constraint2, [0, 1, 2])
+
+    result = decompose_vector_nodal_constraints([nodal1, nodal2])
+
+    # Should return the same constraints unchanged
+    assert len(result) == 2
+    assert result[0] is nodal1
+    assert result[1] is nodal2
+
+
+def test_decompose_vector_constraint_basic():
+    """Test basic vector constraint decomposition."""
+    x = State("x", (3,))
+    bounds = np.array([1.0, 2.0, 3.0])
+    nodes = [0, 1, 2]
+
+    # Create vector constraint in canonical form: (x - bounds) <= 0
+    vector_constraint = Inequality(Sub(x, Constant(bounds)), Constant(0))
+    nodal = NodalConstraint(vector_constraint, nodes)
+
+    result = decompose_vector_nodal_constraints([nodal])
+
+    # Should decompose into 3 scalar constraints
+    assert len(result) == 3
+
+    # Check each decomposed constraint
+    for i, decomposed in enumerate(result):
+        assert isinstance(decomposed, NodalConstraint)
+        assert decomposed.nodes == [0, 1, 2]  # Same nodes as original
+
+        constraint = decomposed.constraint
+        assert isinstance(constraint, Inequality)
+
+        # LHS should be indexed version of original LHS
+        assert isinstance(constraint.lhs, Index)
+        assert constraint.lhs.index == i
+
+        # RHS should be same as original (Constant(0))
+        assert isinstance(constraint.rhs, Constant)
+        assert constraint.rhs.value == 0
+
+
+def test_decompose_vector_constraint_preserves_nodes():
+    """Test that node specifications are preserved during decomposition."""
+    x = State("x", (2,))
+    bounds = np.array([5.0, 10.0])
+
+    # Create vector constraint in canonical form
+    vector_constraint = Inequality(Sub(x, Constant(bounds)), Constant(0))
+    specific_nodes = [1, 3, 5]
+    nodal = NodalConstraint(vector_constraint, specific_nodes)
+
+    result = decompose_vector_nodal_constraints([nodal])
+
+    # Should decompose into 2 scalar constraints, each with same nodes
+    assert len(result) == 2
+    for decomposed in result:
+        assert decomposed.nodes == specific_nodes
+
+
+def test_decompose_empty_list():
+    """Test decomposition with empty constraint list."""
+    result = decompose_vector_nodal_constraints([])
+    assert result == []
