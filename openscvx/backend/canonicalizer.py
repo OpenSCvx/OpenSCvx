@@ -67,10 +67,16 @@ class Canonicalizer:
 
     @visitor(State)
     @visitor(Control)
-    @visitor(Constant)
-    def visit_leaf(self, node: Union[State, Control, Constant]) -> Expr:
-        # leaf nodes are already canonical
+    def visit_variable(self, node: Union[State, Control]) -> Expr:
+        # variable nodes are already canonical
         return node
+
+    @visitor(Constant)
+    def visit_constant(self, node: Constant) -> Expr:
+        # Normalize constant by squeezing unnecessary singleton dimensions
+        # This ensures Constant(x.max) and Constant(np.array([x.max])) are identical
+        squeezed_value = np.squeeze(node.value)
+        return Constant(squeezed_value)
 
     @visitor(Add)
     def visit_add(self, node: Add) -> Expr:
