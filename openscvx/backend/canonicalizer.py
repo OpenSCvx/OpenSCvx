@@ -4,19 +4,28 @@ import numpy as np
 
 from openscvx.backend.control import Control
 from openscvx.backend.expr import (
+    CTCS,
     Add,
     Concat,
     Constant,
+    Cos,
     Div,
     Equality,
     Expr,
+    Huber,
     Index,
     Inequality,
+    MatMul,
     Mul,
     Neg,
     NodalConstraint,
     Norm,
+    PositivePart,
+    Sin,
+    SmoothReLU,
+    Square,
     Sub,
+    Sum,
 )
 from openscvx.backend.state import State
 
@@ -44,10 +53,9 @@ def visitor(expr_cls: Type[Expr]):
 def dispatch(canon: "Canonicalizer", expr: Expr) -> Expr:
     fn = _CANON_VISITORS.get(type(expr))
     if fn is None:
-        # by default, just recurse into children and rebuild
-        rebuilt_children = [canon.canonicalize(child) for child in expr.children()]
-        # assumes each Expr has a constructor matching its fields
-        return expr.__class__(*rebuilt_children)
+        raise NotImplementedError(
+            f"{canon.__class__.__name__!r} has no visitor for {type(expr).__name__}"
+        )
     return fn(canon, expr)
 
 
@@ -175,3 +183,58 @@ class Canonicalizer:
         # Canonicalize the wrapped constraint and preserve the node specification
         canon_constraint = self.canonicalize(node.constraint)
         return NodalConstraint(canon_constraint, node.nodes)
+
+    @visitor(MatMul)
+    def visit_matmul(self, node: MatMul) -> Expr:
+        # Canonicalize operands but preserve the operation
+        left = self.canonicalize(node.left)
+        right = self.canonicalize(node.right)
+        return MatMul(left, right)
+
+    @visitor(Sum)
+    def visit_sum(self, node: Sum) -> Expr:
+        # Canonicalize the operand
+        operand = self.canonicalize(node.operand)
+        return Sum(operand)
+
+    @visitor(Sin)
+    def visit_sin(self, node: Sin) -> Expr:
+        # Canonicalize the operand
+        operand = self.canonicalize(node.operand)
+        return Sin(operand)
+
+    @visitor(Cos)
+    def visit_cos(self, node: Cos) -> Expr:
+        # Canonicalize the operand
+        operand = self.canonicalize(node.operand)
+        return Cos(operand)
+
+    @visitor(PositivePart)
+    def visit_positive_part(self, node: PositivePart) -> Expr:
+        # Canonicalize the operand
+        x = self.canonicalize(node.x)
+        return PositivePart(x)
+
+    @visitor(Square)
+    def visit_square(self, node: Square) -> Expr:
+        # Canonicalize the operand
+        x = self.canonicalize(node.x)
+        return Square(x)
+
+    @visitor(Huber)
+    def visit_huber(self, node: Huber) -> Expr:
+        # Canonicalize the operand but preserve delta parameter
+        x = self.canonicalize(node.x)
+        return Huber(x, delta=node.delta)
+
+    @visitor(SmoothReLU)
+    def visit_smooth_relu(self, node: SmoothReLU) -> Expr:
+        # Canonicalize the operand but preserve c parameter
+        x = self.canonicalize(node.x)
+        return SmoothReLU(x, c=node.c)
+
+    @visitor(CTCS)
+    def visit_ctcs(self, node: CTCS) -> Expr:
+        # Canonicalize the inner constraint but preserve CTCS parameters
+        canon_constraint = self.canonicalize(node.constraint)
+        return CTCS(canon_constraint, penalty=node.penalty, nodes=node.nodes)
