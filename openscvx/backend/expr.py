@@ -327,11 +327,19 @@ class NodalConstraint(Expr):
             raise TypeError("NodalConstraint must wrap a Constraint")
         if not isinstance(nodes, list):
             raise TypeError("nodes must be a list of integers")
-        if not all(isinstance(n, int) for n in nodes):
-            raise TypeError("all node indices must be integers")
+
+        # Convert numpy integers to Python integers
+        converted_nodes = []
+        for n in nodes:
+            if isinstance(n, np.integer):
+                converted_nodes.append(int(n))
+            elif isinstance(n, int):
+                converted_nodes.append(n)
+            else:
+                raise TypeError("all node indices must be integers")
 
         self.constraint = constraint
-        self.nodes = nodes
+        self.nodes = converted_nodes
 
     def children(self):
         return [self.constraint]
