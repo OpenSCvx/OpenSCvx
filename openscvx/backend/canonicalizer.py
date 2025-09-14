@@ -15,6 +15,7 @@ from openscvx.backend.expr import (
     Mul,
     Neg,
     NodalConstraint,
+    Norm,
     Sub,
 )
 from openscvx.backend.state import State
@@ -162,6 +163,12 @@ class Canonicalizer:
         diff = Sub(node.lhs, node.rhs)
         canon_diff = self.canonicalize(diff)
         return Equality(canon_diff, Constant(np.array(0)))
+
+    @visitor(Norm)
+    def visit_norm(self, node: Norm) -> Expr:
+        # Canonicalize the operand but preserve the ord parameter
+        canon_operand = self.canonicalize(node.operand)
+        return Norm(canon_operand, ord=node.ord)
 
     @visitor(NodalConstraint)
     def visit_nodal_constraint(self, node: NodalConstraint) -> Expr:
