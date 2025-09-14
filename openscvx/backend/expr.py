@@ -250,7 +250,11 @@ class Cos(Expr):
 
 class Constant(Expr):
     def __init__(self, value: np.ndarray):
-        self.value = value
+        # Normalize immediately upon construction to ensure consistency
+        # This ensures Constant(5.0) and Constant([5.0]) create identical objects
+        if not isinstance(value, np.ndarray):
+            value = np.array(value)
+        self.value = np.squeeze(value)
 
     def __repr__(self):
         return f"Const({self.value!r})"

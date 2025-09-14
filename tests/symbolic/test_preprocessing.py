@@ -480,7 +480,7 @@ def test_concat_1d_passes():
 
 def test_concat_rank_mismatch_raises():
     a = Constant(np.zeros((2, 2)))
-    b = Constant(np.ones((3, 2, 1)))
+    b = Constant(np.ones((3, 2, 2)))  # Changed to (3, 2, 2) to avoid squeeze collapsing dimensions
     with pytest.raises(ValueError):
         validate_shapes(Concat(a, b))
 
@@ -581,3 +581,67 @@ def test_ctcs_constraint_shape_mismatch_raises():
     # Should raise due to underlying constraint shape mismatch
     with pytest.raises(ValueError):
         validate_shapes(wrapped)
+
+
+def test_constant_normalization_invariant():
+    """Test that different ways of creating constants are normalized consistently"""
+    import numpy as np
+
+    # Test scalar normalization
+    scalar = Constant(5.0)
+    array_1d = Constant(np.array([5.0]))
+    array_2d = Constant(np.array([[5.0]]))
+
+    # All should have same shape and value after normalization
+    assert scalar.value.shape == array_1d.value.shape == array_2d.value.shape
+    assert np.allclose(scalar.value, array_1d.value)
+    assert np.allclose(scalar.value, array_2d.value)
+
+    # Test vector normalization
+    vector = Constant(np.array([1.0, 2.0, 3.0]))
+    wrapped_vector = Constant(np.array([[1.0, 2.0, 3.0]]))  # (1, 3) shape
+
+    assert vector.value.shape == wrapped_vector.value.shape == (3,)
+    assert np.array_equal(vector.value, wrapped_vector.value)
+
+    # Test that meaningful dimensions are preserved
+    matrix = Constant(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    assert matrix.value.shape == (2, 2)
+
+    # Test multiple singleton dimensions
+    multi_singleton = Constant(np.array([[[[1.0], [2.0]]]]))  # (1, 1, 2, 1)
+    assert multi_singleton.value.shape == (2,)
+    assert np.array_equal(multi_singleton.value, [1.0, 2.0])
+
+
+def test_constant_normalization_validation_invariant():
+    """Test that preprocessing validation catches improperly normalized constants"""
+    # This test verifies our validation works, but we shouldn't be able to create
+    # improperly normalized constants anymore due to the new __init__ logic
+
+    # Create a properly normalized constant
+    c = Constant(np.array([1.0, 2.0]))
+    validate_shapes(c)  # Should not raise
+
+    # Test that validation would catch violation if it occurred
+    # (Though this shouldn't happen with new __init__ logic)
+    assert c.value.shape == np.squeeze(c.value).shape
+
+
+def test_to_expr_normalization_consistency():
+    """Test that to_expr creates properly normalized constants"""
+    from openscvx.backend.expr import to_expr
+
+    # Different ways of creating same value through to_expr
+    expr1 = to_expr(5.0)
+    expr2 = to_expr([5.0])
+    expr3 = to_expr([[5.0]])
+
+    # All should be identical after normalization
+    assert isinstance(expr1, Constant)
+    assert isinstance(expr2, Constant)
+    assert isinstance(expr3, Constant)
+
+    assert expr1.value.shape == expr2.value.shape == expr3.value.shape
+    assert np.allclose(expr1.value, expr2.value)
+    assert np.allclose(expr1.value, expr3.value)

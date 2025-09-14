@@ -329,6 +329,14 @@ def _broadcast_shape_for(node: Expr) -> tuple[int, ...]:
 
 @visitor(Constant)
 def visit_constant(c: Constant):
+    # Verify the invariant: constants should already be squeezed during construction
+    original_shape = c.value.shape
+    squeezed_shape = np.squeeze(c.value).shape
+    if original_shape != squeezed_shape:
+        raise ValueError(
+            f"Constant not properly normalized: has shape {original_shape} but should have shape {squeezed_shape}. "
+            "Constants should be squeezed during construction."
+        )
     return c.value.shape
 
 
