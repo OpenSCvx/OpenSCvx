@@ -840,6 +840,7 @@ def test_ctcs_multiple_augmented_states():
 
 # Tests for vector constraint decomposition
 
+
 def test_decompose_scalar_constraints_unchanged():
     """Test that scalar constraints remain unchanged during decomposition."""
     x = State("x", (3,))

@@ -613,6 +613,13 @@ def test_constant_normalization_invariant():
     assert multi_singleton.value.shape == (2,)
     assert np.array_equal(multi_singleton.value, [1.0, 2.0])
 
+    # Test the exact case from the old canonicalizer tests: (1, 1, 3, 1) -> (3,)
+    array_multi_singleton = np.array([[[[1.0], [2.0], [3.0]]]])
+    assert array_multi_singleton.shape == (1, 1, 3, 1)
+    const = Constant(array_multi_singleton)
+    assert const.value.shape == (3,)
+    assert np.array_equal(const.value, [1.0, 2.0, 3.0])
+
 
 def test_constant_normalization_validation_invariant():
     """Test that preprocessing validation catches improperly normalized constants"""
@@ -645,3 +652,27 @@ def test_to_expr_normalization_consistency():
     assert expr1.value.shape == expr2.value.shape == expr3.value.shape
     assert np.allclose(expr1.value, expr2.value)
     assert np.allclose(expr1.value, expr3.value)
+
+
+def test_constant_repr_format():
+    """Test that constant repr shows clean Python values, not numpy arrays"""
+    import numpy as np
+
+    # Scalar should show as plain number
+    scalar = Constant(1.5)
+    assert repr(scalar) == "Const(1.5)"
+
+    # Vector should show as Python list
+    vector = Constant([1.0, 2.0, 3.0])
+    assert repr(vector) == "Const([1.0, 2.0, 3.0])"
+
+    # Matrix should show as nested Python list
+    matrix = Constant([[1.0, 2.0], [3.0, 4.0]])
+    assert repr(matrix) == "Const([[1.0, 2.0], [3.0, 4.0]])"
+
+    # Verify that constants created with different input types have same repr
+    scalar_from_array = Constant(np.array([1.5]))  # Gets squeezed to scalar
+    assert repr(scalar_from_array) == "Const(1.5)"
+
+    vector_from_nested = Constant(np.array([[1.0, 2.0, 3.0]]))  # Gets squeezed to vector
+    assert repr(vector_from_nested) == "Const([1.0, 2.0, 3.0])"
