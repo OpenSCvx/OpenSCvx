@@ -257,7 +257,13 @@ class Constant(Expr):
         self.value = np.squeeze(value)
 
     def __repr__(self):
-        return f"Const({self.value!r})"
+        # Show clean representation - always show as Python values, not numpy arrays
+        if self.value.ndim == 0:
+            # Scalar: show as plain number
+            return f"Const({self.value.item()!r})"
+        else:
+            # Array: show as Python list for readability
+            return f"Const({self.value.tolist()!r})"
 
 
 class Constraint(Expr):

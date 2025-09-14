@@ -103,7 +103,7 @@ def test_equality_creation_and_children():
     lhs, rhs = c.children()
     assert lhs is x
     assert isinstance(rhs, Constant)
-    assert repr(c) == "Var('x') == Const(array([0., 1., 2.]))"
+    assert repr(c) == "Var('x') == Const([0.0, 1.0, 2.0])"
 
 
 def test_inequality_creation_and_children():
@@ -116,7 +116,7 @@ def test_inequality_creation_and_children():
     lhs, rhs = c.children()
     assert lhs is x
     assert isinstance(rhs, Constant)
-    assert repr(c) == "Var('x') <= Const(array([0., 1., 2.]))"
+    assert repr(c) == "Var('x') <= Const([0.0, 1.0, 2.0])"
 
 
 def test_inequality_reverse_creation_and_children():
@@ -129,7 +129,7 @@ def test_inequality_reverse_creation_and_children():
     lhs, rhs = c.children()
     assert rhs is x
     assert isinstance(lhs, Constant)
-    assert repr(c) == "Const(array([0., 1., 2.])) <= Var('x')"
+    assert repr(c) == "Const([0.0, 1.0, 2.0]) <= Var('x')"
 
 
 def test_pretty_print_tree_structure():
@@ -249,7 +249,7 @@ def test_sum_wraps_constants_and_expressions():
     sum1 = Sum(arr)
     assert isinstance(sum1.operand, Constant)
     assert np.array_equal(sum1.operand.value, arr)
-    assert repr(sum1) == "sum(Const(array([1., 2., 3.])))"
+    assert repr(sum1) == "sum(Const([1.0, 2.0, 3.0]))"
 
     # Sum of an arithmetic expression
     x = Variable("x", shape=(2,))
@@ -331,10 +331,10 @@ def test_ctcs_repr():
     constraint = x <= 1.5
 
     ctcs_default = CTCS(constraint)
-    assert repr(ctcs_default) == "CTCS(Var('x') <= Const(array(1.5)), penalty='squared_relu')"
+    assert repr(ctcs_default) == "CTCS(Var('x') <= Const(1.5), penalty='squared_relu')"
 
     ctcs_huber = CTCS(constraint, penalty="huber")
-    assert repr(ctcs_huber) == "CTCS(Var('x') <= Const(array(1.5)), penalty='huber')"
+    assert repr(ctcs_huber) == "CTCS(Var('x') <= Const(1.5), penalty='huber')"
 
 
 def test_ctcs_traversal():
