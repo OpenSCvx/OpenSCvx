@@ -9,6 +9,7 @@ from openscvx.backend.expr import (
     Concat,
     Constraint,
     Expr,
+    Index,
     NodalConstraint,
 )
 from openscvx.backend.state import Free, State
@@ -125,6 +126,59 @@ def separate_constraints(
         constraints_nodal.append(NodalConstraint(constraint, all_nodes))
 
     return constraints_ctcs, constraints_nodal
+
+
+def decompose_vector_nodal_constraints(
+    constraints_nodal: List[NodalConstraint],
+) -> List[NodalConstraint]:
+    """
+    Decompose vector-valued nodal constraints into multiple scalar constraints.
+
+    This is necessary for nonconvex nodal constraints that get lowered to JAX functions,
+    because the JAX->CVXPY interface expects scalar constraint values per node.
+
+    CTCS constraints and future convex nodal constraints can handle vector values,
+    so they don't need decomposition.
+
+    Args:
+        constraints_nodal: List of NodalConstraint objects (already canonicalized)
+
+    Returns:
+        List of NodalConstraint objects with vector constraints decomposed into scalars
+    """
+    from openscvx.backend.preprocessing import dispatch as get_shape
+
+    decomposed_constraints = []
+
+    for nodal_constraint in constraints_nodal:
+        constraint = nodal_constraint.constraint
+        nodes = nodal_constraint.nodes
+
+        try:
+            # Get the shape of the constraint residual
+            # Canonicalized constraints are in form: residual <= 0 or residual == 0
+            residual_shape = get_shape(constraint.lhs)
+
+            # Check if this is a vector constraint
+            if len(residual_shape) > 0 and np.prod(residual_shape) > 1:
+                # Vector constraint - decompose into scalar constraints
+                total_elements = int(np.prod(residual_shape))
+
+                for i in range(total_elements):
+                    # Create indexed version: residual[i] <= 0 or residual[i] == 0
+                    indexed_lhs = Index(constraint.lhs, i)
+                    indexed_rhs = constraint.rhs  # Should be Constant(0)
+                    indexed_constraint = constraint.__class__(indexed_lhs, indexed_rhs)
+                    decomposed_constraints.append(NodalConstraint(indexed_constraint, nodes))
+            else:
+                # Scalar constraint - keep as is
+                decomposed_constraints.append(nodal_constraint)
+
+        except Exception:
+            # If shape analysis fails, keep original constraint for backward compatibility
+            decomposed_constraints.append(nodal_constraint)
+
+    return decomposed_constraints
 
 
 def get_nodal_constraints_from_ctcs(constraints_ctcs: List[CTCS]) -> List[Constraint]:

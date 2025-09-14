@@ -14,6 +14,7 @@ os.environ["EQX_ON_ERROR"] = "nan"
 from openscvx import io
 from openscvx.backend.augmentation import (
     augment_dynamics_with_ctcs,
+    decompose_vector_nodal_constraints,
     separate_constraints,
     sort_ctcs_constraints,
 )
@@ -131,6 +132,10 @@ class TrajOptProblem:
 
         # Sort and separate constraints first
         constraints_ctcs, constraints_nodal = separate_constraints(constraints, N)
+
+        # Decompose vector-valued nodal constraints into scalar constraints
+        # This is necessary for nonconvex nodal constraints that get lowered to JAX
+        constraints_nodal = decompose_vector_nodal_constraints(constraints_nodal)
 
         # Sort CTCS constraints by their idx to get node_intervals
         constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(
