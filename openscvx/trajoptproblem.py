@@ -134,7 +134,7 @@ class TrajOptProblem:
 
         # Sort CTCS constraints by their idx to get node_intervals
         constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(
-            constraints_ctcs, N
+            constraints_ctcs
         )
 
         # Augment dynamics, states, and controls with CTCS constraints, time dilation

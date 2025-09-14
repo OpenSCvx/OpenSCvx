@@ -15,14 +15,13 @@ from openscvx.backend.state import Free, State
 
 
 def sort_ctcs_constraints(
-    constraints_ctcs: List[CTCS], N: int
+    constraints_ctcs: List[CTCS],
 ) -> Tuple[List[CTCS], List[Tuple[int, int]], int]:
     """
     Sort and group CTCS constraints by their idx, ensuring proper grouping rules.
 
     Args:
         constraints_ctcs: List of CTCS constraints to sort and group
-        N: Number of discretization nodes (for normalizing None nodes to (0, N))
 
     Returns:
         Tuple of:
@@ -40,8 +39,6 @@ def sort_ctcs_constraints(
     next_idx = 0
 
     for c in constraints_ctcs:
-        # Normalize None to full horizon
-        c.nodes = c.nodes or (0, N)
         key = c.nodes
 
         if c.idx is not None:
@@ -105,6 +102,8 @@ def separate_constraints(
 
     for c in constraints:
         if isinstance(c, CTCS):
+            # Normalize None to full horizon
+            c.nodes = c.nodes or (0, n_nodes)
             constraints_ctcs.append(c)
         elif isinstance(c, NodalConstraint):
             # Already a properly formed nodal constraint

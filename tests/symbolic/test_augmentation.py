@@ -723,7 +723,7 @@ def test_ctcs_idx_grouping_auto_assignment():
     c3 = ctcs(x[0] <= 3.0, nodes=(3, 8))  # Different nodes, should get different idx
 
     constraints = [c1, c2, c3]
-    sorted_constraints, node_intervals, num_states = sort_ctcs_constraints(constraints, 10)
+    sorted_constraints, node_intervals, num_states = sort_ctcs_constraints(constraints)
 
     # Should have 2 groups: (0,5) and (3,8)
     assert num_states == 2
@@ -743,7 +743,7 @@ def test_ctcs_idx_grouping_explicit_assignment():
     c3 = ctcs(x[0] <= 3.0, nodes=(3, 8), idx=0)  # Different nodes, different idx - OK
 
     constraints = [c1, c2, c3]
-    sorted_constraints, node_intervals, num_states = sort_ctcs_constraints(constraints, 10)
+    sorted_constraints, node_intervals, num_states = sort_ctcs_constraints(constraints)
 
     # Should have 2 groups with correct ordering
     assert num_states == 2
@@ -762,7 +762,7 @@ def test_ctcs_idx_grouping_mixed_assignment():
     c3 = ctcs(x[2] <= 3.0, nodes=(3, 8))  # Auto - should get idx 1
 
     constraints = [c1, c2, c3]
-    sorted_constraints, node_intervals, num_states = sort_ctcs_constraints(constraints, 10)
+    sorted_constraints, node_intervals, num_states = sort_ctcs_constraints(constraints)
 
     # Should have 3 groups: auto-assigned 0, auto-assigned 1, explicit 2
     assert num_states == 3
@@ -784,14 +784,14 @@ def test_ctcs_idx_validation_errors():
     with pytest.raises(
         ValueError, match="idx=0 was first used with interval.*but now you gave it interval"
     ):
-        sort_ctcs_constraints([c1, c2], 10)
+        sort_ctcs_constraints([c1, c2])
 
     # Test: non-contiguous idx values
     c3 = ctcs(x[0] <= 1.0, nodes=(0, 5), idx=0)
     c4 = ctcs(x[1] <= 2.0, nodes=(3, 8), idx=2)  # Gap: missing idx=1
 
     with pytest.raises(ValueError, match="must form a contiguous block starting from 0"):
-        sort_ctcs_constraints([c3, c4], 10)
+        sort_ctcs_constraints([c3, c4])
 
 
 def test_ctcs_multiple_augmented_states():
