@@ -142,7 +142,7 @@ def lower_convex_constraints(constraints_nodal_convex, ocp_vars: Dict) -> List[c
     if not constraints_nodal_convex:
         return []
 
-    # TODO: (norrisg) This does not work. Fix. :(
+    # Get the full trajectory CVXPy variables (n_nodes, n_states/n_controls)
     x_nonscaled = ocp_vars["x_nonscaled"]  # List of x_nonscaled[k] for each node k
     u_nonscaled = ocp_vars["u_nonscaled"]  # List of u_nonscaled[k] for each node k
 
@@ -153,31 +153,47 @@ def lower_convex_constraints(constraints_nodal_convex, ocp_vars: Dict) -> List[c
         nodes = constraint.nodes
 
         # Collect all State and Control variables referenced in the constraint
-        state_vars = set()
-        control_vars = set()
+        state_vars = {}
+        control_vars = {}
 
         def collect_vars(expr):
             if isinstance(expr, State):
-                state_vars.add(expr.name)
+                state_vars[expr.name] = expr
             elif isinstance(expr, Control):
-                control_vars.add(expr.name)
+                control_vars[expr.name] = expr
 
         traverse(constraint.constraint, collect_vars)
 
         # Apply the constraint at each specified node
         for node in nodes:
-            # Create variable map for this specific node (row k of the trajectory)
+            # Create simplified variable map for this specific node
+            # The CVXPy lowerer will use _slice attributes to extract the right portions
             variable_map = {}
 
-            # Map state variables to x_nonscaled[node] (the state at node k)
-            # The CVXPy lowerer will handle _slice attributes automatically
-            for state_name in state_vars:
-                variable_map[state_name] = x_nonscaled[node]  # x_nonscaled[k, :]
+            # Only add state vector if we have state variables in this constraint
+            if state_vars:
+                variable_map["x"] = x_nonscaled[node]  # Full state vector at this node
 
-            # Map control variables to u_nonscaled[node] (the control at node k)
-            # The CVXPy lowerer will handle _slice attributes automatically
-            for control_name in control_vars:
-                variable_map[control_name] = u_nonscaled[node]  # u_nonscaled[k, :]
+            # Only add control vector if we have control variables in this constraint
+            if control_vars:
+                variable_map["u"] = u_nonscaled[node]  # Full control vector at this node
+
+            # Verify all variables have slices (should be guaranteed by preprocessing)
+            for state_name, state_var in state_vars.items():
+                if state_var._slice is None:
+                    raise ValueError(
+                        f"State variable '{state_name}' has no slice assigned. "
+                        f"This indicates a bug in the preprocessing pipeline - "
+                        f"collect_and_assign_slices should have assigned slices to all variables."
+                    )
+
+            for control_name, control_var in control_vars.items():
+                if control_var._slice is None:
+                    raise ValueError(
+                        f"Control variable '{control_name}' has no slice assigned. "
+                        f"This indicates a bug in the preprocessing pipeline - "
+                        f"collect_and_assign_slices should have assigned slices to all variables."
+                    )
 
             # Lower the constraint to CVXPy using existing infrastructure
             # This creates one CVXPy constraint for this specific node

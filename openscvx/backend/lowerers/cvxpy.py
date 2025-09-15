@@ -79,13 +79,10 @@ class CvxpyLowerer:
 
     @visitor(State)
     def visit_state(self, node: State) -> cp.Expression:
-        if node.name not in self.variable_map:
-            raise ValueError(
-                f"State variable '{node.name}' not found in variable_map. "
-                f"Available: {list(self.variable_map.keys())}"
-            )
+        if "x" not in self.variable_map:
+            raise ValueError("State vector 'x' not found in variable_map.")
 
-        cvx_var = self.variable_map[node.name]
+        cvx_var = self.variable_map["x"]
 
         # If the state has a slice assigned, apply it
         if node._slice is not None:
@@ -94,13 +91,10 @@ class CvxpyLowerer:
 
     @visitor(Control)
     def visit_control(self, node: Control) -> cp.Expression:
-        if node.name not in self.variable_map:
-            raise ValueError(
-                f"Control variable '{node.name}' not found in variable_map. "
-                f"Available: {list(self.variable_map.keys())}"
-            )
+        if "u" not in self.variable_map:
+            raise ValueError("Control vector 'u' not found in variable_map.")
 
-        cvx_var = self.variable_map[node.name]
+        cvx_var = self.variable_map["u"]
 
         # If the control has a slice assigned, apply it
         if node._slice is not None:
