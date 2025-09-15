@@ -14,7 +14,7 @@ from examples.plotting import (
 )
 from openscvx.backend.control import Control
 from openscvx.backend.expr import Concat, Constant, Cos, Sin, ctcs
-from openscvx.backend.state import Free, Minimize, State
+from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
 
 n = 2
@@ -25,7 +25,7 @@ x = State("x", shape=(4,))  # State variable with 4 dimensions
 x.max = np.array([10.0, 10.0, 10.0, total_time])  # Upper Bound on the states
 x.min = np.array([0.0, 0.0, 0.0, 0.0])  # Lower Bound on the states
 x.initial = np.array([0, 10, 0, 0])
-x.final = np.array([10, 5, Free(10), Minimize(total_time)])
+x.final = [10, 5, ("free", 10), ("minimize", total_time)]
 x.guess = np.linspace(x.initial, x.final, n)
 
 u = Control("u", shape=(1,))  # Control variable with 1 dimension

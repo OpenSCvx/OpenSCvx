@@ -45,9 +45,6 @@ class Control(Variable):
         """
         super().__init__(name, shape)
 
-
-
-
     def __repr__(self):
         """String representation of the Control object.
 

@@ -1,114 +1,20 @@
+from enum import Enum
+
 import numpy as np
 
 from openscvx.backend.variable import Variable
 
 
-class Fix:
-    """Class representing a fixed state variable in the optimization problem.
+class BoundaryType(str, Enum):
+    """String enum for boundary condition types.
 
-    A fixed state variable is one that is constrained to a specific value
-    and cannot be optimized.
-
-    Attributes:
-        value: The fixed value that the state variable must take.
+    This allows users to pass plain strings while we maintain type safety internally.
     """
 
-    def __init__(self, value):
-        """Initialize a new fixed state variable.
-
-        Args:
-            value: The fixed value that the state variable must take.
-        """
-        self.value = value
-
-    def __repr__(self):
-        """Get a string representation of this fixed state variable.
-
-        Returns:
-            str: A string representation showing the fixed value.
-        """
-        return f"Fix({self.value})"
-
-
-class Free:
-    """Class representing a free state variable in the optimization problem.
-
-    A free state variable is one that is not constrained to any specific value
-    but can be optimized within its bounds.
-
-    Attributes:
-        guess: The initial guess value for optimization.
-    """
-
-    def __init__(self, guess):
-        """Initialize a new free state variable.
-
-        Args:
-            guess: The initial guess value for optimization.
-        """
-        self.guess = guess
-
-    def __repr__(self):
-        """Get a string representation of this free state variable.
-
-        Returns:
-            str: A string representation showing the guess value.
-        """
-        return f"Free({self.guess})"
-
-
-class Minimize:
-    """Class representing a state variable to be minimized in the optimization problem.
-
-    A minimized state variable is one that is optimized to achieve the lowest
-    possible value within its bounds.
-
-    Attributes:
-        guess: The initial guess value for optimization.
-    """
-
-    def __init__(self, guess):
-        """Initialize a new minimized state variable.
-
-        Args:
-            guess: The initial guess value for optimization.
-        """
-        self.guess = guess
-
-    def __repr__(self):
-        """Get a string representation of this minimized state variable.
-
-        Returns:
-            str: A string representation showing the guess value.
-        """
-        return f"Minimize({self.guess})"
-
-
-class Maximize:
-    """Class representing a state variable to be maximized in the optimization problem.
-
-    A maximized state variable is one that is optimized to achieve the highest
-    possible value within its bounds.
-
-    Attributes:
-        guess: The initial guess value for optimization.
-    """
-
-    def __init__(self, guess):
-        """Initialize a new maximized state variable.
-
-        Args:
-            guess: The initial guess value for optimization.
-        """
-        self.guess = guess
-
-    def __repr__(self):
-        """Get a string representation of this maximized state variable.
-
-        Returns:
-            str: A string representation showing the guess value.
-        """
-        return f"Maximize({self.guess})"
+    FIXED = "fixed"
+    FREE = "free"
+    MINIMIZE = "minimize"
+    MAXIMIZE = "maximize"
 
 
 class State(Variable):
@@ -143,15 +49,15 @@ class State(Variable):
         time = State("time", (1,))
         time.min = np.array([0.0])
         time.max = np.array([10.0])
-        time.initial = np.array([Fix(0.0)])
-        time.final = np.array([Minimize(5.0)])
+        time.initial = [0.0]  # Defaults to fixed
+        time.final = [("minimize", 5.0)]
 
         # Vector state
         position = State("position", (3,))
         position.min = np.array([0, 0, 10])
         position.max = np.array([10, 10, 200])
-        position.initial = np.array([Fix(0), Free(1), Fix(50)])
-        position.final = np.array([Fix(10), Free(5), Maximize(150)])
+        position.initial = [0, ("free", 1), 50]  # Mix of fixed and free
+        position.final = [10, ("free", 5), ("maximize", 150)]
         ```
     """
 
@@ -167,7 +73,6 @@ class State(Variable):
         self.initial_type = None
         self._final = None
         self.final_type = None
-
 
     @property
     def min(self):
@@ -261,35 +166,51 @@ class State(Variable):
         """Set the initial state values and their types.
 
         Args:
-            arr (np.ndarray): Array of initial values or boundary condition objects
-                (Fix, Free, Minimize, Maximize)
+            arr: Array of initial values. Can be:
+                - Numbers (default to "fixed")
+                - Tuples of (type, value) where type is "fixed", "free", "minimize", "maximize"
 
         Raises:
-            ValueError: If the shape of arr doesn't match the state shape
+            ValueError: If the shape doesn't match the state shape
         """
-        if arr.shape != self.shape:
-            raise ValueError(f"Shape mismatch: {arr.shape} != {self.shape}")
-        self._initial = np.zeros(arr.shape)
-        self.initial_type = np.full(arr.shape, "Fix", dtype=object)
+        # Convert to list first to handle mixed types properly
+        if not isinstance(arr, (list, tuple)):
+            arr = np.asarray(arr)
+            if arr.shape != self.shape:
+                raise ValueError(f"Shape mismatch: {arr.shape} != {self.shape}")
+            arr = arr.tolist()
 
-        for i, v in np.ndenumerate(arr):
-            if isinstance(v, Free):
-                self._initial[i] = v.guess
-                self.initial_type[i] = "Free"
-            elif isinstance(v, Minimize):
-                self._initial[i] = v.guess
-                self.initial_type[i] = "Minimize"
-            elif isinstance(v, Maximize):
-                self._initial[i] = v.guess
-                self.initial_type[i] = "Maximize"
-            elif isinstance(v, Fix):
-                val = v.value
-                self._initial[i] = val
+        # Ensure we have the right number of elements
+        if len(arr) != self.shape[0]:
+            raise ValueError(f"Length mismatch: got {len(arr)} elements, expected {self.shape[0]}")
+
+        self._initial = np.zeros(self.shape, dtype=float)
+        self.initial_type = np.full(self.shape, "Fix", dtype=object)
+
+        for i, v in enumerate(arr):
+            if isinstance(v, tuple) and len(v) == 2:
+                # Tuple API: (type, value)
+                bc_type_str, bc_value = v
+                try:
+                    bc_type = BoundaryType(bc_type_str)  # Validates the string
+                except ValueError:
+                    valid_types = [t.value for t in BoundaryType]
+                    raise ValueError(
+                        f"Invalid boundary condition type: {bc_type_str}. "
+                        f"Valid types are: {valid_types}"
+                    )
+                self._initial[i] = float(bc_value)
+                self.initial_type[i] = bc_type.value.capitalize()
+            elif isinstance(v, (int, float, np.number)):
+                # Simple number defaults to fixed
+                self._initial[i] = float(v)
                 self.initial_type[i] = "Fix"
             else:
-                val = v
-                self._initial[i] = val
-                self.initial_type[i] = "Fix"
+                raise ValueError(
+                    f"Invalid boundary condition format: {v}. "
+                    f"Use a number (defaults to fixed) or tuple ('type', value) "
+                    f"where type is 'fixed', 'free', 'minimize', or 'maximize'."
+                )
 
         self._check_bounds_against_initial_final()
 
@@ -307,40 +228,53 @@ class State(Variable):
         """Set the final state values and their types.
 
         Args:
-            arr (np.ndarray): Array of final values or boundary condition objects
-                (Fix, Free, Minimize, Maximize)
+            arr: Array of final values. Can be:
+                - Numbers (default to "fixed")
+                - Tuples of (type, value) where type is "fixed", "free", "minimize", "maximize"
 
         Raises:
-            ValueError: If the shape of arr doesn't match the state shape
+            ValueError: If the shape doesn't match the state shape
         """
-        if arr.shape != self.shape:
-            raise ValueError(f"Shape mismatch: {arr.shape} != {self.shape}")
-        self._final = np.zeros(arr.shape)
-        self.final_type = np.full(arr.shape, "Fix", dtype=object)
+        # Convert to list first to handle mixed types properly
+        if not isinstance(arr, (list, tuple)):
+            arr = np.asarray(arr)
+            if arr.shape != self.shape:
+                raise ValueError(f"Shape mismatch: {arr.shape} != {self.shape}")
+            arr = arr.tolist()
 
-        for i, v in np.ndenumerate(arr):
-            if isinstance(v, Free):
-                self._final[i] = v.guess
-                self.final_type[i] = "Free"
-            elif isinstance(v, Minimize):
-                self._final[i] = v.guess
-                self.final_type[i] = "Minimize"
-            elif isinstance(v, Maximize):
-                self._final[i] = v.guess
-                self.final_type[i] = "Maximize"
-            elif isinstance(v, Fix):
-                val = v.value
-                self._final[i] = val
+        # Ensure we have the right number of elements
+        if len(arr) != self.shape[0]:
+            raise ValueError(f"Length mismatch: got {len(arr)} elements, expected {self.shape[0]}")
+
+        self._final = np.zeros(self.shape, dtype=float)
+        self.final_type = np.full(self.shape, "Fix", dtype=object)
+
+        for i, v in enumerate(arr):
+            if isinstance(v, tuple) and len(v) == 2:
+                # Tuple API: (type, value)
+                bc_type_str, bc_value = v
+                try:
+                    bc_type = BoundaryType(bc_type_str)  # Validates the string
+                except ValueError:
+                    valid_types = [t.value for t in BoundaryType]
+                    raise ValueError(
+                        f"Invalid boundary condition type: {bc_type_str}. "
+                        f"Valid types are: {valid_types}"
+                    )
+                self._final[i] = float(bc_value)
+                self.final_type[i] = bc_type.value.capitalize()
+            elif isinstance(v, (int, float, np.number)):
+                # Simple number defaults to fixed
+                self._final[i] = float(v)
                 self.final_type[i] = "Fix"
             else:
-                val = v
-                self._final[i] = val
-                self.final_type[i] = "Fix"
+                raise ValueError(
+                    f"Invalid boundary condition format: {v}. "
+                    f"Use a number (defaults to fixed) or tuple ('type', value) "
+                    f"where type is 'fixed', 'free', 'minimize', or 'maximize'."
+                )
 
         self._check_bounds_against_initial_final()
-
-
-
 
     def __repr__(self):
         """String representation of the State object.

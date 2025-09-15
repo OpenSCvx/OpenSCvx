@@ -11,7 +11,7 @@ sys.path.append(grandparent_dir)
 from examples.plotting import plot_animation_double_integrator
 from openscvx.backend.control import Control
 from openscvx.backend.expr import Concat, Constant, Norm, ctcs
-from openscvx.backend.state import Free, Minimize, State
+from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.utils import gen_vertices, rot
 
@@ -24,7 +24,7 @@ x.max = np.array([200.0, 100, 50, 100, 100, 100, 100])  # Upper Bound on the sta
 x.min = np.array([-200.0, -100, 15, -100, -100, -100, 0])  # Lower Bound on the states
 
 x.initial = np.array([10.0, 0, 20, 0, 0, 0, 0])
-x.final = np.array([10.0, 0, 20, Free(0), Free(0), Free(0), Minimize(total_time)])
+x.final = [10.0, 0, 20, ("free", 0), ("free", 0), ("free", 0), ("minimize", total_time)]
 x.guess = np.linspace(x.initial, x.final, n)
 
 u = Control("u", shape=(3,))  # Control variable with 6 dimensions

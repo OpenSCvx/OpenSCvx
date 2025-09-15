@@ -12,7 +12,7 @@ from openscvx.backend.expr import (
     Index,
     NodalConstraint,
 )
-from openscvx.backend.state import Free, State
+from openscvx.backend.state import State
 
 
 def sort_ctcs_constraints(
@@ -268,7 +268,7 @@ def augment_dynamics_with_ctcs(
         for idx in range(num_augmented_states):
             aug_var = State(f"_ctcs_aug_{idx}", shape=(1,))
             aug_var.initial = np.array([licq_min])  # Set initial to respect bounds
-            aug_var.final = np.array([Free(0)])
+            aug_var.final = [("free", 0)]
             aug_var.min = np.array([licq_min])
             aug_var.max = np.array([licq_max])
             # Set guess to licq_min as well

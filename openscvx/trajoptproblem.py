@@ -30,7 +30,7 @@ from openscvx.backend.preprocessing import (
     validate_shapes,
     validate_variable_names,
 )
-from openscvx.backend.state import Free, State
+from openscvx.backend.state import State
 from openscvx.backend.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
 from openscvx.caching import (
     get_solver_cache_paths,
