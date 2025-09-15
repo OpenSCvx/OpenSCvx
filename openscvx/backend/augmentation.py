@@ -110,7 +110,7 @@ def separate_constraints(
             constraints_ctcs.append(c)
         elif isinstance(c, NodalConstraint):
             # Check if the underlying constraint is convex
-            if c.constraint.convex:
+            if c.constraint.is_convex:
                 constraints_nodal_convex.append(c)
             else:
                 constraints_nodal.append(c)
@@ -120,7 +120,7 @@ def separate_constraints(
             nodal_constraint = NodalConstraint(c, all_nodes)
 
             # Check if the constraint is convex
-            if c.convex:
+            if c.is_convex:
                 constraints_nodal_convex.append(nodal_constraint)
             else:
                 constraints_nodal.append(nodal_constraint)
@@ -137,7 +137,7 @@ def separate_constraints(
         nodal_constraint = NodalConstraint(constraint, all_nodes)
 
         # Check if the underlying constraint is convex
-        if constraint.convex:
+        if constraint.is_convex:
             constraints_nodal_convex.append(nodal_constraint)
         else:
             constraints_nodal.append(nodal_constraint)

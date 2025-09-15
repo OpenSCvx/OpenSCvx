@@ -32,10 +32,13 @@ from openscvx.backend.state import State
 def test_separate_constraints_empty():
     """Test separate_constraints with no constraints."""
     n_nodes = 10
-    constraints_ctcs, constraints_nodal = separate_constraints([], n_nodes)
+    constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
+        [], n_nodes
+    )
 
     assert constraints_ctcs == []
     assert constraints_nodal == []
+    assert constraints_nodal_convex == []
 
 
 def test_separate_constraints_only_ctcs():
@@ -45,10 +48,13 @@ def test_separate_constraints_only_ctcs():
     c1 = ctcs(x <= 1.0, penalty="squared_relu")
     c2 = ctcs(x >= 0.0, penalty="huber", check_nodally=True)
 
-    constraints_ctcs, constraints_nodal = separate_constraints([c1, c2], n_nodes)
+    constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
+        [c1, c2], n_nodes
+    )
 
     assert constraints_ctcs == [c1, c2]
     assert len(constraints_nodal) == 1  # Only c2 should be in nodal (check_nodally=True)
+    assert len(constraints_nodal_convex) == 0  # No convex constraints
     # Should be converted to NodalConstraint
     assert hasattr(constraints_nodal[0], "constraint")
     assert constraints_nodal[0].constraint == c2.constraint
@@ -61,10 +67,13 @@ def test_separate_constraints_only_nodal():
     c1 = x <= 1.0
     c2 = x >= 0.0
 
-    constraints_ctcs, constraints_nodal = separate_constraints([c1, c2], n_nodes)
+    constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
+        [c1, c2], n_nodes
+    )
 
     assert constraints_ctcs == []
     assert len(constraints_nodal) == 2
+    assert len(constraints_nodal_convex) == 0  # No convex constraints
     # Should be converted to NodalConstraint objects
     assert hasattr(constraints_nodal[0], "constraint")
     assert hasattr(constraints_nodal[1], "constraint")
@@ -80,10 +89,13 @@ def test_separate_constraints_mixed():
     c2 = x >= 0.0  # Regular constraint
     c3 = ctcs(x <= 2.0, penalty="huber", check_nodally=True)
 
-    constraints_ctcs, constraints_nodal = separate_constraints([c1, c2, c3], n_nodes)
+    constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
+        [c1, c2, c3], n_nodes
+    )
 
     assert constraints_ctcs == [c1, c3]
     assert len(constraints_nodal) == 2  # c2 + c3's underlying constraint
+    assert len(constraints_nodal_convex) == 0  # No convex constraints
     # Should be converted to NodalConstraint objects
     assert constraints_nodal[0].constraint == c2
     assert constraints_nodal[1].constraint == c3.constraint
@@ -99,6 +111,83 @@ def test_separate_constraints_invalid_type():
         separate_constraints([invalid], n_nodes)
 
     assert "Constraints must be `Constraint`, `NodalConstraint`, or `CTCS`" in str(exc.value)
+
+
+def test_separate_constraints_convex_constraints():
+    """Test separate_constraints with convex constraints."""
+    n_nodes = 10
+    x = State("x", (1,))
+
+    # Create convex and non-convex constraints
+    c1 = (x <= 1.0).convex()  # Convex constraint
+    c2 = x >= 0.0  # Non-convex constraint
+    c3 = (x <= 2.0).convex()  # Another convex constraint
+
+    constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
+        [c1, c2, c3], n_nodes
+    )
+
+    assert constraints_ctcs == []
+    assert len(constraints_nodal) == 1  # Only c2 (non-convex)
+    assert len(constraints_nodal_convex) == 2  # c1 and c3 (convex)
+
+    # Verify non-convex constraint
+    assert constraints_nodal[0].constraint == c2
+    assert not constraints_nodal[0].constraint.is_convex
+
+    # Verify convex constraints
+    assert constraints_nodal_convex[0].constraint == c1
+    assert constraints_nodal_convex[0].constraint.is_convex
+    assert constraints_nodal_convex[1].constraint == c3
+    assert constraints_nodal_convex[1].constraint.is_convex
+
+
+def test_separate_constraints_convex_nodal_constraints():
+    """Test separate_constraints with convex NodalConstraint objects."""
+    n_nodes = 10
+    x = State("x", (1,))
+
+    # Create convex and non-convex constraints, then wrap in NodalConstraint
+    c1 = (x <= 1.0).convex()
+    c2 = x >= 0.0
+    nodal1 = NodalConstraint(c1, [0, 1, 2])  # Convex
+    nodal2 = NodalConstraint(c2, [1, 2, 3])  # Non-convex
+
+    constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
+        [nodal1, nodal2], n_nodes
+    )
+
+    assert constraints_ctcs == []
+    assert len(constraints_nodal) == 1  # nodal2 (non-convex)
+    assert len(constraints_nodal_convex) == 1  # nodal1 (convex)
+
+    # Verify the NodalConstraint objects are preserved
+    assert constraints_nodal[0] is nodal2
+    assert constraints_nodal_convex[0] is nodal1
+
+
+def test_separate_constraints_convex_ctcs_check_nodally():
+    """Test separate_constraints with convex CTCS constraints that have check_nodally=True."""
+    n_nodes = 10
+    x = State("x", (1,))
+
+    # Create CTCS constraints with convex underlying constraints
+    c1 = ctcs((x <= 1.0).convex(), penalty="squared_relu", check_nodally=True)
+    c2 = ctcs(x >= 0.0, penalty="huber", check_nodally=True)  # Non-convex
+
+    constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
+        [c1, c2], n_nodes
+    )
+
+    assert constraints_ctcs == [c1, c2]
+    assert len(constraints_nodal) == 1  # c2's underlying constraint (non-convex)
+    assert len(constraints_nodal_convex) == 1  # c1's underlying constraint (convex)
+
+    # Verify the underlying constraints from CTCS are correctly separated
+    assert constraints_nodal[0].constraint == c2.constraint
+    assert not constraints_nodal[0].constraint.is_convex
+    assert constraints_nodal_convex[0].constraint == c1.constraint
+    assert constraints_nodal_convex[0].constraint.is_convex
 
 
 def test_augment_no_ctcs_constraints():

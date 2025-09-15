@@ -274,7 +274,7 @@ class Constraint(Expr):
     def __init__(self, lhs: Expr, rhs: Expr):
         self.lhs = lhs
         self.rhs = rhs
-        self.convex = False
+        self.is_convex = False
 
     def children(self):
         return [self.lhs, self.rhs]
@@ -316,7 +316,7 @@ class Constraint(Expr):
         Returns:
             Self with convex flag set to True (enables method chaining)
         """
-        self.convex = True
+        self.is_convex = True
         return self
 
 
