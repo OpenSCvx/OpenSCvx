@@ -141,7 +141,8 @@ def lower_convex_constraints(constraints_nodal_convex, ocp_vars: Dict) -> List[c
 
     if not constraints_nodal_convex:
         return []
-
+    
+    # TODO: (norrisg) This does not work. Fix. :(
     x_nonscaled = ocp_vars["x_nonscaled"]  # List of x_nonscaled[k] for each node k
     u_nonscaled = ocp_vars["u_nonscaled"]  # List of u_nonscaled[k] for each node k
 
