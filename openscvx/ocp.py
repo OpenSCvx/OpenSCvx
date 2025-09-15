@@ -1,4 +1,5 @@
 import os
+from typing import Dict, List
 
 import cvxpy as cp
 import numpy as np
@@ -17,7 +18,8 @@ except ImportError:
     cpg = None
 
 
-def OptimalControlProblem(settings: Config):
+def create_cvxpy_variables(settings: Config) -> Dict:
+    """Phase 1: Create CVXPy variables and parameters for the optimal control problem."""
     ########################
     # VARIABLES & PARAMETERS
     ########################
@@ -66,11 +68,11 @@ def OptimalControlProblem(settings: Config):
     nu = cp.Variable((settings.scp.n - 1, settings.sim.n_states), name="nu")  # Virtual Control
 
     # Linearized Nonconvex Nodal Constraints
+    g = []
+    grad_g_x = []
+    grad_g_u = []
+    nu_vb = []
     if settings.sim.constraints_nodal:
-        g = []
-        grad_g_x = []
-        grad_g_u = []
-        nu_vb = []
         for idx_ncvx, constraint in enumerate(settings.sim.constraints_nodal):
             g.append(cp.Parameter(settings.scp.n, name="g_" + str(idx_ncvx)))
             grad_g_x.append(
@@ -93,6 +95,127 @@ def OptimalControlProblem(settings: Config):
     for k in range(settings.scp.n):
         x_nonscaled.append(S_x @ x[k] + c_x)
         u_nonscaled.append(S_u @ u[k] + c_u)
+
+    return {
+        "w_tr": w_tr,
+        "lam_cost": lam_cost,
+        "x": x,
+        "dx": dx,
+        "x_bar": x_bar,
+        "x_init": x_init,
+        "x_term": x_term,
+        "u": u,
+        "du": du,
+        "u_bar": u_bar,
+        "A_d": A_d,
+        "B_d": B_d,
+        "C_d": C_d,
+        "z_d": z_d,
+        "nu": nu,
+        "g": g,
+        "grad_g_x": grad_g_x,
+        "grad_g_u": grad_g_u,
+        "nu_vb": nu_vb,
+        "S_x": S_x,
+        "inv_S_x": inv_S_x,
+        "c_x": c_x,
+        "S_u": S_u,
+        "inv_S_u": inv_S_u,
+        "c_u": c_u,
+        "x_nonscaled": x_nonscaled,
+        "u_nonscaled": u_nonscaled,
+    }
+
+
+def lower_convex_constraints(constraints_nodal_convex, ocp_vars: Dict) -> List[cp.Constraint]:
+    """Phase 2: Lower symbolic convex constraints to CVXPy constraints with node-awareness.
+
+    Note: One symbolic constraint applied at N nodes becomes N CVXPy constraints.
+    The CVXPy variables x and u are already (n_nodes, n_states/n_controls) shaped,
+    so we apply constraints at specific nodes using x[k] and u[k].
+    """
+    from openscvx.backend.control import Control
+    from openscvx.backend.expr import traverse
+    from openscvx.backend.lowerers.cvxpy import lower_to_cvxpy
+    from openscvx.backend.state import State
+
+    if not constraints_nodal_convex:
+        return []
+
+    x_nonscaled = ocp_vars["x_nonscaled"]  # List of x_nonscaled[k] for each node k
+    u_nonscaled = ocp_vars["u_nonscaled"]  # List of u_nonscaled[k] for each node k
+
+    cvxpy_constraints = []
+
+    for constraint in constraints_nodal_convex:
+        # nodes should already be validated and normalized in preprocessing
+        nodes = constraint.nodes
+
+        # Collect all State and Control variables referenced in the constraint
+        state_vars = set()
+        control_vars = set()
+
+        def collect_vars(expr):
+            if isinstance(expr, State):
+                state_vars.add(expr.name)
+            elif isinstance(expr, Control):
+                control_vars.add(expr.name)
+
+        traverse(constraint.constraint, collect_vars)
+
+        # Apply the constraint at each specified node
+        for node in nodes:
+            # Create variable map for this specific node (row k of the trajectory)
+            variable_map = {}
+
+            # Map state variables to x_nonscaled[node] (the state at node k)
+            # The CVXPy lowerer will handle _slice attributes automatically
+            for state_name in state_vars:
+                variable_map[state_name] = x_nonscaled[node]  # x_nonscaled[k, :]
+
+            # Map control variables to u_nonscaled[node] (the control at node k)
+            # The CVXPy lowerer will handle _slice attributes automatically
+            for control_name in control_vars:
+                variable_map[control_name] = u_nonscaled[node]  # u_nonscaled[k, :]
+
+            # Lower the constraint to CVXPy using existing infrastructure
+            # This creates one CVXPy constraint for this specific node
+            cvxpy_constraint = lower_to_cvxpy(constraint.constraint, variable_map)
+            cvxpy_constraints.append(cvxpy_constraint)
+
+    return cvxpy_constraints
+
+
+def OptimalControlProblem(settings: Config, ocp_vars: Dict):
+    """Phase 3: Build the complete optimal control problem with all constraints."""
+    # Extract variables from the dict for easier access
+    w_tr = ocp_vars["w_tr"]
+    lam_cost = ocp_vars["lam_cost"]
+    x = ocp_vars["x"]
+    dx = ocp_vars["dx"]
+    x_bar = ocp_vars["x_bar"]
+    x_init = ocp_vars["x_init"]
+    x_term = ocp_vars["x_term"]
+    u = ocp_vars["u"]
+    du = ocp_vars["du"]
+    u_bar = ocp_vars["u_bar"]
+    A_d = ocp_vars["A_d"]
+    B_d = ocp_vars["B_d"]
+    C_d = ocp_vars["C_d"]
+    z_d = ocp_vars["z_d"]
+    nu = ocp_vars["nu"]
+    g = ocp_vars["g"]
+    grad_g_x = ocp_vars["grad_g_x"]
+    grad_g_u = ocp_vars["grad_g_u"]
+    nu_vb = ocp_vars["nu_vb"]
+    S_x = ocp_vars["S_x"]
+    inv_S_x = ocp_vars["inv_S_x"]
+    c_x = ocp_vars["c_x"]
+    S_u = ocp_vars["S_u"]
+    inv_S_u = ocp_vars["inv_S_u"]
+    c_u = ocp_vars["c_u"]
+    x_nonscaled = ocp_vars["x_nonscaled"]
+    u_nonscaled = ocp_vars["u_nonscaled"]
 
     constr = []
     cost = lam_cost * 0
@@ -118,20 +241,9 @@ def OptimalControlProblem(settings: Config):
             ]
             idx_ncvx += 1
 
-    # Convex nodal constraints
+    # Convex nodal constraints (already lowered to CVXPy in trajoptproblem)
     if settings.sim.constraints_nodal_convex:
-        raise RuntimeError(
-            "Tried instantiating 'OptimalControlProblem' without implementing proper support for convex nodal constraints"
-        )
-        for constraint in settings.sim.constraints_nodal_convex:
-            # nodes should already be validated and normalized in preprocessing
-            nodes = constraint.nodes
-
-            if constraint.convex and constraint.vectorized:
-                constr += constraint.get_cvxpy_constraints(x_nonscaled, u_nonscaled)
-            elif constraint.convex:
-                for node in nodes:
-                    constr += constraint.get_cvxpy_constraints(x_nonscaled[node], u_nonscaled[node])
+        constr += settings.sim.constraints_nodal_convex
 
     for i in range(settings.sim.idx_x_true.start, settings.sim.idx_x_true.stop):
         if settings.sim.x.initial_type[i] == "Fix":

@@ -51,7 +51,7 @@ from openscvx.constraints.lowered import LoweredNodalConstraint
 from openscvx.discretization import get_discretization_solver
 from openscvx.dynamics import Dynamics
 from openscvx.dynamics import dynamics as to_dynamics
-from openscvx.ocp import OptimalControlProblem
+from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables, lower_convex_constraints
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
 from openscvx.ptr import PTR_init, PTR_subproblem, format_result
@@ -358,7 +358,19 @@ class TrajOptProblem:
         self.propagation_solver = get_propagation_solver(
             self.dynamics_augmented_prop.f, self.settings, self.params
         )
-        self.optimal_control_problem = OptimalControlProblem(self.settings)
+        # Phase 1: Create CVXPy variables
+        ocp_vars = create_cvxpy_variables(self.settings)
+
+        # Phase 2: Lower convex constraints to CVXPy
+        lowered_convex_constraints = lower_convex_constraints(
+            self.settings.sim.constraints_nodal_convex, ocp_vars
+        )
+
+        # Store lowered constraints back in settings for Phase 3
+        self.settings.sim.constraints_nodal_convex = lowered_convex_constraints
+
+        # Phase 3: Build complete optimal control problem
+        self.optimal_control_problem = OptimalControlProblem(self.settings, ocp_vars)
 
         # Collect all relevant functions
         functions_to_hash = [self.dynamics_augmented.f, self.dynamics_augmented_prop.f]

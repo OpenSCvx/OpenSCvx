@@ -179,10 +179,7 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
                 constraint.grad_g_u(x.guess, u.guess, 0)
             )
 
-    if settings.sim.constraints_nodal_convex:
-        raise RuntimeError(
-            "Tried calling 'PTR_subproblem' without implementing proper support for convex nodal constraints"
-        )
+    # Convex constraints are already lowered and handled in the OCP, no action needed here
 
     prob.param_dict["w_tr"].value = settings.scp.w_tr
     prob.param_dict["lam_cost"].value = settings.scp.lam_cost
@@ -241,8 +238,7 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
     for constraint in settings.sim.constraints_nodal:
         J_vb_vec += np.maximum(0, prob.var_dict["nu_vb_" + str(id_ncvx)].value)
         id_ncvx += 1
-    for constraint in settings.sim.constraints_nodal_convex:
-        raise RuntimeError("Failed to handle convex nodal constraints in `ptr`")
+    # Convex constraints are already handled in the OCP, no processing needed here
     return (
         x_new_guess,
         u_new_guess,
