@@ -84,10 +84,10 @@ def sort_ctcs_constraints(
 
 def separate_constraints(
     constraints: List[Expr], n_nodes: int
-) -> Tuple[List[CTCS], List[NodalConstraint]]:
+) -> Tuple[List[CTCS], List[NodalConstraint], List[NodalConstraint]]:
     """
     Separate CTCS constraints from regular constraints, converting bare constraints
-    to NodalConstraints that apply at all nodes.
+    to NodalConstraints that apply at all nodes. Also separate convex constraints.
 
     Args:
         constraints: List of constraints (mix of CTCS, NodalConstraint, and bare Constraints)
@@ -96,10 +96,12 @@ def separate_constraints(
     Returns:
         Tuple of:
         - List of CTCS constraints
-        - List of NodalConstraint objects (including converted bare constraints)
+        - List of non-convex NodalConstraint objects (including converted bare constraints)
+        - List of convex NodalConstraint objects
     """
     constraints_ctcs: List[CTCS] = []
     constraints_nodal: List[NodalConstraint] = []
+    constraints_nodal_convex: List[NodalConstraint] = []
 
     for c in constraints:
         if isinstance(c, CTCS):
@@ -107,12 +109,21 @@ def separate_constraints(
             c.nodes = c.nodes or (0, n_nodes)
             constraints_ctcs.append(c)
         elif isinstance(c, NodalConstraint):
-            # Already a properly formed nodal constraint
-            constraints_nodal.append(c)
+            # Check if the underlying constraint is convex
+            if c.constraint.convex:
+                constraints_nodal_convex.append(c)
+            else:
+                constraints_nodal.append(c)
         elif isinstance(c, Constraint):
             # Convert bare constraint to NodalConstraint that applies at all nodes
             all_nodes = list(range(n_nodes))
-            constraints_nodal.append(NodalConstraint(c, all_nodes))
+            nodal_constraint = NodalConstraint(c, all_nodes)
+
+            # Check if the constraint is convex
+            if c.convex:
+                constraints_nodal_convex.append(nodal_constraint)
+            else:
+                constraints_nodal.append(nodal_constraint)
         else:
             raise ValueError(
                 f"Constraints must be `Constraint`, `NodalConstraint`, or `CTCS`, got {type(c).__name__}"
@@ -123,9 +134,15 @@ def separate_constraints(
     for constraint in ctcs_nodal_constraints:
         # These also need to be converted to NodalConstraint (apply at all nodes)
         all_nodes = list(range(n_nodes))
-        constraints_nodal.append(NodalConstraint(constraint, all_nodes))
+        nodal_constraint = NodalConstraint(constraint, all_nodes)
 
-    return constraints_ctcs, constraints_nodal
+        # Check if the underlying constraint is convex
+        if constraint.convex:
+            constraints_nodal_convex.append(nodal_constraint)
+        else:
+            constraints_nodal.append(nodal_constraint)
+
+    return constraints_ctcs, constraints_nodal, constraints_nodal_convex
 
 
 def decompose_vector_nodal_constraints(

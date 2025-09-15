@@ -131,7 +131,9 @@ class TrajOptProblem:
         constraints = [canonicalize(expr) for expr in constraints]
 
         # Sort and separate constraints first
-        constraints_ctcs, constraints_nodal = separate_constraints(constraints, N)
+        constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
+            constraints, N
+        )
 
         # Decompose vector-valued nodal constraints into scalar constraints
         # This is necessary for nonconvex nodal constraints that get lowered to JAX
@@ -163,6 +165,10 @@ class TrajOptProblem:
         # TODO: (norrisg) allow non-ctcs constraints
         dyn_fn = lower_to_jax(dynamics_aug)
         constraints_nodal_fns = lower_to_jax(constraints_nodal)
+
+        # Lower convex constraints to CVXPy
+        # Note: CVXPy lowering will happen later in the OCP when CVXPy variables are available
+        # For now, we just store the symbolic constraints
 
         dynamics_fn = to_dynamics(dyn_fn)
 
@@ -250,6 +256,7 @@ class TrajOptProblem:
 
         sim.constraints_ctcs = []
         sim.constraints_nodal = lowered_constraints_nodal
+        sim.constraints_nodal_convex = constraints_nodal_convex
 
         # Create dynamics objects from the symbolic augmented dynamics
         self.dynamics_augmented = Dynamics(
