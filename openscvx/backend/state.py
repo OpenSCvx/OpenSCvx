@@ -112,49 +112,46 @@ class Maximize:
 
 
 class State(Variable):
-    """A class representing the state variables in an optimal control problem.
+    """Symbolic state variable for trajectory optimization.
 
-    The State class extends Variable to handle state-specific properties like initial and final
-    conditions, as well as true and augmented state dimensions. It supports various boundary
-    condition types:
+    A State represents a named state variable in the symbolic expression tree.
+    It integrates with the AST system and supports boundary conditions for
+    trajectory optimization.
+
+    The State class is designed to be lightweight and focused on symbolic
+    representation, with optimization-specific functionality handled by the
+    unified layer.
+
+    Boundary condition types:
     - Fixed values (Fix)
     - Free variables (Free)
     - Minimization objectives (Minimize)
     - Maximization objectives (Maximize)
 
     Attributes:
-        name (str): Name of the state variable.
-        shape (tuple): Shape of the state variable array.
-        min (np.ndarray): Minimum bounds for the state variables. Shape: (n_states,).
-        max (np.ndarray): Maximum bounds for the state variables. Shape: (n_states,).
-        guess (np.ndarray): Used to initialize SCP and contains the current SCP solution for the
-            state trajectory. Shape: (n_nodes, n_states).
-        initial (np.ndarray): Initial state values or boundary condition objects (Free, Fixed,
-            Minimize, Maximize). Shape: (n_states,).
-        final (np.ndarray): Final state values or boundary condition objects (Free, Fixed,
-            Minimize, Maximize). Shape: (n_states,).
-        _initial (np.ndarray): Internal storage for initial state values.
-        _final (np.ndarray): Internal storage for final state values.
-        initial_type (str): Type of initial boundary condition ('fix', 'free', 'minimize',
-            'maximize').
-        final_type (str): Type of final boundary condition ('fix', 'free', 'minimize',
-            'maximize').
-        _true_dim (int): True dimensionality of the state variables.
-        _true_slice (slice): Slice for accessing true state variables.
-        _augmented_slice (slice): Slice for accessing augmented state variables.
-
-    Notes:
-        Attributes prefixed with underscore (_) are for internal use only and should not be
-        accessed directly.
+        name (str): Unique name identifier for this state variable
+        shape (tuple): Shape of the state vector (e.g., (3,) for 3D position)
+        min (np.ndarray): Minimum bounds for state variables
+        max (np.ndarray): Maximum bounds for state variables
+        guess (np.ndarray): Initial trajectory guess
+        initial (np.ndarray): Initial boundary conditions
+        final (np.ndarray): Final boundary conditions
 
     Example:
         ```python
-        state = State("position", (3,))
-        state.min = np.array([0, 0, 10])
-        state.max = np.array([10, 10, 200])
-        state.guess = np.linspace([0, 1, 2], [10, 5, 8], 3)
-        state.initial = np.array([Fix(0), Free(1), 2])
-        state.final = np.array([Fix(10), Free(5), Maximize(8)])
+        # Simple scalar state
+        time = State("time", (1,))
+        time.min = np.array([0.0])
+        time.max = np.array([10.0])
+        time.initial = np.array([Fix(0.0)])
+        time.final = np.array([Minimize(5.0)])
+
+        # Vector state
+        position = State("position", (3,))
+        position.min = np.array([0, 0, 10])
+        position.max = np.array([10, 10, 200])
+        position.initial = np.array([Fix(0), Free(1), Fix(50)])
+        position.final = np.array([Fix(10), Free(5), Maximize(150)])
         ```
     """
 
@@ -171,13 +168,6 @@ class State(Variable):
         self._final = None
         self.final_type = None
 
-        self._true_dim = shape[0]
-        self._update_slices()
-
-    def _update_slices(self):
-        """Update the slice objects for true and augmented states."""
-        self._true_slice = slice(0, self._true_dim)
-        self._augmented_slice = slice(self._true_dim, self.shape[0])
 
     @property
     def min(self):
@@ -349,124 +339,8 @@ class State(Variable):
 
         self._check_bounds_against_initial_final()
 
-    @property
-    def true(self):
-        """Get the true state variables (excluding augmented states).
 
-        Returns:
-            State: A new State object containing only the true state variables
-        """
-        return self[self._true_slice]
 
-    @property
-    def augmented(self):
-        """Get the augmented state variables.
-
-        Returns:
-            State: A new State object containing only the augmented state variables
-        """
-        return self[self._augmented_slice]
-
-    def append(
-        self,
-        other=None,
-        *,
-        min=-np.inf,
-        max=np.inf,
-        guess=0.0,
-        initial=0.0,
-        final=0.0,
-        augmented=False,
-    ):
-        """Append another state or create a new state variable.
-
-        Args:
-            other (State, optional): Another State object to append
-            min (float, optional): Minimum bound for new state. Defaults to -np.inf
-            max (float, optional): Maximum bound for new state. Defaults to np.inf
-            guess (float, optional): Initial guess for new state. Defaults to 0.0
-            initial (float, optional): Initial value for new state. Defaults to 0.0
-            final (float, optional): Final value for new state. Defaults to 0.0
-            augmented (bool, optional): Whether the new state is augmented. Defaults to False
-        """
-        if isinstance(other, State):
-            super().append(other=other)
-
-            if self._initial is None:
-                self._initial = np.array(other._initial) if other._initial is not None else None
-            elif other._initial is not None:
-                self._initial = np.concatenate([self._initial, other._initial], axis=0)
-
-            if self._final is None:
-                self._final = np.array(other._final) if other._final is not None else None
-            elif other._final is not None:
-                self._final = np.concatenate([self._final, other._final], axis=0)
-
-            if self.initial_type is None:
-                self.initial_type = (
-                    np.array(other.initial_type) if other.initial_type is not None else None
-                )
-            elif other.initial_type is not None:
-                self.initial_type = np.concatenate([self.initial_type, other.initial_type], axis=0)
-
-            if self.final_type is None:
-                self.final_type = (
-                    np.array(other.final_type) if other.final_type is not None else None
-                )
-            elif other.final_type is not None:
-                self.final_type = np.concatenate([self.final_type, other.final_type], axis=0)
-
-            if not augmented:
-                self._true_dim += getattr(other, "_true_dim", other.shape[0])
-            self._update_slices()
-        else:
-            temp_state = State(name=f"{self.name}_temp_append", shape=(1,))
-            temp_state.min = min
-            temp_state.max = max
-            temp_state.guess = guess
-            temp_state.initial = initial
-            temp_state.final = final
-            self.append(temp_state, augmented=augmented)
-
-    # TODO: (norrisg) fix this so that can still nicely access min/max limits
-    # Arguably this was already mesy since user needed to magically know to write `x.true.max`
-    # instead of just `x.max` while writing constraints
-    #
-    # def __getitem__(self, idx):
-    #     """Get a subset of the state variables.
-
-    #     Args:
-    #         idx: Index or slice to select state variables
-
-    #     Returns:
-    #         State: A new State object containing the selected variables
-    #     """
-    #     new_state = super().__getitem__(idx)
-    #     new_state.__class__ = State
-
-    #     def slice_attr(attr):
-    #         if attr is None:
-    #             return None
-    #         if attr.ndim == 2 and attr.shape[1] == self.shape[0]:
-    #             return attr[:, idx]
-    #         return attr[idx]
-
-    #     new_state._initial = slice_attr(self._initial)
-    #     new_state.initial_type = slice_attr(self.initial_type)
-    #     new_state._final = slice_attr(self._final)
-    #     new_state.final_type = slice_attr(self.final_type)
-
-    #     if isinstance(idx, slice):
-    #         selected = np.arange(self.shape[0])[idx]
-    #     elif isinstance(idx, (list, np.ndarray)):
-    #         selected = np.array(idx)
-    #     else:
-    #         selected = np.array([idx])
-
-    #     new_state._true_dim = np.sum(selected < self._true_dim)
-    #     new_state._update_slices()
-
-    #     return new_state
 
     def __repr__(self):
         """String representation of the State object.

@@ -461,8 +461,9 @@ def unify_states(states: List[State], name: str = "unified_state") -> UnifiedSta
     unified_initial_type = np.concatenate(initial_type_arrays) if initial_type_arrays else None
     unified_final_type = np.concatenate(final_type_arrays) if final_type_arrays else None
 
-    # Calculate true dimension (only from true states, not augmented ones)
-    true_dim = sum(getattr(state, "_true_dim", state.shape[0]) for state in true_states)
+    # Calculate true dimension (only from user-defined states, not augmented ones)
+    # Since we simplified State/Control classes, all user states are "true" dimensions
+    true_dim = sum(state.shape[0] for state in true_states)
 
     return UnifiedState(
         name=name,
@@ -529,8 +530,9 @@ def unify_controls(controls: List[Control], name: str = "unified_control") -> Un
     unified_max = np.concatenate(max_arrays) if max_arrays else None
     unified_guess = np.concatenate(guess_arrays, axis=1) if guess_arrays else None
 
-    # Calculate true dimension (only from true controls, not augmented ones)
-    true_dim = sum(getattr(control, "_true_dim", control.shape[0]) for control in true_controls)
+    # Calculate true dimension (only from user-defined controls, not augmented ones)
+    # Since we simplified State/Control classes, all user controls are "true" dimensions
+    true_dim = sum(control.shape[0] for control in true_controls)
 
     return UnifiedControl(
         name=name,
