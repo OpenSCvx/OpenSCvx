@@ -274,6 +274,7 @@ class Constraint(Expr):
     def __init__(self, lhs: Expr, rhs: Expr):
         self.lhs = lhs
         self.rhs = rhs
+        self.convex = False
 
     def children(self):
         return [self.lhs, self.rhs]
@@ -308,6 +309,15 @@ class Constraint(Expr):
             CTCS constraint wrapping this constraint with interval specification
         """
         return CTCS(self, penalty=penalty, nodes=interval, idx=idx, check_nodally=check_nodally)
+
+    def convex(self) -> "Constraint":
+        """Mark this constraint as convex for CVXPy lowering.
+
+        Returns:
+            Self with convex flag set to True (enables method chaining)
+        """
+        self.convex = True
+        return self
 
 
 class Equality(Constraint):
