@@ -6,11 +6,15 @@ from jax.lax import cond
 from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     CTCS,
+    QDCM,
+    SSM,
+    SSMP,
     Add,
     Concat,
     Constant,
     Constraint,
     Cos,
+    Diag,
     Div,
     Equality,
     Expr,
@@ -272,3 +276,32 @@ class JaxLowerer:
             return jnp.stack(rows, axis=0)
 
         return stack_fn
+
+    @visitor(QDCM)
+    def visit_qdcm(self, node: QDCM):
+        # TODO: (norrisg) implement here directly rather than importing!
+        from openscvx.utils import qdcm
+
+        f = self.lower(node.q)
+        return lambda x, u, node, **kwargs: qdcm(f(x, u, node, **kwargs))
+
+    @visitor(SSMP)
+    def visit_ssmp(self, node: SSMP):
+        # TODO: (norrisg) implement here directly rather than importing!
+        from openscvx.utils import SSMP
+
+        f = self.lower(node.w)
+        return lambda x, u, node, **kwargs: SSMP(f(x, u, node, **kwargs))
+
+    @visitor(SSM)
+    def visit_ssm(self, node: SSM):
+        # TODO: (norrisg) implement here directly rather than importing!
+        from openscvx.utils import SSM
+
+        f = self.lower(node.w)
+        return lambda x, u, node, **kwargs: SSM(f(x, u, node, **kwargs))
+
+    @visitor(Diag)
+    def visit_diag(self, node: Diag):
+        f = self.lower(node.operand)
+        return lambda x, u, node, **kwargs: jnp.diag(f(x, u, node, **kwargs))

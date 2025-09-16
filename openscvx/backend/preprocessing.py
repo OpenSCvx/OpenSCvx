@@ -5,11 +5,15 @@ import numpy as np
 from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     CTCS,
+    QDCM,
+    SSM,
+    SSMP,
     Add,
     Concat,
     Constant,
     Constraint,
     Cos,
+    Diag,
     Div,
     Equality,
     Expr,
@@ -561,3 +565,40 @@ def visit_stack(node: Stack) -> tuple[int, ...]:
 
     # Result shape is (num_rows, *row_shape)
     return (len(node.rows),) + first_shape
+
+
+@visitor(QDCM)
+def visit_qdcm(node: QDCM) -> tuple[int, ...]:
+    """QDCM takes a quaternion (4,) and produces a 3x3 DCM"""
+    q_shape = dispatch(node.q)
+    if q_shape != (4,):
+        raise ValueError(f"QDCM expects quaternion with shape (4,), got {q_shape}")
+    return (3, 3)
+
+
+@visitor(SSMP)
+def visit_ssmp(node: SSMP) -> tuple[int, ...]:
+    """SSMP takes angular velocity (3,) and produces a 4x4 matrix"""
+    w_shape = dispatch(node.w)
+    if w_shape != (3,):
+        raise ValueError(f"SSMP expects angular velocity with shape (3,), got {w_shape}")
+    return (4, 4)
+
+
+@visitor(SSM)
+def visit_ssm(node: SSM) -> tuple[int, ...]:
+    """SSM takes angular velocity (3,) and produces a 3x3 matrix"""
+    w_shape = dispatch(node.w)
+    if w_shape != (3,):
+        raise ValueError(f"SSM expects angular velocity with shape (3,), got {w_shape}")
+    return (3, 3)
+
+
+@visitor(Diag)
+def visit_diag(node: Diag) -> tuple[int, ...]:
+    """Diag converts a vector (n,) to a diagonal matrix (n,n)"""
+    operand_shape = dispatch(node.operand)
+    if len(operand_shape) != 1:
+        raise ValueError(f"Diag expects a 1D vector, got shape {operand_shape}")
+    n = operand_shape[0]
+    return (n, n)

@@ -5,10 +5,14 @@ import numpy as np
 from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     CTCS,
+    QDCM,
+    SSM,
+    SSMP,
     Add,
     Concat,
     Constant,
     Cos,
+    Diag,
     Div,
     Equality,
     Expr,
@@ -264,3 +268,27 @@ class Canonicalizer:
         # Canonicalize all rows
         rows = [self.canonicalize(row) for row in node.rows]
         return Stack(rows)
+
+    @visitor(QDCM)
+    def visit_qdcm(self, node: QDCM) -> Expr:
+        # Canonicalize the quaternion operand
+        q = self.canonicalize(node.q)
+        return QDCM(q)
+
+    @visitor(SSMP)
+    def visit_ssmp(self, node: SSMP) -> Expr:
+        # Canonicalize the angular velocity operand
+        w = self.canonicalize(node.w)
+        return SSMP(w)
+
+    @visitor(SSM)
+    def visit_ssm(self, node: SSM) -> Expr:
+        # Canonicalize the angular velocity operand
+        w = self.canonicalize(node.w)
+        return SSM(w)
+
+    @visitor(Diag)
+    def visit_diag(self, node: Diag) -> Expr:
+        # Canonicalize the operand
+        operand = self.canonicalize(node.operand)
+        return Diag(operand)
