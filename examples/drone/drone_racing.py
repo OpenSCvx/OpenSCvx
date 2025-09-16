@@ -1,7 +1,6 @@
 import os
 import sys
 
-import cvxpy as cp
 import jax.numpy as jnp
 import numpy as np
 
@@ -11,11 +10,10 @@ sys.path.append(grandparent_dir)
 
 from examples.plotting import plot_animation
 from openscvx.backend.control import Control
-from openscvx.backend.state import Free, Minimize, State
-from openscvx.constraints import ctcs, nodal
-from openscvx.dynamics import dynamics
+from openscvx.backend.expr import Concat, Constant, Norm, Power, Sqrt, Stack, Sum, ctcs
+from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.utils import SSM, SSMP, gen_vertices, qdcm, rot
+from openscvx.utils import gen_vertices, rot
 
 n = 22  # Number of Nodes
 total_time = 24.0  # Total time for the simulation
@@ -27,27 +25,23 @@ x.min = np.array(
     [-200.0, -100, 15, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0]
 )  # Lower Bound on the states
 
-x.initial = np.array(
-    [10.0, 0, 20, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0]
-)
-x.final = np.array(
-    [
-        10.0,
-        0,
-        20,
-        Free(0),
-        Free(0),
-        Free(0),
-        Free(1),
-        Free(0),
-        Free(0),
-        Free(0),
-        Free(0),
-        Free(0),
-        Free(0),
-        Minimize(total_time),
-    ]
-)
+x.initial = np.array([10.0, 0, 20, 0, 0, 0, 1.0, 0, 0, 0, 0, 0, 0, 0])
+x.final = [
+    10.0,
+    0,
+    20,
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 1),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("minimize", total_time),
+]
 
 u = Control("u", shape=(6,))  # Control variable with 6 dimensions
 
@@ -63,13 +57,6 @@ J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
 
 ### Gate Parameters ###
 n_gates = 10
-
-# Create cvxpy.Parameters for gate centers, A_gate, and A_gate_c (A @ center)
-gate_center_params = []
-A_gate_c_params = []
-for i in range(n_gates):
-    gate_center_params.append(cp.Parameter(3, name=f"gate_center_{i}"))
-    A_gate_c_params.append(cp.Parameter(3, name=f"A_gate_c_{i}"))
 
 # Initialize gate centers
 initial_gate_centers = [
@@ -87,8 +74,7 @@ initial_gate_centers = [
 
 # Set initial values for gate center parameters and A_gate_c_params
 radii = np.array([2.5, 1e-4, 2.5])
-A_gate_param = cp.Parameter((3, 3), name="A_gate")
-A_gate_param.value = rot @ np.diag(1 / radii) @ rot.T
+A_gate = rot @ np.diag(1 / radii) @ rot.T
 
 # Create modified centers (matching original behavior exactly)
 modified_centers = []
@@ -98,9 +84,9 @@ for center in initial_gate_centers:
     modified_center[2] = modified_center[2] + 2.5
     modified_centers.append(modified_center)
 
-for i, modified_center in enumerate(modified_centers):
-    gate_center_params[i].value = modified_center  # Use modified centers for parameters
-    A_gate_c_params[i].value = A_gate_param.value @ modified_center
+A_gate_cen = []
+for modified_center in modified_centers:
+    A_gate_cen.append(A_gate @ modified_center)
 
 nodes_per_gate = 2
 gate_nodes = np.arange(nodes_per_gate, n, nodes_per_gate)
@@ -110,41 +96,110 @@ for modified_center in modified_centers:  # Use modified centers for vertices
 ### End Gate Parameters ###
 
 
-constraints = [
-    ctcs(lambda x_, u_: (x_ - x.true.max)),
-    ctcs(lambda x_, u_: (x.true.min - x_)),
+constraint_exprs = [
+    ctcs(x <= Constant(np.array([x.max]))),
+    ctcs(Constant(np.array([x.min])) <= x),
 ]
 
-for node, A_c in zip(gate_nodes, A_gate_c_params):
-    constraints.append(
-        nodal(
-            lambda x_, u_, A=A_gate_param, Ac=A_c: cp.norm(A @ x_[:3] - Ac, "inf") <= 1,
-            nodes=[node],
-            convex=True,
-        )
+for node, cen in zip(gate_nodes, A_gate_cen):
+    A_gate_const = Constant(A_gate)
+    c_const = Constant(cen)
+    gate_constraint = (
+        (Norm(A_gate_const @ x[:3] - c_const, ord="inf") <= Constant(np.array([1.0])))
+        .convex()
+        .at([node])
     )
+    constraint_exprs.append(gate_constraint)
 
 
-@dynamics
-def dynamics(x_, u_):
-    # Unpack the state and control vectors
-    v = x_[3:6]
-    q = x_[6:10]
-    w = x_[10:13]
+# Define symbolic utility functions
+def symbolic_qdcm(q):
+    """Quaternion to Direction Cosine Matrix conversion using symbolic expressions"""
+    # Normalize quaternion
+    q_norm = Sqrt(Sum(q * q))
+    q_normalized = q / q_norm
 
-    f = u_[:3]
-    tau = u_[3:]
+    w, x, y, z = q_normalized[0], q_normalized[1], q_normalized[2], q_normalized[3]
 
-    q_norm = jnp.linalg.norm(q)
-    q = q / q_norm
+    # Create DCM elements
+    r11 = Constant(1.0) - Constant(2.0) * (y * y + z * z)
+    r12 = Constant(2.0) * (x * y - z * w)
+    r13 = Constant(2.0) * (x * z + y * w)
 
-    # Compute the time derivatives of the state variables
-    r_dot = v
-    v_dot = (1 / m) * qdcm(q) @ f + jnp.array([0, 0, g_const])
-    q_dot = 0.5 * SSMP(w) @ q
-    w_dot = jnp.diag(1 / J_b) @ (tau - SSM(w) @ jnp.diag(J_b) @ w)
-    t_dot = 1
-    return jnp.hstack([r_dot, v_dot, q_dot, w_dot, t_dot])
+    r21 = Constant(2.0) * (x * y + z * w)
+    r22 = Constant(1.0) - Constant(2.0) * (x * x + z * z)
+    r23 = Constant(2.0) * (y * z - x * w)
+
+    r31 = Constant(2.0) * (x * z - y * w)
+    r32 = Constant(2.0) * (y * z + x * w)
+    r33 = Constant(1.0) - Constant(2.0) * (x * x + y * y)
+
+    # Stack into 3x3 matrix
+    row1 = Concat(r11, r12, r13)
+    row2 = Concat(r21, r22, r23)
+    row3 = Concat(r31, r32, r33)
+
+    return Stack([row1, row2, row3])
+
+
+def symbolic_ssmp(w):
+    """Angular rate to 4x4 skew symmetric matrix for quaternion dynamics"""
+    x, y, z = w[0], w[1], w[2]
+    zero = Constant(0.0)
+
+    # Create SSMP matrix
+    row1 = Concat(zero, -x, -y, -z)
+    row2 = Concat(x, zero, z, -y)
+    row3 = Concat(y, -z, zero, x)
+    row4 = Concat(z, y, -x, zero)
+
+    return Stack([row1, row2, row3, row4])
+
+
+def symbolic_ssm(w):
+    """Angular rate to 3x3 skew symmetric matrix"""
+    x, y, z = w[0], w[1], w[2]
+    zero = Constant(0.0)
+
+    # Create SSM matrix
+    row1 = Concat(zero, -z, y)
+    row2 = Concat(z, zero, -x)
+    row3 = Concat(-y, x, zero)
+
+    return Stack([row1, row2, row3])
+
+
+def symbolic_diag(v):
+    """Create diagonal matrix from vector"""
+    if len(v) == 3:
+        zero = Constant(0.0)
+        row1 = Concat(v[0], zero, zero)
+        row2 = Concat(zero, v[1], zero)
+        row3 = Concat(zero, zero, v[2])
+        return Stack([row1, row2, row3])
+    else:
+        raise NotImplementedError("Only 3x3 diagonal matrices supported")
+
+
+# Create symbolic dynamics
+v = x[3:6]
+q = x[6:10]
+w = x[10:13]
+
+f = u[:3]
+tau = u[3:]
+
+# Compute the time derivatives of the state variables
+r_dot = v
+v_dot = (Constant(1.0 / m)) * symbolic_qdcm(q) @ f + Constant(
+    np.array([0, 0, g_const], dtype=np.float64)
+)
+q_dot = Constant(0.5) * symbolic_ssmp(w) @ q
+J_b_inv = Constant(1.0 / J_b)
+J_b_diag = symbolic_diag([Constant(J_b[0]), Constant(J_b[1]), Constant(J_b[2])])
+w_dot = symbolic_diag([J_b_inv[0], J_b_inv[1], J_b_inv[2]]) @ (tau - symbolic_ssm(w) @ J_b_diag @ w)
+t_dot = Constant(np.array([1.0], dtype=np.float64))
+dyn_expr = Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
 
 
 x_bar = np.linspace(x.initial, x.final, n)
@@ -168,10 +223,10 @@ for _ in range(n_gates + 1):
 x.guess = x_bar
 
 problem = TrajOptProblem(
-    dynamics=dynamics,
+    dynamics=dyn_expr,
     x=x,
     u=u,
-    constraints=constraints,
+    constraints=constraint_exprs,
     idx_time=len(x.max) - 1,
     N=n,
     # licq_max=1E-8
@@ -194,9 +249,9 @@ problem.settings.scp.w_tr_max_scaling_factor = 1e2  # Maximum Trust Region Weigh
 
 plotting_dict = {
     "vertices": vertices,
-    "gate_center_params": gate_center_params,
-    "A_gate_param": A_gate_param,
-    "A_gate_c_params": A_gate_c_params,
+    "gate_centers": modified_centers,
+    "A_gate": A_gate,
+    "A_gate_cen": A_gate_cen,
 }
 
 if __name__ == "__main__":
