@@ -18,6 +18,7 @@ from openscvx.backend.expr import (
     MatMul,
     Mul,
     Neg,
+    Norm,
     PositivePart,
     Sin,
     SmoothReLU,
@@ -144,6 +145,11 @@ class CvxpyLowerer:
     def visit_sum(self, node: Sum) -> cp.Expression:
         operand = self.lower(node.operand)
         return cp.sum(operand)
+
+    @visitor(Norm)
+    def visit_norm(self, node: Norm) -> cp.Expression:
+        operand = self.lower(node.operand)
+        return cp.norm(operand, node.ord)
 
     @visitor(Index)
     def visit_index(self, node: Index) -> cp.Expression:
