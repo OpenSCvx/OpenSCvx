@@ -23,9 +23,12 @@ from openscvx.backend.expr import (
     NodalConstraint,
     Norm,
     PositivePart,
+    Power,
     Sin,
     SmoothReLU,
+    Sqrt,
     Square,
+    Stack,
     Sub,
     Sum,
 )
@@ -246,3 +249,26 @@ class JaxLowerer:
     def visit_nodal_constraint(self, node: NodalConstraint):
         """Lower a NodalConstraint by lowering its underlying constraint."""
         return self.lower(node.constraint)
+
+    @visitor(Sqrt)
+    def visit_sqrt(self, node: Sqrt):
+        f = self.lower(node.operand)
+        return lambda x, u, node, **kwargs: jnp.sqrt(f(x, u, node, **kwargs))
+
+    @visitor(Power)
+    def visit_power(self, node: Power):
+        fB = self.lower(node.base)
+        fE = self.lower(node.exponent)
+        return lambda x, u, node, **kwargs: jnp.power(
+            fB(x, u, node, **kwargs), fE(x, u, node, **kwargs)
+        )
+
+    @visitor(Stack)
+    def visit_stack(self, node: Stack):
+        row_fns = [self.lower(row) for row in node.rows]
+
+        def stack_fn(x, u, node, **kwargs):
+            rows = [jnp.atleast_1d(fn(x, u, node, **kwargs)) for fn in row_fns]
+            return jnp.stack(rows, axis=0)
+
+        return stack_fn

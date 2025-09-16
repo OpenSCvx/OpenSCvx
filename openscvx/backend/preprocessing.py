@@ -22,9 +22,12 @@ from openscvx.backend.expr import (
     NodalConstraint,
     Norm,
     PositivePart,
+    Power,
     Sin,
     SmoothReLU,
+    Sqrt,
     Square,
+    Stack,
     Sub,
     Sum,
     traverse,
@@ -527,3 +530,34 @@ def visit_huber(node: Huber) -> tuple[int, ...]:
 def visit_smooth_relu(node: SmoothReLU) -> tuple[int, ...]:
     """Smooth ReLU preserves the shape of x"""
     return dispatch(node.x)
+
+
+@visitor(Sqrt)
+def visit_sqrt(node: Sqrt) -> tuple[int, ...]:
+    """sqrt preserves the shape of its operand"""
+    return dispatch(node.operand)
+
+
+@visitor(Power)
+def visit_power(node: Power) -> tuple[int, ...]:
+    """power preserves the broadcasted shape of base and exponent"""
+    return _broadcast_shape_for(node)
+
+
+@visitor(Stack)
+def visit_stack(node: Stack) -> tuple[int, ...]:
+    """Stack creates a 2D matrix from 1D rows"""
+    if not node.rows:
+        raise ValueError("Stack requires at least one row")
+
+    # All rows should have the same shape
+    row_shapes = [dispatch(row) for row in node.rows]
+
+    # Verify all rows have the same shape
+    first_shape = row_shapes[0]
+    for i, shape in enumerate(row_shapes[1:], 1):
+        if shape != first_shape:
+            raise ValueError(f"Stack row {i} has shape {shape}, but row 0 has shape {first_shape}")
+
+    # Result shape is (num_rows, *row_shape)
+    return (len(node.rows),) + first_shape

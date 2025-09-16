@@ -20,9 +20,12 @@ from openscvx.backend.expr import (
     Neg,
     Norm,
     PositivePart,
+    Power,
     Sin,
     SmoothReLU,
+    Sqrt,
     Square,
+    Stack,
     Sub,
     Sum,
 )
@@ -230,6 +233,23 @@ class CvxpyLowerer:
         pos_part = cp.maximum(operand, 0.0)
         # For SmoothReLU, we use the 2-norm formulation
         return cp.sqrt(cp.sum_squares(pos_part) + c**2) - c
+
+    @visitor(Sqrt)
+    def visit_sqrt(self, node: Sqrt) -> cp.Expression:
+        operand = self.lower(node.operand)
+        return cp.sqrt(operand)
+
+    @visitor(Power)
+    def visit_power(self, node: Power) -> cp.Expression:
+        base = self.lower(node.base)
+        exponent = self.lower(node.exponent)
+        return cp.power(base, exponent)
+
+    @visitor(Stack)
+    def visit_stack(self, node: Stack) -> cp.Expression:
+        rows = [self.lower(row) for row in node.rows]
+        # Stack rows vertically
+        return cp.vstack(rows)
 
 
 def lower_to_cvxpy(expr: Expr, variable_map: Dict[str, cp.Expression] = None) -> cp.Expression:

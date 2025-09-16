@@ -21,9 +21,12 @@ from openscvx.backend.expr import (
     NodalConstraint,
     Norm,
     PositivePart,
+    Power,
     Sin,
     SmoothReLU,
+    Sqrt,
     Square,
+    Stack,
     Sub,
     Sum,
 )
@@ -242,3 +245,22 @@ class Canonicalizer:
         # Canonicalize the inner constraint but preserve CTCS parameters
         canon_constraint = self.canonicalize(node.constraint)
         return CTCS(canon_constraint, penalty=node.penalty, nodes=node.nodes)
+
+    @visitor(Sqrt)
+    def visit_sqrt(self, node: Sqrt) -> Expr:
+        # Canonicalize the operand
+        operand = self.canonicalize(node.operand)
+        return Sqrt(operand)
+
+    @visitor(Power)
+    def visit_power(self, node: Power) -> Expr:
+        # Canonicalize both operands
+        base = self.canonicalize(node.base)
+        exponent = self.canonicalize(node.exponent)
+        return Power(base, exponent)
+
+    @visitor(Stack)
+    def visit_stack(self, node: Stack) -> Expr:
+        # Canonicalize all rows
+        rows = [self.canonicalize(row) for row in node.rows]
+        return Stack(rows)

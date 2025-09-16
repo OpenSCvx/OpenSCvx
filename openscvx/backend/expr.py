@@ -228,7 +228,45 @@ class Cos(Expr):
         return [self.operand]
 
     def __repr__(self):
-        return f"(sin{self.operand!r})"
+        return f"(cos{self.operand!r})"
+
+
+class Sqrt(Expr):
+    def __init__(self, operand):
+        self.operand = to_expr(operand)
+
+    def children(self):
+        return [self.operand]
+
+    def __repr__(self):
+        return f"sqrt({self.operand!r})"
+
+
+class Power(Expr):
+    def __init__(self, base, exponent):
+        self.base = to_expr(base)
+        self.exponent = to_expr(exponent)
+
+    def children(self):
+        return [self.base, self.exponent]
+
+    def __repr__(self):
+        return f"({self.base!r})**({self.exponent!r})"
+
+
+class Stack(Expr):
+    """Stack expressions into a matrix - similar to jnp.array([[row1], [row2], ...])"""
+
+    def __init__(self, rows):
+        # rows should be a list of expressions representing each row
+        self.rows = [to_expr(row) for row in rows]
+
+    def children(self):
+        return self.rows
+
+    def __repr__(self):
+        rows_repr = ", ".join(repr(row) for row in self.rows)
+        return f"Stack([{rows_repr}])"
 
 
 # class Literal(Expr):
