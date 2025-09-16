@@ -16,6 +16,7 @@ from openscvx.backend.expr import (
     MatMul,
     Mul,
     Neg,
+    Norm,
     PositivePart,
     Sin,
     SmoothReLU,
@@ -83,13 +84,21 @@ class TestCvxpyLowerer:
         result = lowerer.lower(u)
         assert result is u_cvx
 
-    def test_missing_variable_error(self):
-        """Test error when variable not in map"""
+    def test_missing_state_variable_error(self):
+        """Test error when state vector not in map"""
         lowerer = CvxpyLowerer({})
         x = State("missing", shape=(3,))
 
-        with pytest.raises(ValueError, match="State variable 'missing' not found"):
+        with pytest.raises(ValueError, match="State vector 'x' not found"):
             lowerer.lower(x)
+
+    def test_missing_control_variable_error(self):
+        """Test error when control vector not in map"""
+        lowerer = CvxpyLowerer({})
+        u = Control("thrust", shape=(2,))
+
+        with pytest.raises(ValueError, match="Control vector 'u' not found"):
+            lowerer.lower(u)
 
     def test_add(self):
         """Test addition expressions"""
@@ -176,6 +185,54 @@ class TestCvxpyLowerer:
 
         x = State("x", shape=(3,))
         expr = Sum(x)
+
+        result = lowerer.lower(expr)
+        assert isinstance(result, cp.Expression)
+
+    def test_norm_l2(self):
+        """Test L2 norm operation"""
+        x_cvx = cp.Variable(3, name="x")
+        variable_map = {"x": x_cvx}
+        lowerer = CvxpyLowerer(variable_map)
+
+        x = State("x", shape=(3,))
+        expr = Norm(x, ord=2)
+
+        result = lowerer.lower(expr)
+        assert isinstance(result, cp.Expression)
+
+    def test_norm_l1(self):
+        """Test L1 norm operation"""
+        x_cvx = cp.Variable(3, name="x")
+        variable_map = {"x": x_cvx}
+        lowerer = CvxpyLowerer(variable_map)
+
+        x = State("x", shape=(3,))
+        expr = Norm(x, ord=1)
+
+        result = lowerer.lower(expr)
+        assert isinstance(result, cp.Expression)
+
+    def test_norm_inf(self):
+        """Test infinity norm operation"""
+        x_cvx = cp.Variable(3, name="x")
+        variable_map = {"x": x_cvx}
+        lowerer = CvxpyLowerer(variable_map)
+
+        x = State("x", shape=(3,))
+        expr = Norm(x, ord="inf")
+
+        result = lowerer.lower(expr)
+        assert isinstance(result, cp.Expression)
+
+    def test_norm_fro(self):
+        """Test Frobenius norm operation"""
+        x_cvx = cp.Variable((2, 3), name="x")
+        variable_map = {"x": x_cvx}
+        lowerer = CvxpyLowerer(variable_map)
+
+        x = State("x", shape=(6,))  # Flattened 2x3 matrix
+        expr = Norm(x, ord="fro")
 
         result = lowerer.lower(expr)
         assert isinstance(result, cp.Expression)
@@ -389,3 +446,51 @@ class TestCvxpyLowerer:
 
         result = lowerer.lower(expr)
         assert isinstance(result, cp.Expression)
+
+    def test_standardized_variable_mapping(self):
+        """Test the new standardized variable mapping approach using 'x' and 'u' keys"""
+        # Single time step variables (like used in lower_convex_constraints)
+        x_node = cp.Variable(6, name="x")  # State vector at a specific node
+        u_node = cp.Variable(3, name="u")  # Control vector at a specific node
+        variable_map = {"x": x_node, "u": u_node}
+        lowerer = CvxpyLowerer(variable_map)
+
+        # Create symbolic variables with slices (simulating preprocessing)
+        position = State("position", shape=(3,))
+        velocity = State("velocity", shape=(3,))
+        thrust = Control("thrust", shape=(3,))
+
+        # Assign slices as preprocessing would do
+        position._slice = slice(0, 3)
+        velocity._slice = slice(3, 6)
+        thrust._slice = slice(0, 3)
+
+        # Test that variables correctly map to their sliced portions
+        pos_result = lowerer.lower(position)
+        vel_result = lowerer.lower(velocity)
+        thrust_result = lowerer.lower(thrust)
+
+        # All should be CVXPy expressions
+        assert isinstance(pos_result, cp.Expression)
+        assert isinstance(vel_result, cp.Expression)
+        assert isinstance(thrust_result, cp.Expression)
+
+    def test_gate_constraint_example(self):
+        """Test a gate constraint similar to the drone example"""
+        # CVXPy variables for a single node (like in lower_convex_constraints)
+        x_node = cp.Variable(3, name="x")  # 3D position at node k
+        variable_map = {"x": x_node}
+        lowerer = CvxpyLowerer(variable_map)
+
+        # Create symbolic position variable
+        position = State("position", shape=(3,))
+        position._slice = slice(0, 3)
+
+        # Gate constraint: ||A @ position - center||_inf <= 1
+        A = Constant(np.eye(3))
+        center = Constant(np.array([1.0, 2.0, 3.0]))
+        gate_expr = Norm(MatMul(A, position) - center, ord="inf")
+        constraint = Inequality(gate_expr, Constant(1.0))
+
+        result = lowerer.lower(constraint)
+        assert isinstance(result, cp.Constraint)
