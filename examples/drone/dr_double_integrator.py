@@ -82,8 +82,10 @@ for node, cen in zip(gate_nodes, A_gate_cen):
     A_gate_const = Constant(A_gate)
     c_const = Constant(cen)
     gate_constraint = (
-        Norm(A_gate_const @ x[:3] - c_const, ord="inf") <= Constant(np.array([1.0]))
-    ).convex().at([node])
+        (Norm(A_gate_const @ x[:3] - c_const, ord="inf") <= Constant(np.array([1.0])))
+        .convex()
+        .at([node])
+    )
     constraint_exprs.append(gate_constraint)
 
 
