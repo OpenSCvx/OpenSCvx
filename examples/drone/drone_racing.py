@@ -97,9 +97,11 @@ for center in initial_gate_centers:
     modified_center[2] = modified_center[2] + 2.5
     modified_centers.append(modified_center)
 
-A_gate_cen = []
+# Create symbolic parameters matching original structure
+A_gate_const = Constant(A_gate)
+A_gate_c_params = []
 for modified_center in modified_centers:
-    A_gate_cen.append(A_gate @ modified_center)
+    A_gate_c_params.append(Constant(A_gate @ modified_center))
 
 nodes_per_gate = 2
 gate_nodes = np.arange(nodes_per_gate, n, nodes_per_gate)
@@ -109,20 +111,16 @@ for modified_center in modified_centers:  # Use modified centers for vertices
 ### End Gate Parameters ###
 
 
-constraint_exprs = [
-    ctcs(x <= Constant(np.array([x.max]))),
-    ctcs(Constant(np.array([x.min])) <= x),
+constraints = [
+    ctcs(x <= Constant(x.max)),
+    ctcs(Constant(x.min) <= x),
 ]
 
-for node, cen in zip(gate_nodes, A_gate_cen):
-    A_gate_const = Constant(A_gate)
-    c_const = Constant(cen)
+for node, A_c in zip(gate_nodes, A_gate_c_params):
     gate_constraint = (
-        (Norm(A_gate_const @ x[:3] - c_const, ord="inf") <= Constant(np.array([1.0])))
-        .convex()
-        .at([node])
+        (Norm(A_gate_const @ x[:3] - A_c, ord="inf") <= Constant(1.0)).convex().at([node])
     )
-    constraint_exprs.append(gate_constraint)
+    constraints.append(gate_constraint)
 
 
 # Define symbolic utility functions
@@ -218,7 +216,9 @@ tau = u[3:]
 
 # Option 2: Efficient dynamics using direct JAX lowering (better performance)
 r_dot = v
-v_dot = (Constant(1.0 / m)) * QDCM(q_normalized) @ f + Constant(np.array([0, 0, g_const], dtype=np.float64))
+v_dot = (Constant(1.0 / m)) * QDCM(q_normalized) @ f + Constant(
+    np.array([0, 0, g_const], dtype=np.float64)
+)
 q_dot = Constant(0.5) * SSMP(w) @ q_normalized
 J_b_inv = Constant(1.0 / J_b)
 J_b_diag = Diag(Constant(J_b))
@@ -251,7 +251,7 @@ problem = TrajOptProblem(
     dynamics=dyn_expr,
     x=x,
     u=u,
-    constraints=constraint_exprs,
+    constraints=constraints,
     idx_time=len(x.max) - 1,
     N=n,
     # licq_max=1E-8
@@ -275,8 +275,8 @@ problem.settings.scp.w_tr_max_scaling_factor = 1e2  # Maximum Trust Region Weigh
 plotting_dict = {
     "vertices": vertices,
     "gate_centers": modified_centers,
-    "A_gate": A_gate,
-    "A_gate_cen": A_gate_cen,
+    "A_gate": A_gate_const,
+    "A_gate_c_params": A_gate_c_params,
 }
 
 if __name__ == "__main__":
