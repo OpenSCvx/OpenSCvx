@@ -164,13 +164,17 @@ class Canonicalizer:
     def visit_inequality(self, node: Inequality) -> Expr:
         diff = Sub(node.lhs, node.rhs)
         canon_diff = self.canonicalize(diff)
-        return Inequality(canon_diff, Constant(np.array(0)))
+        new_ineq = Inequality(canon_diff, Constant(np.array(0)))
+        new_ineq.is_convex = node.is_convex  # Preserve convex flag
+        return new_ineq
 
     @visitor(Equality)
     def visit_equality(self, node: Equality) -> Expr:
         diff = Sub(node.lhs, node.rhs)
         canon_diff = self.canonicalize(diff)
-        return Equality(canon_diff, Constant(np.array(0)))
+        new_eq = Equality(canon_diff, Constant(np.array(0)))
+        new_eq.is_convex = node.is_convex  # Preserve convex flag
+        return new_eq
 
     @visitor(Norm)
     def visit_norm(self, node: Norm) -> Expr:
