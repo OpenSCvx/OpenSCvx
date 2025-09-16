@@ -197,6 +197,8 @@ def symbolic_diag(v):
 # Create symbolic dynamics
 v = x[3:6]
 q = x[6:10]
+q_norm = Norm(q)  # Cleaner than Sqrt(Sum(q * q))
+q_normalized = q / q_norm
 w = x[10:13]
 
 f = u[:3]
@@ -216,8 +218,8 @@ tau = u[3:]
 
 # Option 2: Efficient dynamics using direct JAX lowering (better performance)
 r_dot = v
-v_dot = (Constant(1.0 / m)) * QDCM(q) @ f + Constant(np.array([0, 0, g_const], dtype=np.float64))
-q_dot = Constant(0.5) * SSMP(w) @ q
+v_dot = (Constant(1.0 / m)) * QDCM(q_normalized) @ f + Constant(np.array([0, 0, g_const], dtype=np.float64))
+q_dot = Constant(0.5) * SSMP(w) @ q_normalized
 J_b_inv = Constant(1.0 / J_b)
 J_b_diag = Diag(Constant(J_b))
 w_dot = Diag(J_b_inv) @ (tau - SSM(w) @ J_b_diag @ w)
