@@ -10,7 +10,20 @@ sys.path.append(grandparent_dir)
 
 from examples.plotting import plot_animation
 from openscvx.backend.control import Control
-from openscvx.backend.expr import Concat, Constant, Norm, Power, Sqrt, Stack, Sum, ctcs
+from openscvx.backend.expr import (
+    QDCM,
+    SSM,
+    SSMP,
+    Concat,
+    Constant,
+    Diag,
+    Norm,
+    Power,
+    Sqrt,
+    Stack,
+    Sum,
+    ctcs,
+)
 from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.utils import gen_vertices, rot
@@ -189,15 +202,25 @@ w = x[10:13]
 f = u[:3]
 tau = u[3:]
 
-# Compute the time derivatives of the state variables
+# Option 1: Full symbolic dynamics (more flexible but potentially slower)
+# r_dot = v
+# v_dot = (Constant(1.0 / m)) * symbolic_qdcm(q) @ f + Constant(
+#     np.array([0, 0, g_const], dtype=np.float64)
+# )
+# q_dot = Constant(0.5) * symbolic_ssmp(w) @ q
+# J_b_inv = Constant(1.0 / J_b)
+# J_b_diag = symbolic_diag([Constant(J_b[0]), Constant(J_b[1]), Constant(J_b[2])])
+# w_dot = symbolic_diag([J_b_inv[0], J_b_inv[1], J_b_inv[2]]) @ (tau - symbolic_ssm(w) @ J_b_diag @ w)
+# t_dot = Constant(np.array([1.0], dtype=np.float64))
+# dyn_expr = Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
+
+# Option 2: Efficient dynamics using direct JAX lowering (better performance)
 r_dot = v
-v_dot = (Constant(1.0 / m)) * symbolic_qdcm(q) @ f + Constant(
-    np.array([0, 0, g_const], dtype=np.float64)
-)
-q_dot = Constant(0.5) * symbolic_ssmp(w) @ q
+v_dot = (Constant(1.0 / m)) * QDCM(q) @ f + Constant(np.array([0, 0, g_const], dtype=np.float64))
+q_dot = Constant(0.5) * SSMP(w) @ q
 J_b_inv = Constant(1.0 / J_b)
-J_b_diag = symbolic_diag([Constant(J_b[0]), Constant(J_b[1]), Constant(J_b[2])])
-w_dot = symbolic_diag([J_b_inv[0], J_b_inv[1], J_b_inv[2]]) @ (tau - symbolic_ssm(w) @ J_b_diag @ w)
+J_b_diag = Diag(Constant(J_b))
+w_dot = Diag(J_b_inv) @ (tau - SSM(w) @ J_b_diag @ w)
 t_dot = Constant(np.array([1.0], dtype=np.float64))
 dyn_expr = Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
 
