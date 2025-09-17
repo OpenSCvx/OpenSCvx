@@ -34,6 +34,7 @@ from openscvx.backend.expr import (
     Stack,
     Sub,
     Sum,
+    Transpose,
     Vstack,
 )
 from openscvx.backend.state import State
@@ -306,3 +307,14 @@ class Canonicalizer:
         # Canonicalize all arrays
         arrays = [self.canonicalize(arr) for arr in node.arrays]
         return Vstack(arrays)
+
+    @visitor(Transpose)
+    def visit_transpose(self, node: Transpose) -> Expr:
+        # Canonicalize the operand
+        operand = self.canonicalize(node.operand)
+
+        # Double transpose optimization: (A.T).T = A
+        if isinstance(operand, Transpose):
+            return operand.operand
+
+        return Transpose(operand)

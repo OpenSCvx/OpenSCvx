@@ -36,6 +36,7 @@ from openscvx.backend.expr import (
     Stack,
     Sub,
     Sum,
+    Transpose,
     Vstack,
 )
 from openscvx.backend.state import State
@@ -260,6 +261,11 @@ class JaxLowerer:
     def visit_sqrt(self, node: Sqrt):
         f = self.lower(node.operand)
         return lambda x, u, node, **kwargs: jnp.sqrt(f(x, u, node, **kwargs))
+
+    @visitor(Transpose)
+    def visit_transpose(self, node: Transpose):
+        f = self.lower(node.operand)
+        return lambda x, u, node, **kwargs: jnp.transpose(f(x, u, node, **kwargs))
 
     @visitor(Power)
     def visit_power(self, node: Power):

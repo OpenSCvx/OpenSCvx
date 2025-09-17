@@ -28,6 +28,7 @@ from openscvx.backend.expr import (
     Stack,
     Sub,
     Sum,
+    Transpose,
 )
 from openscvx.backend.state import State
 
@@ -238,6 +239,11 @@ class CvxpyLowerer:
     def visit_sqrt(self, node: Sqrt) -> cp.Expression:
         operand = self.lower(node.operand)
         return cp.sqrt(operand)
+
+    @visitor(Transpose)
+    def visit_transpose(self, node: Transpose) -> cp.Expression:
+        operand = self.lower(node.operand)
+        return operand.T
 
     @visitor(Power)
     def visit_power(self, node: Power) -> cp.Expression:

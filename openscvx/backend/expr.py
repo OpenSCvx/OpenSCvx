@@ -60,6 +60,10 @@ class Expr:
     def __getitem__(self, idx):
         return Index(self, idx)
 
+    @property
+    def T(self):
+        return Transpose(self)
+
     def children(self):
         return []
 
@@ -246,6 +250,19 @@ class Sqrt(Expr):
 
     def __repr__(self):
         return f"sqrt({self.operand!r})"
+
+
+class Transpose(Expr):
+    """Matrix transpose operation"""
+
+    def __init__(self, operand):
+        self.operand = to_expr(operand)
+
+    def children(self):
+        return [self.operand]
+
+    def __repr__(self):
+        return f"({self.operand!r}).T"
 
 
 class Power(Expr):

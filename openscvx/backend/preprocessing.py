@@ -35,6 +35,7 @@ from openscvx.backend.expr import (
     Stack,
     Sub,
     Sum,
+    Transpose,
     Vstack,
     traverse,
 )
@@ -671,3 +672,23 @@ def visit_vstack(node: Vstack) -> tuple[int, ...]:
     # Result shape: concatenate along axis 0 (rows)
     total_rows = sum(shape[0] for shape in array_shapes)
     return (total_rows,) + first_shape[1:]
+
+
+@visitor(Transpose)
+def visit_transpose(node: Transpose) -> tuple[int, ...]:
+    """Matrix transpose operation swaps the last two dimensions"""
+    operand_shape = dispatch(node.operand)
+
+    if len(operand_shape) == 0:
+        # Scalar transpose is the scalar itself
+        return ()
+    elif len(operand_shape) == 1:
+        # Vector transpose is the vector itself (row vector remains row vector)
+        return operand_shape
+    elif len(operand_shape) == 2:
+        # Matrix transpose: (m,n) -> (n,m)
+        return (operand_shape[1], operand_shape[0])
+    else:
+        # Higher-dimensional array: transpose last two dimensions
+        # (..., m, n) -> (..., n, m)
+        return operand_shape[:-2] + (operand_shape[-1], operand_shape[-2])
