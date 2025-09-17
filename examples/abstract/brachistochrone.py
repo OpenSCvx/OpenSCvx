@@ -42,15 +42,10 @@ y_dot = -x[2] * Cos(u[0])
 v_dot = g * Cos(u[0])
 t_dot = 1
 dyn_expr = Concat(x_dot, y_dot, v_dot, t_dot)
-# constraint_exprs = [
-#     ctcs(x <= Constant(np.array([x.max]))),
-#     ctcs(Constant(np.array([x.min])) <= x),
-# ]
-constraint_exprs = []
-# Break down vector constraints into individual scalar constraints
-for i in range(4):
-    constraint_exprs.append(x[i] <= Constant(x.max[i]))
-    constraint_exprs.append(Constant(x.min[i]) <= x[i])
+constraint_exprs = [
+    ctcs(x <= Constant(x.max)),
+    ctcs(Constant(x.min) <= x),
+]
 
 problem = TrajOptProblem(
     dynamics=dyn_expr,
@@ -84,5 +79,5 @@ if __name__ == "__main__":
 
     results.update(plotting_dict)
 
-    plot_brachistochrone_position(results).show()
-    plot_brachistochrone_velocity(results).show()
+    # plot_brachistochrone_position(results).show()
+    # plot_brachistochrone_velocity(results).show()
