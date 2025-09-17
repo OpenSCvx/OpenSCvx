@@ -84,7 +84,7 @@ def test_power_operator_and_node():
     a, b = Constant(2), Constant(3)
 
     # Test ** operator
-    pow1 = a ** b
+    pow1 = a**b
     assert isinstance(pow1, Power)
     assert pow1.children() == [a, b]
     assert repr(pow1) == "(Const(2))**(Const(3))"
@@ -101,7 +101,7 @@ def test_power_with_mixed_types():
     x = Variable("x", shape=(1,))
 
     # Expression ** numeric
-    pow1 = x ** 2
+    pow1 = x**2
     assert isinstance(pow1, Power)
     assert pow1.base is x
     assert isinstance(pow1.exponent, Constant)
@@ -109,7 +109,7 @@ def test_power_with_mixed_types():
     assert repr(pow1) == "(Var('x'))**(Const(2))"
 
     # Numeric ** expression (rpow)
-    pow2 = 10 ** x
+    pow2 = 10**x
     assert isinstance(pow2, Power)
     assert isinstance(pow2.base, Constant)
     assert pow2.base.value == 10
