@@ -16,6 +16,7 @@ from openscvx.backend.expr import (
     Div,
     Equality,
     Expr,
+    Hstack,
     Huber,
     Index,
     Inequality,
@@ -33,6 +34,7 @@ from openscvx.backend.expr import (
     Stack,
     Sub,
     Sum,
+    Vstack,
 )
 from openscvx.backend.state import State
 
@@ -292,3 +294,15 @@ class Canonicalizer:
         # Canonicalize the operand
         operand = self.canonicalize(node.operand)
         return Diag(operand)
+
+    @visitor(Hstack)
+    def visit_hstack(self, node: Hstack) -> Expr:
+        # Canonicalize all arrays
+        arrays = [self.canonicalize(arr) for arr in node.arrays]
+        return Hstack(arrays)
+
+    @visitor(Vstack)
+    def visit_vstack(self, node: Vstack) -> Expr:
+        # Canonicalize all arrays
+        arrays = [self.canonicalize(arr) for arr in node.arrays]
+        return Vstack(arrays)

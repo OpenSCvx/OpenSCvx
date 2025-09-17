@@ -17,6 +17,7 @@ from openscvx.backend.expr import (
     Div,
     Equality,
     Expr,
+    Hstack,
     Huber,
     Index,
     Inequality,
@@ -34,6 +35,7 @@ from openscvx.backend.expr import (
     Stack,
     Sub,
     Sum,
+    Vstack,
     traverse,
 )
 from openscvx.backend.state import State
@@ -602,3 +604,70 @@ def visit_diag(node: Diag) -> tuple[int, ...]:
         raise ValueError(f"Diag expects a 1D vector, got shape {operand_shape}")
     n = operand_shape[0]
     return (n, n)
+
+
+@visitor(Hstack)
+def visit_hstack(node: Hstack) -> tuple[int, ...]:
+    """Horizontal stack concatenates arrays along the second axis (columns)"""
+    if not node.arrays:
+        raise ValueError("Hstack requires at least one array")
+
+    array_shapes = [dispatch(arr) for arr in node.arrays]
+
+    # All arrays must have the same number of dimensions
+    first_ndim = len(array_shapes[0])
+    for i, shape in enumerate(array_shapes[1:], 1):
+        if len(shape) != first_ndim:
+            raise ValueError(
+                f"Hstack array {i} has {len(shape)} dimensions, but array 0 has {first_ndim}"
+            )
+
+    # For 1D arrays, hstack concatenates along axis 0
+    if first_ndim == 1:
+        total_length = sum(shape[0] for shape in array_shapes)
+        return (total_length,)
+
+    # For 2D+ arrays, all dimensions except the second must match
+    first_shape = array_shapes[0]
+    for i, shape in enumerate(array_shapes[1:], 1):
+        if shape[0] != first_shape[0]:
+            raise ValueError(
+                f"Hstack array {i} has {shape[0]} rows, but array 0 has {first_shape[0]} rows"
+            )
+        if shape[2:] != first_shape[2:]:
+            raise ValueError(
+                f"Hstack array {i} has trailing dimensions {shape[2:]}, but array 0 has {first_shape[2:]}"
+            )
+
+    # Result shape: concatenate along axis 1 (columns)
+    total_cols = sum(shape[1] for shape in array_shapes)
+    return (first_shape[0], total_cols) + first_shape[2:]
+
+
+@visitor(Vstack)
+def visit_vstack(node: Vstack) -> tuple[int, ...]:
+    """Vertical stack concatenates arrays along the first axis (rows)"""
+    if not node.arrays:
+        raise ValueError("Vstack requires at least one array")
+
+    array_shapes = [dispatch(arr) for arr in node.arrays]
+
+    # All arrays must have the same number of dimensions
+    first_ndim = len(array_shapes[0])
+    for i, shape in enumerate(array_shapes[1:], 1):
+        if len(shape) != first_ndim:
+            raise ValueError(
+                f"Vstack array {i} has {len(shape)} dimensions, but array 0 has {first_ndim}"
+            )
+
+    # All dimensions except the first must match
+    first_shape = array_shapes[0]
+    for i, shape in enumerate(array_shapes[1:], 1):
+        if shape[1:] != first_shape[1:]:
+            raise ValueError(
+                f"Vstack array {i} has trailing dimensions {shape[1:]}, but array 0 has {first_shape[1:]}"
+            )
+
+    # Result shape: concatenate along axis 0 (rows)
+    total_rows = sum(shape[0] for shape in array_shapes)
+    return (total_rows,) + first_shape[1:]

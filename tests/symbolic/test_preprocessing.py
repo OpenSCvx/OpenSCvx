@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from openscvx.backend.control import Control
-from openscvx.backend.expr import Add, Concat, Constant
+from openscvx.backend.expr import Add, Concat, Constant, Hstack, Vstack
 from openscvx.backend.preprocessing import (
     collect_and_assign_slices,
     validate_constraints_at_root,
@@ -769,3 +769,51 @@ def test_constant_normalization_preserves_dtype():
     assert scalar_float.value.dtype == np.float64
     assert scalar_int.value == 42
     assert scalar_float.value == 3.14
+
+
+def test_hstack_basic_passes():
+    """Test basic horizontal stacking functionality"""
+    a = Constant(np.array([1.0, 2.0]))  # (2,)
+    b = Constant(np.array([3.0, 4.0, 5.0]))  # (3,)
+
+    stacked = Hstack([a, b])
+    validate_shapes(stacked)
+
+    from openscvx.backend.preprocessing import dispatch
+
+    result_shape = dispatch(stacked)
+    assert result_shape == (5,)  # 2 + 3 = 5
+
+
+def test_hstack_dimension_mismatch_raises():
+    """Test that arrays with different numbers of dimensions raise error"""
+    a = Constant(np.zeros((2,)))  # 1D
+    b = Constant(np.ones((2, 3)))  # 2D
+
+    with pytest.raises(ValueError) as exc:
+        validate_shapes(Hstack([a, b]))
+    assert "dimensions" in str(exc.value)
+
+
+def test_vstack_basic_passes():
+    """Test basic vertical stacking functionality"""
+    a = Constant(np.zeros((2, 3)))  # (2, 3)
+    b = Constant(np.ones((4, 3)))  # (4, 3)
+
+    stacked = Vstack([a, b])
+    validate_shapes(stacked)
+
+    from openscvx.backend.preprocessing import dispatch
+
+    result_shape = dispatch(stacked)
+    assert result_shape == (6, 3)  # 2 + 4 = 6 rows
+
+
+def test_vstack_trailing_dimension_mismatch_raises():
+    """Test that arrays with mismatched trailing dimensions raise error"""
+    a = Constant(np.zeros((2, 3)))  # (2, 3)
+    b = Constant(np.ones((4, 5)))  # (4, 5) - different second dim
+
+    with pytest.raises(ValueError) as exc:
+        validate_shapes(Vstack([a, b]))
+    assert "trailing dimensions" in str(exc.value)

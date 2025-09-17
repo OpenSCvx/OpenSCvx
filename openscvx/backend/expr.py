@@ -269,6 +269,34 @@ class Stack(Expr):
         return f"Stack([{rows_repr}])"
 
 
+class Hstack(Expr):
+    """Horizontal stack"""
+
+    def __init__(self, arrays):
+        self.arrays = [to_expr(arr) for arr in arrays]
+
+    def children(self):
+        return self.arrays
+
+    def __repr__(self):
+        arrays_repr = ", ".join(repr(arr) for arr in self.arrays)
+        return f"Hstack([{arrays_repr}])"
+
+
+class Vstack(Expr):
+    """Vertical stack"""
+
+    def __init__(self, arrays):
+        self.arrays = [to_expr(arr) for arr in arrays]
+
+    def children(self):
+        return self.arrays
+
+    def __repr__(self):
+        arrays_repr = ", ".join(repr(arr) for arr in self.arrays)
+        return f"Vstack([{arrays_repr}])"
+
+
 # class Literal(Expr):
 #     """Represents a literal value in an expression."""
 
