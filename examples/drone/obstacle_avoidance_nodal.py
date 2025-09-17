@@ -130,11 +130,9 @@ for center, A in zip(obstacle_centers, A_obs):
     A_const = Constant(A)
     pos = x[:3]
 
-    # Obstacle constraint: (pos - center)^T @ A @ (pos - center) <= 1
-    # Equivalent to: 1 - (pos - center)^T @ A @ (pos - center) >= 0
+    # Obstacle constraint: (pos - center)^T @ A @ (pos - center) >= 1
     diff = pos - center_const
-    constraint_expr = Constant(1.0) - diff.T @ A_const @ diff
-    obstacle_constraint = (constraint_expr >= Constant(0.0)).nonconvex()
+    obstacle_constraint = 1.0 <= diff.T @ A_const @ diff
     constraints.append(obstacle_constraint)
 
 x.guess = np.linspace(x.initial, x.final, n)
