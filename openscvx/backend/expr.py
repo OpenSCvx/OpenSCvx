@@ -51,6 +51,12 @@ class Expr:
     def __neg__(self):
         return Neg(self)
 
+    def __pow__(self, other):
+        return Power(self, to_expr(other))
+
+    def __rpow__(self, other):
+        return Power(to_expr(other), self)
+
     def __getitem__(self, idx):
         return Index(self, idx)
 

@@ -12,6 +12,7 @@ from openscvx.backend.expr import (
     MatMul,
     Mul,
     Neg,
+    Power,
     Sub,
     Sum,
     ctcs,
@@ -76,6 +77,44 @@ def test_basic_arithmetic_nodes_and_children_repr():
     assert repr(mul) == "(Const(2) * Const(3))"
     assert repr(div) == "(Const(2) / Const(3))"
     assert repr(neg) == "(-Const(2))"
+
+
+def test_power_operator_and_node():
+    """Test power operation using ** operator and Power node."""
+    a, b = Constant(2), Constant(3)
+
+    # Test ** operator
+    pow1 = a ** b
+    assert isinstance(pow1, Power)
+    assert pow1.children() == [a, b]
+    assert repr(pow1) == "(Const(2))**(Const(3))"
+
+    # Test direct Power node creation
+    pow2 = Power(a, b)
+    assert isinstance(pow2, Power)
+    assert pow2.children() == [a, b]
+    assert repr(pow2) == "(Const(2))**(Const(3))"
+
+
+def test_power_with_mixed_types():
+    """Test power operation with mixed numeric and expression types."""
+    x = Variable("x", shape=(1,))
+
+    # Expression ** numeric
+    pow1 = x ** 2
+    assert isinstance(pow1, Power)
+    assert pow1.base is x
+    assert isinstance(pow1.exponent, Constant)
+    assert pow1.exponent.value == 2
+    assert repr(pow1) == "(Var('x'))**(Const(2))"
+
+    # Numeric ** expression (rpow)
+    pow2 = 10 ** x
+    assert isinstance(pow2, Power)
+    assert isinstance(pow2.base, Constant)
+    assert pow2.base.value == 10
+    assert pow2.exponent is x
+    assert repr(pow2) == "(Const(10))**(Var('x'))"
 
 
 def test_matmul_vector_and_matrix():
