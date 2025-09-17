@@ -18,6 +18,7 @@ from openscvx.backend.expr import (
     Div,
     Equality,
     Expr,
+    Hstack,
     Huber,
     Index,
     Inequality,
@@ -35,6 +36,7 @@ from openscvx.backend.expr import (
     Stack,
     Sub,
     Sum,
+    Vstack,
 )
 from openscvx.backend.state import State
 
@@ -276,6 +278,26 @@ class JaxLowerer:
             return jnp.stack(rows, axis=0)
 
         return stack_fn
+
+    @visitor(Hstack)
+    def visit_hstack(self, node: Hstack):
+        array_fns = [self.lower(arr) for arr in node.arrays]
+
+        def hstack_fn(x, u, node, **kwargs):
+            arrays = [jnp.atleast_1d(fn(x, u, node, **kwargs)) for fn in array_fns]
+            return jnp.hstack(arrays)
+
+        return hstack_fn
+
+    @visitor(Vstack)
+    def visit_vstack(self, node: Vstack):
+        array_fns = [self.lower(arr) for arr in node.arrays]
+
+        def vstack_fn(x, u, node, **kwargs):
+            arrays = [jnp.atleast_1d(fn(x, u, node, **kwargs)) for fn in array_fns]
+            return jnp.vstack(arrays)
+
+        return vstack_fn
 
     @visitor(QDCM)
     def visit_qdcm(self, node: QDCM):

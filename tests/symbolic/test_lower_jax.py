@@ -15,6 +15,7 @@ from openscvx.backend.expr import (
     Div,
     Equality,
     Expr,
+    Hstack,
     Huber,
     Inequality,
     MatMul,
@@ -28,6 +29,7 @@ from openscvx.backend.expr import (
     Stack,
     Sub,
     Sum,
+    Vstack,
 )
 from openscvx.backend.lower import lower, lower_to_jax
 from openscvx.backend.lowerers.jax import JaxLowerer
@@ -340,6 +342,77 @@ def test_lower_to_jax_double_integrator():
 
     assert jnp.allclose(xdot, expected)
     assert xdot.shape == (6,)
+
+
+def test_hstack_constants():
+    """Test Hstack with constant arrays."""
+    arr1 = Constant(np.array([1.0, 2.0]))
+    arr2 = Constant(np.array([3.0, 4.0, 5.0]))
+    expr = Hstack([arr1, arr2])
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None)
+
+    expected = jnp.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    assert jnp.allclose(result, expected)
+    assert result.shape == (5,)
+
+
+def test_hstack_states_and_controls():
+    """Test Hstack with state and control variables."""
+    x = jnp.array([10.0, 20.0, 30.0])
+    u = jnp.array([40.0, 50.0])
+
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+    control = Control("u", (2,))
+    control._slice = slice(0, 2)
+
+    # Stack: [state[0:2], control, constant]
+    const = Constant(np.array([60.0]))
+    expr = Hstack([state[0:2], control, const])
+
+    fn = lower_to_jax(expr)
+    result = fn(x, u, None)
+
+    expected = jnp.array([10.0, 20.0, 40.0, 50.0, 60.0])
+    assert jnp.allclose(result, expected)
+    assert result.shape == (5,)
+
+
+def test_vstack_constants():
+    """Test Vstack with constant arrays."""
+    arr1 = Constant(np.array([[1.0, 2.0]]))  # (1, 2)
+    arr2 = Constant(np.array([[3.0, 4.0], [5.0, 6.0]]))  # (2, 2)
+    expr = Vstack([arr1, arr2])
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None)
+
+    expected = jnp.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+    assert jnp.allclose(result, expected)
+    assert result.shape == (3, 2)
+
+
+def test_vstack_vectors():
+    """Test Vstack with vector arrays (promotes to 2D)."""
+    x = jnp.array([10.0, 20.0, 30.0, 40.0])
+
+    state = State("x", (4,))
+    state._slice = slice(0, 4)
+
+    # Split state into two parts and stack vertically
+    part1 = state[0:2]  # [10, 20]
+    part2 = state[2:4]  # [30, 40]
+    expr = Vstack([part1, part2])
+
+    fn = lower_to_jax(expr)
+    result = fn(x, None, None)
+
+    # vstack promotes 1D arrays to 2D: [[10, 20], [30, 40]]
+    expected = jnp.array([[10.0, 20.0], [30.0, 40.0]])
+    assert jnp.allclose(result, expected)
+    assert result.shape == (2, 2)
 
 
 def test_index_and_slice():
