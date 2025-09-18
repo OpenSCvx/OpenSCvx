@@ -12,6 +12,7 @@ from openscvx.backend.expr import (
     MatMul,
     Mul,
     Neg,
+    NodalConstraint,
     Power,
     Sub,
     Sum,
@@ -514,3 +515,20 @@ def test_ctcs_unknown_penalty():
 
     with pytest.raises(ValueError, match="Unknown penalty"):
         ctcs_constraint.penalty_expr()
+
+
+def test_nodal_constraint_convex_method_chaining():
+    """Test that NodalConstraint.convex() works in both chaining orders."""
+    x = Variable("x", shape=(3,))
+
+    # Test .at().convex() chaining
+    nodal1 = (x <= [1, 2, 3]).at([0, 5, 10]).convex()
+    assert isinstance(nodal1, NodalConstraint)
+    assert nodal1.constraint.is_convex is True
+    assert nodal1.nodes == [0, 5, 10]
+
+    # Test .convex().at() chaining
+    nodal2 = (x <= [1, 2, 3]).convex().at([0, 5, 10])
+    assert isinstance(nodal2, NodalConstraint)
+    assert nodal2.constraint.is_convex is True
+    assert nodal2.nodes == [0, 5, 10]

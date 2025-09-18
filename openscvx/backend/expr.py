@@ -453,6 +453,15 @@ class NodalConstraint(Expr):
     def children(self):
         return [self.constraint]
 
+    def convex(self) -> "NodalConstraint":
+        """Mark the underlying constraint as convex for CVXPy lowering.
+
+        Returns:
+            Self with underlying constraint's convex flag set to True (enables method chaining)
+        """
+        self.constraint.convex()
+        return self
+
     def __repr__(self):
         return f"NodalConstraint({self.constraint!r}, nodes={self.nodes})"
 
