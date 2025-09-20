@@ -179,7 +179,7 @@ class CvxpyLowerer:
         exprs_1d = []
         for expr in exprs:
             if expr.ndim == 0:  # scalar
-                exprs_1d.append(cp.reshape(expr, (1,)))
+                exprs_1d.append(cp.reshape(expr, (1,), order="C"))
             else:
                 exprs_1d.append(expr)
         return cp.hstack(exprs_1d)
