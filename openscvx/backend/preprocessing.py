@@ -26,6 +26,7 @@ from openscvx.backend.expr import (
     Neg,
     NodalConstraint,
     Norm,
+    Parameter,
     PositivePart,
     Power,
     Sin,
@@ -352,6 +353,7 @@ def visit_constant(c: Constant):
 
 @visitor(State)
 @visitor(Control)
+@visitor(Parameter)
 def visit_variable(v: Variable):
     return v.shape
 

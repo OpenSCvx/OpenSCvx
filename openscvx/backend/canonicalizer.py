@@ -25,6 +25,7 @@ from openscvx.backend.expr import (
     Neg,
     NodalConstraint,
     Norm,
+    Parameter,
     PositivePart,
     Power,
     Sin,
@@ -77,8 +78,9 @@ class Canonicalizer:
 
     @visitor(State)
     @visitor(Control)
+    @visitor(Parameter)
     @visitor(Constant)
-    def visit_leaf(self, node: Union[State, Control]) -> Expr:
+    def visit_leaf(self, node: Union[State, Control, Parameter, Constant]) -> Expr:
         # leaf nodes are already canonical
         return node
 
