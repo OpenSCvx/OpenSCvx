@@ -1,7 +1,7 @@
-from openscvx.backend.expr import Expr
+from openscvx.backend.expr import Leaf
 
 
-class Parameter(Expr):
+class Parameter(Leaf):
     """A class representing a parameter in the optimization problem.
 
     Parameters are symbolic variables that can be used in expressions and constraints.
@@ -26,23 +26,12 @@ class Parameter(Expr):
         Note:
             The parameter is automatically registered in the class registry if not already present.
         """
-        super().__init__()
-        self.name = name
-        self._shape = shape
+        super().__init__(name, shape)
         self.value = None
 
         # Automatically register the parameter if not already present
         if name not in Parameter._registry:
             Parameter._registry[name] = self
-
-    @property
-    def shape(self):
-        """Get the shape of the parameter.
-
-        Returns:
-            tuple: The shape of the parameter.
-        """
-        return self._shape
 
     def __getitem__(self, idx):
         """Get a subset of the parameter using indexing or slicing.

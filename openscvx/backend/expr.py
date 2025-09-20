@@ -76,6 +76,55 @@ class Expr:
         return "\n".join(lines)
 
 
+class Leaf(Expr):
+    """
+    Base class for leaf nodes (terminal expressions) in the symbolic expression tree.
+
+    Leaf nodes represent named symbolic variables that don't have child expressions.
+    This includes Parameters, Variables, States, and Controls.
+
+    Attributes:
+        name (str): Name identifier for the leaf node
+        _shape (tuple): Shape of the leaf node
+    """
+
+    def __init__(self, name: str, shape: tuple = ()):
+        """Initialize a Leaf node.
+
+        Args:
+            name (str): Name identifier for the leaf node
+            shape (tuple): Shape of the leaf node
+        """
+        super().__init__()
+        self.name = name
+        self._shape = shape
+
+    @property
+    def shape(self):
+        """Get the shape of the leaf node.
+
+        Returns:
+            tuple: Shape of the leaf node
+        """
+        return self._shape
+
+    def children(self):
+        """Leaf nodes have no children.
+
+        Returns:
+            list: Empty list since leaf nodes are terminal
+        """
+        return []
+
+    def __repr__(self):
+        """String representation of the leaf node.
+
+        Returns:
+            str: A string describing the leaf node
+        """
+        return f"{self.__class__.__name__}('{self.name}', shape={self.shape})"
+
+
 def to_expr(x: Union[Expr, float, int, np.ndarray]) -> Expr:
     return x if isinstance(x, Expr) else Constant(np.array(x))
 

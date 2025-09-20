@@ -1,9 +1,9 @@
 import numpy as np
 
-from openscvx.backend.expr import Expr
+from openscvx.backend.expr import Leaf
 
 
-class Variable(Expr):
+class Variable(Leaf):
     """A base class for variables in an optimal control problem.
 
     The Variable class provides the fundamental structure for state and control variables,
@@ -26,9 +26,7 @@ class Variable(Expr):
             name (str): Name identifier for the variable
             shape (tuple): Shape of the variable vector
         """
-        super().__init__()
-        self.name = name
-        self._shape = shape
+        super().__init__(name, shape)
         self._slice = None
         self._min = None
         self._max = None
@@ -36,15 +34,6 @@ class Variable(Expr):
 
     def __repr__(self):
         return f"Var({self.name!r})"
-
-    @property
-    def shape(self):
-        """Get the shape of the variable.
-
-        Returns:
-            tuple: Shape of the variable vector
-        """
-        return self._shape
 
     @property
     def min(self):
