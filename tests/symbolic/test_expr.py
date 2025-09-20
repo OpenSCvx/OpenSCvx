@@ -13,6 +13,7 @@ from openscvx.backend.expr import (
     Mul,
     Neg,
     NodalConstraint,
+    Parameter,
     Power,
     Sub,
     Sum,
@@ -532,3 +533,41 @@ def test_nodal_constraint_convex_method_chaining():
     assert isinstance(nodal2, NodalConstraint)
     assert nodal2.constraint.is_convex is True
     assert nodal2.nodes == [0, 5, 10]
+
+
+def test_parameter_creation():
+    """Test basic Parameter node creation."""
+    p1 = Parameter("mass")
+    assert p1.name == "mass"
+    assert p1.shape == ()
+    assert isinstance(p1, Parameter)
+
+    p2 = Parameter("position", shape=(3,))
+    assert p2.name == "position"
+    assert p2.shape == (3,)
+
+
+def test_parameter_arithmetic_operations():
+    """Test Parameter in arithmetic operations."""
+    p = Parameter("param")
+    x = Variable("x", shape=())
+
+    add_expr = p + x
+    assert isinstance(add_expr, Add)
+    assert p in add_expr.children()
+    assert x in add_expr.children()
+
+    mul_expr = p * 2
+    assert isinstance(mul_expr, Mul)
+    assert p in mul_expr.children()
+
+
+def test_parameter_in_constraints():
+    """Test Parameter in constraint creation."""
+    p = Parameter("threshold")
+    x = Variable("x", shape=())
+
+    ineq = x <= p
+    assert isinstance(ineq, Inequality)
+    assert ineq.lhs is x
+    assert ineq.rhs is p
