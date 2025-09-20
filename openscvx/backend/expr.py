@@ -125,6 +125,24 @@ class Leaf(Expr):
         return f"{self.__class__.__name__}('{self.name}', shape={self.shape})"
 
 
+class Parameter(Leaf):
+    """Parameter that can be changed at runtime without recompilation.
+
+    Parameters are symbolic variables whose values are provided at solve time
+    through the problem's parameter dictionary. They allow for efficient
+    parameter sweeps without needing to recompile the optimization problem.
+    """
+
+    def __init__(self, name: str, shape: tuple = ()):
+        """Initialize a Parameter node.
+
+        Args:
+            name (str): Name identifier for the parameter
+            shape (tuple): Shape of the parameter
+        """
+        super().__init__(name, shape)
+
+
 def to_expr(x: Union[Expr, float, int, np.ndarray]) -> Expr:
     return x if isinstance(x, Expr) else Constant(np.array(x))
 

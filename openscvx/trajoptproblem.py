@@ -175,9 +175,8 @@ class TrajOptProblem:
         x_unified: UnifiedState = unify_states(x_aug)
         u_unified: UnifiedControl = unify_controls(u_aug)
 
-        if params is None:
-            params = {}
-        self.params = params
+        # Store parameters dictionary for runtime parameter changes
+        self.parameters = params or {}
 
         if dynamics_prop is None:
             dynamics_prop = dynamics_fn
@@ -332,17 +331,17 @@ class TrajOptProblem:
 
         # Compile dynamics and jacobians
         self.dynamics_augmented.f = jax.vmap(
-            self.dynamics_augmented.f, in_axes=(0, 0, 0, *(None,) * len(self.params))
+            self.dynamics_augmented.f, in_axes=(0, 0, 0, *(None,) * len(self.parameters))
         )
         self.dynamics_augmented.A = jax.vmap(
-            self.dynamics_augmented.A, in_axes=(0, 0, 0, *(None,) * len(self.params))
+            self.dynamics_augmented.A, in_axes=(0, 0, 0, *(None,) * len(self.parameters))
         )
         self.dynamics_augmented.B = jax.vmap(
-            self.dynamics_augmented.B, in_axes=(0, 0, 0, *(None,) * len(self.params))
+            self.dynamics_augmented.B, in_axes=(0, 0, 0, *(None,) * len(self.parameters))
         )
 
         self.dynamics_augmented_prop.f = jax.vmap(
-            self.dynamics_augmented_prop.f, in_axes=(0, 0, 0, *(None,) * len(self.params))
+            self.dynamics_augmented_prop.f, in_axes=(0, 0, 0, *(None,) * len(self.parameters))
         )
 
         for constraint in self.settings.sim.constraints_nodal:
@@ -353,10 +352,10 @@ class TrajOptProblem:
 
         # Generate solvers and optimal control problem
         self.discretization_solver = get_discretization_solver(
-            self.dynamics_augmented, self.settings, self.params
+            self.dynamics_augmented, self.settings, self.parameters
         )
         self.propagation_solver = get_propagation_solver(
-            self.dynamics_augmented_prop.f, self.settings, self.params
+            self.dynamics_augmented_prop.f, self.settings, self.parameters
         )
         # Phase 1: Create CVXPy variables
         ocp_vars = create_cvxpy_variables(self.settings)
@@ -395,7 +394,7 @@ class TrajOptProblem:
         self.discretization_solver = load_or_compile_discretization_solver(
             self.discretization_solver,
             dis_solver_file,
-            self.params,
+            self.parameters,
             self.settings.scp.n,
             self.settings.sim.n_states,
             self.settings.sim.n_controls,
@@ -412,7 +411,7 @@ class TrajOptProblem:
         self.propagation_solver = load_or_compile_propagation_solver(
             self.propagation_solver,
             prop_solver_file,
-            self.params,
+            self.parameters,
             self.settings.sim.n_states_prop,
             self.settings.sim.n_controls,
             self.settings.prp.max_tau_len,
@@ -422,7 +421,7 @@ class TrajOptProblem:
         # Initialize the PTR loop
         print("Initializing the SCvx Subproblem Solver...")
         self.cpg_solve = PTR_init(
-            self.params,
+            self.parameters,
             self.optimal_control_problem,
             self.discretization_solver,
             self.settings,
@@ -443,7 +442,7 @@ class TrajOptProblem:
         print("Total Initialization Time: ", self.timing_init)
 
         # Prime the propagation solver
-        prime_propagation_solver(self.propagation_solver, self.params, self.settings)
+        prime_propagation_solver(self.propagation_solver, self.parameters, self.settings)
 
         if self.settings.dev.profiling:
             pr.disable()
@@ -477,7 +476,7 @@ class TrajOptProblem:
             subprop_time,
             dis_time,
         ) = PTR_subproblem(
-            self.params.items(),
+            self.parameters.items(),
             self.cpg_solve,
             x,
             u,
@@ -589,7 +588,7 @@ class TrajOptProblem:
 
         t_0_post = time.time()
         result = propagate_trajectory_results(
-            self.params, self.settings, result, self.propagation_solver
+            self.parameters, self.settings, result, self.propagation_solver
         )
         t_f_post = time.time()
 

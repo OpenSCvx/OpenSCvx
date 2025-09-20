@@ -27,6 +27,7 @@ from openscvx.backend.expr import (
     Neg,
     NodalConstraint,
     Norm,
+    Parameter,
     PositivePart,
     Power,
     Sin,
@@ -88,6 +89,11 @@ class JaxLowerer:
         if sl is None:
             raise ValueError(f"Control {node.name!r} has no slice assigned")
         return lambda x, u, node, **kwargs: u[sl]
+
+    @visitor(Parameter)
+    def visit_parameter(self, node: Parameter):
+        param_name = node.name
+        return lambda x, u, node, **kwargs: jnp.array(kwargs[param_name])
 
     @visitor(Add)
     def visit_add(self, node: Add):

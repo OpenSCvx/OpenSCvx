@@ -15,7 +15,7 @@ def prop_aug_dy(
     state_dot: callable,
     dis_type: str,
     N: int,
-    *params,
+    params,
 ) -> np.ndarray:
     """Compute the augmented dynamics for propagation.
 
@@ -33,7 +33,7 @@ def prop_aug_dy(
         state_dot (callable): Function computing state derivatives.
         dis_type (str): Discretization type ("ZOH" or "FOH").
         N (int): Number of nodes in trajectory.
-        *params: Additional parameters passed to state_dot.
+        params: Dictionary of additional parameters passed to state_dot.
 
     Returns:
         np.ndarray: Time-scaled state derivatives.
@@ -46,7 +46,7 @@ def prop_aug_dy(
         beta = (tau - tau_init) * N
     u = u_current + beta * (u_next - u_current)
 
-    return u[:, idx_s] * state_dot(x, u[:, :-1], node, *params).squeeze()
+    return u[:, idx_s] * state_dot(x, u[:, :-1], node, **params).squeeze()
 
 
 def get_propagation_solver(state_dot, settings, param_map):
@@ -81,7 +81,7 @@ def get_propagation_solver(state_dot, settings, param_map):
                 state_dot,  # function or array
                 settings.dis.dis_type,
                 settings.scp.n,
-                *param_map_update.items(),
+                param_map_update,
                 # additional named parameters as **kwargs
             ),
             tau_0=tau_grid[0],  # scalar

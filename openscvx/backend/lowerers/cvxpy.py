@@ -19,6 +19,7 @@ from openscvx.backend.expr import (
     Mul,
     Neg,
     Norm,
+    Parameter,
     PositivePart,
     Power,
     Sin,
@@ -105,6 +106,17 @@ class CvxpyLowerer:
         if node._slice is not None:
             return cvx_var[node._slice]
         return cvx_var
+
+    @visitor(Parameter)
+    def visit_parameter(self, node: Parameter) -> cp.Expression:
+        param_name = node.name
+        if param_name in self.variable_map:
+            return self.variable_map[param_name]
+        else:
+            raise ValueError(
+                f"Parameter '{param_name}' not found in variable_map. "
+                f"Add it during CVXPy lowering or use cp.Parameter for parameter sweeps."
+            )
 
     @visitor(Add)
     def visit_add(self, node: Add) -> cp.Expression:

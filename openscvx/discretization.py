@@ -75,15 +75,15 @@ def dVdt(
     u = u[: x.shape[0]]
 
     # Compute the nonlinear propagation term
-    f = state_dot(x, u[:, :-1], nodes, *params.items())
+    f = state_dot(x, u[:, :-1], nodes, **params)
     F = s[:, None] * f
 
     # Evaluate the State Jacobian
-    dfdx = A(x, u[:, :-1], nodes, *params.items())
+    dfdx = A(x, u[:, :-1], nodes, **params)
     sdfdx = s[:, None, None] * dfdx
 
     # Evaluate the Control Jacobian
-    dfdu_veh = B(x, u[:, :-1], nodes, *params.items())
+    dfdu_veh = B(x, u[:, :-1], nodes, **params)
     dfdu = dfdu.at[:, :, :-1].set(s[:, None, None] * dfdu_veh)
     dfdu = dfdu.at[:, :, -1].set(f)
 
