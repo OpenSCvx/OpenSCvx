@@ -183,7 +183,7 @@ def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_sol
     n_tau = len(tau_vals)
 
     params = params.items()
-    param_values = tuple([param.value for _, param in params])
+    param_values = tuple([param for _, param in params])
 
     states = np.empty((n_states, n_tau))
     tau = np.linspace(0, 1, settings.scp.n)

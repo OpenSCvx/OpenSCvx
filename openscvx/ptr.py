@@ -154,7 +154,7 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
     prob.param_dict["u_bar"].value = u.guess
 
     # Make a tuple from list of parameter values
-    param_values = tuple([param.value for _, param in params])
+    param_values = tuple([param for _, param in params])
 
     t0 = time.time()
     A_bar, B_bar, C_bar, z_bar, V_multi_shoot = aug_dy.call(
