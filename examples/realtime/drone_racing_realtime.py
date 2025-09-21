@@ -307,7 +307,7 @@ class DroneRacingGUI(QMainWindow):
         for i in range(10):  # 10 gates
             gate_control_group = QWidget()
             gate_control_layout = QGridLayout(gate_control_group)
-            gate_label = QLabel(f"Gate {i+1}")
+            gate_label = QLabel(f"Gate {i + 1}")
             gate_control_layout.addWidget(gate_label, 0, 0, 1, 3)
             # X, Y, Z text inputs
             x_input = QLineEdit()

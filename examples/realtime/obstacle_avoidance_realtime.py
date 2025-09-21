@@ -156,7 +156,7 @@ class Obstacle3DPlotWidget(QWidget):
         control_layout.addWidget(weights_group)
         # Sliders for each obstacle
         for i in range(3):
-            obs_group = QGroupBox(f"Obstacle {i+1} Position")
+            obs_group = QGroupBox(f"Obstacle {i + 1} Position")
             obs_layout = QVBoxLayout()
             obs_group.setLayout(obs_layout)
             # X, Y, Z sliders

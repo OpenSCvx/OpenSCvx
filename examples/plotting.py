@@ -267,7 +267,9 @@ def plot_camera_view(result: OptimizationResults, params: Config) -> None:
 
     sub_idx = 0
     for sub_traj in sub_positions_sen:
-        color = f"rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})"
+        color = (
+            f"rgb({random.randint(10, 255)}, {random.randint(10, 255)}, {random.randint(10, 255)})"
+        )
         sub_traj = np.array(sub_traj)
         sub_traj[:, 0] = sub_traj[:, 0] / sub_traj[:, 2]
         sub_traj[:, 1] = sub_traj[:, 1] / sub_traj[:, 2]
@@ -388,7 +390,7 @@ def plot_camera_animation(result: dict, params: Config, path="") -> None:
 
     # Choose a random color for each subject
     colors = [
-        f"rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})"
+        f"rgb({random.randint(10, 255)}, {random.randint(10, 255)}, {random.randint(10, 255)})"
         for _ in subs_positions_sen
     ]
 
@@ -594,7 +596,7 @@ def plot_camera_polytope_animation(result: dict, params: Config, path="") -> Non
 
     # Choose a random color for each subject
     [
-        f"rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})"
+        f"rgb({random.randint(10, 255)}, {random.randint(10, 255)}, {random.randint(10, 255)})"
         for _ in sub_positions_sen
     ]
 
@@ -1775,7 +1777,9 @@ def plot_conic_view_animation(result: dict, params: Config, path="") -> None:
     # Choose a random color for each subject
     colors = []
     for sub_traj in sub_positions_sen:
-        color = f"rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})"
+        color = (
+            f"rgb({random.randint(10, 255)}, {random.randint(10, 255)}, {random.randint(10, 255)})"
+        )
         colors.append(color)
 
     sub_node_plot = []
@@ -2025,7 +2029,9 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
     # Choose a random color for each subject
     colors = []
     for sub_traj in sub_positions_sen:
-        color = f"rgb({random.randint(10,255)}, {random.randint(10,255)}, {random.randint(10,255)})"
+        color = (
+            f"rgb({random.randint(10, 255)}, {random.randint(10, 255)}, {random.randint(10, 255)})"
+        )
         colors.append(color)
 
     for i in range(0, len(sub_positions_sen[0]), 4):
@@ -2868,12 +2874,12 @@ def plot_animation(
         if "init_poses" in result:
             for j in range(len(result["init_poses"])):
                 color_kp.append(
-                    f"rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})"
+                    f"rgb({random.randint(0, 255)}, {random.randint(0, 255)}, {random.randint(0, 255)})"
                 )
         else:
             for j in range(1):
                 color_kp.append(
-                    f"rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})"
+                    f"rgb({random.randint(0, 255)}, {random.randint(0, 255)}, {random.randint(0, 255)})"
                 )
 
     # Draw drone attitudes as axes
@@ -3831,12 +3837,12 @@ def plot_animation_double_integrator(
         if "init_poses" in result:
             for j in range(len(result["init_poses"])):
                 color_kp.append(
-                    f"rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})"
+                    f"rgb({random.randint(0, 255)}, {random.randint(0, 255)}, {random.randint(0, 255)})"
                 )
         else:
             for j in range(1):
                 color_kp.append(
-                    f"rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})"
+                    f"rgb({random.randint(0, 255)}, {random.randint(0, 255)}, {random.randint(0, 255)})"
                 )
 
     # Draw drone attitudes as axes
