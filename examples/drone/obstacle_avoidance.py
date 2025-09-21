@@ -112,14 +112,14 @@ obstacle_centers = [
 ]
 
 # Default values for the obstacle centers
-obstacle_centers_default = [
+obstacle_center_positions = [
     np.array([-5.1, 0.1, 2]),
     np.array([0.1, 0.1, 2]),
     np.array([5.1, 0.1, 2]),
 ]
 
 np.random.seed(0)
-for _ in obstacle_centers_default:
+for _ in obstacle_center_positions:
     ax = generate_orthogonal_unit_vectors()
     axes.append(generate_orthogonal_unit_vectors())
     rad = np.random.rand(3) + 0.1 * np.ones(3)
@@ -131,7 +131,7 @@ constraints = [
     ctcs(Constant(x.min) <= x),
 ]
 
-# Add obstacle constraints using parameter expressions
+# Add obstacle constraints using symbolic expressions
 for center, A in zip(obstacle_centers, A_obs):
     A_const = Constant(A)
     pos = x[:3]
@@ -145,9 +145,9 @@ x.guess = np.linspace(x.initial, x.final, n)
 
 # Set parameter values for obstacle centers
 params = {
-    "obstacle_center_1": obstacle_centers_default[0],
-    "obstacle_center_2": obstacle_centers_default[1],
-    "obstacle_center_3": obstacle_centers_default[2],
+    "obstacle_center_1": obstacle_center_positions[0],
+    "obstacle_center_2": obstacle_center_positions[1],
+    "obstacle_center_3": obstacle_center_positions[2],
 }
 
 problem = TrajOptProblem(
@@ -170,7 +170,7 @@ problem.settings.scp.cost_drop = 4  # SCP iteration to relax minimal final time 
 problem.settings.scp.cost_relax = 0.5  # Minimal Time Relaxation Factor
 
 plotting_dict = {
-    "obstacles_centers": obstacle_centers_default,
+    "obstacles_centers": obstacle_center_positions,
     "obstacles_axes": axes,
     "obstacles_radii": radius,
 }
