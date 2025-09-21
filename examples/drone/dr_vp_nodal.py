@@ -12,11 +12,19 @@ sys.path.append(grandparent_dir)
 
 from examples.plotting import plot_animation
 from openscvx.backend.control import Control
-from openscvx.backend.state import Free, Minimize, State
-from openscvx.constraints import nodal
-from openscvx.dynamics import dynamics
+from openscvx.backend.expr import (
+    QDCM,
+    SSM,
+    SSMP,
+    Concat,
+    Constant,
+    Diag,
+    Norm,
+    ctcs,
+)
+from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.utils import SSM, SSMP, gen_vertices, qdcm, rot
+from openscvx.utils import gen_vertices, rot
 
 n = 33  # Number of Nodes
 total_time = 30.0  # Total time for the simulation
@@ -29,27 +37,38 @@ x.max = np.array(
 x.min = np.array(
     [-200.0, -100, 15, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0]
 )  # Lower Bound on the states
-x.initial = np.array(
-    [10.0, 0, 20, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0]
-)
-x.final = np.array(
-    [
-        10.0,
-        0,
-        20,
-        Free(0),
-        Free(0),
-        Free(0),
-        Free(1),
-        Free(0),
-        Free(0),
-        Free(0),
-        Free(0),
-        Free(0),
-        Free(0),
-        Minimize(total_time),
-    ]
-)
+x.initial = [
+    10.0,
+    0,
+    20,
+    0,
+    0,
+    0,
+    ("free", 1.0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    0,
+]
+x.final = [
+    10.0,
+    0,
+    20,
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 1.0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("minimize", total_time),
+]
 
 u = Control("u", shape=(6,))  # Control variable with 6 dimensions
 u.max = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])  # Upper Bound on the controls
@@ -113,54 +132,65 @@ for i in range(n_subs):
 init_poses = init_poses
 
 
-def g_vp(x_, u_, p_s_I):
-    p_s_s = R_sb @ qdcm(x_[6:10]).T @ (p_s_I - x_[0:3])
-    return jnp.linalg.norm(A_cone @ p_s_s, ord=norm_type) - (c.T @ p_s_s)
+def g_vp(p_s_I_const, x_pos, x_quat):
+    p_s_I = Constant(p_s_I_const)
+    R_sb_const = Constant(R_sb)
+    A_cone_const = Constant(A_cone)
+    c_const = Constant(c)
+
+    p_s_s = R_sb_const @ QDCM(x_quat).T @ (p_s_I - x_pos)
+    return Norm(A_cone_const @ p_s_s, ord=norm_type) - (c_const.T @ p_s_s)
 
 
-def g_cvx_nodal(x_):  # Nodal Convex Inequality Constraints
-    constr = []
-    for node, cen in zip(gate_nodes, A_gate_cen):
-        constr += [cp.norm(A_gate @ x_[node][:3] - cen, "inf") <= 1]
-    return constr
+# Create symbolic constraints
+constraints = [
+    ctcs(x <= Constant(x.max)),
+    ctcs(Constant(x.min) <= x),
+]
 
-
-constraints = []
+# Add visibility constraints for submarines using symbolic expressions
 for pose in init_poses:
-    constraints.append(nodal(lambda x_, u_, p=pose: g_vp(x_, u_, p), convex=False))
+    constraints.append((g_vp(pose, x[:3], x[6:10]) <= Constant(0.0)))
+
+# Add gate constraints using symbolic expressions
 for node, cen in zip(gate_nodes, A_gate_cen):
-    constraints.append(
-        nodal(
-            lambda x_, u_, A=A_gate, c=cen: cp.norm(A @ x_[:3] - c, "inf") <= 1,
-            nodes=[node],
-            convex=True,
-        )
-    )  # use local variables inside the lambda function
+    A_gate_const = Constant(A_gate)
+    cen_const = Constant(cen)
+    pos = x[:3]
+
+    # Gate constraint: ||A @ pos - c||_inf <= 1
+    gate_constraint = (
+        (Norm(A_gate_const @ pos - cen_const, ord="inf") <= Constant(1.0)).convex().at([node])
+    )
+    constraints.append(gate_constraint)
 
 
-@dynamics
-def dynamics(x_, u_):
-    m = 1.0  # Mass of the drone
-    g_const = -9.81
-    J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
-    # Unpack the state and control vectors
-    v = x_[3:6]
-    q = x_[6:10]
-    w = x_[10:13]
+# Create symbolic dynamics
+m = 1.0  # Mass of the drone
+g_const = -9.81
+J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
 
-    f = u_[:3]
-    tau = u_[3:]
+# Unpack the state and control vectors using symbolic expressions
+v = x[3:6]
+q = x[6:10]
+q_norm = Norm(q)
+q_normalized = q / q_norm
+w = x[10:13]
 
-    q_norm = jnp.linalg.norm(q)
-    q = q / q_norm
+f = u[:3]
+tau = u[3:]
 
-    # Compute the time derivatives of the state variables
-    r_dot = v
-    v_dot = (1 / m) * qdcm(q) @ f + jnp.array([0, 0, g_const])
-    q_dot = 0.5 * SSMP(w) @ q
-    w_dot = jnp.diag(1 / J_b) @ (tau - SSM(w) @ jnp.diag(J_b) @ w)
-    t_dot = 1
-    return jnp.hstack([r_dot, v_dot, q_dot, w_dot, t_dot])
+# Define dynamics using symbolic expressions
+r_dot = v
+v_dot = (Constant(1.0 / m)) * QDCM(q_normalized) @ f + Constant(
+    np.array([0, 0, g_const], dtype=np.float64)
+)
+q_dot = Constant(0.5) * SSMP(w) @ q_normalized
+J_b_inv = Constant(1.0 / J_b)
+J_b_diag = Diag(Constant(J_b))
+w_dot = Diag(J_b_inv) @ (tau - SSM(w) @ J_b_diag @ w)
+t_dot = Constant(np.array([1.0], dtype=np.float64))
+dynamics = Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
 
 
 x_bar = np.linspace(x.initial, x.final, n)
