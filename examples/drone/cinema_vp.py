@@ -194,20 +194,7 @@ constraints.extend(
 )
 
 
-# Convert tuples back to numeric arrays for x_bar initialization
-def convert_boundary_condition(bc):
-    result = []
-    for item in bc:
-        if isinstance(item, tuple):
-            result.append(item[1])  # Extract the numeric value
-        else:
-            result.append(item)
-    return np.array(result)
-
-
-x_initial_numeric = convert_boundary_condition(x.initial)
-x_final_numeric = convert_boundary_condition(x.final)
-x_bar = np.linspace(x_initial_numeric, x_final_numeric, n)
+x_bar = np.linspace(x.initial, x.final, n)
 
 x_bar[:, :3] = get_kp_pose(x_bar[:, t_inds], init_pose) + jnp.array([-5, 0.2, 0.2])[None, :]
 
