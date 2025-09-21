@@ -182,9 +182,6 @@ def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_sol
     n_states = x_0.shape[0]
     n_tau = len(tau_vals)
 
-    params = params.items()
-    param_values = tuple([param for _, param in params])
-
     states = np.empty((n_states, n_tau))
     tau = np.linspace(0, 1, settings.scp.n)
 
@@ -226,7 +223,7 @@ def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_sol
             settings.sim.idx_s.stop,
             tau_cur_padded,
             mask_padded,
-            *param_values,
+            params,
         )
 
         # Only store the valid portion (excluding the final point which becomes next x_0)
