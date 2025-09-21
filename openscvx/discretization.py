@@ -17,7 +17,7 @@ def dVdt(
     n_u: int,
     N: int,
     dis_type: str,
-    **params,
+    params: dict,
 ) -> jnp.ndarray:
     """Compute the time derivative of the augmented state vector.
 
@@ -75,15 +75,15 @@ def dVdt(
     u = u[: x.shape[0]]
 
     # Compute the nonlinear propagation term
-    f = state_dot(x, u[:, :-1], nodes, **params)
+    f = state_dot(x, u[:, :-1], nodes, params)
     F = s[:, None] * f
 
     # Evaluate the State Jacobian
-    dfdx = A(x, u[:, :-1], nodes, **params)
+    dfdx = A(x, u[:, :-1], nodes, params)
     sdfdx = s[:, None, None] * dfdx
 
     # Evaluate the Control Jacobian
-    dfdu_veh = B(x, u[:, :-1], nodes, **params)
+    dfdu_veh = B(x, u[:, :-1], nodes, params)
     dfdu = dfdu.at[:, :, :-1].set(s[:, None, None] * dfdu_veh)
     dfdu = dfdu.at[:, :, -1].set(f)
 
@@ -128,7 +128,7 @@ def calculate_discretization(
     rtol,
     atol,
     dis_type: str,
-    **kwargs,
+    params: dict,
 ):
     """Calculate the discretized system matrices.
 
@@ -183,7 +183,7 @@ def calculate_discretization(
         n_u=n_u,
         N=N,
         dis_type=dis_type,
-        **kwargs,  # <-- adds parameter values with names
+        params=params,  # Pass params as single dict
     )
 
     # Define dVdt wrapper using named arguments
@@ -254,7 +254,7 @@ def get_discretization_solver(dyn: Dynamics, settings, param_map):
     Returns:
         callable: A function that computes the discretized system matrices.
     """
-    return lambda x, u, *params: calculate_discretization(
+    return lambda x, u, params: calculate_discretization(
         x=x,
         u=u,
         state_dot=dyn.f,
@@ -269,5 +269,5 @@ def get_discretization_solver(dyn: Dynamics, settings, param_map):
         rtol=settings.dis.rtol,
         atol=settings.dis.atol,
         dis_type=settings.dis.dis_type,
-        **dict(zip(param_map.keys(), params)),  # <--- Named keyword args
+        params=params,  # Pass as single dict
     )

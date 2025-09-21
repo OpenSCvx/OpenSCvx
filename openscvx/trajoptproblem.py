@@ -330,18 +330,12 @@ class TrajOptProblem:
         self.settings.sim.__post_init__()
 
         # Compile dynamics and jacobians
-        self.dynamics_augmented.f = jax.vmap(
-            self.dynamics_augmented.f, in_axes=(0, 0, 0, *(None,) * len(self.parameters))
-        )
-        self.dynamics_augmented.A = jax.vmap(
-            self.dynamics_augmented.A, in_axes=(0, 0, 0, *(None,) * len(self.parameters))
-        )
-        self.dynamics_augmented.B = jax.vmap(
-            self.dynamics_augmented.B, in_axes=(0, 0, 0, *(None,) * len(self.parameters))
-        )
+        self.dynamics_augmented.f = jax.vmap(self.dynamics_augmented.f, in_axes=(0, 0, 0, None))
+        self.dynamics_augmented.A = jax.vmap(self.dynamics_augmented.A, in_axes=(0, 0, 0, None))
+        self.dynamics_augmented.B = jax.vmap(self.dynamics_augmented.B, in_axes=(0, 0, 0, None))
 
         self.dynamics_augmented_prop.f = jax.vmap(
-            self.dynamics_augmented_prop.f, in_axes=(0, 0, 0, *(None,) * len(self.parameters))
+            self.dynamics_augmented_prop.f, in_axes=(0, 0, 0, None)
         )
 
         for constraint in self.settings.sim.constraints_nodal:

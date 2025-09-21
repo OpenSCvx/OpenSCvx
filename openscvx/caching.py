@@ -97,13 +97,11 @@ def load_or_compile_discretization_solver(
     else:
         print("Compiling discretization solver (not saving/loading from disk)...")
 
-    # Extract parameter values and names in order
-    param_values = [param for _, param in params.items()]
-
+    # Pass parameters as a single dictionary
     compiled_solver = export.export(jax.jit(discretization_solver))(
         np.ones((n_discretization_nodes, n_states)),
         np.ones((n_discretization_nodes, n_controls)),
-        *param_values,
+        params,
     )
 
     if save_compiled:
@@ -150,9 +148,7 @@ def load_or_compile_propagation_solver(
     else:
         print("Compiling propagation solver (not saving/loading from disk)...")
 
-    # Extract parameter values and names in order
-    param_values = [param for _, param in params.items()]
-
+    # Pass parameters as a single dictionary
     compiled_solver = export.export(jax.jit(propagation_solver))(
         np.ones(n_states_prop),  # x_0
         (0.0, 0.0),  # time span
@@ -163,7 +159,7 @@ def load_or_compile_propagation_solver(
         0,  # idx_s_stop
         np.ones((max_tau_len,)),  # save_time (tau_cur_padded)
         np.ones((max_tau_len,), dtype=bool),  # mask_padded (boolean mask)
-        *param_values,  # additional parameters
+        params,  # additional parameters as dict
     )
 
     if save_compiled:

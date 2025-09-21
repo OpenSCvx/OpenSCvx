@@ -46,7 +46,7 @@ def prop_aug_dy(
         beta = (tau - tau_init) * N
     u = u_current + beta * (u_next - u_current)
 
-    return u[:, idx_s] * state_dot(x, u[:, :-1], node, **params).squeeze()
+    return u[:, idx_s] * state_dot(x, u[:, :-1], node, params).squeeze()
 
 
 def get_propagation_solver(state_dot, settings, param_map):
@@ -65,9 +65,9 @@ def get_propagation_solver(state_dot, settings, param_map):
     """
 
     def propagation_solver(
-        V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask, *params
+        V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask, params
     ):
-        param_map_update = dict(zip(param_map.keys(), params))
+        param_map_update = params
         return solve_ivp_diffrax_prop(
             f=prop_aug_dy,
             tau_final=tau_grid[1],  # scalar

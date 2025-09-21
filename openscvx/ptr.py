@@ -153,12 +153,12 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
     prob.param_dict["x_bar"].value = x.guess
     prob.param_dict["u_bar"].value = u.guess
 
-    # Make a tuple from list of parameter values
-    param_values = tuple([param for _, param in params])
+    # Convert parameters to dictionary
+    param_dict = dict(params)
 
     t0 = time.time()
     A_bar, B_bar, C_bar, z_bar, V_multi_shoot = aug_dy.call(
-        x.guess, u.guess.astype(float), *param_values
+        x.guess, u.guess.astype(float), param_dict
     )
 
     prob.param_dict["A_d"].value = A_bar.__array__()
@@ -170,13 +170,13 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
     if settings.sim.constraints_nodal:
         for g_id, constraint in enumerate(settings.sim.constraints_nodal):
             prob.param_dict["g_" + str(g_id)].value = np.asarray(
-                constraint.func(x.guess, u.guess, 0)
+                constraint.func(x.guess, u.guess, 0, {})
             )
             prob.param_dict["grad_g_x_" + str(g_id)].value = np.asarray(
-                constraint.grad_g_x(x.guess, u.guess, 0)
+                constraint.grad_g_x(x.guess, u.guess, 0, {})
             )
             prob.param_dict["grad_g_u_" + str(g_id)].value = np.asarray(
-                constraint.grad_g_u(x.guess, u.guess, 0)
+                constraint.grad_g_u(x.guess, u.guess, 0, {})
             )
 
     # Convex constraints are already lowered and handled in the OCP, no action needed here

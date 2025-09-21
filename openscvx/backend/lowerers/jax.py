@@ -74,35 +74,35 @@ class JaxLowerer:
         # This prevents (1,) shapes in constraint residuals
         if value.size == 1:
             value = value.squeeze()
-        return lambda x, u, node, **kwargs: value
+        return lambda x, u, node, params: value
 
     @visitor(State)
     def visit_state(self, node: State):
         sl = node._slice
         if sl is None:
             raise ValueError(f"State {node.name!r} has no slice assigned")
-        return lambda x, u, node, **kwargs: x[sl]
+        return lambda x, u, node, params: x[sl]
 
     @visitor(Control)
     def visit_control(self, node: Control):
         sl = node._slice
         if sl is None:
             raise ValueError(f"Control {node.name!r} has no slice assigned")
-        return lambda x, u, node, **kwargs: u[sl]
+        return lambda x, u, node, params: u[sl]
 
     @visitor(Parameter)
     def visit_parameter(self, node: Parameter):
         param_name = node.name
-        return lambda x, u, node, **kwargs: jnp.array(kwargs[param_name])
+        return lambda x, u, node, params: jnp.array(params[param_name])
 
     @visitor(Add)
     def visit_add(self, node: Add):
         fs = [self.lower(term) for term in node.terms]
 
-        def fn(x, u, node, **kwargs):
-            acc = fs[0](x, u, node, **kwargs)
+        def fn(x, u, node, params):
+            acc = fs[0](x, u, node, params)
             for f in fs[1:]:
-                acc = acc + f(x, u, node, **kwargs)
+                acc = acc + f(x, u, node, params)
             return acc
 
         return fn
@@ -111,16 +111,16 @@ class JaxLowerer:
     def visit_sub(self, node: Sub):
         fL = self.lower(node.left)
         fR = self.lower(node.right)
-        return lambda x, u, node, **kwargs: fL(x, u, node, **kwargs) - fR(x, u, node, **kwargs)
+        return lambda x, u, node, params: fL(x, u, node, params) - fR(x, u, node, params)
 
     @visitor(Mul)
     def visit_mul(self, node: Mul):
         fs = [self.lower(factor) for factor in node.factors]
 
-        def fn(x, u, node, **kwargs):
-            acc = fs[0](x, u, node, **kwargs)
+        def fn(x, u, node, params):
+            acc = fs[0](x, u, node, params)
             for f in fs[1:]:
-                acc = acc * f(x, u, node, **kwargs)
+                acc = acc * f(x, u, node, params)
             return acc
 
         return fn
@@ -129,25 +129,23 @@ class JaxLowerer:
     def visit_div(self, node: Div):
         fL = self.lower(node.left)
         fR = self.lower(node.right)
-        return lambda x, u, node, **kwargs: fL(x, u, node, **kwargs) / fR(x, u, node, **kwargs)
+        return lambda x, u, node, params: fL(x, u, node, params) / fR(x, u, node, params)
 
     @visitor(MatMul)
     def visit_matmul(self, node: MatMul):
         fL = self.lower(node.left)
         fR = self.lower(node.right)
-        return lambda x, u, node, **kwargs: jnp.matmul(
-            fL(x, u, node, **kwargs), fR(x, u, node, **kwargs)
-        )
+        return lambda x, u, node, params: jnp.matmul(fL(x, u, node, params), fR(x, u, node, params))
 
     @visitor(Neg)
     def visit_neg(self, node: Neg):
         fO = self.lower(node.operand)
-        return lambda x, u, node, **kwargs: -fO(x, u, node, **kwargs)
+        return lambda x, u, node, params: -fO(x, u, node, params)
 
     @visitor(Sum)
     def visit_sum(self, node: Sum):
         f = self.lower(node.operand)
-        return lambda x, u, node, **kwargs: jnp.sum(f(x, u, node, **kwargs))
+        return lambda x, u, node, params: jnp.sum(f(x, u, node, params))
 
     @visitor(Norm)
     def visit_norm(self, node: Norm):
@@ -163,14 +161,14 @@ class JaxLowerer:
             # For vectors, Frobenius norm is the same as 2-norm
             ord_val = None  # Default is 2-norm
 
-        return lambda x, u, node, **kwargs: jnp.linalg.norm(f(x, u, node, **kwargs), ord=ord_val)
+        return lambda x, u, node, params: jnp.linalg.norm(f(x, u, node, params), ord=ord_val)
 
     @visitor(Index)
     def visit_index(self, node: Index):
         # lower the "base" expr into a fn(x,u,node), then index it
         f_base = self.lower(node.base)
         idx = node.index
-        return lambda x, u, node, **kwargs: jnp.atleast_1d(f_base(x, u, node, **kwargs))[idx]
+        return lambda x, u, node, params: jnp.atleast_1d(f_base(x, u, node, params))[idx]
 
     @visitor(Concat)
     def visit_concat(self, node: Concat):
@@ -178,8 +176,8 @@ class JaxLowerer:
         fn_list = [self.lower(child) for child in node.exprs]
 
         # wrapper that promotes scalars to 1-D and concatenates
-        def concat_fn(x, u, node, **kwargs):
-            parts = [jnp.atleast_1d(fn(x, u, node, **kwargs)) for fn in fn_list]
+        def concat_fn(x, u, node, params):
+            parts = [jnp.atleast_1d(fn(x, u, node, params)) for fn in fn_list]
             return jnp.concatenate(parts, axis=0)
 
         return concat_fn
@@ -187,12 +185,12 @@ class JaxLowerer:
     @visitor(Sin)
     def visit_sin(self, node: Sin):
         fO = self.lower(node.operand)
-        return lambda x, u, node, **kwargs: jnp.sin(fO(x, u, node, **kwargs))
+        return lambda x, u, node, params: jnp.sin(fO(x, u, node, params))
 
     @visitor(Cos)
     def visit_cos(self, node: Cos):
         fO = self.lower(node.operand)
-        return lambda x, u, node, **kwargs: jnp.cos(fO(x, u, node, **kwargs))
+        return lambda x, u, node, params: jnp.cos(fO(x, u, node, params))
 
     @visitor(Equality)
     @visitor(Inequality)
@@ -200,14 +198,14 @@ class JaxLowerer:
         """Lower equality constraint: lhs == rhs or lhs <= rhs becomes lhs - rhs"""
         fL = self.lower(node.lhs)
         fR = self.lower(node.rhs)
-        return lambda x, u, node, **kwargs: fL(x, u, node, **kwargs) - fR(x, u, node, **kwargs)
+        return lambda x, u, node, params: fL(x, u, node, params) - fR(x, u, node, params)
 
     @visitor(CTCS)
     def visit_ctcs(self, node: CTCS):
         # Lower the penalty expression (which includes the constraint residual)
         penalty_expr_fn = self.lower(node.penalty_expr())
 
-        def ctcs_fn(x, u, current_node, **kwargs):
+        def ctcs_fn(x, u, current_node, params):
             # Check if constraint is active at this node
             if node.nodes is not None:
                 start_node, end_node = node.nodes
@@ -216,34 +214,34 @@ class JaxLowerer:
                 # Use jax.lax.cond for conditional evaluation
                 return cond(
                     is_active,
-                    lambda _: penalty_expr_fn(x, u, current_node, **kwargs),
+                    lambda _: penalty_expr_fn(x, u, current_node, params),
                     lambda _: 0.0,
                     operand=None,
                 )
             else:
                 # Always active if no node range specified
-                return penalty_expr_fn(x, u, current_node, **kwargs)
+                return penalty_expr_fn(x, u, current_node, params)
 
         return ctcs_fn
 
     @visitor(PositivePart)
     def visit_pos(self, node):
         f = self.lower(node.x)
-        return lambda x, u, node, **kwargs: jnp.maximum(f(x, u, node, **kwargs), 0.0)
+        return lambda x, u, node, params: jnp.maximum(f(x, u, node, params), 0.0)
 
     @visitor(Square)
     def visit_square(self, node):
         f = self.lower(node.x)
-        return lambda x, u, node, **kwargs: f(x, u, node, **kwargs) * f(x, u, node, **kwargs)
+        return lambda x, u, node, params: f(x, u, node, params) * f(x, u, node, params)
 
     @visitor(Huber)
     def visit_huber(self, node):
         f = self.lower(node.x)
         delta = node.delta
-        return lambda x, u, node, **kwargs: jnp.where(
-            jnp.abs(f(x, u, node, **kwargs)) <= delta,
-            0.5 * f(x, u, node, **kwargs) ** 2,
-            delta * (jnp.abs(f(x, u, node, **kwargs)) - 0.5 * delta),
+        return lambda x, u, node, params: jnp.where(
+            jnp.abs(f(x, u, node, params)) <= delta,
+            0.5 * f(x, u, node, params) ** 2,
+            delta * (jnp.abs(f(x, u, node, params)) - 0.5 * delta),
         )
 
     @visitor(SmoothReLU)
@@ -252,9 +250,7 @@ class JaxLowerer:
         c = node.c
         # smooth_relu(pos(x)) = sqrt(pos(x)^2 + c^2) - c ; here f already includes pos inside node
         return (
-            lambda x, u, node, **kwargs: jnp.sqrt(
-                jnp.maximum(f(x, u, node, **kwargs), 0.0) ** 2 + c**2
-            )
+            lambda x, u, node, params: jnp.sqrt(jnp.maximum(f(x, u, node, params), 0.0) ** 2 + c**2)
             - c
         )
 
@@ -266,27 +262,25 @@ class JaxLowerer:
     @visitor(Sqrt)
     def visit_sqrt(self, node: Sqrt):
         f = self.lower(node.operand)
-        return lambda x, u, node, **kwargs: jnp.sqrt(f(x, u, node, **kwargs))
+        return lambda x, u, node, params: jnp.sqrt(f(x, u, node, params))
 
     @visitor(Transpose)
     def visit_transpose(self, node: Transpose):
         f = self.lower(node.operand)
-        return lambda x, u, node, **kwargs: jnp.transpose(f(x, u, node, **kwargs))
+        return lambda x, u, node, params: jnp.transpose(f(x, u, node, params))
 
     @visitor(Power)
     def visit_power(self, node: Power):
         fB = self.lower(node.base)
         fE = self.lower(node.exponent)
-        return lambda x, u, node, **kwargs: jnp.power(
-            fB(x, u, node, **kwargs), fE(x, u, node, **kwargs)
-        )
+        return lambda x, u, node, params: jnp.power(fB(x, u, node, params), fE(x, u, node, params))
 
     @visitor(Stack)
     def visit_stack(self, node: Stack):
         row_fns = [self.lower(row) for row in node.rows]
 
-        def stack_fn(x, u, node, **kwargs):
-            rows = [jnp.atleast_1d(fn(x, u, node, **kwargs)) for fn in row_fns]
+        def stack_fn(x, u, node, params):
+            rows = [jnp.atleast_1d(fn(x, u, node, params)) for fn in row_fns]
             return jnp.stack(rows, axis=0)
 
         return stack_fn
@@ -295,8 +289,8 @@ class JaxLowerer:
     def visit_hstack(self, node: Hstack):
         array_fns = [self.lower(arr) for arr in node.arrays]
 
-        def hstack_fn(x, u, node, **kwargs):
-            arrays = [jnp.atleast_1d(fn(x, u, node, **kwargs)) for fn in array_fns]
+        def hstack_fn(x, u, node, params):
+            arrays = [jnp.atleast_1d(fn(x, u, node, params)) for fn in array_fns]
             return jnp.hstack(arrays)
 
         return hstack_fn
@@ -305,8 +299,8 @@ class JaxLowerer:
     def visit_vstack(self, node: Vstack):
         array_fns = [self.lower(arr) for arr in node.arrays]
 
-        def vstack_fn(x, u, node, **kwargs):
-            arrays = [jnp.atleast_1d(fn(x, u, node, **kwargs)) for fn in array_fns]
+        def vstack_fn(x, u, node, params):
+            arrays = [jnp.atleast_1d(fn(x, u, node, params)) for fn in array_fns]
             return jnp.vstack(arrays)
 
         return vstack_fn
@@ -317,7 +311,7 @@ class JaxLowerer:
         from openscvx.utils import qdcm
 
         f = self.lower(node.q)
-        return lambda x, u, node, **kwargs: qdcm(f(x, u, node, **kwargs))
+        return lambda x, u, node, params: qdcm(f(x, u, node, params))
 
     @visitor(SSMP)
     def visit_ssmp(self, node: SSMP):
@@ -325,7 +319,7 @@ class JaxLowerer:
         from openscvx.utils import SSMP
 
         f = self.lower(node.w)
-        return lambda x, u, node, **kwargs: SSMP(f(x, u, node, **kwargs))
+        return lambda x, u, node, params: SSMP(f(x, u, node, params))
 
     @visitor(SSM)
     def visit_ssm(self, node: SSM):
@@ -333,9 +327,9 @@ class JaxLowerer:
         from openscvx.utils import SSM
 
         f = self.lower(node.w)
-        return lambda x, u, node, **kwargs: SSM(f(x, u, node, **kwargs))
+        return lambda x, u, node, params: SSM(f(x, u, node, params))
 
     @visitor(Diag)
     def visit_diag(self, node: Diag):
         f = self.lower(node.operand)
-        return lambda x, u, node, **kwargs: jnp.diag(f(x, u, node, **kwargs))
+        return lambda x, u, node, params: jnp.diag(f(x, u, node, params))
