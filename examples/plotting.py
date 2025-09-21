@@ -3124,7 +3124,7 @@ def plot_animation(
             # Rotate and translate points
             points = np.array([x.flatten(), y.flatten(), z.flatten()])
             points = axes @ points
-            points = points.T + center.value
+            points = points.T + center
 
             fig.add_trace(
                 go.Surface(
