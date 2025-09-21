@@ -11,11 +11,21 @@ sys.path.append(grandparent_dir)
 
 from examples.plotting import plot_animation
 from openscvx.backend.control import Control
-from openscvx.backend.state import Free, Minimize, State
-from openscvx.constraints import ctcs
-from openscvx.dynamics import dynamics
+from openscvx.backend.expr import (
+    QDCM,
+    SSM,
+    SSMP,
+    Concat,
+    Constant,
+    Cos,
+    Diag,
+    Norm,
+    Sin,
+    ctcs,
+)
+from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
-from openscvx.utils import SSM, SSMP, get_kp_pose, qdcm
+from openscvx.utils import get_kp_pose
 
 n = 12  # Number of Nodes
 total_time = 40.0  # Total time for the simulation
@@ -32,28 +42,40 @@ x.min = np.array(
     [-100.0, -100, -10, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0, 0]
 )  # Lower Bound on the states
 
-x.initial = np.array(
-    [8.0, -0.2, 2.2, 0, 0, 0, Free(1), Free(0), Free(0), Free(0), Free(0), Free(0), Free(0), 0, 0]
-)
-x.final = np.array(
-    [
-        Free(-10.0),
-        Free(0),
-        Free(2),
-        Free(0),
-        Free(0),
-        Free(0),
-        Free(1),
-        Free(0),
-        Free(0),
-        Free(0),
-        Free(0),
-        Free(0),
-        Free(0),
-        Minimize(0),
-        40,
-    ]
-)
+x.initial = [
+    8.0,
+    -0.2,
+    2.2,
+    0,
+    0,
+    0,
+    ("free", 1.0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    0,
+    0,
+]
+x.final = [
+    ("free", -10.0),
+    ("free", 0),
+    ("free", 2),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 1.0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("free", 0),
+    ("minimize", 0),
+    40,
+]
 
 u = Control("u", shape=(6,))  # Control variable with 6 dimensions
 
@@ -78,62 +100,114 @@ A_cone = np.diag(
     ]
 )  # Conic Matrix in Sensor Frame
 c = jnp.array([0, 0, 1])  # Boresight Vector in Sensor Frame
-norm_type = np.inf  # Norm Type
+norm_type = "inf"
 R_sb = jnp.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]])
 
 
-@dynamics
-def dynamics(x_, u_):
-    m = 1.0  # Mass of the drone
-    g_const = -9.18
-    J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
-    # Unpack the state and control vectors
-    v = x_[3:6]
-    q = x_[6:10]
-    w = x_[10:13]
+# Create symbolic dynamics
+m = 1.0  # Mass of the drone
+g_const = -9.18
+J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
 
-    f = u_[:3]
-    tau = u_[3:]
+# Unpack the state and control vectors using symbolic expressions
+v = x[3:6]
+q = x[6:10]
+q_norm = Norm(q)
+q_normalized = q / q_norm
+w = x[10:13]
 
-    q_norm = jnp.linalg.norm(q)
-    q = q / q_norm
+f = u[:3]
+tau = u[3:]
 
-    # Compute the time derivatives of the state variables
-    r_dot = v
-    v_dot = (1 / m) * qdcm(q) @ f + jnp.array([0, 0, g_const])
-    q_dot = 0.5 * SSMP(w) @ q
-    w_dot = jnp.diag(1 / J_b) @ (tau - SSM(w) @ jnp.diag(J_b) @ w)
-    fuel_dot = jnp.linalg.norm(u_)[None]
-    t_dot = 1
-    return jnp.hstack([r_dot, v_dot, q_dot, w_dot, fuel_dot, t_dot])
-
-
-def g_vp(x_):
-    p_s_I = get_kp_pose(x_[t_inds], init_pose)
-    p_s_s = R_sb @ qdcm(x_[6:10]).T @ (p_s_I - x_[:3])
-    return jnp.linalg.norm(A_cone @ p_s_s, ord=norm_type) - (c.T @ p_s_s)
+# Define dynamics using symbolic expressions
+r_dot = v
+v_dot = (Constant(1.0 / m)) * QDCM(q_normalized) @ f + Constant(
+    np.array([0, 0, g_const], dtype=np.float64)
+)
+q_dot = Constant(0.5) * SSMP(w) @ q_normalized
+J_b_inv = Constant(1.0 / J_b)
+J_b_diag = Diag(Constant(J_b))
+w_dot = Diag(J_b_inv) @ (tau - SSM(w) @ J_b_diag @ w)
+fuel_dot = Norm(u)
+t_dot = Constant(np.array([1.0], dtype=np.float64))
+dynamics = Concat(r_dot, v_dot, q_dot, w_dot, fuel_dot, t_dot)
 
 
-def g_min(x_):
-    p_s_I = get_kp_pose(x_[t_inds], init_pose)
-    return min_range - jnp.linalg.norm(p_s_I - x_[:3])
+# Symbolic implementation of get_kp_pose function
+def get_kp_pose_symbolic(t_expr, init_pose):
+    loop_time = 40.0
+    loop_radius = 20.0
+
+    # Convert the trajectory parameters to symbolic constants
+    loop_time_const = Constant(loop_time)
+    loop_radius_const = Constant(loop_radius)
+    two_pi_const = Constant(2 * np.pi)
+    init_pose_const = Constant(init_pose)
+    half_const = Constant(0.5)
+
+    # Compute symbolic trajectory: t_angle = t / loop_time * (2 * pi)
+    t_angle = t_expr / loop_time_const * two_pi_const
+
+    # x = loop_radius * sin(t_angle)
+    x_pos = loop_radius_const * Sin(t_angle)
+
+    # y = x * cos(t_angle)
+    y_pos = x_pos * Cos(t_angle)
+
+    # z = 0.5 * x * sin(t_angle)
+    z_pos = half_const * x_pos * Sin(t_angle)
+
+    # Stack into position vector and add initial pose
+    kp_trajectory = Concat(x_pos, y_pos, z_pos) + init_pose_const
+    return kp_trajectory
 
 
-def g_max(x_):
-    p_s_I = get_kp_pose(x_[t_inds], init_pose)
-    return jnp.linalg.norm(p_s_I - x_[:3]) - max_range
-
-
+# Create symbolic constraints
 constraints = [
-    ctcs(lambda x_, u_: np.sqrt(2e1) * g_vp(x_)),
-    ctcs(lambda x_, u_: x_ - x.true.max),
-    ctcs(lambda x_, u_: x.true.min - x_),
-    ctcs(lambda x_, u_: g_min(x_)),
-    ctcs(lambda x_, u_: g_max(x_)),
+    ctcs(x <= Constant(x.max)),
+    ctcs(Constant(x.min) <= x),
 ]
 
+# Get the symbolic keypoint pose based on time
+kp_pose_symbolic = get_kp_pose_symbolic(x[t_inds], init_pose)
 
-x_bar = np.linspace(x.initial, x.final, n)
+# View planning constraint using symbolic keypoint pose
+R_sb_const = Constant(R_sb)
+A_cone_const = Constant(A_cone)
+c_const = Constant(c)
+
+p_s_s = R_sb_const @ QDCM(x[6:10]).T @ (kp_pose_symbolic - x[:3])
+vp_constraint = Constant(np.sqrt(2e1)) * (
+    Norm(A_cone_const @ p_s_s, ord=norm_type) - (c_const.T @ p_s_s)
+)
+
+# Range constraints using symbolic keypoint pose
+min_range_constraint = Constant(min_range) - Norm(kp_pose_symbolic - x[:3])
+max_range_constraint = Norm(kp_pose_symbolic - x[:3]) - Constant(max_range)
+
+constraints.extend(
+    [
+        ctcs(vp_constraint <= Constant(0.0)),
+        ctcs(min_range_constraint <= Constant(0.0)),
+        ctcs(max_range_constraint <= Constant(0.0)),
+    ]
+)
+
+
+# Convert tuples back to numeric arrays for x_bar initialization
+def convert_boundary_condition(bc):
+    result = []
+    for item in bc:
+        if isinstance(item, tuple):
+            result.append(item[1])  # Extract the numeric value
+        else:
+            result.append(item)
+    return np.array(result)
+
+
+x_initial_numeric = convert_boundary_condition(x.initial)
+x_final_numeric = convert_boundary_condition(x.final)
+x_bar = np.linspace(x_initial_numeric, x_final_numeric, n)
 
 x_bar[:, :3] = get_kp_pose(x_bar[:, t_inds], init_pose) + jnp.array([-5, 0.2, 0.2])[None, :]
 
