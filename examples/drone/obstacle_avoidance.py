@@ -18,6 +18,7 @@ from openscvx.backend.expr import (
     Constant,
     Diag,
     Norm,
+    Parameter,
     ctcs,
 )
 from openscvx.backend.state import State
@@ -103,16 +104,22 @@ A_obs = []
 radius = []
 axes = []
 
-# Define obstacle centers as constants
-# TODO: (norrisg) Convert to use `Parameter`!
+# Define obstacle centers as parameters for runtime updates
 obstacle_centers = [
+    Parameter("obstacle_center_1", shape=(3,)),
+    Parameter("obstacle_center_2", shape=(3,)),
+    Parameter("obstacle_center_3", shape=(3,)),
+]
+
+# Default values for the obstacle centers
+obstacle_centers_default = [
     np.array([-5.1, 0.1, 2]),
     np.array([0.1, 0.1, 2]),
     np.array([5.1, 0.1, 2]),
 ]
 
 np.random.seed(0)
-for _ in obstacle_centers:
+for _ in obstacle_centers_default:
     ax = generate_orthogonal_unit_vectors()
     axes.append(generate_orthogonal_unit_vectors())
     rad = np.random.rand(3) + 0.1 * np.ones(3)
@@ -124,18 +131,24 @@ constraints = [
     ctcs(Constant(x.min) <= x),
 ]
 
-# Add obstacle constraints using symbolic expressions
+# Add obstacle constraints using parameter expressions
 for center, A in zip(obstacle_centers, A_obs):
-    center_const = Constant(center)
     A_const = Constant(A)
     pos = x[:3]
 
     # Obstacle constraint: (pos - center)^T @ A @ (pos - center) >= 1
-    diff = pos - center_const
+    diff = pos - center
     obstacle_constraint = ctcs(1.0 <= diff.T @ A_const @ diff)
     constraints.append(obstacle_constraint)
 
 x.guess = np.linspace(x.initial, x.final, n)
+
+# Set parameter values for obstacle centers
+params = {
+    "obstacle_center_1": obstacle_centers_default[0],
+    "obstacle_center_2": obstacle_centers_default[1],
+    "obstacle_center_3": obstacle_centers_default[2],
+}
 
 problem = TrajOptProblem(
     dynamics=dyn_expr,
@@ -144,6 +157,7 @@ problem = TrajOptProblem(
     constraints=constraints,
     idx_time=len(x.max) - 1,
     N=n,
+    params=params,
 )
 
 problem.settings.prp.dt = 0.01
@@ -156,7 +170,7 @@ problem.settings.scp.cost_drop = 4  # SCP iteration to relax minimal final time 
 problem.settings.scp.cost_relax = 0.5  # Minimal Time Relaxation Factor
 
 plotting_dict = {
-    "obstacles_centers": obstacle_centers,
+    "obstacles_centers": obstacle_centers_default,
     "obstacles_axes": axes,
     "obstacles_radii": radius,
 }
