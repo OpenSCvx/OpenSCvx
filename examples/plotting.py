@@ -42,8 +42,8 @@ def plot_dubins_car(results: OptimizationResults, params: Config):
     # Plot the circular obstacle
     fig.add_trace(
         go.Scatter(
-            x=obs_center.value[0] + obs_radius.value * np.cos(np.linspace(0, 2 * np.pi, 100)),
-            y=obs_center.value[1] + obs_radius.value * np.sin(np.linspace(0, 2 * np.pi, 100)),
+            x=obs_center[0] + obs_radius * np.cos(np.linspace(0, 2 * np.pi, 100)),
+            y=obs_center[1] + obs_radius * np.sin(np.linspace(0, 2 * np.pi, 100)),
             mode="lines",
             line={"color": "red", "width": 2},
             name="Obstacle",

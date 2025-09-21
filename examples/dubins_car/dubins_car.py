@@ -10,10 +10,8 @@ sys.path.append(grandparent_dir)
 
 from examples.plotting import plot_dubins_car
 from openscvx.backend.control import Control
-from openscvx.backend.parameter import Parameter
-from openscvx.backend.state import Free, Minimize, State
-from openscvx.constraints import ctcs
-from openscvx.dynamics import dynamics
+from openscvx.backend.expr import Concat, Constant, Cos, Norm, Parameter, Sin, ctcs
+from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
 
 n = 8
@@ -29,8 +27,8 @@ x.min = np.array([-5.0, -5.0, -2 * jnp.pi, 0])
 x.max = np.array([5.0, 5.0, 2 * jnp.pi, 20])
 
 # Set initial, final, and guess for state trajectory using symbolic boundary expressions
-x.initial = np.array([0, -2, 0, 0])
-x.final = np.array([0, 2, Free(0), Minimize(total_time)])
+x.initial = [0, -2, 0, 0]
+x.final = [0, 2, ("free", 0), ("minimize", total_time)]
 x.guess = np.linspace([0, -2, 0, 0], [0, 2, 0, total_time], n)
 
 # Set bounds on control
@@ -45,36 +43,36 @@ obs_center = Parameter("obs_center", shape=(2,))
 obs_radius = Parameter("obs_radius", shape=())
 
 
-obs_radius.value = 1.0
-obs_center.value = np.array([-2.01, 0.0])  # Center of the obstacle
+# Parameter values will be set through params dictionary
 
-# Define constraints using symbolic x, u, and parameters
+# Define constraints using symbolic expressions
 constraints = [
-    ctcs(
-        lambda x_, u_, obs_radius_, obs_center_: obs_radius_ - jnp.linalg.norm(x_[:2] - obs_center_)
-    ),
-    ctcs(lambda x_, u_: x_ - x.true.max),
-    ctcs(lambda x_, u_: x.true.min - x_),
+    ctcs(obs_radius <= Norm(x[:2] - obs_center)),
+    ctcs(x <= Constant(x.max)),
+    ctcs(Constant(x.min) <= x),
 ]
 
 
-# Define dynamics
-@dynamics
-def dynamics_fn(x_, u_):
-    rx_dot = u_[0] * jnp.sin(x_[2])
-    ry_dot = u_[0] * jnp.cos(x_[2])
-    theta_dot = u_[1]
-    x_dot = jnp.asarray([rx_dot, ry_dot, theta_dot])
-    t_dot = 1
-    return jnp.hstack([x_dot, t_dot])
+# Define dynamics using symbolic expressions
+rx_dot = u[0] * Sin(x[2])
+ry_dot = u[0] * Cos(x[2])
+theta_dot = u[1]
+t_dot = Constant(np.array([1.0], dtype=np.float64))
+dynamics = Concat(rx_dot, ry_dot, theta_dot, t_dot)
 
+
+# Set parameter values
+params = {
+    "obs_radius": 1.0,
+    "obs_center": np.array([-2.01, 0.0]),
+}
 
 # Build the problem
 problem = TrajOptProblem(
-    dynamics=dynamics_fn,
+    dynamics=dynamics,
     x=x,
     u=u,
-    params=Parameter.get_all(),
+    params=params,
     idx_time=3,  # Index of time variable in state vector
     constraints=constraints,
     N=n,
@@ -100,8 +98,8 @@ problem.settings.cvx.solver_args = {}
 
 
 plotting_dict = {
-    "obs_radius": obs_radius,
-    "obs_center": obs_center,
+    "obs_radius": params["obs_radius"],
+    "obs_center": params["obs_center"],
 }
 
 if __name__ == "__main__":
@@ -113,14 +111,13 @@ if __name__ == "__main__":
     plot_dubins_car(results, problem.settings).show()
 
     # Second run with different parameters
-    obs_center.value = np.array([0.5, 0.0])
+    params["obs_center"] = np.array([0.5, 0.0])
     total_time = 0.7  # Adjust total time for second run
     problem.settings.scp.lam_cost = 1e-1  # Disable minimal time objective for second run
     problem.settings.scp.w_tr = 1e0
     problem.settings.scp.lam_vc = 1e2  # Adjust virtual control weight
     x.guess[:, 0:4] = np.linspace([0, -2, 0, 0], [0, 2, 0, total_time], n)
     u.guess[:, 0:2] = np.repeat(np.expand_dims(np.array([0, 0]), axis=0), n, axis=0)
-    u.guess[:, 2] = np.repeat(total_time, n)  # Adjust initial control guess
 
     results = problem.solve()
     results = problem.post_process(results)
