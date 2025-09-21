@@ -119,6 +119,8 @@ if __name__ == "__main__":
     x.guess[:, 0:4] = np.linspace([0, -2, 0, 0], [0, 2, 0, total_time], n)
     u.guess[:, 0:2] = np.repeat(np.expand_dims(np.array([0, 0]), axis=0), n, axis=0)
 
+    plotting_dict["obs_center"] = np.array([0.5, 0.0])
+
     results = problem.solve()
     results = problem.post_process(results)
     results.update(plotting_dict)
