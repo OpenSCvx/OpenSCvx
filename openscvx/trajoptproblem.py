@@ -246,9 +246,9 @@ class TrajOptProblem:
             # The lowered functions have signature (x, u, node, **kwargs), so we need to handle node
             # parameter, node is broadcast (same for all),
             constraint = LoweredNodalConstraint(
-                func=jax.vmap(fn, in_axes=(0, 0, None)),
-                grad_g_x=jax.vmap(jacfwd(fn, argnums=0), in_axes=(0, 0, None)),
-                grad_g_u=jax.vmap(jacfwd(fn, argnums=1), in_axes=(0, 0, None)),
+                func=jax.vmap(fn, in_axes=(0, 0, None, None)),
+                grad_g_x=jax.vmap(jacfwd(fn, argnums=0), in_axes=(0, 0, None, None)),
+                grad_g_u=jax.vmap(jacfwd(fn, argnums=1), in_axes=(0, 0, None, None)),
                 nodes=constraints_nodal[i].nodes,
             )
             lowered_constraints_nodal.append(constraint)

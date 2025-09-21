@@ -167,16 +167,17 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
     prob.param_dict["z_d"].value = z_bar.__array__()
     dis_time = time.time() - t0
 
+    # TODO: (norrisg) investigate why we are passing `0` for the node here
     if settings.sim.constraints_nodal:
         for g_id, constraint in enumerate(settings.sim.constraints_nodal):
             prob.param_dict["g_" + str(g_id)].value = np.asarray(
-                constraint.func(x.guess, u.guess, 0, {})
+                constraint.func(x.guess, u.guess, 0, param_dict)
             )
             prob.param_dict["grad_g_x_" + str(g_id)].value = np.asarray(
-                constraint.grad_g_x(x.guess, u.guess, 0, {})
+                constraint.grad_g_x(x.guess, u.guess, 0, param_dict)
             )
             prob.param_dict["grad_g_u_" + str(g_id)].value = np.asarray(
-                constraint.grad_g_u(x.guess, u.guess, 0, {})
+                constraint.grad_g_u(x.guess, u.guess, 0, param_dict)
             )
 
     # Convex constraints are already lowered and handled in the OCP, no action needed here
