@@ -511,7 +511,7 @@ def test_inequality_constraint_penalty_activation():
             penalty_expr = ctcs.penalty_expr()
 
             fn = lower_to_jax(penalty_expr)
-            result = fn(x, None, None)
+            result = fn(x, None, None, None)
 
             if should_violate:
                 assert result > 0, (
@@ -546,7 +546,7 @@ def test_reverse_inequality_constraint_penalty():
     # Test with squared ReLU penalty
     penalty = Square(PositivePart(violation))
     fn = lower_to_jax(penalty)
-    result = fn(x_vals, None, None)
+    result = fn(x_vals, None, None, None)
 
     # Violated constraints (x < 2.0) should have positive penalty
     assert result[0] > 0, "x=0 violates x>=2, should have positive penalty"
@@ -584,8 +584,8 @@ def test_box_constraint_penalties():
     fn_lower = lower_to_jax(lower_penalty)
     fn_upper = lower_to_jax(upper_penalty)
 
-    result_upper = fn_upper(x_vals, None, None)
-    result_lower = fn_lower(x_vals, None, None)
+    result_upper = fn_upper(x_vals, None, None, None)
+    result_lower = fn_lower(x_vals, None, None, None)
 
     # Test lower bound
     assert result_lower[0] > 0, "x=0 violates lower bound"
@@ -646,7 +646,7 @@ def test_norm_constraint_penalty():
 
         penalty = Square(PositivePart(violation))
         fn = lower_to_jax(penalty)
-        result = fn(x_vals, None, None)
+        result = fn(x_vals, None, None, None)
         results.append(result)
 
     # Points inside or on the circle should have zero penalty
@@ -679,7 +679,7 @@ def test_penalty_gradients_at_boundary():
     # Squared ReLU has a sharp transition at the boundary
     squared_penalty = Square(PositivePart(violation))
     fn_squared = lower_to_jax(squared_penalty)
-    result_squared = fn_squared(x_vals, None, None)
+    result_squared = fn_squared(x_vals, None, None, None)
 
     # Should be exactly zero below boundary, positive above
     assert jnp.allclose(result_squared[0], 0.0)
@@ -691,7 +691,7 @@ def test_penalty_gradients_at_boundary():
     # SmoothReLU should have smooth transition
     smooth_penalty = SmoothReLU(violation, c=1e-4)
     fn_smooth = lower_to_jax(smooth_penalty)
-    result_smooth = fn_smooth(x_vals, None, None)
+    result_smooth = fn_smooth(x_vals, None, None, None)
 
     # Should be approximately zero below, smoothly increasing above
     assert jnp.allclose(result_smooth[0], 0.0, atol=1e-8)
@@ -718,7 +718,7 @@ def test_equality_constraint_penalty():
     # Test with Huber penalty (naturally handles both sides)
     penalty = Huber(deviation, delta=0.5)
     fn = lower_to_jax(penalty)
-    result = fn(x_vals, None, None)
+    result = fn(x_vals, None, None, None)
 
     # Only x == target should have zero penalty
     assert result[0] > 0, "x=0 != 2 should have positive penalty"
