@@ -10,10 +10,14 @@ sys.path.append(grandparent_dir)
 
 from examples.plotting import plot_control_norm, plot_xy_xz_yz
 from openscvx.backend.control import Control
-from openscvx.backend.parameter import Parameter
-from openscvx.backend.state import Free, Maximize, State
-from openscvx.constraints import ctcs
-from openscvx.dynamics import dynamics
+from openscvx.backend.expr import (
+    Concat,
+    Constant,
+    Norm,
+    Parameter,
+    ctcs,
+)
+from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
 
 n = 30
@@ -29,8 +33,8 @@ x.min = np.array([-3000, -3000, 0, -v_max, -v_max, -v_max, 1505, 0])
 x.max = np.array([3000, 3000, 3000, v_max, v_max, v_max, 1905, 1e2])
 
 # Set initial, final, and guess
-x.initial = np.array([2000, 0, 1500, 80, 30, -75, 1905, 0])
-x.final = np.array([0, 0, 0, 0, 0, 0, Maximize(1590), Free(total_time)])
+x.initial = [2000, 0, 1500, 80, 30, -75, 1905, 0]
+x.final = [0, 0, 0, 0, 0, 0, ("maximize", 1590), ("free", total_time)]
 x.guess = np.linspace(x.initial, x.final, n)
 
 u = Control("u", shape=(3,))
@@ -48,68 +52,61 @@ u.max = n_eng * np.array([T_bar, T_bar, T_bar])
 u.guess = np.repeat(np.expand_dims(np.array([0, 0, n_eng * (T2) / 2]), axis=0), n, axis=0)
 
 
-# Define Parameters for obstacle radius and center
-I_sp = Parameter("I_sp")
-I_sp.value = 225  # Specific impulse in seconds
-
-g = Parameter("g")
-g.value = 3.7114  # Gravitational acceleration on Mars in m/s^2
-
+# Define Parameters for physical constants
 g_e = 9.807  # Gravitational acceleration on Earth in m/s^2
 
+# Create parameters for the problem
+I_sp = Parameter("I_sp")
+g = Parameter("g")
 theta = Parameter("theta")
-theta.value = 27 * jnp.pi / 180  # Cant angle of the thrusters in radians
 
-rho_min = n_eng * T1 * np.cos(theta.value)  # Minimum thrust-to-weight ratio
-rho_max = n_eng * T2 * np.cos(theta.value)  # Maximum thrust-to-weight ratio
+# These will be computed symbolically in constraints
+theta_val = 27 * np.pi / 180  # Cant angle value for parameter setup
+rho_min = n_eng * T1 * np.cos(theta_val)  # Minimum thrust-to-weight ratio
+rho_max = n_eng * T2 * np.cos(theta_val)  # Maximum thrust-to-weight ratio
 
-# Define constraints using symbolic x, u, and parameters
+# Define constraints using symbolic expressions
 constraints = [
-    ctcs(lambda x_, u_: x_ - x.true.max, idx=0),
-    ctcs(lambda x_, u_: x.true.min - x_, idx=0),
-    ctcs(lambda x_, u_: rho_min - jnp.linalg.norm(u_[:3]), idx=1, scaling=1e-4),
-    ctcs(lambda x_, u_: jnp.linalg.norm(u_[:3]) - rho_max, idx=1, scaling=1e-4),
-    ctcs(
-        lambda x_, u_: jnp.cos((180 - 40) * jnp.pi / 180) - u_[2] / jnp.linalg.norm(u_[:3]), idx=2
-    ),
-    ctcs(
-        lambda x_, u_: jnp.linalg.norm(jnp.array([x_[0], x_[1]]))
-        - jnp.tan((86) * jnp.pi / 180) * x_[2],
-        idx=3,
-    ),
-    # nodal(lambda x_, u_: u_[:2] == 0, nodes = [-1], convex = True)22
+    # State bounds
+    ctcs(x <= Constant(x.max), idx=0),
+    ctcs(Constant(x.min) <= x, idx=0),
+    # Thrust magnitude constraints
+    ctcs(Constant(rho_min) <= Norm(u[:3]), idx=1),
+    ctcs(Norm(u[:3]) <= Constant(rho_max), idx=1),
+    # Thrust pointing constraint (thrust cant angle)
+    ctcs(Constant(np.cos((180 - 40) * np.pi / 180)) <= u[2] / Norm(u[:3]), idx=2),
+    # Glideslope constraint
+    ctcs(Norm(x[:2]) <= Constant(np.tan(86 * np.pi / 180)) * x[2], idx=3),
 ]
 
 
-# Define dynamics
-@dynamics
-def dynamics_fn(x_, u_, I_sp_, g_, theta_):
-    m = x_[6]
+# Define dynamics using symbolic expressions
+m = x[6]
+T = u
+r_dot = x[3:6]
+g_vec = Constant(np.array([0, 0, 1], dtype=np.float64)) * g  # Gravitational acceleration vector
+v_dot = T / m - g_vec
+m_dot = -Norm(T) / (I_sp * Constant(g_e) * Constant(np.cos(theta_val)))
+t_dot = Constant(np.array([1], dtype=np.float64))
+dynamics_expr = Concat(r_dot, v_dot, m_dot, t_dot)
 
-    T = u_
 
-    r_dot = x_[3:6]
-
-    g_vec = jnp.array([0, 0, g_])  # Gravitational acceleration vector
-
-    v_dot = T / m - g_vec
-
-    m_dot = -jnp.linalg.norm(T) / (I_sp_ * g_e * jnp.cos(theta_))
-
-    t_dot = 1
-    return jnp.hstack([r_dot, v_dot, m_dot, t_dot])
-
+# Set parameter values
+params = {
+    "I_sp": 225,  # Specific impulse in seconds
+    "g": 3.7114,  # Gravitational acceleration on Mars in m/s^2
+    "theta": theta_val,  # Cant angle of the thrusters in radians
+}
 
 # Build the problem
 problem = TrajOptProblem(
-    dynamics=dynamics_fn,
+    dynamics=dynamics_expr,
     x=x,
     u=u,
-    params=Parameter.get_all(),
+    params=params,
     idx_time=7,  # Index of time variable in state vector
     constraints=constraints,
     N=n,
-    licq_max=1e-6,
 )
 
 # Apply custom scaling to the mass term (assume mass is at index 6 in the state vector)
