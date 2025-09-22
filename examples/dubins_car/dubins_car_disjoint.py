@@ -1,7 +1,6 @@
 import os
 import sys
 
-import cvxpy as cp
 import jax.numpy as jnp
 import numpy as np
 
@@ -11,10 +10,18 @@ sys.path.append(grandparent_dir)
 
 from examples.plotting import plot_dubins_car_disjoint
 from openscvx.backend.control import Control
-from openscvx.backend.parameter import Parameter
-from openscvx.backend.state import Free, Minimize, State
-from openscvx.constraints import ctcs, nodal
-from openscvx.dynamics import dynamics
+from openscvx.backend.expr import (
+    Concat,
+    Constant,
+    Cos,
+    Exp,
+    Log,
+    Norm,
+    Parameter,
+    Sin,
+    ctcs,
+)
+from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
 
 n = 8
@@ -26,8 +33,8 @@ u = Control("u", shape=(2,))
 x.min = np.array([-5.0, -5.0, -2 * jnp.pi, 0])
 x.max = np.array([5.0, 5.0, 2 * jnp.pi, 20])
 # Set initial, final, and guess for state trajectory using symbolic boundary expressions
-x.initial = np.array([0, -2, 0, 0])
-x.final = np.array([Free(1), Free(-1.5), Free(0), Minimize(total_time)])
+x.initial = [0, -2, 0, 0]
+x.final = [("free", 1), ("free", -1.5), ("free", 0), ("minimize", total_time)]
 x.guess = np.linspace([0, -2, 0, 0], [0, 2, 0, total_time], n)
 # Set bounds on control
 u.min = np.array([0, -5])
@@ -39,55 +46,63 @@ wp1_center = Parameter("wp1_center", shape=(2,))
 wp1_radius = Parameter("wp1_radius", shape=())
 wp2_center = Parameter("wp2_center", shape=(2,))
 wp2_radius = Parameter("wp2_radius", shape=())
-wp1_radius.value = 0.5
-wp1_center.value = np.array([-2.1, 0.0])  # Center of the wp 1
-wp2_radius.value = 0.5
-wp2_center.value = np.array([1.9, 0.0])  # Center of the wp 2
+
+# Create symbolic expressions for the dynamics
+pos = x[:2]
+theta = x[2]
+time = x[3]
+velocity = u[0]
+angular_velocity = u[1]
+
+# Define dynamics using symbolic expressions
+rx_dot = velocity * Sin(theta)
+ry_dot = velocity * Cos(theta)
+theta_dot = angular_velocity
+t_dot = Constant(1.0)
+dyn_expr = Concat(rx_dot, ry_dot, theta_dot, t_dot)
 
 
-def visit_wp_OR(x_, u_, wp1_center_, wp1_radius_, wp2_center_, wp2_radius_):
-    # Visit wp1 or wp2
-    # Returns a value <= 0 if x_ is within either wp1 or wp2
-    d1 = jnp.linalg.norm(x_[:2] - wp1_center_)
-    d2 = jnp.linalg.norm(x_[:2] - wp2_center_)
-    v1 = wp1_radius_ - d1
-    v2 = wp2_radius_ - d2
-    alpha = 10.0  # smoothing parameter; higher = closer to max
-    smooth_max = (1 / alpha) * jnp.log(jnp.exp(alpha * v1) + jnp.exp(alpha * v2))
+# Create symbolic visit waypoint OR constraint
+def create_visit_wp_OR_expr():
+    # Visit wp1 or wp2 using smooth max
+    d1 = Norm(pos - wp1_center)
+    d2 = Norm(pos - wp2_center)
+    v1 = wp1_radius - d1
+    v2 = wp2_radius - d2
+    alpha = Constant(10.0)  # smoothing parameter; higher = closer to max
+    smooth_max = (Constant(1.0) / alpha) * Log(Exp(alpha * v1) + Exp(alpha * v2))
     return -smooth_max
 
 
-# Define constraints using symbolic x, u, and parameters
+visit_wp_expr = create_visit_wp_OR_expr()
+
+
+# Define constraints using symbolic expressions
 constraints = [
-    ctcs(
-        lambda x_, u_, wp1_radius_, wp1_center_, wp2_radius_, wp2_center_: visit_wp_OR(
-            x_, u_, wp1_center_, wp1_radius_, wp2_center_, wp2_radius_
-        ),
-        nodes=(3, 5),
-    ),
-    ctcs(lambda x_, u_: x_ - x.true.max),
-    ctcs(lambda x_, u_: x.true.min - x_),
-    nodal(lambda x_, u_: cp.norm(x_[0][:2] - x_[-1][:2]) <= 1, convex=True, vectorized=True),
+    # Visit waypoint constraints using smooth max
+    ctcs(visit_wp_expr <= Constant(0.0)).over((3, 5)),
+    # State bounds constraints
+    ctcs(x <= Constant(x.max)),
+    ctcs(Constant(x.min) <= x),
+    # TODO: (norrisg) Make the `cp.norm(x_[0][:2] - x_[-1][:2]) <= 1` work, allow cross-nodal 
+    # constraints
 ]
 
 
-# Define dynamics
-@dynamics
-def dynamics_fn(x_, u_):
-    rx_dot = u_[0] * jnp.sin(x_[2])
-    ry_dot = u_[0] * jnp.cos(x_[2])
-    theta_dot = u_[1]
-    x_dot = jnp.asarray([rx_dot, ry_dot, theta_dot])
-    t_dot = 1
-    return jnp.hstack([x_dot, t_dot])
-
+# Set parameter values
+params = {
+    "wp1_center": np.array([-2.1, 0.0]),
+    "wp1_radius": 0.5,
+    "wp2_center": np.array([1.9, 0.0]),
+    "wp2_radius": 0.5,
+}
 
 # Build the problem
 problem = TrajOptProblem(
-    dynamics=dynamics_fn,
+    dynamics=dyn_expr,
     x=x,
     u=u,
-    params=Parameter.get_all(),
+    params=params,
     idx_time=3,  # Index of time variable in state vector
     constraints=constraints,
     N=n,
@@ -101,10 +116,10 @@ problem.settings.scp.lam_cost = 1e-1
 problem.settings.scp.lam_vc = 6e2
 problem.settings.scp.uniform_time_grid = True
 plotting_dict = {
-    "wp1_radius": wp1_radius.value,
-    "wp1_center": wp1_center.value,
-    "wp2_radius": wp2_radius.value,
-    "wp2_center": wp2_center.value,
+    "wp1_radius": params["wp1_radius"],
+    "wp1_center": params["wp1_center"],
+    "wp2_radius": params["wp2_radius"],
+    "wp2_center": params["wp2_center"],
 }
 if __name__ == "__main__":
     problem.initialize()
