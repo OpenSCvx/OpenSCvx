@@ -63,13 +63,118 @@ def format_result(problem, converged: bool) -> OptimizationResults:
     )
 
 
+def PTR_step(
+    params,
+    settings: Config,
+    prob: cp.Problem,
+    discretization_solver: callable,
+    cpg_solve,
+    emitter_function,
+    scp_k: int,
+    scp_J_tr: float,
+    scp_J_vb: float,
+    scp_J_vc: float,
+    scp_trajs: list,
+    scp_controls: list,
+    scp_V_multi_shoot_traj: list,
+) -> dict:
+    """Performs a single SCP iteration.
+
+    Args:
+        params: Problem parameters
+        settings: Configuration object
+        prob: CVXPy problem
+        discretization_solver: Discretization solver function
+        cpg_solve: CVXPyGen solver (if enabled)
+        emitter_function: Function to emit iteration data
+        scp_k: Current iteration number
+        scp_J_tr: Current trust region cost
+        scp_J_vb: Current virtual buffer cost
+        scp_J_vc: Current virtual control cost
+        scp_trajs: List of trajectory history
+        scp_controls: List of control history
+        scp_V_multi_shoot_traj: List of discretization history
+
+    Returns:
+        dict: Updated SCP state and convergence information
+    """
+    x = settings.sim.x
+    u = settings.sim.u
+
+    # Run the subproblem
+    (
+        x_sol,
+        u_sol,
+        cost,
+        J_total,
+        J_vb_vec,
+        J_vc_vec,
+        J_tr_vec,
+        prob_stat,
+        V_multi_shoot,
+        subprop_time,
+        dis_time,
+    ) = PTR_subproblem(
+        params.items(),
+        cpg_solve,
+        x,
+        u,
+        discretization_solver,
+        prob,
+        settings,
+    )
+
+    # Update state
+    scp_V_multi_shoot_traj.append(V_multi_shoot)
+    x.guess = x_sol
+    u.guess = u_sol
+    scp_trajs.append(x.guess)
+    scp_controls.append(u.guess)
+
+    scp_J_tr = np.sum(np.array(J_tr_vec))
+    scp_J_vb = np.sum(np.array(J_vb_vec))
+    scp_J_vc = np.sum(np.array(J_vc_vec))
+
+    # Update weights
+    settings.scp.w_tr = min(settings.scp.w_tr * settings.scp.w_tr_adapt, settings.scp.w_tr_max)
+    if scp_k > settings.scp.cost_drop:
+        settings.scp.lam_cost = settings.scp.lam_cost * settings.scp.cost_relax
+
+    # Emit data
+    emitter_function(
+        {
+            "iter": scp_k,
+            "dis_time": dis_time * 1000.0,
+            "subprop_time": subprop_time * 1000.0,
+            "J_total": J_total,
+            "J_tr": scp_J_tr,
+            "J_vb": scp_J_vb,
+            "J_vc": scp_J_vc,
+            "cost": cost[-1],
+            "prob_stat": prob_stat,
+        }
+    )
+
+    # Return updated state and convergence info
+    return {
+        "converged": (
+            (scp_J_tr < settings.scp.ep_tr)
+            and (scp_J_vb < settings.scp.ep_vb)
+            and (scp_J_vc < settings.scp.ep_vc)
+        ),
+        "scp_k": scp_k + 1,
+        "scp_J_tr": scp_J_tr,
+        "scp_J_vb": scp_J_vb,
+        "scp_J_vc": scp_J_vc,
+        "u": u,
+        "x": x,
+        "V_multi_shoot": V_multi_shoot,
+    }
+
+
 def PTR_main(
     params, settings: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emitter_function
 ) -> OptimizationResults:
-    J_vb = 1e2
-    J_vc = 1e2
-    J_tr = 1e2
-
     x = settings.sim.x
     u = settings.sim.u
 
@@ -79,71 +184,58 @@ def PTR_main(
     if "x_term" in prob.param_dict:
         prob.param_dict["x_term"].value = settings.sim.x.final
 
+    # Initialize SCP state
+    scp_k = 1
+    scp_J_tr = 1e2
+    scp_J_vb = 1e2
+    scp_J_vc = 1e2
     scp_trajs = [x.guess]
     scp_controls = [u.guess]
-    V_multi_shoot_traj = []
+    scp_V_multi_shoot_traj = []
 
-    k = 1
-
-    while k <= settings.scp.k_max and (
-        (J_tr >= settings.scp.ep_tr) or (J_vb >= settings.scp.ep_vb) or (J_vc >= settings.scp.ep_vc)
+    while scp_k <= settings.scp.k_max and (
+        (scp_J_tr >= settings.scp.ep_tr)
+        or (scp_J_vb >= settings.scp.ep_vb)
+        or (scp_J_vc >= settings.scp.ep_vc)
     ):
-        (
-            x_sol,
-            u_sol,
-            cost,
-            J_total,
-            J_vb_vec,
-            J_vc_vec,
-            J_tr_vec,
-            prob_stat,
-            V_multi_shoot,
-            subprop_time,
-            dis_time,
-        ) = PTR_subproblem(params.items(), cpg_solve, x, u, aug_dy, prob, settings)
-
-        V_multi_shoot_traj.append(V_multi_shoot)
-
-        x.guess = x_sol
-        u.guess = u_sol
-
-        J_tr = np.sum(np.array(J_tr_vec))
-        J_vb = np.sum(np.array(J_vb_vec))
-        J_vc = np.sum(np.array(J_vc_vec))
-        scp_trajs.append(x.guess)
-        scp_controls.append(u.guess)
-
-        settings.scp.w_tr = min(settings.scp.w_tr * settings.scp.w_tr_adapt, settings.scp.w_tr_max)
-        if k > settings.scp.cost_drop:
-            settings.scp.lam_cost = settings.scp.lam_cost * settings.scp.cost_relax
-
-        emitter_function(
-            {
-                "iter": k,
-                "dis_time": dis_time * 1000.0,
-                "subprop_time": subprop_time * 1000.0,
-                "J_total": J_total,
-                "J_tr": J_tr,
-                "J_vb": J_vb,
-                "J_vc": J_vc,
-                "cost": cost[-1],
-                "prob_stat": prob_stat,
-            }
+        result = PTR_step(
+            params,
+            settings,
+            prob,
+            aug_dy,
+            cpg_solve,
+            emitter_function,
+            scp_k,
+            scp_J_tr,
+            scp_J_vb,
+            scp_J_vc,
+            scp_trajs,
+            scp_controls,
+            scp_V_multi_shoot_traj,
         )
 
-        k += 1
+        # Update state from result
+        scp_k = result["scp_k"]
+        scp_J_tr = result["scp_J_tr"]
+        scp_J_vb = result["scp_J_vb"]
+        scp_J_vc = result["scp_J_vc"]
+
+    # Use the final vectors for the result (from the last iteration)
+    final_J_tr_vec = [scp_J_tr]
+    final_J_vb_vec = [scp_J_vb]
+    final_J_vc_vec = [scp_J_vc]
 
     result = OptimizationResults(
-        converged=k <= settings.scp.k_max,
+        converged=scp_k <= settings.scp.k_max,
         t_final=x.guess[:, settings.sim.idx_t][-1],
         u=u,
         x=x,
         x_history=scp_trajs,
         u_history=scp_controls,
-        discretization_history=V_multi_shoot_traj,
-        J_tr_history=J_tr_vec,
-        J_vb_history=J_vb_vec,
-        J_vc_history=J_vc_vec,
+        discretization_history=scp_V_multi_shoot_traj,
+        J_tr_history=final_J_tr_vec,
+        J_vb_history=final_J_vb_vec,
+        J_vc_history=final_J_vc_vec,
     )
 
     return result

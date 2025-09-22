@@ -54,7 +54,7 @@ from openscvx.dynamics import dynamics as to_dynamics
 from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables, lower_convex_constraints
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
-from openscvx.ptr import PTR_init, PTR_subproblem, format_result
+from openscvx.ptr import PTR_init, PTR_step, PTR_subproblem, format_result
 from openscvx.results import OptimizationResults
 
 if TYPE_CHECKING:
@@ -453,79 +453,29 @@ class TrajOptProblem:
         Returns:
             dict: Dictionary containing convergence status and current state
         """
-        x = self.settings.sim.x
-        u = self.settings.sim.u
-
-        # Run the subproblem
-        (
-            x_sol,
-            u_sol,
-            cost,
-            J_total,
-            J_vb_vec,
-            J_vc_vec,
-            J_tr_vec,
-            prob_stat,
-            V_multi_shoot,
-            subprop_time,
-            dis_time,
-        ) = PTR_subproblem(
-            self.parameters.items(),
-            self.cpg_solve,
-            x,
-            u,
-            self.discretization_solver,
-            self.optimal_control_problem,
+        result = PTR_step(
+            self.parameters,
             self.settings,
+            self.optimal_control_problem,
+            self.discretization_solver,
+            self.cpg_solve,
+            self.emitter_function,
+            self.scp_k,
+            self.scp_J_tr,
+            self.scp_J_vb,
+            self.scp_J_vc,
+            self.scp_trajs,
+            self.scp_controls,
+            self.scp_V_multi_shoot_traj,
         )
 
-        # Update state
-        self.scp_V_multi_shoot_traj.append(V_multi_shoot)
-        x.guess = x_sol
-        u.guess = u_sol
-        self.scp_trajs.append(x.guess)
-        self.scp_controls.append(u.guess)
+        # Update instance state from result
+        self.scp_k = result["scp_k"]
+        self.scp_J_tr = result["scp_J_tr"]
+        self.scp_J_vb = result["scp_J_vb"]
+        self.scp_J_vc = result["scp_J_vc"]
 
-        self.scp_J_tr = np.sum(np.array(J_tr_vec))
-        self.scp_J_vb = np.sum(np.array(J_vb_vec))
-        self.scp_J_vc = np.sum(np.array(J_vc_vec))
-
-        # Update weights
-        self.settings.scp.w_tr = min(
-            self.settings.scp.w_tr * self.settings.scp.w_tr_adapt, self.settings.scp.w_tr_max
-        )
-        if self.scp_k > self.settings.scp.cost_drop:
-            self.settings.scp.lam_cost = self.settings.scp.lam_cost * self.settings.scp.cost_relax
-
-        # Emit data
-        self.emitter_function(
-            {
-                "iter": self.scp_k,
-                "dis_time": dis_time * 1000.0,
-                "subprop_time": subprop_time * 1000.0,
-                "J_total": J_total,
-                "J_tr": self.scp_J_tr,
-                "J_vb": self.scp_J_vb,
-                "J_vc": self.scp_J_vc,
-                "cost": cost[-1],
-                "prob_stat": prob_stat,
-            }
-        )
-
-        # Increment counter
-        self.scp_k += 1
-
-        # Create a result dictionary for this step
-        return {
-            "converged": (
-                (self.scp_J_tr < self.settings.scp.ep_tr)
-                and (self.scp_J_vb < self.settings.scp.ep_vb)
-                and (self.scp_J_vc < self.settings.scp.ep_vc)
-            ),
-            "u": u,
-            "x": x,
-            "V_multi_shoot": V_multi_shoot,
-        }
+        return result
 
     def solve(
         self, max_iters: Optional[int] = None, continuous: bool = False
