@@ -10,7 +10,7 @@ sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_control_norm, plot_xy_xz_yz
-from openscvx.trajoptproblem import TrajOptProblem
+from openscvx import TrajOptProblem
 
 n = 30
 total_time = 95.0  # Total simulation time

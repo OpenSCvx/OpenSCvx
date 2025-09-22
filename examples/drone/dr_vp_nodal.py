@@ -12,7 +12,7 @@ sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_animation
-from openscvx.trajoptproblem import TrajOptProblem
+from openscvx import TrajOptProblem
 from openscvx.utils import gen_vertices, rot
 
 n = 33  # Number of Nodes

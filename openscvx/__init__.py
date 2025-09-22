@@ -37,8 +37,11 @@ from openscvx.backend.expr import (
     Variable,
     ctcs,
 )
+from openscvx.trajoptproblem import TrajOptProblem
 
 __all__ = [
+    # Main Trajectory Optimization Entrypoint
+    "TrajOptProblem",
     # Core base classes
     "Expr",
     "Leaf",

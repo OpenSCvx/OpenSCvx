@@ -11,7 +11,7 @@ sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_animation
-from openscvx.trajoptproblem import TrajOptProblem
+from openscvx import TrajOptProblem
 from openscvx.utils import get_kp_pose
 
 n = 12  # Number of Nodes

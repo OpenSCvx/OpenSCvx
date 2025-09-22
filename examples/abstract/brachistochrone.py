@@ -13,7 +13,7 @@ from examples.plotting import (
     plot_brachistochrone_position,
     plot_brachistochrone_velocity,
 )
-from openscvx.trajoptproblem import TrajOptProblem
+from openscvx import TrajOptProblem
 
 n = 2
 total_time = 2.0
