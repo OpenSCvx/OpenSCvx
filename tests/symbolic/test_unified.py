@@ -1,8 +1,7 @@
 import numpy as np
 import pytest
 
-from openscvx.backend.control import Control
-from openscvx.backend.state import State
+from openscvx.backend.expr import Control, State
 from openscvx.backend.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
 
 

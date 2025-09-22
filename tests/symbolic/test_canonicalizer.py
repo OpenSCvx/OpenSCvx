@@ -12,10 +12,10 @@ from openscvx.backend.expr import (
     Mul,
     Neg,
     NodalConstraint,
+    State,
     Sub,
     to_expr,
 )
-from openscvx.backend.state import State
 
 
 def test_flatten_and_fold_add():

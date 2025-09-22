@@ -1,11 +1,11 @@
 import numpy as np
 import pytest
 
-from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     CTCS,
     Add,
     Constant,
+    Control,
     Div,
     Equality,
     Inequality,
@@ -15,14 +15,14 @@ from openscvx.backend.expr import (
     NodalConstraint,
     Parameter,
     Power,
+    State,
     Sub,
     Sum,
+    Variable,
     ctcs,
     to_expr,
     traverse,
 )
-from openscvx.backend.state import State
-from openscvx.backend.variable import Variable
 
 
 def test_to_expr_wraps_numbers_and_arrays():

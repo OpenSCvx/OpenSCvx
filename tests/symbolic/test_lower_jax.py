@@ -2,7 +2,6 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     CTCS,
     QDCM,
@@ -11,6 +10,7 @@ from openscvx.backend.expr import (
     Add,
     Concat,
     Constant,
+    Control,
     Diag,
     Div,
     Equality,
@@ -30,13 +30,13 @@ from openscvx.backend.expr import (
     Sqrt,
     Square,
     Stack,
+    State,
     Sub,
     Sum,
     Vstack,
 )
 from openscvx.backend.lower import lower, lower_to_jax
 from openscvx.backend.lowerers.jax import JaxLowerer
-from openscvx.backend.state import State
 
 
 class UnregisteredExpr(Expr):

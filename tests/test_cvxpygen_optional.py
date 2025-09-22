@@ -6,8 +6,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from openscvx.backend.control import Control
-from openscvx.backend.state import State
+from openscvx.backend.expr import Control, State
 from openscvx.constraints import ctcs
 from openscvx.dynamics import dynamics
 from openscvx.trajoptproblem import TrajOptProblem

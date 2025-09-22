@@ -2,11 +2,11 @@ import cvxpy as cp
 import numpy as np
 import pytest
 
-from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     Add,
     Concat,
     Constant,
+    Control,
     Cos,
     Div,
     Equality,
@@ -22,12 +22,12 @@ from openscvx.backend.expr import (
     Sin,
     SmoothReLU,
     Square,
+    State,
     Sub,
     Sum,
     ctcs,
 )
 from openscvx.backend.lowerers.cvxpy import CvxpyLowerer, lower_to_cvxpy
-from openscvx.backend.state import State
 
 
 class TestCvxpyLowerer:

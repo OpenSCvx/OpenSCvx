@@ -8,12 +8,12 @@ from openscvx.backend.augmentation import (
     separate_constraints,
     sort_ctcs_constraints,
 )
-from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     CTCS,
     Add,
     Concat,
     Constant,
+    Control,
     Huber,
     Index,
     Inequality,
@@ -21,12 +21,12 @@ from openscvx.backend.expr import (
     PositivePart,
     SmoothReLU,
     Square,
+    State,
     Sub,
     Sum,
     ctcs,
 )
 from openscvx.backend.lower import lower_to_jax
-from openscvx.backend.state import State
 
 
 def test_separate_constraints_empty():

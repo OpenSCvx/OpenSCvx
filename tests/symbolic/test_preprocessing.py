@@ -2,8 +2,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from openscvx.backend.control import Control
-from openscvx.backend.expr import Add, Concat, Constant, Hstack, Vstack
+from openscvx.backend.expr import Add, Concat, Constant, Control, Hstack, State, Vstack
 from openscvx.backend.preprocessing import (
     collect_and_assign_slices,
     validate_constraints_at_root,
@@ -11,7 +10,6 @@ from openscvx.backend.preprocessing import (
     validate_shapes,
     validate_variable_names,
 )
-from openscvx.backend.state import State
 
 
 def test_unique_names_passes():
