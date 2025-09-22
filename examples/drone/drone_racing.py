@@ -216,13 +216,13 @@ tau = u[3:]
 
 # Option 2: Efficient dynamics using direct JAX lowering (better performance)
 r_dot = v
-v_dot = (ox.Constant(1.0 / m)) * ox.QDCM(q_normalized) @ f + ox.Constant(
+v_dot = (ox.Constant(1.0 / m)) * ox.spatial.QDCM(q_normalized) @ f + ox.Constant(
     np.array([0, 0, g_const], dtype=np.float64)
 )
-q_dot = ox.Constant(0.5) * ox.SSMP(w) @ q_normalized
+q_dot = ox.Constant(0.5) * ox.spatial.SSMP(w) @ q_normalized
 J_b_inv = ox.Constant(1.0 / J_b)
-J_b_diag = ox.Diag(ox.Constant(J_b))
-w_dot = ox.Diag(J_b_inv) @ (tau - ox.SSM(w) @ J_b_diag @ w)
+J_b_diag = ox.linalg.Diag(ox.Constant(J_b))
+w_dot = ox.linalg.Diag(J_b_inv) @ (tau - ox.spatial.SSM(w) @ J_b_diag @ w)
 t_dot = ox.Constant(np.array([1.0], dtype=np.float64))
 dyn_expr = ox.Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
 

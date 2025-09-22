@@ -4,7 +4,9 @@ import os
 os.environ["EQX_ON_ERROR"] = "nan"
 
 # Core symbolic expressions - flat namespace for most common functions
-from openscvx import stl
+import openscvx.backend.expr.linalg as linalg
+import openscvx.backend.expr.spatial as spatial
+import openscvx.backend.expr.stl as stl
 from openscvx.backend.expr import (
     CTCS,
     # Basic arithmetic operations
@@ -83,4 +85,6 @@ __all__ = [
     "Norm",
     # Submodules
     "stl",
+    "spatial",
+    "linalg",
 ]

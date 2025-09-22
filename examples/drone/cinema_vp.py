@@ -108,13 +108,13 @@ tau = u[3:]
 
 # Define dynamics using symbolic expressions
 r_dot = v
-v_dot = (ox.Constant(1.0 / m)) * ox.QDCM(q_normalized) @ f + ox.Constant(
+v_dot = (ox.Constant(1.0 / m)) * ox.spatial.QDCM(q_normalized) @ f + ox.Constant(
     np.array([0, 0, g_const], dtype=np.float64)
 )
-q_dot = ox.Constant(0.5) * ox.SSMP(w) @ q_normalized
+q_dot = ox.Constant(0.5) * ox.spatial.SSMP(w) @ q_normalized
 J_b_inv = ox.Constant(1.0 / J_b)
-J_b_diag = ox.Diag(ox.Constant(J_b))
-w_dot = ox.Diag(J_b_inv) @ (tau - ox.SSM(w) @ J_b_diag @ w)
+J_b_diag = ox.linalg.Diag(ox.Constant(J_b))
+w_dot = ox.linalg.Diag(J_b_inv) @ (tau - ox.spatial.SSM(w) @ J_b_diag @ w)
 fuel_dot = ox.Norm(u)
 t_dot = ox.Constant(np.array([1.0], dtype=np.float64))
 dynamics = ox.Concat(r_dot, v_dot, q_dot, w_dot, fuel_dot, t_dot)
@@ -163,7 +163,7 @@ R_sb_const = ox.Constant(R_sb)
 A_cone_const = ox.Constant(A_cone)
 c_const = ox.Constant(c)
 
-p_s_s = R_sb_const @ ox.QDCM(x[6:10]).T @ (kp_pose_symbolic - x[:3])
+p_s_s = R_sb_const @ ox.spatial.QDCM(x[6:10]).T @ (kp_pose_symbolic - x[:3])
 vp_constraint = ox.Constant(np.sqrt(2e1)) * (
     ox.Norm(A_cone_const @ p_s_s, ord=norm_type) - (c_const.T @ p_s_s)
 )
