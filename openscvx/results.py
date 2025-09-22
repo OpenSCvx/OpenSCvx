@@ -3,8 +3,8 @@ from typing import Any, Optional
 
 import numpy as np
 
-from openscvx.backend.control import Control
-from openscvx.backend.state import State
+from openscvx.backend.expr.control import Control
+from openscvx.backend.expr.state import State
 
 
 @dataclass

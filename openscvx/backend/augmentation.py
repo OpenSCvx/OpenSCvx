@@ -2,7 +2,6 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 
-from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     CTCS,
     Add,
@@ -12,7 +11,8 @@ from openscvx.backend.expr import (
     Index,
     NodalConstraint,
 )
-from openscvx.backend.state import State
+from openscvx.backend.expr.control import Control
+from openscvx.backend.expr.state import State
 
 
 def sort_ctcs_constraints(

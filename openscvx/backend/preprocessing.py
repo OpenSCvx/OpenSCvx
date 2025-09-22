@@ -2,7 +2,6 @@ from typing import Callable, Dict, Iterable, Set, Tuple, Type, Union
 
 import numpy as np
 
-from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     CTCS,
     QDCM,
@@ -12,6 +11,7 @@ from openscvx.backend.expr import (
     Concat,
     Constant,
     Constraint,
+    Control,
     Cos,
     Diag,
     Div,
@@ -37,14 +37,14 @@ from openscvx.backend.expr import (
     Sqrt,
     Square,
     Stack,
+    State,
     Sub,
     Sum,
     Transpose,
+    Variable,
     Vstack,
     traverse,
 )
-from openscvx.backend.state import State
-from openscvx.backend.variable import Variable
 
 
 # TODO: (norrisg) allow `traverse` to take a list of visitors, that way we can combine steps

@@ -6,8 +6,8 @@ from typing import Callable, Optional, Union
 import jax.numpy as jnp
 from jax.lax import cond
 
-from openscvx.backend.control import Control
-from openscvx.backend.state import State, Variable
+from openscvx.backend.expr.control import Control
+from openscvx.backend.expr.state import State, Variable
 
 # TODO: (norrisg) Unclear if should specify behavior for `idx`, `jacfwd`
 # behavior for Jacobians, etc. since that logic is handled elsewhere and

@@ -2,7 +2,6 @@ from typing import Any, Callable, Dict, Type, Union
 
 import numpy as np
 
-from openscvx.backend.control import Control
 from openscvx.backend.expr import (
     CTCS,
     QDCM,
@@ -41,7 +40,8 @@ from openscvx.backend.expr import (
     Transpose,
     Vstack,
 )
-from openscvx.backend.state import State
+from openscvx.backend.expr.control import Control
+from openscvx.backend.expr.state import State
 
 _CANON_VISITORS: Dict[Type[Expr], Callable] = {}
 

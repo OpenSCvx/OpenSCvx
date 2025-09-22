@@ -19,8 +19,9 @@ from openscvx.backend.augmentation import (
     sort_ctcs_constraints,
 )
 from openscvx.backend.canonicalizer import canonicalize
-from openscvx.backend.control import Control
 from openscvx.backend.expr import CTCS, Constraint, Expr
+from openscvx.backend.expr.control import Control
+from openscvx.backend.expr.state import State
 from openscvx.backend.lower import lower_to_jax
 from openscvx.backend.preprocessing import (
     collect_and_assign_slices,
@@ -30,7 +31,6 @@ from openscvx.backend.preprocessing import (
     validate_shapes,
     validate_variable_names,
 )
-from openscvx.backend.state import State
 from openscvx.backend.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
 from openscvx.caching import (
     get_solver_cache_paths,
