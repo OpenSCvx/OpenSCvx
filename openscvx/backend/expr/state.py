@@ -2,7 +2,7 @@ from enum import Enum
 
 import numpy as np
 
-from openscvx.backend.variable import Variable
+from .variable import Variable
 
 
 class BoundaryType(str, Enum):

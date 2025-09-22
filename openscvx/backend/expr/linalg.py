@@ -1,4 +1,3 @@
-
 from .expr import Expr, to_expr
 
 
@@ -40,6 +39,7 @@ class Norm(Expr):
 
     def __repr__(self):
         return f"norm({self.operand!r}, ord={self.ord!r})"
+
 
 class Stack(Expr):
     """Stack expressions into a matrix - similar to jnp.array([[row1], [row2], ...])"""

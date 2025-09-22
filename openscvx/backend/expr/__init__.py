@@ -1,6 +1,8 @@
-
 # Specialized constraints
 from .constraint import CTCS, NodalConstraint, ctcs
+
+# Control
+from .control import Control
 
 # Core base classes and fundamental operations
 from .expr import (
@@ -34,28 +36,68 @@ from .math import Cos, Exp, Huber, Log, PositivePart, Sin, SmoothReLU, Sqrt, Squ
 # Spatial/3D operations
 from .spatial import QDCM, SSM, SSMP
 
+# State
+from .state import BoundaryType, State
+
 # STL operations
 from .stl import Or
 
+# Variable
+from .variable import Variable
+
 __all__ = [
     # Core base classes and fundamental operations
-    "Expr", "Leaf", "Parameter", "to_expr", "traverse",
-    "Add", "Sub", "Mul", "Div", "MatMul", "Neg", "Power",
-    "Sum", "Index", "Concat", "Constant",
-    "Constraint", "Equality", "Inequality",
-
+    "Expr",
+    "Leaf",
+    "Parameter",
+    "to_expr",
+    "traverse",
+    "Add",
+    "Sub",
+    "Mul",
+    "Div",
+    "MatMul",
+    "Neg",
+    "Power",
+    "Sum",
+    "Index",
+    "Concat",
+    "Constant",
+    "Constraint",
+    "Equality",
+    "Inequality",
+    # Variable
+    "Variable",
+    # State
+    "State",
+    "BoundaryType",
+    # Control
+    "Control",
     # Mathematical functions
-    "Sin", "Cos", "Sqrt", "PositivePart", "Square", "Huber", "SmoothReLU", "Exp", "Log",
-
+    "Sin",
+    "Cos",
+    "Sqrt",
+    "PositivePart",
+    "Square",
+    "Huber",
+    "SmoothReLU",
+    "Exp",
+    "Log",
     # Linear algebra operations
-    "Transpose", "Stack", "Hstack", "Vstack", "Norm", "Diag",
-
+    "Transpose",
+    "Stack",
+    "Hstack",
+    "Vstack",
+    "Norm",
+    "Diag",
     # Spatial/3D operations
-    "QDCM", "SSMP", "SSM",
-
+    "QDCM",
+    "SSMP",
+    "SSM",
     # Specialized constraints
-    "NodalConstraint", "CTCS", "ctcs",
-
+    "NodalConstraint",
+    "CTCS",
+    "ctcs",
     # STL operations
     "Or",
 ]

@@ -1,6 +1,4 @@
-import numpy as np
-
-from openscvx.backend.variable import Variable
+from .variable import Variable
 
 
 class Control(Variable):

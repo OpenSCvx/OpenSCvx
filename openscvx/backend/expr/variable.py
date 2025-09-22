@@ -1,6 +1,6 @@
 import numpy as np
 
-from openscvx.backend.expr import Leaf
+from .expr import Leaf
 
 
 class Variable(Leaf):
@@ -174,49 +174,3 @@ class Variable(Leaf):
                 if guess_arr.shape[1] != 1:
                     guess_arr = guess_arr.T
                 self._guess = np.concatenate([self._guess, guess_arr], axis=1)
-
-    # TODO: (norrisg) fix this so that can still nicely access min/max limits
-    # Arguably this was already mesy since user needed to magically know to write `x.true.max`
-    # instead of just `x.max` while writing constraints
-    #
-    # def __getitem__(self, idx):
-    #     """Get a subset of the variable.
-
-    #     Args:
-    #         idx (int or slice): Index or slice to select variables
-
-    #     Returns:
-    #         Variable: A new Variable object containing the selected variables
-
-    #     Raises:
-    #         TypeError: If idx is not an int or slice
-    #     """
-    #     if isinstance(idx, int):
-    #         new_shape = ()
-    #     elif isinstance(idx, slice):
-    #         new_shape = (len(range(*idx.indices(self.shape[0]))),)
-    #     else:
-    #         raise TypeError("Variable indices must be int or slice")
-
-    #     sliced = Variable(f"{self.name}[{idx}]", new_shape)
-
-    #     def slice_attr(attr):
-    #         """Slice an attribute array based on the index.
-
-    #         Args:
-    #             attr (np.ndarray): Attribute array to slice
-
-    #         Returns:
-    #             np.ndarray: Sliced attribute array
-    #         """
-    #         if attr is None:
-    #             return None
-    #         if attr.ndim == 2 and attr.shape[1] == self.shape[0]:
-    #             return attr[:, idx]
-    #         return attr[idx]
-
-    #     sliced._min = slice_attr(self._min)
-    #     sliced._max = slice_attr(self._max)
-    #     sliced._guess = slice_attr(self._guess)
-
-    #     return sliced
