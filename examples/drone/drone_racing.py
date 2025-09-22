@@ -18,7 +18,6 @@ from openscvx.backend.expr import (
     Constant,
     Diag,
     Norm,
-    Power,
     Sqrt,
     Stack,
     Sum,
