@@ -45,7 +45,7 @@ obs_radius = ox.Parameter("obs_radius", shape=())
 
 # Define constraints using symbolic expressions
 constraints = [
-    ox.ctcs(obs_radius <= ox.Norm(x[:2] - obs_center)),
+    ox.ctcs(obs_radius <= ox.linalg.Norm(x[:2] - obs_center)),
     ox.ctcs(x <= ox.Constant(x.max)),
     ox.ctcs(ox.Constant(x.min) <= x),
 ]

@@ -118,7 +118,9 @@ constraints = [
 
 for node, A_c in zip(gate_nodes, A_gate_c_params):
     gate_constraint = (
-        (ox.Norm(A_gate_const @ x[:3] - A_c, ord="inf") <= ox.Constant(1.0)).convex().at([node])
+        (ox.linalg.Norm(A_gate_const @ x[:3] - A_c, ord="inf") <= ox.Constant(1.0))
+        .convex()
+        .at([node])
     )
     constraints.append(gate_constraint)
 
@@ -195,7 +197,7 @@ def symbolic_diag(v):
 # Create symbolic dynamics
 v = x[3:6]
 q = x[6:10]
-q_norm = ox.Norm(q)  # Cleaner than Sqrt(Sum(q * q))
+q_norm = ox.linalg.Norm(q)  # Cleaner than Sqrt(Sum(q * q))
 q_normalized = q / q_norm
 w = x[10:13]
 

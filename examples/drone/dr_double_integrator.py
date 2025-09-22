@@ -80,7 +80,7 @@ for node, cen in zip(gate_nodes, A_gate_cen):
     A_gate_const = ox.Constant(A_gate)
     c_const = ox.Constant(cen)
     gate_constraint = (
-        (ox.Norm(A_gate_const @ x[:3] - c_const, ord="inf") <= ox.Constant(np.array([1.0])))
+        (ox.linalg.Norm(A_gate_const @ x[:3] - c_const, ord="inf") <= ox.Constant(np.array([1.0])))
         .convex()
         .at([node])
     )

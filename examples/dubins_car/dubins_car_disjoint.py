@@ -53,8 +53,8 @@ dyn_expr = ox.Concat(rx_dot, ry_dot, theta_dot, t_dot)
 # Create symbolic visit waypoint OR constraint
 def create_visit_wp_OR_expr():
     # Visit wp1 or wp2 using smooth max
-    d1 = ox.Norm(pos - wp1_center)
-    d2 = ox.Norm(pos - wp2_center)
+    d1 = ox.linalg.Norm(pos - wp1_center)
+    d2 = ox.linalg.Norm(pos - wp2_center)
     v1 = wp1_radius - d1
     v2 = wp2_radius - d2
     alpha = ox.Constant(10.0)  # smoothing parameter; higher = closer to max

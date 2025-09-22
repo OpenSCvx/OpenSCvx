@@ -9,20 +9,16 @@ import openscvx.backend.expr.spatial as spatial
 import openscvx.backend.expr.stl as stl
 from openscvx.backend.expr import (
     CTCS,
-    # Basic arithmetic operations
     Add,
     Concat,
     Constant,
-    # Constraints
     Constraint,
     Control,
     Cos,
     Div,
     Equality,
     Exp,
-    # Core base classes
     Expr,
-    # Array operations
     Index,
     Inequality,
     Leaf,
@@ -31,17 +27,13 @@ from openscvx.backend.expr import (
     Mul,
     Neg,
     NodalConstraint,
-    Norm,
     Parameter,
     Power,
-    # Mathematical functions
     Sin,
     Sqrt,
     State,
     Sub,
     Sum,
-    # Common linear algebra (also available via openscvx.linalg)
-    Transpose,
     Variable,
     ctcs,
 )
@@ -80,9 +72,6 @@ __all__ = [
     "NodalConstraint",
     "CTCS",
     "ctcs",
-    # Common linear algebra
-    "Transpose",
-    "Norm",
     # Submodules
     "stl",
     "spatial",

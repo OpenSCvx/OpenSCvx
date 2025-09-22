@@ -63,12 +63,12 @@ constraints = [
     ox.ctcs(x <= ox.Constant(x.max), idx=0),
     ox.ctcs(ox.Constant(x.min) <= x, idx=0),
     # Thrust magnitude constraints
-    ox.ctcs(ox.Constant(rho_min) <= ox.Norm(u[:3]), idx=1),
-    ox.ctcs(ox.Norm(u[:3]) <= ox.Constant(rho_max), idx=1),
+    ox.ctcs(ox.Constant(rho_min) <= ox.linalg.Norm(u[:3]), idx=1),
+    ox.ctcs(ox.linalg.Norm(u[:3]) <= ox.Constant(rho_max), idx=1),
     # Thrust pointing constraint (thrust cant angle)
-    ox.ctcs(ox.Constant(np.cos((180 - 40) * np.pi / 180)) <= u[2] / ox.Norm(u[:3]), idx=2),
+    ox.ctcs(ox.Constant(np.cos((180 - 40) * np.pi / 180)) <= u[2] / ox.linalg.Norm(u[:3]), idx=2),
     # Glideslope constraint
-    ox.ctcs(ox.Norm(x[:2]) <= ox.Constant(np.tan(86 * np.pi / 180)) * x[2], idx=3),
+    ox.ctcs(ox.linalg.Norm(x[:2]) <= ox.Constant(np.tan(86 * np.pi / 180)) * x[2], idx=3),
 ]
 
 
@@ -78,7 +78,7 @@ T = u
 r_dot = x[3:6]
 g_vec = ox.Constant(np.array([0, 0, 1], dtype=np.float64)) * g  # Gravitational acceleration vector
 v_dot = T / m - g_vec
-m_dot = -ox.Norm(T) / (I_sp * ox.Constant(g_e) * ox.Constant(np.cos(theta_val)))
+m_dot = -ox.linalg.Norm(T) / (I_sp * ox.Constant(g_e) * ox.Constant(np.cos(theta_val)))
 t_dot = ox.Constant(np.array([1], dtype=np.float64))
 dynamics_expr = ox.Concat(r_dot, v_dot, m_dot, t_dot)
 

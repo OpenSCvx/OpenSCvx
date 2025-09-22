@@ -128,7 +128,7 @@ def g_vp(p_s_I_const, x_pos, x_quat):
     c_const = ox.Constant(c)
 
     p_s_s = R_sb_const @ ox.spatial.QDCM(x_quat).T @ (p_s_I - x_pos)
-    return ox.Norm(A_cone_const @ p_s_s, ord=norm_type) - (c_const.T @ p_s_s)
+    return ox.linalg.Norm(A_cone_const @ p_s_s, ord=norm_type) - (c_const.T @ p_s_s)
 
 
 # Create symbolic constraints
@@ -149,7 +149,9 @@ for node, cen in zip(gate_nodes, A_gate_cen):
 
     # Gate constraint: ||A @ pos - c||_inf <= 1
     gate_constraint = (
-        (ox.Norm(A_gate_const @ pos - cen_const, ord="inf") <= ox.Constant(1.0)).convex().at([node])
+        (ox.linalg.Norm(A_gate_const @ pos - cen_const, ord="inf") <= ox.Constant(1.0))
+        .convex()
+        .at([node])
     )
     constraints.append(gate_constraint)
 
@@ -162,7 +164,7 @@ J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
 # Unpack the state and control vectors using symbolic expressions
 v = x[3:6]
 q = x[6:10]
-q_norm = ox.Norm(q)
+q_norm = ox.linalg.Norm(q)
 q_normalized = q / q_norm
 w = x[10:13]
 

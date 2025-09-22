@@ -68,7 +68,7 @@ J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
 # Create symbolic dynamics
 v = x[3:6]
 q = x[6:10]
-q_norm = ox.Norm(q)
+q_norm = ox.linalg.Norm(q)
 q_normalized = q / q_norm
 w = x[10:13]
 

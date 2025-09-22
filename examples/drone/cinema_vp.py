@@ -99,7 +99,7 @@ J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
 # Unpack the state and control vectors using symbolic expressions
 v = x[3:6]
 q = x[6:10]
-q_norm = ox.Norm(q)
+q_norm = ox.linalg.Norm(q)
 q_normalized = q / q_norm
 w = x[10:13]
 
@@ -115,7 +115,7 @@ q_dot = ox.Constant(0.5) * ox.spatial.SSMP(w) @ q_normalized
 J_b_inv = ox.Constant(1.0 / J_b)
 J_b_diag = ox.linalg.Diag(ox.Constant(J_b))
 w_dot = ox.linalg.Diag(J_b_inv) @ (tau - ox.spatial.SSM(w) @ J_b_diag @ w)
-fuel_dot = ox.Norm(u)
+fuel_dot = ox.linalg.Norm(u)
 t_dot = ox.Constant(np.array([1.0], dtype=np.float64))
 dynamics = ox.Concat(r_dot, v_dot, q_dot, w_dot, fuel_dot, t_dot)
 
@@ -165,12 +165,12 @@ c_const = ox.Constant(c)
 
 p_s_s = R_sb_const @ ox.spatial.QDCM(x[6:10]).T @ (kp_pose_symbolic - x[:3])
 vp_constraint = ox.Constant(np.sqrt(2e1)) * (
-    ox.Norm(A_cone_const @ p_s_s, ord=norm_type) - (c_const.T @ p_s_s)
+    ox.linalg.Norm(A_cone_const @ p_s_s, ord=norm_type) - (c_const.T @ p_s_s)
 )
 
 # Range constraints using symbolic keypoint pose
-min_range_constraint = ox.Constant(min_range) - ox.Norm(kp_pose_symbolic - x[:3])
-max_range_constraint = ox.Norm(kp_pose_symbolic - x[:3]) - ox.Constant(max_range)
+min_range_constraint = ox.Constant(min_range) - ox.linalg.Norm(kp_pose_symbolic - x[:3])
+max_range_constraint = ox.linalg.Norm(kp_pose_symbolic - x[:3]) - ox.Constant(max_range)
 
 constraints.extend(
     [

@@ -54,8 +54,8 @@ t_dot = ox.Constant(1.0)
 dyn_expr = ox.Concat(rx_dot, ry_dot, theta_dot, t_dot)
 
 # Create symbolic expressions for waypoint predicates
-wp1_pred = wp1_radius - ox.Norm(pos - wp1_center)
-wp2_pred = wp2_radius - ox.Norm(pos - wp2_center)
+wp1_pred = wp1_radius - ox.linalg.Norm(pos - wp1_center)
+wp2_pred = wp2_radius - ox.linalg.Norm(pos - wp2_center)
 
 # Create symbolic OR expression using the new Or node
 visit_wp_or_expr = ox.stl.Or(wp1_pred, wp2_pred)
