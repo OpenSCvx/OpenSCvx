@@ -28,6 +28,7 @@ from openscvx.backend.expr import (
     Neg,
     NodalConstraint,
     Norm,
+    Or,
     Parameter,
     PositivePart,
     Power,
@@ -708,3 +709,25 @@ def visit_transpose(node: Transpose) -> tuple[int, ...]:
         # Higher-dimensional array: transpose last two dimensions
         # (..., m, n) -> (..., n, m)
         return operand_shape[:-2] + (operand_shape[-1], operand_shape[-2])
+
+
+@visitor(Or)
+def visit_or(node: Or) -> tuple[int, ...]:
+    """Logical OR operation for STL expressions - validates operand shapes and returns scalar"""
+    if len(node.operands) < 2:
+        raise ValueError("Or requires at least two operands")
+
+    # Validate all operands and get their shapes
+    operand_shapes = [dispatch(operand) for operand in node.operands]
+
+    # For logical operations, all operands should be broadcastable
+    # This allows mixing scalars with vectors for element-wise operations
+    try:
+        result_shape = operand_shapes[0]
+        for shape in operand_shapes[1:]:
+            result_shape = np.broadcast_shapes(result_shape, shape)
+    except ValueError as e:
+        raise ValueError(f"Or operands not broadcastable: {operand_shapes}") from e
+
+    # Or produces a scalar result (like constraints)
+    return ()

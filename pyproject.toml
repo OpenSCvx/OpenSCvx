@@ -43,6 +43,9 @@ cvxpygen = [
     "cvxpygen",
     "qocogen",
 ]
+stl = [
+    "stljax",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

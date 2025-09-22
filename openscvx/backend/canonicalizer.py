@@ -27,6 +27,7 @@ from openscvx.backend.expr import (
     Neg,
     NodalConstraint,
     Norm,
+    Or,
     Parameter,
     PositivePart,
     Power,
@@ -334,3 +335,21 @@ class Canonicalizer:
             return operand.operand
 
         return Transpose(operand)
+
+    @visitor(Or)
+    def visit_or(self, node: Or) -> Expr:
+        # Flatten nested Or expressions and canonicalize operands
+        operands: list[Expr] = []
+
+        for operand in node.operands:
+            canonicalized = self.canonicalize(operand)
+            if isinstance(canonicalized, Or):
+                # Flatten nested Or: Or(a, Or(b, c)) -> Or(a, b, c)
+                operands.extend(canonicalized.operands)
+            else:
+                operands.append(canonicalized)
+
+        # Return simplified Or expression
+        if len(operands) == 1:
+            return operands[0]
+        return Or(*operands)

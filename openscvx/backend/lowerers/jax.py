@@ -29,6 +29,7 @@ from openscvx.backend.expr import (
     Neg,
     NodalConstraint,
     Norm,
+    Or,
     Parameter,
     PositivePart,
     Power,
@@ -345,3 +346,30 @@ class JaxLowerer:
     def visit_diag(self, node: Diag):
         f = self.lower(node.operand)
         return lambda x, u, node, params: jnp.diag(f(x, u, node, params))
+
+    @visitor(Or)
+    def visit_or(self, node: Or):
+        from stljax.formula import Or as STLOr
+        from stljax.formula import Predicate
+
+        # Lower each operand to get their functions
+        operand_fns = [self.lower(operand) for operand in node.operands]
+
+        # Create STLJax predicates for each operand
+        predicates = []
+        for i, operand_fn in enumerate(operand_fns):
+            # Create a predicate function that takes only state (x_)
+            def make_pred_fn(fn):
+                return lambda x_: fn(x_, None, None, {})
+
+            pred_fn = make_pred_fn(operand_fn)
+            predicates.append(Predicate(f"pred_{i}", pred_fn))
+
+        # Create STLJax Or formula
+        stl_or = STLOr(*predicates)
+
+        # Return a function that evaluates the STLJax Or
+        def or_fn(x, u, node, params):
+            return stl_or(x)
+
+        return or_fn
