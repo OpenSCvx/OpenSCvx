@@ -8,17 +8,15 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
+import openscvx as ox
 from examples.plotting import plot_animation_double_integrator
-from openscvx.backend.control import Control
-from openscvx.backend.expr import Concat, Constant, Norm, ctcs
-from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.utils import gen_vertices, rot
 
 n = 22  # Number of Nodes
 total_time = 24.0  # Total time for the simulation
 
-x = State("x", shape=(7,))  # State variable with 14 dimensions
+x = ox.State("x", shape=(7,))  # State variable with 14 dimensions
 
 x.max = np.array([200.0, 100, 50, 100, 100, 100, 100])  # Upper Bound on the states
 x.min = np.array([-200.0, -100, 15, -100, -100, -100, 0])  # Lower Bound on the states
@@ -27,7 +25,7 @@ x.initial = np.array([10.0, 0, 20, 0, 0, 0, 0])
 x.final = [10.0, 0, 20, ("free", 0), ("free", 0), ("free", 0), ("minimize", total_time)]
 x.guess = np.linspace(x.initial, x.final, n)
 
-u = Control("u", shape=(3,))  # Control variable with 6 dimensions
+u = ox.Control("u", shape=(3,))  # Control variable with 6 dimensions
 f_max = 4.179446268 * 9.81
 u.max = np.array([f_max, f_max, f_max])
 u.min = np.array([-f_max, -f_max, -f_max])  # Lower Bound on the controls
@@ -75,14 +73,14 @@ for center in gate_centers:
 ### End Gate Parameters ###
 
 constraint_exprs = [
-    ctcs(x <= Constant(np.array([x.max]))),
-    ctcs(Constant(np.array([x.min])) <= x),
+    ox.ctcs(x <= ox.Constant(np.array([x.max]))),
+    ox.ctcs(ox.Constant(np.array([x.min])) <= x),
 ]
 for node, cen in zip(gate_nodes, A_gate_cen):
-    A_gate_const = Constant(A_gate)
-    c_const = Constant(cen)
+    A_gate_const = ox.Constant(A_gate)
+    c_const = ox.Constant(cen)
     gate_constraint = (
-        (Norm(A_gate_const @ x[:3] - c_const, ord="inf") <= Constant(np.array([1.0])))
+        (ox.Norm(A_gate_const @ x[:3] - c_const, ord="inf") <= ox.Constant(np.array([1.0])))
         .convex()
         .at([node])
     )
@@ -95,9 +93,9 @@ f = u[:3]
 
 # Compute the time derivatives of the state variables
 r_dot = v
-v_dot = (1 / m) * f + Constant(np.array([0, 0, g_const], dtype=np.float64))
-t_dot = Constant(np.array([1.0], dtype=np.float64))
-dyn_expr = Concat(r_dot, v_dot, t_dot)
+v_dot = (1 / m) * f + ox.Constant(np.array([0, 0, g_const], dtype=np.float64))
+t_dot = ox.Constant(np.array([1.0], dtype=np.float64))
+dyn_expr = ox.Concat(r_dot, v_dot, t_dot)
 
 
 x_bar = np.linspace(x.initial, x.final, n)

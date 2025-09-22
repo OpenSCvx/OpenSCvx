@@ -9,21 +9,8 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
+import openscvx as ox
 from examples.plotting import plot_animation
-from openscvx.backend.control import Control
-from openscvx.backend.expr import (
-    QDCM,
-    SSM,
-    SSMP,
-    Concat,
-    Constant,
-    Cos,
-    Diag,
-    Norm,
-    Sin,
-    ctcs,
-)
-from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.utils import get_kp_pose
 
@@ -34,7 +21,7 @@ fuel_inds = 13  # Fuel Index in State
 t_inds = 14
 s_inds = 6  # Time dilation index in Control
 
-x = State("x", shape=(15,))  # State variable with 15 dimensions
+x = ox.State("x", shape=(15,))  # State variable with 15 dimensions
 x.max = np.array(
     [200.0, 100, 50, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 2000, 40]
 )  # Upper Bound on the states
@@ -77,7 +64,7 @@ x.final = [
     40,
 ]
 
-u = Control("u", shape=(6,))  # Control variable with 6 dimensions
+u = ox.Control("u", shape=(6,))  # Control variable with 6 dimensions
 
 u.max = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])
 u.min = np.array([0, 0, 0, -18.665, -18.665, -0.55562])
@@ -112,7 +99,7 @@ J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
 # Unpack the state and control vectors using symbolic expressions
 v = x[3:6]
 q = x[6:10]
-q_norm = Norm(q)
+q_norm = ox.Norm(q)
 q_normalized = q / q_norm
 w = x[10:13]
 
@@ -121,16 +108,16 @@ tau = u[3:]
 
 # Define dynamics using symbolic expressions
 r_dot = v
-v_dot = (Constant(1.0 / m)) * QDCM(q_normalized) @ f + Constant(
+v_dot = (ox.Constant(1.0 / m)) * ox.QDCM(q_normalized) @ f + ox.Constant(
     np.array([0, 0, g_const], dtype=np.float64)
 )
-q_dot = Constant(0.5) * SSMP(w) @ q_normalized
-J_b_inv = Constant(1.0 / J_b)
-J_b_diag = Diag(Constant(J_b))
-w_dot = Diag(J_b_inv) @ (tau - SSM(w) @ J_b_diag @ w)
-fuel_dot = Norm(u)
-t_dot = Constant(np.array([1.0], dtype=np.float64))
-dynamics = Concat(r_dot, v_dot, q_dot, w_dot, fuel_dot, t_dot)
+q_dot = ox.Constant(0.5) * ox.SSMP(w) @ q_normalized
+J_b_inv = ox.Constant(1.0 / J_b)
+J_b_diag = ox.Diag(ox.Constant(J_b))
+w_dot = ox.Diag(J_b_inv) @ (tau - ox.SSM(w) @ J_b_diag @ w)
+fuel_dot = ox.Norm(u)
+t_dot = ox.Constant(np.array([1.0], dtype=np.float64))
+dynamics = ox.Concat(r_dot, v_dot, q_dot, w_dot, fuel_dot, t_dot)
 
 
 # Symbolic implementation of get_kp_pose function
@@ -139,57 +126,57 @@ def get_kp_pose_symbolic(t_expr, init_pose):
     loop_radius = 20.0
 
     # Convert the trajectory parameters to symbolic constants
-    loop_time_const = Constant(loop_time)
-    loop_radius_const = Constant(loop_radius)
-    two_pi_const = Constant(2 * np.pi)
-    init_pose_const = Constant(init_pose)
-    half_const = Constant(0.5)
+    loop_time_const = ox.Constant(loop_time)
+    loop_radius_const = ox.Constant(loop_radius)
+    two_pi_const = ox.Constant(2 * np.pi)
+    init_pose_const = ox.Constant(init_pose)
+    half_const = ox.Constant(0.5)
 
     # Compute symbolic trajectory: t_angle = t / loop_time * (2 * pi)
     t_angle = t_expr / loop_time_const * two_pi_const
 
     # x = loop_radius * sin(t_angle)
-    x_pos = loop_radius_const * Sin(t_angle)
+    x_pos = loop_radius_const * ox.Sin(t_angle)
 
     # y = x * cos(t_angle)
-    y_pos = x_pos * Cos(t_angle)
+    y_pos = x_pos * ox.Cos(t_angle)
 
     # z = 0.5 * x * sin(t_angle)
-    z_pos = half_const * x_pos * Sin(t_angle)
+    z_pos = half_const * x_pos * ox.Sin(t_angle)
 
     # Stack into position vector and add initial pose
-    kp_trajectory = Concat(x_pos, y_pos, z_pos) + init_pose_const
+    kp_trajectory = ox.Concat(x_pos, y_pos, z_pos) + init_pose_const
     return kp_trajectory
 
 
 # Create symbolic constraints
 constraints = [
-    ctcs(x <= Constant(x.max)),
-    ctcs(Constant(x.min) <= x),
+    ox.ctcs(x <= ox.Constant(x.max)),
+    ox.ctcs(ox.Constant(x.min) <= x),
 ]
 
 # Get the symbolic keypoint pose based on time
 kp_pose_symbolic = get_kp_pose_symbolic(x[t_inds], init_pose)
 
 # View planning constraint using symbolic keypoint pose
-R_sb_const = Constant(R_sb)
-A_cone_const = Constant(A_cone)
-c_const = Constant(c)
+R_sb_const = ox.Constant(R_sb)
+A_cone_const = ox.Constant(A_cone)
+c_const = ox.Constant(c)
 
-p_s_s = R_sb_const @ QDCM(x[6:10]).T @ (kp_pose_symbolic - x[:3])
-vp_constraint = Constant(np.sqrt(2e1)) * (
-    Norm(A_cone_const @ p_s_s, ord=norm_type) - (c_const.T @ p_s_s)
+p_s_s = R_sb_const @ ox.QDCM(x[6:10]).T @ (kp_pose_symbolic - x[:3])
+vp_constraint = ox.Constant(np.sqrt(2e1)) * (
+    ox.Norm(A_cone_const @ p_s_s, ord=norm_type) - (c_const.T @ p_s_s)
 )
 
 # Range constraints using symbolic keypoint pose
-min_range_constraint = Constant(min_range) - Norm(kp_pose_symbolic - x[:3])
-max_range_constraint = Norm(kp_pose_symbolic - x[:3]) - Constant(max_range)
+min_range_constraint = ox.Constant(min_range) - ox.Norm(kp_pose_symbolic - x[:3])
+max_range_constraint = ox.Norm(kp_pose_symbolic - x[:3]) - ox.Constant(max_range)
 
 constraints.extend(
     [
-        ctcs(vp_constraint <= Constant(0.0)),
-        ctcs(min_range_constraint <= Constant(0.0)),
-        ctcs(max_range_constraint <= Constant(0.0)),
+        ox.ctcs(vp_constraint <= ox.Constant(0.0)),
+        ox.ctcs(min_range_constraint <= ox.Constant(0.0)),
+        ox.ctcs(max_range_constraint <= ox.Constant(0.0)),
     ]
 )
 

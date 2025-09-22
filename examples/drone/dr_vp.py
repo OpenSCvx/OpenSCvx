@@ -10,26 +10,15 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
+import openscvx as ox
 from examples.plotting import plot_animation
-from openscvx.backend.control import Control
-from openscvx.backend.expr import (
-    QDCM,
-    SSM,
-    SSMP,
-    Concat,
-    Constant,
-    Diag,
-    Norm,
-    ctcs,
-)
-from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.utils import gen_vertices, rot
 
 n = 33  # Number of Nodes
 total_time = 40.0  # Total time for the simulation
 
-x = State("x", shape=(14,))  # State variable with 14 dimensions
+x = ox.State("x", shape=(14,))  # State variable with 14 dimensions
 
 x.max = np.array(
     [200.0, 100, 50, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100]
@@ -70,7 +59,7 @@ x.final = [
     ("minimize", total_time),
 ]
 
-u = Control("u", shape=(6,))  # Control variable with 6 dimensions
+u = ox.Control("u", shape=(6,))  # Control variable with 6 dimensions
 u.max = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])  # Upper Bound on the controls
 u.min = np.array([0, 0, 0, -18.665, -18.665, -0.55562])  # Lower Bound on the controls
 u.guess = np.repeat(np.expand_dims(np.array([0.0, 0.0, 10.0, 0.0, 0.0, 0.0]), axis=0), n, axis=0)
@@ -134,34 +123,34 @@ init_poses = init_poses
 
 # Symbolic sensor visibility constraint function
 def g_vp(p_s_I_const, x_pos, x_quat):
-    p_s_I = Constant(p_s_I_const)
-    R_sb_const = Constant(R_sb)
-    A_cone_const = Constant(A_cone)
-    c_const = Constant(c)
+    p_s_I = ox.Constant(p_s_I_const)
+    R_sb_const = ox.Constant(R_sb)
+    A_cone_const = ox.Constant(A_cone)
+    c_const = ox.Constant(c)
 
-    p_s_s = R_sb_const @ QDCM(x_quat).T @ (p_s_I - x_pos)
-    return Norm(A_cone_const @ p_s_s, ord=norm_type) - (c_const.T @ p_s_s)
+    p_s_s = R_sb_const @ ox.QDCM(x_quat).T @ (p_s_I - x_pos)
+    return ox.Norm(A_cone_const @ p_s_s, ord=norm_type) - (c_const.T @ p_s_s)
 
 
 # Create symbolic constraints
 constraints = [
-    ctcs(x <= Constant(x.max)),
-    ctcs(Constant(x.min) <= x),
+    ox.ctcs(x <= ox.Constant(x.max)),
+    ox.ctcs(ox.Constant(x.min) <= x),
 ]
 
 # Add visibility constraints for submarines using symbolic expressions
 for pose in init_poses:
-    constraints.append(ctcs(g_vp(pose, x[:3], x[6:10]) <= Constant(0.0)))
+    constraints.append(ox.ctcs(g_vp(pose, x[:3], x[6:10]) <= ox.Constant(0.0)))
 
 # Add gate constraints using symbolic expressions
 for node, cen in zip(gate_nodes, A_gate_cen):
-    A_gate_const = Constant(A_gate)
-    cen_const = Constant(cen)
+    A_gate_const = ox.Constant(A_gate)
+    cen_const = ox.Constant(cen)
     pos = x[:3]
 
     # Gate constraint: ||A @ pos - c||_inf <= 1
     gate_constraint = (
-        (Norm(A_gate_const @ pos - cen_const, ord="inf") <= Constant(1.0)).convex().at([node])
+        (ox.Norm(A_gate_const @ pos - cen_const, ord="inf") <= ox.Constant(1.0)).convex().at([node])
     )
     constraints.append(gate_constraint)
 
@@ -174,7 +163,7 @@ J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
 # Unpack the state and control vectors using symbolic expressions
 v = x[3:6]
 q = x[6:10]
-q_norm = Norm(q)
+q_norm = ox.Norm(q)
 q_normalized = q / q_norm
 w = x[10:13]
 
@@ -183,15 +172,15 @@ tau = u[3:]
 
 # Define dynamics using symbolic expressions
 r_dot = v
-v_dot = (Constant(1.0 / m)) * QDCM(q_normalized) @ f + Constant(
+v_dot = (ox.Constant(1.0 / m)) * ox.QDCM(q_normalized) @ f + ox.Constant(
     np.array([0, 0, g_const], dtype=np.float64)
 )
-q_dot = Constant(0.5) * SSMP(w) @ q_normalized
-J_b_inv = Constant(1.0 / J_b)
-J_b_diag = Diag(Constant(J_b))
-w_dot = Diag(J_b_inv) @ (tau - SSM(w) @ J_b_diag @ w)
-t_dot = Constant(np.array([1.0], dtype=np.float64))
-dynamics = Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
+q_dot = ox.Constant(0.5) * ox.SSMP(w) @ q_normalized
+J_b_inv = ox.Constant(1.0 / J_b)
+J_b_diag = ox.Diag(ox.Constant(J_b))
+w_dot = ox.Diag(J_b_inv) @ (tau - ox.SSM(w) @ J_b_diag @ w)
+t_dot = ox.Constant(np.array([1.0], dtype=np.float64))
+dynamics = ox.Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
 
 
 x_bar = np.linspace(x.initial, x.final, n)

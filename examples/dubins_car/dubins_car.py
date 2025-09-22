@@ -8,19 +8,17 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
+import openscvx as ox
 from examples.plotting import plot_dubins_car
-from openscvx.backend.control import Control
-from openscvx.backend.expr import Concat, Constant, Cos, Norm, Parameter, Sin, ctcs
-from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
 
 n = 8
 total_time = 1.2  # Total simulation time
 
 # Define State and Control symbolic variables
-x = State("x", shape=(4,))
+x = ox.State("x", shape=(4,))
 
-u = Control("u", shape=(2,))
+u = ox.Control("u", shape=(2,))
 
 # Set bounds on state
 x.min = np.array([-5.0, -5.0, -2 * jnp.pi, 0])
@@ -39,26 +37,26 @@ u.max = np.array([10, 5])
 u.guess = np.repeat(np.expand_dims(np.array([0, 0]), axis=0), n, axis=0)
 
 # Define Parameters for obstacle radius and center
-obs_center = Parameter("obs_center", shape=(2,))
-obs_radius = Parameter("obs_radius", shape=())
+obs_center = ox.Parameter("obs_center", shape=(2,))
+obs_radius = ox.Parameter("obs_radius", shape=())
 
 
 # Parameter values will be set through params dictionary
 
 # Define constraints using symbolic expressions
 constraints = [
-    ctcs(obs_radius <= Norm(x[:2] - obs_center)),
-    ctcs(x <= Constant(x.max)),
-    ctcs(Constant(x.min) <= x),
+    ox.ctcs(obs_radius <= ox.Norm(x[:2] - obs_center)),
+    ox.ctcs(x <= ox.Constant(x.max)),
+    ox.ctcs(ox.Constant(x.min) <= x),
 ]
 
 
 # Define dynamics using symbolic expressions
-rx_dot = u[0] * Sin(x[2])
-ry_dot = u[0] * Cos(x[2])
+rx_dot = u[0] * ox.Sin(x[2])
+ry_dot = u[0] * ox.Cos(x[2])
 theta_dot = u[1]
-t_dot = Constant(np.array([1.0], dtype=np.float64))
-dynamics = Concat(rx_dot, ry_dot, theta_dot, t_dot)
+t_dot = ox.Constant(np.array([1.0], dtype=np.float64))
+dynamics = ox.Concat(rx_dot, ry_dot, theta_dot, t_dot)
 
 
 # Set parameter values

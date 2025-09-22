@@ -8,23 +8,15 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
+import openscvx as ox
 from examples.plotting import plot_control_norm, plot_xy_xz_yz
-from openscvx.backend.control import Control
-from openscvx.backend.expr import (
-    Concat,
-    Constant,
-    Norm,
-    Parameter,
-    ctcs,
-)
-from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
 
 n = 30
 total_time = 95.0  # Total simulation time
 
 # Define State and Control symbolic variables
-x = State("x", shape=(8,))
+x = ox.State("x", shape=(8,))
 
 # Set bounds on state
 v_max = 500 * 1e3 / 3600  # Maximum velocity in m/s (800 km/h converted to m/s)
@@ -37,7 +29,7 @@ x.initial = [2000, 0, 1500, 80, 30, -75, 1905, 0]
 x.final = [0, 0, 0, 0, 0, 0, ("maximize", 1590), ("free", total_time)]
 x.guess = np.linspace(x.initial, x.final, n)
 
-u = Control("u", shape=(3,))
+u = ox.Control("u", shape=(3,))
 
 T_bar = 3.1 * 1e3
 T1 = 0.3 * T_bar
@@ -56,9 +48,9 @@ u.guess = np.repeat(np.expand_dims(np.array([0, 0, n_eng * (T2) / 2]), axis=0), 
 g_e = 9.807  # Gravitational acceleration on Earth in m/s^2
 
 # Create parameters for the problem
-I_sp = Parameter("I_sp")
-g = Parameter("g")
-theta = Parameter("theta")
+I_sp = ox.Parameter("I_sp")
+g = ox.Parameter("g")
+theta = ox.Parameter("theta")
 
 # These will be computed symbolically in constraints
 theta_val = 27 * np.pi / 180  # Cant angle value for parameter setup
@@ -68,15 +60,15 @@ rho_max = n_eng * T2 * np.cos(theta_val)  # Maximum thrust-to-weight ratio
 # Define constraints using symbolic expressions
 constraints = [
     # State bounds
-    ctcs(x <= Constant(x.max), idx=0),
-    ctcs(Constant(x.min) <= x, idx=0),
+    ox.ctcs(x <= ox.Constant(x.max), idx=0),
+    ox.ctcs(ox.Constant(x.min) <= x, idx=0),
     # Thrust magnitude constraints
-    ctcs(Constant(rho_min) <= Norm(u[:3]), idx=1),
-    ctcs(Norm(u[:3]) <= Constant(rho_max), idx=1),
+    ox.ctcs(ox.Constant(rho_min) <= ox.Norm(u[:3]), idx=1),
+    ox.ctcs(ox.Norm(u[:3]) <= ox.Constant(rho_max), idx=1),
     # Thrust pointing constraint (thrust cant angle)
-    ctcs(Constant(np.cos((180 - 40) * np.pi / 180)) <= u[2] / Norm(u[:3]), idx=2),
+    ox.ctcs(ox.Constant(np.cos((180 - 40) * np.pi / 180)) <= u[2] / ox.Norm(u[:3]), idx=2),
     # Glideslope constraint
-    ctcs(Norm(x[:2]) <= Constant(np.tan(86 * np.pi / 180)) * x[2], idx=3),
+    ox.ctcs(ox.Norm(x[:2]) <= ox.Constant(np.tan(86 * np.pi / 180)) * x[2], idx=3),
 ]
 
 
@@ -84,11 +76,11 @@ constraints = [
 m = x[6]
 T = u
 r_dot = x[3:6]
-g_vec = Constant(np.array([0, 0, 1], dtype=np.float64)) * g  # Gravitational acceleration vector
+g_vec = ox.Constant(np.array([0, 0, 1], dtype=np.float64)) * g  # Gravitational acceleration vector
 v_dot = T / m - g_vec
-m_dot = -Norm(T) / (I_sp * Constant(g_e) * Constant(np.cos(theta_val)))
-t_dot = Constant(np.array([1], dtype=np.float64))
-dynamics_expr = Concat(r_dot, v_dot, m_dot, t_dot)
+m_dot = -ox.Norm(T) / (I_sp * ox.Constant(g_e) * ox.Constant(np.cos(theta_val)))
+t_dot = ox.Constant(np.array([1], dtype=np.float64))
+dynamics_expr = ox.Concat(r_dot, v_dot, m_dot, t_dot)
 
 
 # Set parameter values

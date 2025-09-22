@@ -8,19 +8,17 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
+import openscvx as ox
 from examples.plotting import (
     plot_brachistochrone_position,
     plot_brachistochrone_velocity,
 )
-from openscvx.backend.control import Control
-from openscvx.backend.expr import Concat, Constant, Cos, Sin, ctcs
-from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
 
 n = 2
 total_time = 2.0
 
-x = State("x", shape=(4,))  # State variable with 4 dimensions
+x = ox.State("x", shape=(4,))  # State variable with 4 dimensions
 
 x.max = np.array([10.0, 10.0, 10.0, total_time])  # Upper Bound on the states
 x.min = np.array([0.0, 0.0, 0.0, 0.0])  # Lower Bound on the states
@@ -28,7 +26,7 @@ x.initial = np.array([0, 10, 0, 0])
 x.final = [10, 5, ("free", 10), ("minimize", total_time)]
 x.guess = np.linspace(x.initial, x.final, n)
 
-u = Control("u", shape=(1,))  # Control variable with 1 dimension
+u = ox.Control("u", shape=(1,))  # Control variable with 1 dimension
 u.max = np.array([100.5 * jnp.pi / 180])  # Upper Bound on the controls
 u.min = np.array([0])  # Lower Bound on the controls
 u.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(
@@ -37,14 +35,14 @@ u.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(
 
 g = 9.81
 
-x_dot = x[2] * Sin(u[0])
-y_dot = -x[2] * Cos(u[0])
-v_dot = g * Cos(u[0])
+x_dot = x[2] * ox.Sin(u[0])
+y_dot = -x[2] * ox.Cos(u[0])
+v_dot = g * ox.Cos(u[0])
 t_dot = 1
-dyn_expr = Concat(x_dot, y_dot, v_dot, t_dot)
+dyn_expr = ox.Concat(x_dot, y_dot, v_dot, t_dot)
 constraint_exprs = [
-    ctcs(x <= Constant(x.max)),
-    ctcs(Constant(x.min) <= x),
+    ox.ctcs(x <= ox.Constant(x.max)),
+    ox.ctcs(ox.Constant(x.min) <= x),
 ]
 
 problem = TrajOptProblem(

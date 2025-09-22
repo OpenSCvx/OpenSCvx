@@ -8,27 +8,15 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
+import openscvx as ox
 from examples.plotting import plot_animation
-from openscvx.backend.control import Control
-from openscvx.backend.expr import (
-    QDCM,
-    SSM,
-    SSMP,
-    Concat,
-    Constant,
-    Diag,
-    Norm,
-    Parameter,
-    ctcs,
-)
-from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.utils import generate_orthogonal_unit_vectors
 
 n = 6
 total_time = 4.0  # Total time for the simulation
 
-x = State("x", shape=(14,))  # State variable with 14 dimensions
+x = ox.State("x", shape=(14,))  # State variable with 14 dimensions
 
 x.max = np.array([200.0, 10, 20, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100])
 x.min = np.array([-200.0, -100, 0, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0])
@@ -66,7 +54,7 @@ x.final = [
     ("minimize", total_time),
 ]
 
-u = Control("u", shape=(6,))  # Control variable with 6 dimensions
+u = ox.Control("u", shape=(6,))  # Control variable with 6 dimensions
 u.max = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])  # Upper Bound on the controls
 u.min = np.array([0, 0, 0, -18.665, -18.665, -0.55562])  # Lower Bound on the controls
 initial_control = np.array([0.0, 0.0, u.max[2], 0.0, 0.0, 0.0])
@@ -80,7 +68,7 @@ J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
 # Create symbolic dynamics
 v = x[3:6]
 q = x[6:10]
-q_norm = Norm(q)
+q_norm = ox.Norm(q)
 q_normalized = q / q_norm
 w = x[10:13]
 
@@ -89,15 +77,15 @@ tau = u[3:]
 
 # Define dynamics using symbolic expressions
 r_dot = v
-v_dot = (Constant(1.0 / m)) * QDCM(q_normalized) @ f + Constant(
+v_dot = (ox.Constant(1.0 / m)) * ox.QDCM(q_normalized) @ f + ox.Constant(
     np.array([0, 0, g_const], dtype=np.float64)
 )
-q_dot = Constant(0.5) * SSMP(w) @ q_normalized
-J_b_inv = Constant(1.0 / J_b)
-J_b_diag = Diag(Constant(J_b))
-w_dot = Diag(J_b_inv) @ (tau - SSM(w) @ J_b_diag @ w)
-t_dot = Constant(np.array([1.0], dtype=np.float64))
-dyn_expr = Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
+q_dot = ox.Constant(0.5) * ox.SSMP(w) @ q_normalized
+J_b_inv = ox.Constant(1.0 / J_b)
+J_b_diag = ox.Diag(ox.Constant(J_b))
+w_dot = ox.Diag(J_b_inv) @ (tau - ox.SSM(w) @ J_b_diag @ w)
+t_dot = ox.Constant(np.array([1.0], dtype=np.float64))
+dyn_expr = ox.Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
 
 
 A_obs = []
@@ -106,9 +94,9 @@ axes = []
 
 # Define obstacle centers as parameters for runtime updates
 obstacle_centers = [
-    Parameter("obstacle_center_1", shape=(3,)),
-    Parameter("obstacle_center_2", shape=(3,)),
-    Parameter("obstacle_center_3", shape=(3,)),
+    ox.Parameter("obstacle_center_1", shape=(3,)),
+    ox.Parameter("obstacle_center_2", shape=(3,)),
+    ox.Parameter("obstacle_center_3", shape=(3,)),
 ]
 
 # Default values for the obstacle centers
@@ -127,18 +115,18 @@ for _ in obstacle_center_positions:
     A_obs.append(ax @ np.diag(rad**2) @ ax.T)
 
 constraints = [
-    ctcs(x <= Constant(x.max)),
-    ctcs(Constant(x.min) <= x),
+    ox.ctcs(x <= ox.Constant(x.max)),
+    ox.ctcs(ox.Constant(x.min) <= x),
 ]
 
 # Add obstacle constraints using symbolic expressions
 for center, A in zip(obstacle_centers, A_obs):
-    A_const = Constant(A)
+    A_const = ox.Constant(A)
     pos = x[:3]
 
     # Obstacle constraint: (pos - center)^T @ A @ (pos - center) >= 1
     diff = pos - center
-    obstacle_constraint = ctcs(1.0 <= diff.T @ A_const @ diff)
+    obstacle_constraint = ox.ctcs(1.0 <= diff.T @ A_const @ diff)
     constraints.append(obstacle_constraint)
 
 x.guess = np.linspace(x.initial, x.final, n)

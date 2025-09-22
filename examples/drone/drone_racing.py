@@ -8,29 +8,15 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
+import openscvx as ox
 from examples.plotting import plot_animation
-from openscvx.backend.control import Control
-from openscvx.backend.expr import (
-    QDCM,
-    SSM,
-    SSMP,
-    Concat,
-    Constant,
-    Diag,
-    Norm,
-    Sqrt,
-    Stack,
-    Sum,
-    ctcs,
-)
-from openscvx.backend.state import State
 from openscvx.trajoptproblem import TrajOptProblem
 from openscvx.utils import gen_vertices, rot
 
 n = 22  # Number of Nodes
 total_time = 24.0  # Total time for the simulation
 
-x = State("x", shape=(14,))  # State variable with 14 dimensions
+x = ox.State("x", shape=(14,))  # State variable with 14 dimensions
 
 x.max = np.array([200.0, 100, 200, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100])
 x.min = np.array(
@@ -70,7 +56,7 @@ x.final = [
     ("minimize", total_time),
 ]
 
-u = Control("u", shape=(6,))  # Control variable with 6 dimensions
+u = ox.Control("u", shape=(6,))  # Control variable with 6 dimensions
 
 u.max = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])
 u.min = np.array([0, 0, 0, -18.665, -18.665, -0.55562])  # Lower Bound on the controls
@@ -112,10 +98,10 @@ for center in initial_gate_centers:
     modified_centers.append(modified_center)
 
 # Create symbolic parameters matching original structure
-A_gate_const = Constant(A_gate)
+A_gate_const = ox.Constant(A_gate)
 A_gate_c_params = []
 for modified_center in modified_centers:
-    A_gate_c_params.append(Constant(A_gate @ modified_center))
+    A_gate_c_params.append(ox.Constant(A_gate @ modified_center))
 
 nodes_per_gate = 2
 gate_nodes = np.arange(nodes_per_gate, n, nodes_per_gate)
@@ -126,13 +112,13 @@ for modified_center in modified_centers:  # Use modified centers for vertices
 
 
 constraints = [
-    ctcs(x <= Constant(x.max)),
-    ctcs(Constant(x.min) <= x),
+    ox.ctcs(x <= ox.Constant(x.max)),
+    ox.ctcs(ox.Constant(x.min) <= x),
 ]
 
 for node, A_c in zip(gate_nodes, A_gate_c_params):
     gate_constraint = (
-        (Norm(A_gate_const @ x[:3] - A_c, ord="inf") <= Constant(1.0)).convex().at([node])
+        (ox.Norm(A_gate_const @ x[:3] - A_c, ord="inf") <= ox.Constant(1.0)).convex().at([node])
     )
     constraints.append(gate_constraint)
 
@@ -141,67 +127,67 @@ for node, A_c in zip(gate_nodes, A_gate_c_params):
 def symbolic_qdcm(q):
     """Quaternion to Direction Cosine Matrix conversion using symbolic expressions"""
     # Normalize quaternion
-    q_norm = Sqrt(Sum(q * q))
+    q_norm = ox.Sqrt(ox.Sum(q * q))
     q_normalized = q / q_norm
 
     w, x, y, z = q_normalized[0], q_normalized[1], q_normalized[2], q_normalized[3]
 
     # Create DCM elements
-    r11 = Constant(1.0) - Constant(2.0) * (y * y + z * z)
-    r12 = Constant(2.0) * (x * y - z * w)
-    r13 = Constant(2.0) * (x * z + y * w)
+    r11 = ox.Constant(1.0) - ox.Constant(2.0) * (y * y + z * z)
+    r12 = ox.Constant(2.0) * (x * y - z * w)
+    r13 = ox.Constant(2.0) * (x * z + y * w)
 
-    r21 = Constant(2.0) * (x * y + z * w)
-    r22 = Constant(1.0) - Constant(2.0) * (x * x + z * z)
-    r23 = Constant(2.0) * (y * z - x * w)
+    r21 = ox.Constant(2.0) * (x * y + z * w)
+    r22 = ox.Constant(1.0) - ox.Constant(2.0) * (x * x + z * z)
+    r23 = ox.Constant(2.0) * (y * z - x * w)
 
-    r31 = Constant(2.0) * (x * z - y * w)
-    r32 = Constant(2.0) * (y * z + x * w)
-    r33 = Constant(1.0) - Constant(2.0) * (x * x + y * y)
+    r31 = ox.Constant(2.0) * (x * z - y * w)
+    r32 = ox.Constant(2.0) * (y * z + x * w)
+    r33 = ox.Constant(1.0) - ox.Constant(2.0) * (x * x + y * y)
 
     # Stack into 3x3 matrix
-    row1 = Concat(r11, r12, r13)
-    row2 = Concat(r21, r22, r23)
-    row3 = Concat(r31, r32, r33)
+    row1 = ox.Concat(r11, r12, r13)
+    row2 = ox.Concat(r21, r22, r23)
+    row3 = ox.Concat(r31, r32, r33)
 
-    return Stack([row1, row2, row3])
+    return ox.Stack([row1, row2, row3])
 
 
 def symbolic_ssmp(w):
     """Angular rate to 4x4 skew symmetric matrix for quaternion dynamics"""
     x, y, z = w[0], w[1], w[2]
-    zero = Constant(0.0)
+    zero = ox.Constant(0.0)
 
     # Create SSMP matrix
-    row1 = Concat(zero, -x, -y, -z)
-    row2 = Concat(x, zero, z, -y)
-    row3 = Concat(y, -z, zero, x)
-    row4 = Concat(z, y, -x, zero)
+    row1 = ox.Concat(zero, -x, -y, -z)
+    row2 = ox.Concat(x, zero, z, -y)
+    row3 = ox.Concat(y, -z, zero, x)
+    row4 = ox.Concat(z, y, -x, zero)
 
-    return Stack([row1, row2, row3, row4])
+    return ox.Stack([row1, row2, row3, row4])
 
 
 def symbolic_ssm(w):
     """Angular rate to 3x3 skew symmetric matrix"""
     x, y, z = w[0], w[1], w[2]
-    zero = Constant(0.0)
+    zero = ox.Constant(0.0)
 
     # Create SSM matrix
-    row1 = Concat(zero, -z, y)
-    row2 = Concat(z, zero, -x)
-    row3 = Concat(-y, x, zero)
+    row1 = ox.Concat(zero, -z, y)
+    row2 = ox.Concat(z, zero, -x)
+    row3 = ox.Concat(-y, x, zero)
 
-    return Stack([row1, row2, row3])
+    return ox.Stack([row1, row2, row3])
 
 
 def symbolic_diag(v):
     """Create diagonal matrix from vector"""
     if len(v) == 3:
-        zero = Constant(0.0)
-        row1 = Concat(v[0], zero, zero)
-        row2 = Concat(zero, v[1], zero)
-        row3 = Concat(zero, zero, v[2])
-        return Stack([row1, row2, row3])
+        zero = ox.Constant(0.0)
+        row1 = ox.Concat(v[0], zero, zero)
+        row2 = ox.Concat(zero, v[1], zero)
+        row3 = ox.Concat(zero, zero, v[2])
+        return ox.Stack([row1, row2, row3])
     else:
         raise NotImplementedError("Only 3x3 diagonal matrices supported")
 
@@ -209,7 +195,7 @@ def symbolic_diag(v):
 # Create symbolic dynamics
 v = x[3:6]
 q = x[6:10]
-q_norm = Norm(q)  # Cleaner than Sqrt(Sum(q * q))
+q_norm = ox.Norm(q)  # Cleaner than Sqrt(Sum(q * q))
 q_normalized = q / q_norm
 w = x[10:13]
 
@@ -230,15 +216,15 @@ tau = u[3:]
 
 # Option 2: Efficient dynamics using direct JAX lowering (better performance)
 r_dot = v
-v_dot = (Constant(1.0 / m)) * QDCM(q_normalized) @ f + Constant(
+v_dot = (ox.Constant(1.0 / m)) * ox.QDCM(q_normalized) @ f + ox.Constant(
     np.array([0, 0, g_const], dtype=np.float64)
 )
-q_dot = Constant(0.5) * SSMP(w) @ q_normalized
-J_b_inv = Constant(1.0 / J_b)
-J_b_diag = Diag(Constant(J_b))
-w_dot = Diag(J_b_inv) @ (tau - SSM(w) @ J_b_diag @ w)
-t_dot = Constant(np.array([1.0], dtype=np.float64))
-dyn_expr = Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
+q_dot = ox.Constant(0.5) * ox.SSMP(w) @ q_normalized
+J_b_inv = ox.Constant(1.0 / J_b)
+J_b_diag = ox.Diag(ox.Constant(J_b))
+w_dot = ox.Diag(J_b_inv) @ (tau - ox.SSM(w) @ J_b_diag @ w)
+t_dot = ox.Constant(np.array([1.0], dtype=np.float64))
+dyn_expr = ox.Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
 
 
 x_bar = np.linspace(x.initial, x.final, n)

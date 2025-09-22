@@ -9,9 +9,9 @@ grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 from examples.plotting import plot_animation
-from openscvx.backend.control import Control
+from openscvx.backend.expr.control import Control
+from openscvx.backend.expr.state import Free, Minimize, State
 from openscvx.backend.parameter import Parameter
-from openscvx.backend.state import Free, Minimize, State
 from openscvx.constraints import ctcs
 from openscvx.dynamics import dynamics
 from openscvx.trajoptproblem import TrajOptProblem
