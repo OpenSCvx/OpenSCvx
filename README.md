@@ -157,11 +157,11 @@ Dependencies can then be installed using Conda or Pip
    python3 -m venv venv
    source venv/bin/activate
    ```
-4. Install environment packages:
+4. Install the package with dependencies:
    ```sh
-   pip install -r requirements.txt
+   pip install -e .
    ```
-   
+
    Or install with optional dependencies:
    ```sh
    pip install -e ".[gui,cvxpygen]"
