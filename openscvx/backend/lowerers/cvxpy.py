@@ -11,10 +11,12 @@ from openscvx.backend.expr import (
     Cos,
     Div,
     Equality,
+    Exp,
     Expr,
     Huber,
     Index,
     Inequality,
+    Log,
     MatMul,
     Mul,
     Neg,
@@ -201,6 +203,18 @@ class CvxpyLowerer:
             "Consider using piecewise-linear approximations or handle these constraints "
             "in the dynamics (JAX) layer instead."
         )
+
+    @visitor(Exp)
+    def visit_exp(self, node: Exp) -> cp.Expression:
+        operand = self.lower(node.operand)
+        # Exponential is convex, so it's DCP-compliant when used appropriately
+        return cp.exp(operand)
+
+    @visitor(Log)
+    def visit_log(self, node: Log) -> cp.Expression:
+        operand = self.lower(node.operand)
+        # Logarithm is concave, so it's DCP-compliant when used appropriately
+        return cp.log(operand)
 
     @visitor(Equality)
     def visit_equality(self, node: Equality) -> cp.Constraint:

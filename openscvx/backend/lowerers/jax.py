@@ -17,11 +17,13 @@ from openscvx.backend.expr import (
     Diag,
     Div,
     Equality,
+    Exp,
     Expr,
     Hstack,
     Huber,
     Index,
     Inequality,
+    Log,
     MatMul,
     Mul,
     Neg,
@@ -191,6 +193,16 @@ class JaxLowerer:
     def visit_cos(self, node: Cos):
         fO = self.lower(node.operand)
         return lambda x, u, node, params: jnp.cos(fO(x, u, node, params))
+
+    @visitor(Exp)
+    def visit_exp(self, node: Exp):
+        fO = self.lower(node.operand)
+        return lambda x, u, node, params: jnp.exp(fO(x, u, node, params))
+
+    @visitor(Log)
+    def visit_log(self, node: Log):
+        fO = self.lower(node.operand)
+        return lambda x, u, node, params: jnp.log(fO(x, u, node, params))
 
     @visitor(Equality)
     @visitor(Inequality)

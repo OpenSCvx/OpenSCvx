@@ -16,11 +16,13 @@ from openscvx.backend.expr import (
     Diag,
     Div,
     Equality,
+    Exp,
     Expr,
     Hstack,
     Huber,
     Index,
     Inequality,
+    Log,
     MatMul,
     Mul,
     Neg,
@@ -544,6 +546,18 @@ def visit_smooth_relu(node: SmoothReLU) -> tuple[int, ...]:
 @visitor(Sqrt)
 def visit_sqrt(node: Sqrt) -> tuple[int, ...]:
     """sqrt preserves the shape of its operand"""
+    return dispatch(node.operand)
+
+
+@visitor(Exp)
+def visit_exp(node: Exp) -> tuple[int, ...]:
+    """exp preserves the shape of its operand"""
+    return dispatch(node.operand)
+
+
+@visitor(Log)
+def visit_log(node: Log) -> tuple[int, ...]:
+    """log preserves the shape of its operand"""
     return dispatch(node.operand)
 
 

@@ -15,11 +15,13 @@ from openscvx.backend.expr import (
     Diag,
     Div,
     Equality,
+    Exp,
     Expr,
     Hstack,
     Huber,
     Index,
     Inequality,
+    Log,
     MatMul,
     Mul,
     Neg,
@@ -260,6 +262,18 @@ class Canonicalizer:
         # Canonicalize the operand
         operand = self.canonicalize(node.operand)
         return Sqrt(operand)
+
+    @visitor(Exp)
+    def visit_exp(self, node: Exp) -> Expr:
+        # Canonicalize the operand
+        operand = self.canonicalize(node.operand)
+        return Exp(operand)
+
+    @visitor(Log)
+    def visit_log(self, node: Log) -> Expr:
+        # Canonicalize the operand
+        operand = self.canonicalize(node.operand)
+        return Log(operand)
 
     @visitor(Power)
     def visit_power(self, node: Power) -> Expr:

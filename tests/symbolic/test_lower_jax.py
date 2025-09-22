@@ -14,10 +14,12 @@ from openscvx.backend.expr import (
     Diag,
     Div,
     Equality,
+    Exp,
     Expr,
     Hstack,
     Huber,
     Inequality,
+    Log,
     MatMul,
     Mul,
     Neg,
@@ -1646,3 +1648,65 @@ def test_diag():
         # Off-diagonal elements should be zero
         off_diag_mask = ~jnp.eye(3, dtype=bool)
         assert jnp.allclose(result[off_diag_mask], 0.0, atol=1e-12)
+
+
+def test_exp_constant():
+    """Test Exp with constant values."""
+    values = np.array([0.0, 1.0, -1.0, 2.0])
+    expr = Exp(Constant(values))
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    expected = jnp.exp(values)
+    assert jnp.allclose(result, expected)
+
+
+def test_exp_state_and_control():
+    """Test Exp with state and control variables in expression."""
+    x = jnp.array([1.0, 0.0, -0.5])
+    u = jnp.array([0.5])
+
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+    control = Control("u", (1,))
+    control._slice = slice(0, 1)
+
+    # Expression: exp(x[0] + u[0])
+    expr = Exp(state[0] + control[0])
+
+    fn = lower_to_jax(expr)
+    result = fn(x, u, None, None)
+
+    # Expected: exp(1.0 + 0.5) = exp(1.5)
+    expected = jnp.exp(1.5)
+    assert jnp.allclose(result, expected)
+
+
+def test_log_constant():
+    """Test Log with constant values."""
+    values = np.array([1.0, np.e, 2.0, 0.5])
+    expr = Log(Constant(values))
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    expected = jnp.log(values)
+    assert jnp.allclose(result, expected)
+
+
+def test_log_with_exp_identity():
+    """Test that log(exp(x)) = x for reasonable values."""
+    x = jnp.array([0.0, 1.0, -1.0, 2.0])
+
+    state = State("x", (4,))
+    state._slice = slice(0, 4)
+
+    # Expression: log(exp(x))
+    expr = Log(Exp(state))
+
+    fn = lower_to_jax(expr)
+    result = fn(x, None, None, None)
+
+    # Should recover original values
+    assert jnp.allclose(result, x, atol=1e-12)

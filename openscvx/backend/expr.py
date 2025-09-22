@@ -319,6 +319,28 @@ class Sqrt(Expr):
         return f"sqrt({self.operand!r})"
 
 
+class Exp(Expr):
+    def __init__(self, operand):
+        self.operand = to_expr(operand)
+
+    def children(self):
+        return [self.operand]
+
+    def __repr__(self):
+        return f"exp({self.operand!r})"
+
+
+class Log(Expr):
+    def __init__(self, operand):
+        self.operand = to_expr(operand)
+
+    def children(self):
+        return [self.operand]
+
+    def __repr__(self):
+        return f"log({self.operand!r})"
+
+
 class Transpose(Expr):
     """Matrix transpose operation"""
 
