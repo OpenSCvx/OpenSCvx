@@ -84,7 +84,7 @@ constraints = [
     # State bounds constraints
     ctcs(x <= Constant(x.max)),
     ctcs(Constant(x.min) <= x),
-    # TODO: (norrisg) Make the `cp.norm(x_[0][:2] - x_[-1][:2]) <= 1` work, allow cross-nodal 
+    # TODO: (norrisg) Make the `cp.norm(x_[0][:2] - x_[-1][:2]) <= 1` work, allow cross-nodal
     # constraints
 ]
 
