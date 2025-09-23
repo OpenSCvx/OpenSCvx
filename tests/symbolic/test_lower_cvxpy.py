@@ -224,7 +224,7 @@ class TestCvxpyLowerer:
         gravity = Parameter("gravity", ())
 
         # Extract state components: pos = x[0:2], vel = x[2:4]
-        pos = Index(state, slice(0, 2))
+        # pos = Index(state, slice(0, 2))
         vel = Index(state, slice(2, 4))
 
         # Dynamics: pos_dot = vel, vel_dot = u/mass + [0, -gravity]

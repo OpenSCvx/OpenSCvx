@@ -6,7 +6,6 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, List, Optional, Union
 
 import jax
-import numpy as np
 from jax import jacfwd
 
 os.environ["EQX_ON_ERROR"] = "nan"
@@ -53,7 +52,7 @@ from openscvx.dynamics import Dynamics
 from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables, lower_convex_constraints
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
-from openscvx.ptr import PTR_init, PTR_step, PTR_subproblem, format_result
+from openscvx.ptr import PTR_init, PTR_step, format_result
 from openscvx.results import OptimizationResults
 
 if TYPE_CHECKING:
@@ -169,8 +168,6 @@ class TrajOptProblem:
         # Note: CVXPy lowering will happen later in the OCP when CVXPy variables are available
         # For now, we just store the symbolic constraints
 
-        dynamics_fn = to_dynamics(dyn_fn)
-
         x_unified: UnifiedState = unify_states(x_aug)
         u_unified: UnifiedControl = unify_controls(u_aug)
 
@@ -178,7 +175,7 @@ class TrajOptProblem:
         self.parameters = params or {}
 
         if dynamics_prop is None:
-            dynamics_prop = dynamics_fn
+            dynamics_prop = Dynamics(dyn_fn)
 
         if x_prop is None:
             x_prop = deepcopy(x_unified)

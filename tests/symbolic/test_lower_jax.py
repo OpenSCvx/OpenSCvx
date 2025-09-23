@@ -27,12 +27,10 @@ from openscvx.backend.expr import (
     Parameter,
     PositivePart,
     SmoothReLU,
-    Sqrt,
     Square,
     Stack,
     State,
     Sub,
-    Sum,
     Vstack,
 )
 from openscvx.backend.lower import lower, lower_to_jax
@@ -211,7 +209,7 @@ def test_parameter_in_double_integrator_dynamics():
     gravity = Parameter("g", ())
 
     # Extract state components
-    pos = state[0:2]  # [pos_x, pos_y]
+    # pos = state[0:2]  # [pos_x, pos_y]
     vel = state[2:4]  # [vel_x, vel_y]
 
     # Dynamics: pos_dot = vel, vel_dot = u/m + [0, -g]
@@ -1275,11 +1273,11 @@ def reference_6dof_dynamics_jax(x_val, u_val):
     J_b = jnp.array([1.0, 1.0, 1.0])
 
     # Extract components
-    r = x_val[0:3]  # position
+    # r = x_val[0:3]  # position
     v = x_val[3:6]  # velocity
     q = x_val[6:10]  # quaternion
     w = x_val[10:13]  # angular velocity
-    t = x_val[13]  # time
+    # t = x_val[13]  # time
 
     f = u_val[:3]  # forces
     tau = u_val[3:]  # torques

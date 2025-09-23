@@ -121,7 +121,6 @@ def test_constraint_recursion_and_type():
 
 def test_constants_are_unchanged_by_canonicalization():
     """Test that constants are already normalized and unchanged by canonicalization"""
-    import numpy as np
 
     # Constants are now normalized at construction time, so canonicalization should be a no-op
     const_scalar = Constant(5.0)
@@ -220,7 +219,8 @@ def test_equality_preserves_convex_flag():
 
 
 def test_nodal_constraint_preserves_inner_convex_flag():
-    """Test that canonicalization preserves the is_convex flag for constraints wrapped in NodalConstraint"""
+    """Test that canonicalization preserves the is_convex flag for constraints wrapped in
+    NodalConstraint"""
     x = State("x", shape=(3,))
 
     # Create a convex constraint and wrap it in NodalConstraint
