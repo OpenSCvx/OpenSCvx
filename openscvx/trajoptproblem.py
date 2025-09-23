@@ -50,7 +50,6 @@ from openscvx.config import (
 from openscvx.constraints.lowered import LoweredNodalConstraint
 from openscvx.discretization import get_discretization_solver
 from openscvx.dynamics import Dynamics
-from openscvx.dynamics import dynamics as to_dynamics
 from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables, lower_convex_constraints
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
