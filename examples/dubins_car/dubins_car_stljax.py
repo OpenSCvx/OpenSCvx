@@ -50,7 +50,7 @@ angular_velocity = u[1]
 rx_dot = velocity * ox.Sin(theta)
 ry_dot = velocity * ox.Cos(theta)
 theta_dot = angular_velocity
-t_dot = ox.Constant(1.0)
+t_dot = 1.0
 dyn_expr = ox.Concat(rx_dot, ry_dot, theta_dot, t_dot)
 
 # Create symbolic expressions for waypoint predicates
@@ -63,10 +63,10 @@ visit_wp_or_expr = ox.stl.Or(wp1_pred, wp2_pred)
 # Define constraints using symbolic expressions
 constraints = [
     # Visit waypoint constraints using symbolic Or
-    ox.ctcs(-visit_wp_or_expr <= ox.Constant(0.0)).over((3, 5)),
+    ox.ctcs(-visit_wp_or_expr <= 0.0).over((3, 5)),
     # State bounds constraints
-    ox.ctcs(x <= ox.Constant(x.max)),
-    ox.ctcs(ox.Constant(x.min) <= x),
+    ox.ctcs(x <= x.max),
+    ox.ctcs(x.min <= x),
 ]
 
 

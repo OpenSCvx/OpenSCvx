@@ -73,14 +73,14 @@ for center in gate_centers:
 ### End Gate Parameters ###
 
 constraint_exprs = [
-    ox.ctcs(x <= ox.Constant(np.array([x.max]))),
-    ox.ctcs(ox.Constant(np.array([x.min])) <= x),
+    ox.ctcs(x <= x.max),
+    ox.ctcs(x.min <= x),
 ]
 for node, cen in zip(gate_nodes, A_gate_cen):
-    A_gate_const = ox.Constant(A_gate)
-    c_const = ox.Constant(cen)
+    A_gate_const = A_gate
+    c_const = cen
     gate_constraint = (
-        (ox.linalg.Norm(A_gate_const @ x[:3] - c_const, ord="inf") <= ox.Constant(np.array([1.0])))
+        (ox.linalg.Norm(A_gate_const @ x[:3] - c_const, ord="inf") <= np.array([1.0]))
         .convex()
         .at([node])
     )
@@ -93,8 +93,8 @@ f = u[:3]
 
 # Compute the time derivatives of the state variables
 r_dot = v
-v_dot = (1 / m) * f + ox.Constant(np.array([0, 0, g_const], dtype=np.float64))
-t_dot = ox.Constant(np.array([1.0], dtype=np.float64))
+v_dot = (1 / m) * f + np.array([0, 0, g_const], dtype=np.float64)
+t_dot = 1.0
 dyn_expr = ox.Concat(r_dot, v_dot, t_dot)
 
 

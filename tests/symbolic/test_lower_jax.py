@@ -1410,16 +1410,16 @@ def test_6dof_rigid_body_dynamics_symbolic():
 
         # Create symbolic dynamics
         r_dot = v
-        v_dot = (Constant(1.0 / m)) * symbolic_qdcm(q_normalized) @ f + Constant(
+        v_dot = (1.0 / m) * symbolic_qdcm(q_normalized) @ f + Constant(
             np.array([0, 0, g_const], dtype=np.float64)
         )
-        q_dot = Constant(0.5) * symbolic_ssmp(w) @ q_normalized
-        J_b_inv = Constant(1.0 / J_b)
-        J_b_diag = symbolic_diag([Constant(J_b[0]), Constant(J_b[1]), Constant(J_b[2])])
+        q_dot = 0.5 * symbolic_ssmp(w) @ q_normalized
+        J_b_inv = 1.0 / J_b
+        J_b_diag = symbolic_diag([J_b[0], J_b[1], J_b[2]])
         w_dot = symbolic_diag([J_b_inv[0], J_b_inv[1], J_b_inv[2]]) @ (
             tau - symbolic_ssm(w) @ J_b_diag @ w
         )
-        t_dot = Constant(np.array([1.0], dtype=np.float64))
+        t_dot = 1.0
 
         dyn_expr = Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
 
@@ -1487,14 +1487,14 @@ def test_6dof_rigid_body_dynamics_compact():
 
         # Create compact node dynamics (from drone racing example)
         r_dot = v
-        v_dot = (Constant(1.0 / m)) * QDCM(q_normalized) @ f + Constant(
+        v_dot = (1.0 / m) * QDCM(q_normalized) @ f + Constant(
             np.array([0, 0, g_const], dtype=np.float64)
         )
-        q_dot = Constant(0.5) * SSMP(w) @ q_normalized
-        J_b_inv = Constant(1.0 / J_b)
-        J_b_diag = Diag(Constant(J_b))
+        q_dot = 0.5 * SSMP(w) @ q_normalized
+        J_b_inv = 1.0 / J_b
+        J_b_diag = Diag(J_b)
         w_dot = Diag(J_b_inv) @ (tau - SSM(w) @ J_b_diag @ w)
-        t_dot = Constant(np.array([1.0], dtype=np.float64))
+        t_dot = 1.0
 
         dyn_expr = Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
 
@@ -1708,3 +1708,123 @@ def test_log_with_exp_identity():
 
     # Should recover original values
     assert jnp.allclose(result, x, atol=1e-12)
+
+
+def test_constant_vs_implicit_conversion_equivalence():
+    """Test that expressions with explicit Constant() and implicit conversion via to_expr produce identical results."""
+    x = jnp.array([1.0, 2.0, 3.0])
+    u = jnp.array([0.5, 1.0])
+
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+    control = Control("u", (2,))
+    control._slice = slice(0, 2)
+
+    # Test various expression types with both explicit and implicit constants
+
+    # 1. Arithmetic operations
+    scalar_value = 2.5
+    vector_value = np.array([1.0, 1.0, 1.0])
+
+    # Explicit vs implicit multiplication
+    expr_explicit_mul = Mul(state, Constant(scalar_value))
+    expr_implicit_mul = state * scalar_value
+
+    fn_explicit_mul = lower_to_jax(expr_explicit_mul)
+    fn_implicit_mul = lower_to_jax(expr_implicit_mul)
+
+    result_explicit_mul = fn_explicit_mul(x, u, None, None)
+    result_implicit_mul = fn_implicit_mul(x, u, None, None)
+
+    assert jnp.allclose(result_explicit_mul, result_implicit_mul)
+    assert jnp.allclose(result_explicit_mul, x * scalar_value)
+
+    # Explicit vs implicit addition with vector
+    expr_explicit_add = Add(state, Constant(vector_value))
+    expr_implicit_add = state + vector_value
+
+    fn_explicit_add = lower_to_jax(expr_explicit_add)
+    fn_implicit_add = lower_to_jax(expr_implicit_add)
+
+    result_explicit_add = fn_explicit_add(x, u, None, None)
+    result_implicit_add = fn_implicit_add(x, u, None, None)
+
+    assert jnp.allclose(result_explicit_add, result_implicit_add)
+    assert jnp.allclose(result_explicit_add, x + vector_value)
+
+    # 2. Matrix operations
+    matrix_value = np.array([[1.0, 0.0, 0.0], [0.0, 2.0, 0.0], [0.0, 0.0, 3.0]])
+
+    # Explicit vs implicit matrix multiplication
+    expr_explicit_matmul = MatMul(Constant(matrix_value), state)
+    expr_implicit_matmul = matrix_value @ state
+
+    fn_explicit_matmul = lower_to_jax(expr_explicit_matmul)
+    fn_implicit_matmul = lower_to_jax(expr_implicit_matmul)
+
+    result_explicit_matmul = fn_explicit_matmul(x, u, None, None)
+    result_implicit_matmul = fn_implicit_matmul(x, u, None, None)
+
+    assert jnp.allclose(result_explicit_matmul, result_implicit_matmul)
+    assert jnp.allclose(result_explicit_matmul, matrix_value @ x)
+
+    # 3. Comparison operations (constraints)
+    bounds_value = np.array([0.5, 1.5, 2.5])
+
+    # Explicit vs implicit inequality
+    constraint_explicit = Inequality(Constant(bounds_value), state)
+    constraint_implicit = bounds_value <= state
+
+    fn_constraint_explicit = lower_to_jax(constraint_explicit)
+    fn_constraint_implicit = lower_to_jax(constraint_implicit)
+
+    result_constraint_explicit = fn_constraint_explicit(x, u, None, None)
+    result_constraint_implicit = fn_constraint_implicit(x, u, None, None)
+
+    assert jnp.allclose(result_constraint_explicit, result_constraint_implicit)
+    assert jnp.allclose(result_constraint_explicit, bounds_value - x)
+
+
+def test_complex_expression_constant_equivalence():
+    """Test equivalence in complex expressions that mix explicit and implicit constants."""
+    x = jnp.array([1.0, 2.0, 3.0])
+    u = jnp.array([0.5])
+
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+    control = Control("u", (1,))
+    control._slice = slice(0, 1)
+
+    # Complex dynamics-like expression with both explicit and implicit constants
+    m = 2.0
+    g = np.array([0.0, 0.0, -9.81])
+    A = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+
+    # Version 1: Fully explicit constants
+    expr_explicit = Add(Div(MatMul(Constant(A), state), Constant(m)), Constant(g))
+
+    # Version 2: Mixed explicit/implicit (what users might write)
+    expr_mixed = (A @ state) / m + g
+
+    # Version 3: All implicit (most natural)
+    expr_implicit = A @ state / m + g
+
+    # All should produce identical results
+    fn_explicit = lower_to_jax(expr_explicit)
+    fn_mixed = lower_to_jax(expr_mixed)
+    fn_implicit = lower_to_jax(expr_implicit)
+
+    result_explicit = fn_explicit(x, u, None, None)
+    result_mixed = fn_mixed(x, u, None, None)
+    result_implicit = fn_implicit(x, u, None, None)
+
+    # All versions should be identical
+    assert jnp.allclose(result_explicit, result_mixed)
+    assert jnp.allclose(result_mixed, result_implicit)
+    assert jnp.allclose(result_explicit, result_implicit)
+
+    # And match the expected mathematical result
+    expected = A @ x / m + g
+    assert jnp.allclose(result_explicit, expected)
+    assert jnp.allclose(result_mixed, expected)
+    assert jnp.allclose(result_implicit, expected)

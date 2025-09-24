@@ -46,8 +46,8 @@ obs_radius = ox.Parameter("obs_radius", shape=())
 # Define constraints using symbolic expressions
 constraints = [
     ox.ctcs(obs_radius <= ox.linalg.Norm(x[:2] - obs_center)),
-    ox.ctcs(x <= ox.Constant(x.max)),
-    ox.ctcs(ox.Constant(x.min) <= x),
+    ox.ctcs(x <= x.max),
+    ox.ctcs(x.min <= x),
 ]
 
 
@@ -55,7 +55,7 @@ constraints = [
 rx_dot = u[0] * ox.Sin(x[2])
 ry_dot = u[0] * ox.Cos(x[2])
 theta_dot = u[1]
-t_dot = ox.Constant(np.array([1.0], dtype=np.float64))
+t_dot = 1.0
 dynamics = ox.Concat(rx_dot, ry_dot, theta_dot, t_dot)
 
 

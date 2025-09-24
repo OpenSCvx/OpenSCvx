@@ -108,15 +108,15 @@ tau = u[3:]
 
 # Define dynamics using symbolic expressions
 r_dot = v
-v_dot = (ox.Constant(1.0 / m)) * ox.spatial.QDCM(q_normalized) @ f + ox.Constant(
+v_dot = (1.0 / m) * ox.spatial.QDCM(q_normalized) @ f + ox.Constant(
     np.array([0, 0, g_const], dtype=np.float64)
 )
-q_dot = ox.Constant(0.5) * ox.spatial.SSMP(w) @ q_normalized
-J_b_inv = ox.Constant(1.0 / J_b)
-J_b_diag = ox.linalg.Diag(ox.Constant(J_b))
+q_dot = 0.5 * ox.spatial.SSMP(w) @ q_normalized
+J_b_inv = 1.0 / J_b
+J_b_diag = ox.linalg.Diag(J_b)
 w_dot = ox.linalg.Diag(J_b_inv) @ (tau - ox.spatial.SSM(w) @ J_b_diag @ w)
 fuel_dot = ox.linalg.Norm(u)
-t_dot = ox.Constant(np.array([1.0], dtype=np.float64))
+t_dot = 1.0
 dynamics = ox.Concat(r_dot, v_dot, q_dot, w_dot, fuel_dot, t_dot)
 
 
@@ -126,11 +126,11 @@ def get_kp_pose_symbolic(t_expr, init_pose):
     loop_radius = 20.0
 
     # Convert the trajectory parameters to symbolic constants
-    loop_time_const = ox.Constant(loop_time)
-    loop_radius_const = ox.Constant(loop_radius)
-    two_pi_const = ox.Constant(2 * np.pi)
-    init_pose_const = ox.Constant(init_pose)
-    half_const = ox.Constant(0.5)
+    loop_time_const = loop_time
+    loop_radius_const = loop_radius
+    two_pi_const = 2 * np.pi
+    init_pose_const = init_pose
+    half_const = 0.5
 
     # Compute symbolic trajectory: t_angle = t / loop_time * (2 * pi)
     t_angle = t_expr / loop_time_const * two_pi_const
@@ -151,32 +151,26 @@ def get_kp_pose_symbolic(t_expr, init_pose):
 
 # Create symbolic constraints
 constraints = [
-    ox.ctcs(x <= ox.Constant(x.max)),
-    ox.ctcs(ox.Constant(x.min) <= x),
+    ox.ctcs(x <= x.max),
+    ox.ctcs(x.min <= x),
 ]
 
 # Get the symbolic keypoint pose based on time
 kp_pose_symbolic = get_kp_pose_symbolic(x[t_inds], init_pose)
 
 # View planning constraint using symbolic keypoint pose
-R_sb_const = ox.Constant(R_sb)
-A_cone_const = ox.Constant(A_cone)
-c_const = ox.Constant(c)
-
-p_s_s = R_sb_const @ ox.spatial.QDCM(x[6:10]).T @ (kp_pose_symbolic - x[:3])
-vp_constraint = ox.Constant(np.sqrt(2e1)) * (
-    ox.linalg.Norm(A_cone_const @ p_s_s, ord=norm_type) - (c_const.T @ p_s_s)
-)
+p_s_s = R_sb @ ox.spatial.QDCM(x[6:10]).T @ (kp_pose_symbolic - x[:3])
+vp_constraint = np.sqrt(2e1) * (ox.linalg.Norm(A_cone @ p_s_s, ord=norm_type) - (c.T @ p_s_s))
 
 # Range constraints using symbolic keypoint pose
-min_range_constraint = ox.Constant(min_range) - ox.linalg.Norm(kp_pose_symbolic - x[:3])
-max_range_constraint = ox.linalg.Norm(kp_pose_symbolic - x[:3]) - ox.Constant(max_range)
+min_range_constraint = min_range - ox.linalg.Norm(kp_pose_symbolic - x[:3])
+max_range_constraint = ox.linalg.Norm(kp_pose_symbolic - x[:3]) - max_range
 
 constraints.extend(
     [
-        ox.ctcs(vp_constraint <= ox.Constant(0.0)),
-        ox.ctcs(min_range_constraint <= ox.Constant(0.0)),
-        ox.ctcs(max_range_constraint <= ox.Constant(0.0)),
+        ox.ctcs(vp_constraint <= 0.0),
+        ox.ctcs(min_range_constraint <= 0.0),
+        ox.ctcs(max_range_constraint <= 0.0),
     ]
 )
 

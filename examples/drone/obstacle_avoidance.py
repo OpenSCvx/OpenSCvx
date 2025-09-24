@@ -77,14 +77,14 @@ tau = u[3:]
 
 # Define dynamics using symbolic expressions
 r_dot = v
-v_dot = (ox.Constant(1.0 / m)) * ox.spatial.QDCM(q_normalized) @ f + ox.Constant(
+v_dot = (1.0 / m) * ox.spatial.QDCM(q_normalized) @ f + ox.Constant(
     np.array([0, 0, g_const], dtype=np.float64)
 )
-q_dot = ox.Constant(0.5) * ox.spatial.SSMP(w) @ q_normalized
-J_b_inv = ox.Constant(1.0 / J_b)
-J_b_diag = ox.linalg.Diag(ox.Constant(J_b))
+q_dot = 0.5 * ox.spatial.SSMP(w) @ q_normalized
+J_b_inv = 1.0 / J_b
+J_b_diag = ox.linalg.Diag(J_b)
 w_dot = ox.linalg.Diag(J_b_inv) @ (tau - ox.spatial.SSM(w) @ J_b_diag @ w)
-t_dot = ox.Constant(np.array([1.0], dtype=np.float64))
+t_dot = 1.0
 dyn_expr = ox.Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
 
 
@@ -115,13 +115,13 @@ for _ in obstacle_center_positions:
     A_obs.append(ax @ np.diag(rad**2) @ ax.T)
 
 constraints = [
-    ox.ctcs(x <= ox.Constant(x.max)),
-    ox.ctcs(ox.Constant(x.min) <= x),
+    ox.ctcs(x <= x.max),
+    ox.ctcs(x.min <= x),
 ]
 
 # Add obstacle constraints using symbolic expressions
 for center, A in zip(obstacle_centers, A_obs):
-    A_const = ox.Constant(A)
+    A_const = A
     pos = x[:3]
 
     # Obstacle constraint: (pos - center)^T @ A @ (pos - center) >= 1

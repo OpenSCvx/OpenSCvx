@@ -10,6 +10,9 @@ class Expr:
     Note: This class is currently not being used.
     """
 
+    # Give Expr objects higher priority than numpy arrays in operations
+    __array_priority__ = 1000
+
     def __le__(self, other):
         return Inequality(self, to_expr(other))
 
@@ -47,6 +50,21 @@ class Expr:
 
     def __matmul__(self, other):
         return MatMul(self, to_expr(other))
+
+    def __rmatmul__(self, other):
+        return MatMul(to_expr(other), self)
+
+    def __rle__(self, other):
+        # other <= self  =>  Inequality(other, self)
+        return Inequality(to_expr(other), self)
+
+    def __rge__(self, other):
+        # other >= self  =>  Inequality(self, other)
+        return Inequality(self, to_expr(other))
+
+    def __req__(self, other):
+        # other == self  =>  Equality(other, self)
+        return Equality(to_expr(other), self)
 
     def __neg__(self):
         return Neg(self)

@@ -98,10 +98,10 @@ for center in initial_gate_centers:
     modified_centers.append(modified_center)
 
 # Create symbolic parameters matching original structure
-A_gate_const = ox.Constant(A_gate)
+A_gate_const = A_gate
 A_gate_c_params = []
 for modified_center in modified_centers:
-    A_gate_c_params.append(ox.Constant(A_gate @ modified_center))
+    A_gate_c_params.append(A_gate @ modified_center)
 
 nodes_per_gate = 2
 gate_nodes = np.arange(nodes_per_gate, n, nodes_per_gate)
@@ -112,15 +112,13 @@ for modified_center in modified_centers:  # Use modified centers for vertices
 
 
 constraints = [
-    ox.ctcs(x <= ox.Constant(x.max)),
-    ox.ctcs(ox.Constant(x.min) <= x),
+    ox.ctcs(x <= x.max),
+    ox.ctcs(x.min <= x),
 ]
 
 for node, A_c in zip(gate_nodes, A_gate_c_params):
     gate_constraint = (
-        (ox.linalg.Norm(A_gate_const @ x[:3] - A_c, ord="inf") <= ox.Constant(1.0))
-        .convex()
-        .at([node])
+        (ox.linalg.Norm(A_gate_const @ x[:3] - A_c, ord="inf") <= 1.0).convex().at([node])
     )
     constraints.append(gate_constraint)
 
@@ -135,17 +133,17 @@ def symbolic_qdcm(q):
     w, x, y, z = q_normalized[0], q_normalized[1], q_normalized[2], q_normalized[3]
 
     # Create DCM elements
-    r11 = ox.Constant(1.0) - ox.Constant(2.0) * (y * y + z * z)
-    r12 = ox.Constant(2.0) * (x * y - z * w)
-    r13 = ox.Constant(2.0) * (x * z + y * w)
+    r11 = 1.0 - 2.0 * (y * y + z * z)
+    r12 = 2.0 * (x * y - z * w)
+    r13 = 2.0 * (x * z + y * w)
 
-    r21 = ox.Constant(2.0) * (x * y + z * w)
-    r22 = ox.Constant(1.0) - ox.Constant(2.0) * (x * x + z * z)
-    r23 = ox.Constant(2.0) * (y * z - x * w)
+    r21 = 2.0 * (x * y + z * w)
+    r22 = 1.0 - 2.0 * (x * x + z * z)
+    r23 = 2.0 * (y * z - x * w)
 
-    r31 = ox.Constant(2.0) * (x * z - y * w)
-    r32 = ox.Constant(2.0) * (y * z + x * w)
-    r33 = ox.Constant(1.0) - ox.Constant(2.0) * (x * x + y * y)
+    r31 = 2.0 * (x * z - y * w)
+    r32 = 2.0 * (y * z + x * w)
+    r33 = 1.0 - 2.0 * (x * x + y * y)
 
     # Stack into 3x3 matrix
     row1 = ox.Concat(r11, r12, r13)
@@ -158,7 +156,7 @@ def symbolic_qdcm(q):
 def symbolic_ssmp(w):
     """Angular rate to 4x4 skew symmetric matrix for quaternion dynamics"""
     x, y, z = w[0], w[1], w[2]
-    zero = ox.Constant(0.0)
+    zero = 0.0
 
     # Create SSMP matrix
     row1 = ox.Concat(zero, -x, -y, -z)
@@ -172,7 +170,7 @@ def symbolic_ssmp(w):
 def symbolic_ssm(w):
     """Angular rate to 3x3 skew symmetric matrix"""
     x, y, z = w[0], w[1], w[2]
-    zero = ox.Constant(0.0)
+    zero = 0.0
 
     # Create SSM matrix
     row1 = ox.Concat(zero, -z, y)
@@ -185,7 +183,7 @@ def symbolic_ssm(w):
 def symbolic_diag(v):
     """Create diagonal matrix from vector"""
     if len(v) == 3:
-        zero = ox.Constant(0.0)
+        zero = 0.0
         row1 = ox.Concat(v[0], zero, zero)
         row2 = ox.Concat(zero, v[1], zero)
         row3 = ox.Concat(zero, zero, v[2])
@@ -213,19 +211,19 @@ tau = u[3:]
 # J_b_inv = Constant(1.0 / J_b)
 # J_b_diag = symbolic_diag([Constant(J_b[0]), Constant(J_b[1]), Constant(J_b[2])])
 # w_dot = symbolic_diag([J_b_inv[0], J_b_inv[1], J_b_inv[2]]) @ (tau - symbolic_ssm(w) @ J_b_diag @ w)
-# t_dot = Constant(np.array([1.0], dtype=np.float64))
+# t_dot = Constant(1.0)
 # dyn_expr = Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
 
 # Option 2: Efficient dynamics using direct JAX lowering (better performance)
 r_dot = v
-v_dot = (ox.Constant(1.0 / m)) * ox.spatial.QDCM(q_normalized) @ f + ox.Constant(
+v_dot = (1.0 / m) * ox.spatial.QDCM(q_normalized) @ f + ox.Constant(
     np.array([0, 0, g_const], dtype=np.float64)
 )
-q_dot = ox.Constant(0.5) * ox.spatial.SSMP(w) @ q_normalized
-J_b_inv = ox.Constant(1.0 / J_b)
-J_b_diag = ox.linalg.Diag(ox.Constant(J_b))
+q_dot = 0.5 * ox.spatial.SSMP(w) @ q_normalized
+J_b_inv = 1.0 / J_b
+J_b_diag = ox.linalg.Diag(J_b)
 w_dot = ox.linalg.Diag(J_b_inv) @ (tau - ox.spatial.SSM(w) @ J_b_diag @ w)
-t_dot = ox.Constant(np.array([1.0], dtype=np.float64))
+t_dot = 1.0
 dyn_expr = ox.Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
 
 

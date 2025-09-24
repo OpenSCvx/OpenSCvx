@@ -46,7 +46,7 @@ angular_velocity = u[1]
 rx_dot = velocity * ox.Sin(theta)
 ry_dot = velocity * ox.Cos(theta)
 theta_dot = angular_velocity
-t_dot = ox.Constant(1.0)
+t_dot = 1.0
 dyn_expr = ox.Concat(rx_dot, ry_dot, theta_dot, t_dot)
 
 
@@ -57,8 +57,8 @@ def create_visit_wp_OR_expr():
     d2 = ox.linalg.Norm(pos - wp2_center)
     v1 = wp1_radius - d1
     v2 = wp2_radius - d2
-    alpha = ox.Constant(10.0)  # smoothing parameter; higher = closer to max
-    smooth_max = (ox.Constant(1.0) / alpha) * ox.Log(ox.Exp(alpha * v1) + ox.Exp(alpha * v2))
+    alpha = 10.0  # smoothing parameter; higher = closer to max
+    smooth_max = (1.0 / alpha) * ox.Log(ox.Exp(alpha * v1) + ox.Exp(alpha * v2))
     return -smooth_max
 
 
@@ -68,10 +68,10 @@ visit_wp_expr = create_visit_wp_OR_expr()
 # Define constraints using symbolic expressions
 constraints = [
     # Visit waypoint constraints using smooth max
-    ox.ctcs(visit_wp_expr <= ox.Constant(0.0)).over((3, 5)),
+    ox.ctcs(visit_wp_expr <= 0.0).over((3, 5)),
     # State bounds constraints
-    ox.ctcs(x <= ox.Constant(x.max)),
-    ox.ctcs(ox.Constant(x.min) <= x),
+    ox.ctcs(x <= x.max),
+    ox.ctcs(x.min <= x),
     # TODO: (norrisg) Make the `cp.norm(x_[0][:2] - x_[-1][:2]) <= 1` work, allow cross-nodal
     # constraints
 ]

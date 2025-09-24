@@ -41,8 +41,8 @@ v_dot = g * ox.Cos(u[0])
 t_dot = 1
 dyn_expr = ox.Concat(x_dot, y_dot, v_dot, t_dot)
 constraint_exprs = [
-    ox.ctcs(x <= ox.Constant(x.max)),
-    ox.ctcs(ox.Constant(x.min) <= x),
+    ox.ctcs(x <= x.max),
+    ox.ctcs(x.min <= x),
 ]
 
 problem = TrajOptProblem(
