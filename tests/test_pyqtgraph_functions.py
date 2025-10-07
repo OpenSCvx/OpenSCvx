@@ -196,18 +196,13 @@ def test_pyqtgraph_functions_with_real_data():
     try:
         from unittest.mock import MagicMock, patch
 
+        # Import a simple problem to get real data
         from examples.params.obstacle_avoidance import (
             plotting_dict as obstacle_avoidance_plotting_dict,
         )
+        from examples.params.obstacle_avoidance import problem as obstacle_avoidance_problem
 
-        # Import a simple problem to get real data
-        from examples.params.obstacle_avoidance import (
-            problem as obstacle_avoidance_problem,
-        )
-        from examples.plotting import (
-            plot_animation_pyqtgraph,
-            plot_scp_animation_pyqtgraph,
-        )
+        from examples.plotting import plot_animation_pyqtgraph, plot_scp_animation_pyqtgraph
 
         # Set up problem
         problem = obstacle_avoidance_problem
