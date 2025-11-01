@@ -163,7 +163,7 @@ def decompose_vector_nodal_constraints(
     Returns:
         List of NodalConstraint objects with vector constraints decomposed into scalars
     """
-    from openscvx.backend.preprocessing import dispatch as get_shape
+    from openscvx.backend.shape_checker import check_shape
 
     decomposed_constraints = []
 
@@ -174,7 +174,7 @@ def decompose_vector_nodal_constraints(
         try:
             # Get the shape of the constraint residual
             # Canonicalized constraints are in form: residual <= 0 or residual == 0
-            residual_shape = get_shape(constraint.lhs)
+            residual_shape = check_shape(constraint.lhs)
 
             # Check if this is a vector constraint
             if len(residual_shape) > 0 and np.prod(residual_shape) > 1:

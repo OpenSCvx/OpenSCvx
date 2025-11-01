@@ -553,7 +553,7 @@ def test_ctcs_basic_shape_validation():
 def test_ctcs_penalty_shape_consistency():
     """Test that penalty expressions have same shape as constraint LHS"""
     from openscvx.backend.expr import ctcs
-    from openscvx.backend.preprocessing import dispatch
+    from openscvx.backend.shape_checker import check_shape
 
     x = State("x", (2, 2))  # matrix state
     constraint = x >= np.zeros((2, 2))
@@ -563,7 +563,7 @@ def test_ctcs_penalty_shape_consistency():
 
     # Penalty should have same shape as constraint LHS
     penalty_expr = wrapped.penalty_expr()
-    penalty_shape = dispatch(penalty_expr)
+    penalty_shape = check_shape(penalty_expr)
     assert penalty_shape == ()
 
 
@@ -777,9 +777,9 @@ def test_hstack_basic_passes():
     stacked = Hstack([a, b])
     validate_shapes(stacked)
 
-    from openscvx.backend.preprocessing import dispatch
+    from openscvx.backend.shape_checker import check_shape
 
-    result_shape = dispatch(stacked)
+    result_shape = check_shape(stacked)
     assert result_shape == (5,)  # 2 + 3 = 5
 
 
@@ -801,9 +801,9 @@ def test_vstack_basic_passes():
     stacked = Vstack([a, b])
     validate_shapes(stacked)
 
-    from openscvx.backend.preprocessing import dispatch
+    from openscvx.backend.shape_checker import check_shape
 
-    result_shape = dispatch(stacked)
+    result_shape = check_shape(stacked)
     assert result_shape == (6, 3)  # 2 + 4 = 6 rows
 
 

@@ -1,4 +1,5 @@
 from ..canonicalizer import canon_visitor
+from ..shape_checker import shape_visitor
 from .variable import Variable
 
 
@@ -57,3 +58,8 @@ class Control(Variable):
 def canon_control(node):
     # Control nodes are already canonical
     return node
+
+
+@shape_visitor(Control)
+def check_shape_control(v):
+    return v.shape

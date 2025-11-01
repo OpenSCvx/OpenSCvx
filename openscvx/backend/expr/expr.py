@@ -394,8 +394,135 @@ class Inequality(Constraint):
         return f"{self.lhs!r} <= {self.rhs!r}"
 
 
-# Import canonicalization system at the end to avoid circular imports
+# Import canonicalization and shape checking systems at the end to avoid circular imports
+import numpy as np
+
 from ..canonicalizer import canon_visitor, canonicalize
+from ..shape_checker import _broadcast_shape_for, check_shape, shape_visitor
+
+
+# Shape visitors for leaf nodes
+@shape_visitor(Parameter)
+@shape_visitor(Constant)
+def check_shape_constant(c):
+    if isinstance(c, Constant):
+        # Verify the invariant: constants should already be squeezed during construction
+        original_shape = c.value.shape
+        squeezed_shape = np.squeeze(c.value).shape
+        if original_shape != squeezed_shape:
+            raise ValueError(
+                f"Constant not properly normalized: has shape {original_shape} but should have shape {squeezed_shape}. "
+                "Constants should be squeezed during construction."
+            )
+        return c.value.shape
+    else:  # Parameter
+        return c.shape
+
+
+# Shape visitors for core operations
+@shape_visitor(Add)
+@shape_visitor(Sub)
+@shape_visitor(Mul)
+@shape_visitor(Div)
+def check_shape_binary_op(node) -> tuple[int, ...]:
+    return _broadcast_shape_for(node)
+
+
+@shape_visitor(MatMul)
+def check_shape_matmul(node: MatMul):
+    L, R = check_shape(node.left), check_shape(node.right)
+
+    # Handle different matmul cases:
+    # Matrix @ Matrix: (m,n) @ (n,k) -> (m,k)
+    # Matrix @ Vector: (m,n) @ (n,) -> (m,)
+    # Vector @ Matrix: (m,) @ (m,n) -> (n,)
+    # Vector @ Vector: (m,) @ (m,) -> ()
+
+    if len(L) == 0 or len(R) == 0:
+        raise ValueError(f"MatMul requires at least 1D operands: {L} @ {R}")
+
+    if len(L) == 1 and len(R) == 1:
+        # Vector @ Vector -> scalar
+        if L[0] != R[0]:
+            raise ValueError(f"MatMul incompatible: {L} @ {R}")
+        return ()
+    elif len(L) == 1:
+        # Vector @ Matrix: (m,) @ (m,n) -> (n,)
+        if len(R) < 2 or L[0] != R[-2]:
+            raise ValueError(f"MatMul incompatible: {L} @ {R}")
+        return R[-1:]
+    elif len(R) == 1:
+        # Matrix @ Vector: (m,n) @ (n,) -> (m,)
+        if len(L) < 2 or L[-1] != R[0]:
+            raise ValueError(f"MatMul incompatible: {L} @ {R}")
+        return L[:-1]
+    else:
+        # Matrix @ Matrix: (...,m,n) @ (...,n,k) -> (...,m,k)
+        if len(L) < 2 or len(R) < 2 or L[-1] != R[-2]:
+            raise ValueError(f"MatMul incompatible: {L} @ {R}")
+        return L[:-1] + (R[-1],)
+
+
+@shape_visitor(Concat)
+def check_shape_concat(node: Concat):
+    shapes = [check_shape(e) for e in node.exprs]
+    shapes = [(1,) if len(s) == 0 else s for s in shapes]
+    rank = len(shapes[0])
+    if any(len(s) != rank for s in shapes):
+        raise ValueError(f"Concat rank mismatch: {shapes}")
+    if any(s[1:] != shapes[0][1:] for s in shapes[1:]):
+        raise ValueError(f"Concat non-0 dims differ: {shapes}")
+    return (sum(s[0] for s in shapes),) + shapes[0][1:]
+
+
+@shape_visitor(Sum)
+def check_shape_sum(node: Sum) -> tuple[int, ...]:
+    """sum() reduces any shape to a scalar"""
+    # Validate that the operand has a valid shape
+    operand_shape = check_shape(node.operand)
+    # Sum always produces a scalar regardless of input shape
+    return ()
+
+
+@shape_visitor(Index)
+def check_shape_index(node: Index):
+    base_shape = check_shape(node.base)
+    dummy = np.zeros(base_shape)
+    try:
+        result = dummy[node.index]
+    except Exception as e:
+        raise ValueError(f"Bad index {node.index} for shape {base_shape}") from e
+    return result.shape
+
+
+@shape_visitor(Neg)
+def check_shape_neg(node: Neg) -> tuple[int, ...]:
+    return check_shape(node.operand)
+
+
+@shape_visitor(Equality)
+@shape_visitor(Inequality)
+def check_shape_constraint(node) -> tuple[int, ...]:
+    # 1) get the two operand shapes
+    L_shape = check_shape(node.lhs)
+    R_shape = check_shape(node.rhs)
+
+    # 2) figure out their broadcasted shape (or error if incompatible)
+    try:
+        np.broadcast_shapes(L_shape, R_shape)
+    except ValueError as e:
+        op = type(node).__name__
+        raise ValueError(f"{op} not broadcastable: {L_shape} vs {R_shape}") from e
+
+    # 3) Allow vector constraints - they're interpreted element-wise
+    # 4) return () as usual
+    return ()
+
+
+@shape_visitor(Power)
+def check_shape_power(node: Power) -> tuple[int, ...]:
+    """power preserves the broadcasted shape of base and exponent"""
+    return _broadcast_shape_for(node)
 
 
 # Canonicalization visitors for leaf nodes

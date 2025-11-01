@@ -1,4 +1,5 @@
 from ..canonicalizer import canon_visitor, canonicalize
+from ..shape_checker import check_shape, shape_visitor
 from .expr import Expr, to_expr
 
 
@@ -23,6 +24,15 @@ def canon_qdcm(node: QDCM) -> Expr:
     return QDCM(q)
 
 
+@shape_visitor(QDCM)
+def check_shape_qdcm(node: QDCM) -> tuple[int, ...]:
+    """QDCM takes a quaternion (4,) and produces a 3x3 DCM"""
+    q_shape = check_shape(node.q)
+    if q_shape != (4,):
+        raise ValueError(f"QDCM expects quaternion with shape (4,), got {q_shape}")
+    return (3, 3)
+
+
 class SSMP(Expr):
     """Angular rate to 4x4 skew symmetric matrix for quaternion dynamics"""
 
@@ -43,6 +53,15 @@ def canon_ssmp(node: SSMP) -> Expr:
     return SSMP(w)
 
 
+@shape_visitor(SSMP)
+def check_shape_ssmp(node: SSMP) -> tuple[int, ...]:
+    """SSMP takes angular velocity (3,) and produces a 4x4 matrix"""
+    w_shape = check_shape(node.w)
+    if w_shape != (3,):
+        raise ValueError(f"SSMP expects angular velocity with shape (3,), got {w_shape}")
+    return (4, 4)
+
+
 class SSM(Expr):
     """Angular rate to 3x3 skew symmetric matrix"""
 
@@ -61,3 +80,12 @@ def canon_ssm(node: SSM) -> Expr:
     # Canonicalize the angular velocity operand
     w = canonicalize(node.w)
     return SSM(w)
+
+
+@shape_visitor(SSM)
+def check_shape_ssm(node: SSM) -> tuple[int, ...]:
+    """SSM takes angular velocity (3,) and produces a 3x3 matrix"""
+    w_shape = check_shape(node.w)
+    if w_shape != (3,):
+        raise ValueError(f"SSM expects angular velocity with shape (3,), got {w_shape}")
+    return (3, 3)

@@ -1,50 +1,18 @@
-from typing import Callable, Dict, Iterable, Set, Tuple, Type, Union
+from typing import Callable, Iterable, Set, Tuple, Union
 
 import numpy as np
 
 from openscvx.backend.expr import (
     CTCS,
-    QDCM,
-    SSM,
-    SSMP,
-    Add,
-    Concat,
-    Constant,
     Constraint,
     Control,
-    Cos,
-    Diag,
-    Div,
-    Equality,
-    Exp,
     Expr,
-    Hstack,
-    Huber,
-    Index,
-    Inequality,
-    Log,
-    MatMul,
-    Mul,
-    Neg,
     NodalConstraint,
-    Norm,
-    Or,
-    Parameter,
-    PositivePart,
-    Power,
-    Sin,
-    SmoothReLU,
-    Sqrt,
-    Square,
-    Stack,
     State,
-    Sub,
-    Sum,
-    Transpose,
     Variable,
-    Vstack,
     traverse,
 )
+from openscvx.backend.shape_checker import check_shape, validate_shapes
 
 
 # TODO: (norrisg) allow `traverse` to take a list of visitors, that way we can combine steps
@@ -173,7 +141,6 @@ def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
 
     Accepts a single Expr or a list of Exprs.
     """
-    from openscvx.backend.expr import CTCS, NodalConstraint  # Import here to avoid circular imports
 
     # Define constraint wrappers that must also be at root level
     CONSTRAINT_WRAPPERS = (CTCS, NodalConstraint)
@@ -229,7 +196,6 @@ def validate_and_normalize_constraint_nodes(exprs: Union[Expr, list[Expr]], n_no
     Raises:
         ValueError: If node specifications are invalid
     """
-    from openscvx.backend.expr import CTCS, NodalConstraint  # Import here to avoid circular imports
 
     # Normalize to list
     expr_list = exprs if isinstance(exprs, (list, tuple)) else [exprs]
@@ -278,7 +244,7 @@ def validate_dynamics_dimension(
 
     for i, dyn_expr in enumerate(dynamics_list):
         # Get the shape of this dynamics expression
-        dynamics_shape = dispatch(dyn_expr)
+        dynamics_shape = check_shape(dyn_expr)
 
         # Dynamics should be a 1D vector
         if len(dynamics_shape) != 1:
@@ -298,436 +264,10 @@ def validate_dynamics_dimension(
                 f"States: {[(s.name, s.shape) for s in states_list]}"
             )
         else:
-            dynamics_dims = [dispatch(dyn)[0] for dyn in dynamics_list]
+            dynamics_dims = [check_shape(dyn)[0] for dyn in dynamics_list]
             raise ValueError(
                 f"Dynamics dimension mismatch: {len(dynamics_list)} dynamics expressions "
                 f"have combined dimension {total_dynamics_dim} {dynamics_dims}, "
                 f"but total state dimension is {total_state_dim}. "
                 f"States: {[(s.name, s.shape) for s in states_list]}"
             )
-
-
-_SHAPE_VISITORS: Dict[Type[Expr], Callable[[Expr], tuple[int, ...]]] = {}
-
-
-def validate_shapes(exprs):
-    exprs = exprs if isinstance(exprs, (list, tuple)) else [exprs]
-    for e in exprs:
-        dispatch(e)  # will raise ValueError if anything's wrong
-
-
-def visitor(expr_cls: Type[Expr]):
-    def register(fn: Callable[[Expr], tuple[int, ...]]):
-        _SHAPE_VISITORS[expr_cls] = fn
-        return fn
-
-    return register
-
-
-def dispatch(expr: Expr) -> tuple[int, ...]:
-    fn = _SHAPE_VISITORS.get(type(expr))
-    if fn is None:
-        raise NotImplementedError(f"No shape rule for {type(expr).__name__}")
-    return fn(expr)
-
-
-def _broadcast_shape_for(node: Expr) -> tuple[int, ...]:
-    # gather all child shapes
-    shapes = [dispatch(child) for child in node.children()]
-    try:
-        return np.broadcast_shapes(*shapes)
-    except ValueError as e:
-        op = type(node).__name__
-        raise ValueError(f"{op} shapes not broadcastable: {shapes}") from e
-
-
-@visitor(Constant)
-def visit_constant(c: Constant):
-    # Verify the invariant: constants should already be squeezed during construction
-    original_shape = c.value.shape
-    squeezed_shape = np.squeeze(c.value).shape
-    if original_shape != squeezed_shape:
-        raise ValueError(
-            f"Constant not properly normalized: has shape {original_shape} but should have shape {squeezed_shape}. "
-            "Constants should be squeezed during construction."
-        )
-    return c.value.shape
-
-
-@visitor(State)
-@visitor(Control)
-@visitor(Parameter)
-def visit_variable(v: Variable):
-    return v.shape
-
-
-@visitor(Add)
-@visitor(Sub)
-@visitor(Mul)
-@visitor(Div)
-def visit_binary_op(node: Expr) -> tuple[int, ...]:
-    return _broadcast_shape_for(node)
-
-
-@visitor(MatMul)
-def visit_matmul(node: MatMul):
-    L, R = dispatch(node.left), dispatch(node.right)
-
-    # Handle different matmul cases:
-    # Matrix @ Matrix: (m,n) @ (n,k) -> (m,k)
-    # Matrix @ Vector: (m,n) @ (n,) -> (m,)
-    # Vector @ Matrix: (m,) @ (m,n) -> (n,)
-    # Vector @ Vector: (m,) @ (m,) -> ()
-
-    if len(L) == 0 or len(R) == 0:
-        raise ValueError(f"MatMul requires at least 1D operands: {L} @ {R}")
-
-    if len(L) == 1 and len(R) == 1:
-        # Vector @ Vector -> scalar
-        if L[0] != R[0]:
-            raise ValueError(f"MatMul incompatible: {L} @ {R}")
-        return ()
-    elif len(L) == 1:
-        # Vector @ Matrix: (m,) @ (m,n) -> (n,)
-        if len(R) < 2 or L[0] != R[-2]:
-            raise ValueError(f"MatMul incompatible: {L} @ {R}")
-        return R[-1:]
-    elif len(R) == 1:
-        # Matrix @ Vector: (m,n) @ (n,) -> (m,)
-        if len(L) < 2 or L[-1] != R[0]:
-            raise ValueError(f"MatMul incompatible: {L} @ {R}")
-        return L[:-1]
-    else:
-        # Matrix @ Matrix: (...,m,n) @ (...,n,k) -> (...,m,k)
-        if len(L) < 2 or len(R) < 2 or L[-1] != R[-2]:
-            raise ValueError(f"MatMul incompatible: {L} @ {R}")
-        return L[:-1] + (R[-1],)
-
-
-@visitor(Concat)
-def visit_concat(node: Concat):
-    shapes = [dispatch(e) for e in node.exprs]
-    shapes = [(1,) if len(s) == 0 else s for s in shapes]
-    rank = len(shapes[0])
-    if any(len(s) != rank for s in shapes):
-        raise ValueError(f"Concat rank mismatch: {shapes}")
-    if any(s[1:] != shapes[0][1:] for s in shapes[1:]):
-        raise ValueError(f"Concat non-0 dims differ: {shapes}")
-    return (sum(s[0] for s in shapes),) + shapes[0][1:]
-
-
-@visitor(Sum)
-def visit_sum(node: Sum) -> tuple[int, ...]:
-    """sum() reduces any shape to a scalar"""
-    # Validate that the operand has a valid shape
-    operand_shape = dispatch(node.operand)
-    # Sum always produces a scalar regardless of input shape
-    return ()
-
-
-@visitor(Norm)
-def visit_norm(node: Norm) -> tuple[int, ...]:
-    """norm() reduces any shape to a scalar"""
-    # Validate that the operand has a valid shape
-    operand_shape = dispatch(node.operand)
-    # Norm always produces a scalar regardless of input shape
-    return ()
-
-
-@visitor(Index)
-def visit_index(node: Index):
-    base_shape = dispatch(node.base)
-    dummy = np.zeros(base_shape)
-    try:
-        result = dummy[node.index]
-    except Exception as e:
-        raise ValueError(f"Bad index {node.index} for shape {base_shape}") from e
-    return result.shape
-
-
-@visitor(Neg)
-def visit_neg(node: Neg) -> tuple[int, ...]:
-    return dispatch(node.operand)
-
-
-@visitor(Sin)
-def visit_sin(node: Sin):
-    return dispatch(node.operand)
-
-
-@visitor(Cos)
-def visit_cos(node: Cos):
-    return dispatch(node.operand)
-
-
-@visitor(Equality)
-@visitor(Inequality)
-def visit_constraint(node: Constraint) -> tuple[int, ...]:
-    # 1) get the two operand shapes
-    L_shape = dispatch(node.lhs)
-    R_shape = dispatch(node.rhs)
-
-    # 2) figure out their broadcasted shape (or error if incompatible)
-    try:
-        np.broadcast_shapes(L_shape, R_shape)
-    except ValueError as e:
-        op = type(node).__name__
-        raise ValueError(f"{op} not broadcastable: {L_shape} vs {R_shape}") from e
-
-    # 3) Allow vector constraints - they're interpreted element-wise
-
-    # 4) return () as usual
-    return ()
-
-
-@visitor(NodalConstraint)
-def visit_nodal_constraint(node: NodalConstraint) -> tuple[int, ...]:
-    """
-    NodalConstraint wraps a constraint but doesn't change its computational meaning,
-    just specifies where it should be applied. Always produces a scalar.
-    """
-    # Validate the wrapped constraint's shape
-    dispatch(node.constraint)
-
-    # NodalConstraint produces a scalar like any constraint
-    return ()
-
-
-@visitor(CTCS)
-def visit_ctcs(node: CTCS) -> tuple[int, ...]:
-    """
-    CTCS wraps a constraint and transforms it into a penalty expression.
-    The penalty expression is always summed, so CTCS always produces a scalar.
-    """
-    # First validate the wrapped constraint's shape
-    dispatch(node.constraint)
-
-    # Also validate the penalty expression that would be generated
-    try:
-        penalty_expr = node.penalty_expr()
-        penalty_shape = dispatch(penalty_expr)
-
-        # The penalty expression should always be scalar due to Sum wrapper
-        if penalty_shape != ():
-            raise ValueError(
-                f"CTCS penalty expression should be scalar, but got shape {penalty_shape}"
-            )
-    except Exception as e:
-        # Re-raise with more context about which CTCS node failed
-        raise ValueError(f"CTCS penalty expression validation failed: {e}") from e
-
-    # CTCS always produces a scalar due to the Sum in penalty_expr
-    return ()
-
-
-@visitor(PositivePart)
-def visit_positive_part(node: PositivePart) -> tuple[int, ...]:
-    """pos(x) = max(x, 0) preserves the shape of x"""
-    return dispatch(node.x)
-
-
-@visitor(Square)
-def visit_square(node: Square) -> tuple[int, ...]:
-    """x^2 preserves the shape of x"""
-    return dispatch(node.x)
-
-
-@visitor(Huber)
-def visit_huber(node: Huber) -> tuple[int, ...]:
-    """Huber penalty preserves the shape of x"""
-    return dispatch(node.x)
-
-
-@visitor(SmoothReLU)
-def visit_smooth_relu(node: SmoothReLU) -> tuple[int, ...]:
-    """Smooth ReLU preserves the shape of x"""
-    return dispatch(node.x)
-
-
-@visitor(Sqrt)
-def visit_sqrt(node: Sqrt) -> tuple[int, ...]:
-    """sqrt preserves the shape of its operand"""
-    return dispatch(node.operand)
-
-
-@visitor(Exp)
-def visit_exp(node: Exp) -> tuple[int, ...]:
-    """exp preserves the shape of its operand"""
-    return dispatch(node.operand)
-
-
-@visitor(Log)
-def visit_log(node: Log) -> tuple[int, ...]:
-    """log preserves the shape of its operand"""
-    return dispatch(node.operand)
-
-
-@visitor(Power)
-def visit_power(node: Power) -> tuple[int, ...]:
-    """power preserves the broadcasted shape of base and exponent"""
-    return _broadcast_shape_for(node)
-
-
-@visitor(Stack)
-def visit_stack(node: Stack) -> tuple[int, ...]:
-    """Stack creates a 2D matrix from 1D rows"""
-    if not node.rows:
-        raise ValueError("Stack requires at least one row")
-
-    # All rows should have the same shape
-    row_shapes = [dispatch(row) for row in node.rows]
-
-    # Verify all rows have the same shape
-    first_shape = row_shapes[0]
-    for i, shape in enumerate(row_shapes[1:], 1):
-        if shape != first_shape:
-            raise ValueError(f"Stack row {i} has shape {shape}, but row 0 has shape {first_shape}")
-
-    # Result shape is (num_rows, *row_shape)
-    return (len(node.rows),) + first_shape
-
-
-@visitor(QDCM)
-def visit_qdcm(node: QDCM) -> tuple[int, ...]:
-    """QDCM takes a quaternion (4,) and produces a 3x3 DCM"""
-    q_shape = dispatch(node.q)
-    if q_shape != (4,):
-        raise ValueError(f"QDCM expects quaternion with shape (4,), got {q_shape}")
-    return (3, 3)
-
-
-@visitor(SSMP)
-def visit_ssmp(node: SSMP) -> tuple[int, ...]:
-    """SSMP takes angular velocity (3,) and produces a 4x4 matrix"""
-    w_shape = dispatch(node.w)
-    if w_shape != (3,):
-        raise ValueError(f"SSMP expects angular velocity with shape (3,), got {w_shape}")
-    return (4, 4)
-
-
-@visitor(SSM)
-def visit_ssm(node: SSM) -> tuple[int, ...]:
-    """SSM takes angular velocity (3,) and produces a 3x3 matrix"""
-    w_shape = dispatch(node.w)
-    if w_shape != (3,):
-        raise ValueError(f"SSM expects angular velocity with shape (3,), got {w_shape}")
-    return (3, 3)
-
-
-@visitor(Diag)
-def visit_diag(node: Diag) -> tuple[int, ...]:
-    """Diag converts a vector (n,) to a diagonal matrix (n,n)"""
-    operand_shape = dispatch(node.operand)
-    if len(operand_shape) != 1:
-        raise ValueError(f"Diag expects a 1D vector, got shape {operand_shape}")
-    n = operand_shape[0]
-    return (n, n)
-
-
-@visitor(Hstack)
-def visit_hstack(node: Hstack) -> tuple[int, ...]:
-    """Horizontal stack concatenates arrays along the second axis (columns)"""
-    if not node.arrays:
-        raise ValueError("Hstack requires at least one array")
-
-    array_shapes = [dispatch(arr) for arr in node.arrays]
-
-    # All arrays must have the same number of dimensions
-    first_ndim = len(array_shapes[0])
-    for i, shape in enumerate(array_shapes[1:], 1):
-        if len(shape) != first_ndim:
-            raise ValueError(
-                f"Hstack array {i} has {len(shape)} dimensions, but array 0 has {first_ndim}"
-            )
-
-    # For 1D arrays, hstack concatenates along axis 0
-    if first_ndim == 1:
-        total_length = sum(shape[0] for shape in array_shapes)
-        return (total_length,)
-
-    # For 2D+ arrays, all dimensions except the second must match
-    first_shape = array_shapes[0]
-    for i, shape in enumerate(array_shapes[1:], 1):
-        if shape[0] != first_shape[0]:
-            raise ValueError(
-                f"Hstack array {i} has {shape[0]} rows, but array 0 has {first_shape[0]} rows"
-            )
-        if shape[2:] != first_shape[2:]:
-            raise ValueError(
-                f"Hstack array {i} has trailing dimensions {shape[2:]}, but array 0 has {first_shape[2:]}"
-            )
-
-    # Result shape: concatenate along axis 1 (columns)
-    total_cols = sum(shape[1] for shape in array_shapes)
-    return (first_shape[0], total_cols) + first_shape[2:]
-
-
-@visitor(Vstack)
-def visit_vstack(node: Vstack) -> tuple[int, ...]:
-    """Vertical stack concatenates arrays along the first axis (rows)"""
-    if not node.arrays:
-        raise ValueError("Vstack requires at least one array")
-
-    array_shapes = [dispatch(arr) for arr in node.arrays]
-
-    # All arrays must have the same number of dimensions
-    first_ndim = len(array_shapes[0])
-    for i, shape in enumerate(array_shapes[1:], 1):
-        if len(shape) != first_ndim:
-            raise ValueError(
-                f"Vstack array {i} has {len(shape)} dimensions, but array 0 has {first_ndim}"
-            )
-
-    # All dimensions except the first must match
-    first_shape = array_shapes[0]
-    for i, shape in enumerate(array_shapes[1:], 1):
-        if shape[1:] != first_shape[1:]:
-            raise ValueError(
-                f"Vstack array {i} has trailing dimensions {shape[1:]}, but array 0 has {first_shape[1:]}"
-            )
-
-    # Result shape: concatenate along axis 0 (rows)
-    total_rows = sum(shape[0] for shape in array_shapes)
-    return (total_rows,) + first_shape[1:]
-
-
-@visitor(Transpose)
-def visit_transpose(node: Transpose) -> tuple[int, ...]:
-    """Matrix transpose operation swaps the last two dimensions"""
-    operand_shape = dispatch(node.operand)
-
-    if len(operand_shape) == 0:
-        # Scalar transpose is the scalar itself
-        return ()
-    elif len(operand_shape) == 1:
-        # Vector transpose is the vector itself (row vector remains row vector)
-        return operand_shape
-    elif len(operand_shape) == 2:
-        # Matrix transpose: (m,n) -> (n,m)
-        return (operand_shape[1], operand_shape[0])
-    else:
-        # Higher-dimensional array: transpose last two dimensions
-        # (..., m, n) -> (..., n, m)
-        return operand_shape[:-2] + (operand_shape[-1], operand_shape[-2])
-
-
-@visitor(Or)
-def visit_or(node: Or) -> tuple[int, ...]:
-    """Logical OR operation for STL expressions - validates operand shapes and returns scalar"""
-    if len(node.operands) < 2:
-        raise ValueError("Or requires at least two operands")
-
-    # Validate all operands and get their shapes
-    operand_shapes = [dispatch(operand) for operand in node.operands]
-
-    # For logical operations, all operands should be broadcastable
-    # This allows mixing scalars with vectors for element-wise operations
-    try:
-        result_shape = operand_shapes[0]
-        for shape in operand_shapes[1:]:
-            result_shape = np.broadcast_shapes(result_shape, shape)
-    except ValueError as e:
-        raise ValueError(f"Or operands not broadcastable: {operand_shapes}") from e
-
-    # Or produces a scalar result (like constraints)
-    return ()

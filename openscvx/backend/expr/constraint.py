@@ -3,6 +3,7 @@ from typing import Optional, Tuple
 import numpy as np
 
 from ..canonicalizer import canon_visitor, canonicalize
+from ..shape_checker import check_shape, shape_visitor
 from .expr import Constraint, Expr, Sum
 
 
@@ -54,6 +55,19 @@ def canon_nodal_constraint(node: NodalConstraint) -> Expr:
     # Canonicalize the wrapped constraint and preserve the node specification
     canon_constraint = canonicalize(node.constraint)
     return NodalConstraint(canon_constraint, node.nodes)
+
+
+@shape_visitor(NodalConstraint)
+def check_shape_nodal_constraint(node: NodalConstraint) -> tuple[int, ...]:
+    """
+    NodalConstraint wraps a constraint but doesn't change its computational meaning,
+    just specifies where it should be applied. Always produces a scalar.
+    """
+    # Validate the wrapped constraint's shape
+    check_shape(node.constraint)
+
+    # NodalConstraint produces a scalar like any constraint
+    return ()
 
 
 # CTCS STUFF
@@ -156,6 +170,33 @@ def canon_ctcs(node: CTCS) -> Expr:
     # Canonicalize the inner constraint but preserve CTCS parameters
     canon_constraint = canonicalize(node.constraint)
     return CTCS(canon_constraint, penalty=node.penalty, nodes=node.nodes)
+
+
+@shape_visitor(CTCS)
+def check_shape_ctcs(node: CTCS) -> tuple[int, ...]:
+    """
+    CTCS wraps a constraint and transforms it into a penalty expression.
+    The penalty expression is always summed, so CTCS always produces a scalar.
+    """
+    # First validate the wrapped constraint's shape
+    check_shape(node.constraint)
+
+    # Also validate the penalty expression that would be generated
+    try:
+        penalty_expr = node.penalty_expr()
+        penalty_shape = check_shape(penalty_expr)
+
+        # The penalty expression should always be scalar due to Sum wrapper
+        if penalty_shape != ():
+            raise ValueError(
+                f"CTCS penalty expression should be scalar, but got shape {penalty_shape}"
+            )
+    except Exception as e:
+        # Re-raise with more context about which CTCS node failed
+        raise ValueError(f"CTCS penalty expression validation failed: {e}") from e
+
+    # CTCS always produces a scalar due to the Sum in penalty_expr
+    return ()
 
 
 def ctcs(
