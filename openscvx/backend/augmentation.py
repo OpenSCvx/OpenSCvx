@@ -219,7 +219,6 @@ def augment_dynamics_with_ctcs(
     controls: List[Control],
     constraints_ctcs: List[CTCS],
     N: int,
-    idx_time: int,
     licq_min=0.0,
     licq_max=1e-4,
     time_dilation_factor_min=0.3,
@@ -230,11 +229,10 @@ def augment_dynamics_with_ctcs(
 
     Args:
         xdot: The original dynamics expression
-        states: The list of state variables
+        states: The list of state variables (must include a state named "time")
         controls: The list of control variables
         constraints_ctcs: List of CTCS constraints
         N: Number of discretization nodes
-        idx_time: Index of time variable in the state vector for time dilation setup
         licq_min: Minimum value for LICQ augmented state
         licq_max: Maximum value for LICQ augmented state
         time_dilation_factor_min: Minimum time dilation factor
@@ -298,8 +296,17 @@ def augment_dynamics_with_ctcs(
     time_dilation = Control("_time_dilation", shape=(1,))
 
     # Set up time dilation bounds and initial guess
-    # Get the time value from the main state (assuming states[0] is the main state)
-    time_final = states[0].final[idx_time]
+    # Find the time state by name
+    time_state = None
+    for state in states:
+        if state.name == "time":
+            time_state = state
+            break
+
+    if time_state is None:
+        raise ValueError("No state named 'time' found in states list")
+
+    time_final = time_state.final[0]
     time_dilation.min = np.array([time_dilation_factor_min * time_final])
     time_dilation.max = np.array([time_dilation_factor_max * time_final])
     time_dilation.guess = np.ones([N, 1]) * time_final

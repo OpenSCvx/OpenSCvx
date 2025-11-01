@@ -6,6 +6,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, List, Optional, Union
 
 import jax
+import numpy as np
 from jax import jacfwd
 
 os.environ["EQX_ON_ERROR"] = "nan"
@@ -17,7 +18,7 @@ from openscvx.backend.augmentation import (
     separate_constraints,
     sort_ctcs_constraints,
 )
-from openscvx.backend.expr import CTCS, Constraint, Expr
+from openscvx.backend.expr import CTCS, Concat, Constant, Constraint, Expr
 from openscvx.backend.expr.control import Control
 from openscvx.backend.expr.state import State
 from openscvx.backend.lower import lower_to_jax
@@ -62,12 +63,16 @@ if TYPE_CHECKING:
 class TrajOptProblem:
     def __init__(
         self,
-        dynamics: Expr,
+        dynamics: dict,
         constraints: List[Union[Constraint, CTCS]],
-        x: State,
-        u: Control,
+        x: List[State],
+        u: List[Control],
         N: int,
-        idx_time: int,
+        time_initial: Union[float, tuple] = 0.0,
+        time_final: Union[float, tuple] = ("minimize", 10.0),
+        time_derivative: Union[float, Expr] = 1.0,
+        time_min: float = 0.0,
+        time_max: float = 100.0,
         params: Optional[dict] = None,
         dynamics_prop: Optional[callable] = None,
         x_prop: State = None,
@@ -85,46 +90,123 @@ class TrajOptProblem:
         """
         The primary class in charge of compiling and exporting the solvers
 
-
         Args:
-            dynamics (Dynamics): Dynamics function decorated with @dynamics
+            dynamics (dict): Dictionary mapping state names to their dynamics expressions.
+                Each key should be a state name, and each value should be an Expr
+                representing the derivative of that state.
             constraints (List[Union[CTCSConstraint, NodalConstraint]]):
                 List of constraints decorated with @ctcs or @nodal
-            idx_time (int): Index of the time variable in the state vector
+            x (List[State]): List of State objects representing the state variables
+            u (List[Control]): List of Control objects representing the control variables
             N (int): Number of segments in the trajectory
-            time_init (float): Initial time for the trajectory
-            x_guess (jnp.ndarray): Initial guess for the state trajectory
-            u_guess (jnp.ndarray): Initial guess for the control trajectory
-            initial_state (BoundaryConstraint): Initial state constraint
-            final_state (BoundaryConstraint): Final state constraint
-            x_max (jnp.ndarray): Upper bound on the state variables
-            x_min (jnp.ndarray): Lower bound on the state variables
-            u_max (jnp.ndarray): Upper bound on the control variables
-            u_min (jnp.ndarray): Lower bound on the control variables
-            dynamics_prop: Propagation dynamics function decorated with @dynamics
-            initial_state_prop: Propagation initial state constraint
+            time_initial (float or tuple): Initial time boundary condition. Can be a float
+                (fixed) or tuple like ("free", value) or ("minimize", value).
+            time_final (float or tuple): Final time boundary condition. Can be a float
+                (fixed) or tuple like ("free", value) or ("minimize", value).
+            time_derivative (float or Expr): Derivative of time (default 1.0 for real time)
+            time_min (float): Minimum bound for time variable
+            time_max (float): Maximum bound for time variable
+            params (dict): Optional parameters dictionary for runtime parameter changes
+            dynamics_prop: Propagation dynamics function (optional)
+            x_prop: Propagation state (optional)
             scp: SCP configuration object
             dis: Discretization configuration object
             prp: Propagation configuration object
             sim: Simulation configuration object
             dev: Development configuration object
             cvx: Convex solver configuration object
+            licq_min: Minimum LICQ constraint value
+            licq_max: Maximum LICQ constraint value
+            time_dilation_factor_min: Minimum time dilation factor
+            time_dilation_factor_max: Maximum time dilation factor
 
         Returns:
             None
         """
 
+        # Step 1: Create time State and add to states list
+        time_state = State("time", shape=(1,))
+        time_state.min = np.array([time_min])
+        time_state.max = np.array([time_max])
+
+        # Set time boundary conditions
+        if isinstance(time_initial, tuple):
+            time_state.initial = [time_initial]
+        else:
+            time_state.initial = [time_initial]
+
+        if isinstance(time_final, tuple):
+            time_state.final = [time_final]
+        else:
+            time_state.final = [time_final]
+
+        # Create initial guess for time (linear interpolation)
+        time_guess_start = (
+            time_state.initial[0]
+            if isinstance(time_state.initial[0], (int, float))
+            else time_state.initial[0][1]
+        )
+        time_guess_end = (
+            time_state.final[0]
+            if isinstance(time_state.final[0], (int, float))
+            else time_state.final[0][1]
+        )
+        time_state.guess = np.linspace(time_guess_start, time_guess_end, N).reshape(-1, 1)
+
+        # Add time state to the list and track its index
+        x = list(x)  # Make a copy to avoid mutating the input
+        idx_time = sum(state.shape[0] for state in x)  # Time will be at this index
+        x.append(time_state)
+
+        # Step 2: Add time derivative to dynamics dict
+        dynamics = dict(dynamics)  # Make a copy to avoid mutating the input
+        dynamics["time"] = time_derivative
+
+        # Step 3: Validate that dynamics dict keys match state names
+        state_names = [state.name for state in x]
+        dynamics_names = set(dynamics.keys())
+        state_names_set = set(state_names)
+
+        if dynamics_names != state_names_set:
+            missing_in_dynamics = state_names_set - dynamics_names
+            extra_in_dynamics = dynamics_names - state_names_set
+            error_msg = "Mismatch between state names and dynamics keys.\n"
+            if missing_in_dynamics:
+                error_msg += f"  States missing from dynamics: {missing_in_dynamics}\n"
+            if extra_in_dynamics:
+                error_msg += f"  Extra keys in dynamics: {extra_in_dynamics}\n"
+            raise ValueError(error_msg)
+
+        # Step 4: Validate that each dynamics expression has the right dimension
+        for state in x:
+            dyn_expr = dynamics[state.name]
+            # Convert scalars to Expr if needed
+            if isinstance(dyn_expr, (int, float)):
+                dyn_expr = Constant(dyn_expr)
+                dynamics[state.name] = dyn_expr
+            # Check dimension
+            expected_shape = state.shape
+            if hasattr(dyn_expr, "shape") and dyn_expr.shape != expected_shape:
+                raise ValueError(
+                    f"Dynamics for state '{state.name}' has shape {dyn_expr.shape}, "
+                    f"but state has shape {expected_shape}"
+                )
+
+        # Step 5: Convert dict dynamics to concatenated Expr, ordered by x
+        dynamics_exprs = [dynamics[state.name] for state in x]
+        dynamics_concat = Concat(*dynamics_exprs)
+
         # Validate expressions
-        all_exprs = [dynamics] + constraints
+        all_exprs = [dynamics_concat] + constraints
         validate_variable_names(all_exprs)
         collect_and_assign_slices(all_exprs)
         validate_shapes(all_exprs)
         validate_constraints_at_root(constraints)
         validate_and_normalize_constraint_nodes(constraints, N)
-        validate_dynamics_dimension(dynamics, x)
+        validate_dynamics_dimension(dynamics_concat, x)
 
         # Canonicalize all expressions after validation
-        dynamics = dynamics.canonicalize()
+        dynamics_concat = dynamics_concat.canonicalize()
         constraints = [expr.canonicalize() for expr in constraints]
 
         # Sort and separate constraints first
@@ -143,12 +225,11 @@ class TrajOptProblem:
 
         # Augment dynamics, states, and controls with CTCS constraints, time dilation
         dynamics_aug, x_aug, u_aug = augment_dynamics_with_ctcs(
-            dynamics,
-            [x],
-            [u],
+            dynamics_concat,
+            x,
+            u,
             constraints_ctcs,
             N,
-            idx_time,
             licq_min=licq_min,
             licq_max=licq_max,
             time_dilation_factor_min=time_dilation_factor_min,
@@ -192,11 +273,12 @@ class TrajOptProblem:
         # Time dilation index for reference
         idx_time_dilation = slice(idx_u_true.stop, idx_u_true.stop + 1)
 
-        # check that idx_time is in the correct range
+        # Calculate idx_time as a slice (time state is always at position idx_time in unified state)
+        # idx_time was calculated earlier as the starting index before time was appended
         assert idx_time >= 0 and idx_time < len(x_unified.max), (
             "idx_time must be in the range of the state vector and non-negative"
         )
-        idx_time = slice(idx_time, idx_time + 1)
+        idx_time_slice = slice(idx_time, idx_time + 1)
 
         if dis is None:
             dis = DiscretizationConfig()
@@ -206,13 +288,13 @@ class TrajOptProblem:
                 x=x_unified,
                 x_prop=x_prop,
                 u=u_unified,
-                total_time=x_unified.initial[idx_time][0],
+                total_time=x_unified.initial[idx_time_slice][0],
                 n_states=x_unified.initial.shape[0],
                 n_states_prop=x_prop.initial.shape[0],
                 idx_x_true=idx_x_true,
                 idx_x_true_prop=idx_x_true_prop,
                 idx_u_true=idx_u_true,
-                idx_t=idx_time,
+                idx_t=idx_time_slice,
                 idx_y=idx_constraint_violation,
                 idx_y_prop=idx_constraint_violation_prop,
                 idx_s=idx_time_dilation,
