@@ -626,6 +626,34 @@ class Constraint(Expr):
     def children(self):
         return [self.lhs, self.rhs]
 
+    def canonicalize(self) -> "Expr":
+        """Canonicalize constraint to standard form: (lhs - rhs) {op} 0.
+
+        This works for both Equality and Inequality by using type(self) to
+        construct the appropriate subclass type.
+        """
+        diff = Sub(self.lhs, self.rhs)
+        canon_diff = diff.canonicalize()
+        new_constraint = type(self)(canon_diff, Constant(np.array(0)))
+        new_constraint.is_convex = self.is_convex  # Preserve convex flag
+        return new_constraint
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Check that constraint operands are broadcastable. Returns scalar shape."""
+        L_shape = self.lhs.check_shape()
+        R_shape = self.rhs.check_shape()
+
+        # Figure out their broadcasted shape (or error if incompatible)
+        try:
+            np.broadcast_shapes(L_shape, R_shape)
+        except ValueError as e:
+            constraint_type = type(self).__name__
+            raise ValueError(f"{constraint_type} not broadcastable: {L_shape} vs {R_shape}") from e
+
+        # Allow vector constraints - they're interpreted element-wise
+        # Return () as constraints always produce a scalar
+        return ()
+
     def at(self, nodes: Union[list, tuple]):
         """Apply this constraint only at specific discrete nodes.
 
@@ -674,58 +702,12 @@ class Constraint(Expr):
 class Equality(Constraint):
     """Represents lhs == rhs."""
 
-    def canonicalize(self) -> "Expr":
-        """Canonicalize equality constraint to standard form: (lhs - rhs) == 0."""
-        diff = Sub(self.lhs, self.rhs)
-        canon_diff = diff.canonicalize()
-        new_eq = Equality(canon_diff, Constant(np.array(0)))
-        new_eq.is_convex = self.is_convex  # Preserve convex flag
-        return new_eq
-
-    def check_shape(self) -> Tuple[int, ...]:
-        """Check that constraint operands are broadcastable. Returns scalar shape."""
-        L_shape = self.lhs.check_shape()
-        R_shape = self.rhs.check_shape()
-
-        # Figure out their broadcasted shape (or error if incompatible)
-        try:
-            np.broadcast_shapes(L_shape, R_shape)
-        except ValueError as e:
-            raise ValueError(f"Equality not broadcastable: {L_shape} vs {R_shape}") from e
-
-        # Allow vector constraints - they're interpreted element-wise
-        # Return () as constraints always produce a scalar
-        return ()
-
     def __repr__(self):
         return f"{self.lhs!r} == {self.rhs!r}"
 
 
 class Inequality(Constraint):
     """Represents lhs <= rhs"""
-
-    def canonicalize(self) -> "Expr":
-        """Canonicalize inequality constraint to standard form: (lhs - rhs) <= 0."""
-        diff = Sub(self.lhs, self.rhs)
-        canon_diff = diff.canonicalize()
-        new_ineq = Inequality(canon_diff, Constant(np.array(0)))
-        new_ineq.is_convex = self.is_convex  # Preserve convex flag
-        return new_ineq
-
-    def check_shape(self) -> Tuple[int, ...]:
-        """Check that constraint operands are broadcastable. Returns scalar shape."""
-        L_shape = self.lhs.check_shape()
-        R_shape = self.rhs.check_shape()
-
-        # Figure out their broadcasted shape (or error if incompatible)
-        try:
-            np.broadcast_shapes(L_shape, R_shape)
-        except ValueError as e:
-            raise ValueError(f"Inequality not broadcastable: {L_shape} vs {R_shape}") from e
-
-        # Allow vector constraints - they're interpreted element-wise
-        # Return () as constraints always produce a scalar
-        return ()
 
     def __repr__(self):
         return f"{self.lhs!r} <= {self.rhs!r}"
