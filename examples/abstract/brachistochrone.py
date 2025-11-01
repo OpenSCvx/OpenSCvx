@@ -17,39 +17,55 @@ from openscvx import TrajOptProblem
 
 n = 2
 total_time = 2.0
-
-x = ox.State("x", shape=(4,))  # State variable with 4 dimensions
-
-x.max = np.array([10.0, 10.0, 10.0, total_time])  # Upper Bound on the states
-x.min = np.array([0.0, 0.0, 0.0, 0.0])  # Lower Bound on the states
-x.initial = np.array([0, 10, 0, 0])
-x.final = [10, 5, ("free", 10), ("minimize", total_time)]
-x.guess = np.linspace(x.initial, x.final, n)
-
-u = ox.Control("u", shape=(1,))  # Control variable with 1 dimension
-u.max = np.array([100.5 * jnp.pi / 180])  # Upper Bound on the controls
-u.min = np.array([0])  # Lower Bound on the controls
-u.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(
-    -1, 1
-)  # Reshaped as a guess needs to be set with a 2D array, in this case (n,1)
-
 g = 9.81
 
-x_dot = x[2] * ox.Sin(u[0])
-y_dot = -x[2] * ox.Cos(u[0])
-v_dot = g * ox.Cos(u[0])
-t_dot = 1
-dyn_expr = ox.Concat(x_dot, y_dot, v_dot, t_dot)
+# Define state components
+position = ox.State("position", shape=(2,))  # 2D position [x, y]
+position.max = np.array([10.0, 10.0])
+position.min = np.array([0.0, 0.0])
+position.initial = np.array([0.0, 10.0])
+position.final = [10.0, 5.0]
+position.guess = np.linspace(position.initial, position.final, n)
+
+velocity = ox.State("velocity", shape=(1,))  # Scalar speed
+velocity.max = np.array([10.0])
+velocity.min = np.array([0.0])
+velocity.initial = np.array([0.0])
+velocity.final = [("free", 10.0)]
+velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
+
+# Define control
+theta = ox.Control("theta", shape=(1,))  # Angle from vertical
+theta.max = np.array([100.5 * jnp.pi / 180])
+theta.min = np.array([0.0])
+theta.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1)
+
+# Define dynamics as dictionary mapping state names to their derivatives
+dynamics = {
+    "position": ox.Concat(
+        velocity[0] * ox.Sin(theta[0]),  # x_dot
+        -velocity[0] * ox.Cos(theta[0]),  # y_dot
+    ),
+    "velocity": g * ox.Cos(theta[0]),
+}
+
+# Define constraints
 constraint_exprs = [
-    ox.ctcs(x <= x.max),
-    ox.ctcs(x.min <= x),
+    ox.ctcs(position <= position.max),
+    ox.ctcs(position.min <= position),
+    ox.ctcs(velocity <= velocity.max),
+    ox.ctcs(velocity.min <= velocity),
 ]
 
 problem = TrajOptProblem(
-    dynamics=dyn_expr,
-    x=x,
-    u=u,
-    idx_time=3,  # Index of time variable in state vector
+    dynamics=dynamics,
+    x=[position, velocity],
+    u=[theta],
+    time_initial=0.0,
+    time_final=("minimize", total_time),
+    time_derivative=1.0,  # Real time
+    time_min=0.0,
+    time_max=total_time,
     constraints=constraint_exprs,
     N=n,
     licq_max=1e-8,
