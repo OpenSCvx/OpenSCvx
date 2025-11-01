@@ -1,3 +1,4 @@
+from ..canonicalizer import canon_visitor, canonicalize
 from .expr import Expr, to_expr
 
 
@@ -14,6 +15,18 @@ class Transpose(Expr):
         return f"({self.operand!r}).T"
 
 
+@canon_visitor(Transpose)
+def canon_transpose(node: Transpose) -> Expr:
+    # Canonicalize the operand
+    operand = canonicalize(node.operand)
+
+    # Double transpose optimization: (A.T).T = A
+    if isinstance(operand, Transpose):
+        return operand.operand
+
+    return Transpose(operand)
+
+
 class Diag(Expr):
     """Create diagonal matrix from vector or extract diagonal from matrix"""
 
@@ -25,6 +38,13 @@ class Diag(Expr):
 
     def __repr__(self):
         return f"diag({self.operand!r})"
+
+
+@canon_visitor(Diag)
+def canon_diag(node: Diag) -> Expr:
+    # Canonicalize the operand
+    operand = canonicalize(node.operand)
+    return Diag(operand)
 
 
 class Norm(Expr):
@@ -39,6 +59,13 @@ class Norm(Expr):
 
     def __repr__(self):
         return f"norm({self.operand!r}, ord={self.ord!r})"
+
+
+@canon_visitor(Norm)
+def canon_norm(node: Norm) -> Expr:
+    # Canonicalize the operand but preserve the ord parameter
+    canon_operand = canonicalize(node.operand)
+    return Norm(canon_operand, ord=node.ord)
 
 
 class Stack(Expr):
@@ -56,6 +83,13 @@ class Stack(Expr):
         return f"Stack([{rows_repr}])"
 
 
+@canon_visitor(Stack)
+def canon_stack(node: Stack) -> Expr:
+    # Canonicalize all rows
+    rows = [canonicalize(row) for row in node.rows]
+    return Stack(rows)
+
+
 class Hstack(Expr):
     """Horizontal stack"""
 
@@ -70,6 +104,13 @@ class Hstack(Expr):
         return f"Hstack([{arrays_repr}])"
 
 
+@canon_visitor(Hstack)
+def canon_hstack(node: Hstack) -> Expr:
+    # Canonicalize all arrays
+    arrays = [canonicalize(arr) for arr in node.arrays]
+    return Hstack(arrays)
+
+
 class Vstack(Expr):
     """Vertical stack"""
 
@@ -82,3 +123,10 @@ class Vstack(Expr):
     def __repr__(self):
         arrays_repr = ", ".join(repr(arr) for arr in self.arrays)
         return f"Vstack([{arrays_repr}])"
+
+
+@canon_visitor(Vstack)
+def canon_vstack(node: Vstack) -> Expr:
+    # Canonicalize all arrays
+    arrays = [canonicalize(arr) for arr in node.arrays]
+    return Vstack(arrays)

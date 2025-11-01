@@ -1,3 +1,4 @@
+from ..canonicalizer import canon_visitor
 from .variable import Variable
 
 
@@ -50,3 +51,9 @@ class Control(Variable):
             str: A string describing the Control object
         """
         return f"Control('{self.name}', shape={self.shape})"
+
+
+@canon_visitor(Control)
+def canon_control(node):
+    # Control nodes are already canonical
+    return node

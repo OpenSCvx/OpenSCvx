@@ -2,6 +2,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 
+from ..canonicalizer import canon_visitor, canonicalize
 from .expr import Constraint, Expr, Sum
 
 
@@ -46,6 +47,13 @@ class NodalConstraint(Expr):
 
     def __repr__(self):
         return f"NodalConstraint({self.constraint!r}, nodes={self.nodes})"
+
+
+@canon_visitor(NodalConstraint)
+def canon_nodal_constraint(node: NodalConstraint) -> Expr:
+    # Canonicalize the wrapped constraint and preserve the node specification
+    canon_constraint = canonicalize(node.constraint)
+    return NodalConstraint(canon_constraint, node.nodes)
 
 
 # CTCS STUFF
@@ -141,6 +149,13 @@ class CTCS(Expr):
             raise ValueError(f"Unknown penalty {self.penalty!r}")
 
         return Sum(penalty)
+
+
+@canon_visitor(CTCS)
+def canon_ctcs(node: CTCS) -> Expr:
+    # Canonicalize the inner constraint but preserve CTCS parameters
+    canon_constraint = canonicalize(node.constraint)
+    return CTCS(canon_constraint, penalty=node.penalty, nodes=node.nodes)
 
 
 def ctcs(

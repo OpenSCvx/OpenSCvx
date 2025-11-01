@@ -392,3 +392,152 @@ class Inequality(Constraint):
 
     def __repr__(self):
         return f"{self.lhs!r} <= {self.rhs!r}"
+
+
+# Import canonicalization system at the end to avoid circular imports
+from ..canonicalizer import canon_visitor, canonicalize
+
+
+# Canonicalization visitors for leaf nodes
+@canon_visitor(Parameter)
+@canon_visitor(Constant)
+def canon_leaf(node):
+    # Leaf nodes are already canonical
+    return node
+
+
+# Canonicalization visitors for core operations
+@canon_visitor(Add)
+def canon_add(node: Add):
+    # Flatten, recurse, fold, eliminate zero, collapse singleton
+    terms = []
+    const_vals = []
+
+    for t in node.terms:
+        c = canonicalize(t)
+        if isinstance(c, Add):
+            terms.extend(c.terms)
+        elif isinstance(c, Constant):
+            const_vals.append(c.value)
+        else:
+            terms.append(c)
+
+    if const_vals:
+        total = sum(const_vals)
+        # If not all-zero, keep it
+        if not (isinstance(total, np.ndarray) and np.all(total == 0)):
+            terms.append(Constant(total))
+
+    if not terms:
+        return Constant(np.array(0))
+    if len(terms) == 1:
+        return terms[0]
+    return Add(*terms)
+
+
+@canon_visitor(Mul)
+def canon_mul(node: Mul):
+    factors = []
+    const_vals = []
+
+    for f in node.factors:
+        c = canonicalize(f)
+        if isinstance(c, Mul):
+            factors.extend(c.factors)
+        elif isinstance(c, Constant):
+            const_vals.append(c.value)
+        else:
+            factors.append(c)
+
+    if const_vals:
+        prod = np.prod(const_vals)
+        # If prod != 1, keep it
+        if not (isinstance(prod, np.ndarray) and np.all(prod == 1)):
+            factors.append(Constant(prod))
+
+    if not factors:
+        return Constant(np.array(1))
+    if len(factors) == 1:
+        return factors[0]
+    return Mul(*factors)
+
+
+@canon_visitor(Sub)
+def canon_sub(node: Sub):
+    # Canonicalize children, but keep as binary
+    left = canonicalize(node.left)
+    right = canonicalize(node.right)
+    # Maybe special-case Constant-Constant?
+    if isinstance(left, Constant) and isinstance(right, Constant):
+        return Constant(left.value - right.value)
+    return Sub(left, right)
+
+
+@canon_visitor(Div)
+def canon_div(node: Div):
+    lhs = canonicalize(node.left)
+    rhs = canonicalize(node.right)
+    if isinstance(lhs, Constant) and isinstance(rhs, Constant):
+        return Constant(lhs.value / rhs.value)
+    return Div(lhs, rhs)
+
+
+@canon_visitor(Neg)
+def canon_neg(node: Neg):
+    o = canonicalize(node.operand)
+    if isinstance(o, Constant):
+        return Constant(-o.value)
+    return Neg(o)
+
+
+@canon_visitor(Concat)
+def canon_concat(node: Concat):
+    exprs = [canonicalize(e) for e in node.exprs]
+    return Concat(*exprs)
+
+
+@canon_visitor(Index)
+def canon_index(node: Index):
+    base = canonicalize(node.base)
+    return Index(base, node.index)
+
+
+@canon_visitor(Inequality)
+def canon_inequality(node: Inequality):
+    diff = Sub(node.lhs, node.rhs)
+    canon_diff = canonicalize(diff)
+    new_ineq = Inequality(canon_diff, Constant(np.array(0)))
+    new_ineq.is_convex = node.is_convex  # Preserve convex flag
+    return new_ineq
+
+
+@canon_visitor(Equality)
+def canon_equality(node: Equality):
+    diff = Sub(node.lhs, node.rhs)
+    canon_diff = canonicalize(diff)
+    new_eq = Equality(canon_diff, Constant(np.array(0)))
+    new_eq.is_convex = node.is_convex  # Preserve convex flag
+    return new_eq
+
+
+@canon_visitor(MatMul)
+def canon_matmul(node: MatMul):
+    # Canonicalize operands but preserve the operation
+    left = canonicalize(node.left)
+    right = canonicalize(node.right)
+    return MatMul(left, right)
+
+
+@canon_visitor(Sum)
+def canon_sum(node: Sum):
+    # Canonicalize the operand
+    operand = canonicalize(node.operand)
+    return Sum(operand)
+
+
+@canon_visitor(Power)
+def canon_power(node: Power):
+    # Canonicalize both operands
+    base = canonicalize(node.base)
+    exponent = canonicalize(node.exponent)
+    return Power(base, exponent)
