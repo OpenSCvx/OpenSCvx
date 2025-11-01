@@ -2,8 +2,6 @@ from enum import Enum
 
 import numpy as np
 
-from ..canonicalizer import canon_visitor
-from ..shape_checker import shape_visitor
 from .variable import Variable
 
 
@@ -285,14 +283,3 @@ class State(Variable):
             str: A string describing the State object
         """
         return f"State('{self.name}', shape={self.shape})"
-
-
-@canon_visitor(State)
-def canon_state(node: State):
-    # State nodes are already canonical
-    return node
-
-
-@shape_visitor(State)
-def check_shape_state(v: State):
-    return v.shape

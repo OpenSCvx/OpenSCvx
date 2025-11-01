@@ -17,7 +17,6 @@ from openscvx.backend.augmentation import (
     separate_constraints,
     sort_ctcs_constraints,
 )
-from openscvx.backend.canonicalizer import canonicalize
 from openscvx.backend.expr import CTCS, Constraint, Expr
 from openscvx.backend.expr.control import Control
 from openscvx.backend.expr.state import State
@@ -125,8 +124,8 @@ class TrajOptProblem:
         validate_dynamics_dimension(dynamics, x)
 
         # Canonicalize all expressions after validation
-        dynamics = canonicalize(dynamics)
-        constraints = [canonicalize(expr) for expr in constraints]
+        dynamics = dynamics.canonicalize()
+        constraints = [expr.canonicalize() for expr in constraints]
 
         # Sort and separate constraints first
         constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(

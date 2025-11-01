@@ -87,6 +87,49 @@ class Expr:
     def children(self):
         return []
 
+    def canonicalize(self) -> "Expr":
+        """
+        Return a canonical (simplified) form of this expression.
+
+        Canonicalization performs algebraic simplifications such as:
+        - Constant folding (e.g., 2 + 3 → 5)
+        - Identity elimination (e.g., x + 0 → x, x * 1 → x)
+        - Flattening nested operations (e.g., Add(Add(a, b), c) → Add(a, b, c))
+        - Algebraic rewrites (e.g., constraints to standard form)
+
+        Returns:
+            Expr: A canonical version of this expression
+
+        Raises:
+            NotImplementedError: If canonicalization is not implemented for this node type
+        """
+        raise NotImplementedError(f"canonicalize() not implemented for {self.__class__.__name__}")
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """
+        Compute and validate the shape of this expression.
+
+        This method:
+        1. Recursively checks shapes of all child expressions
+        2. Validates that operations are shape-compatible (e.g., broadcasting rules)
+        3. Returns the output shape of this expression
+
+        For example:
+        - A Parameter with shape (3, 4) returns (3, 4)
+        - MatMul of (3, 4) @ (4, 5) returns (3, 5)
+        - Sum of any shape returns () (scalar)
+        - Add broadcasts shapes like NumPy
+
+        Returns:
+            tuple: The shape of this expression as a tuple of integers.
+                   Empty tuple () represents a scalar.
+
+        Raises:
+            NotImplementedError: If shape checking is not implemented for this node type
+            ValueError: If the expression has invalid shapes (e.g., incompatible dimensions)
+        """
+        raise NotImplementedError(f"check_shape() not implemented for {self.__class__.__name__}")
+
     def pretty(self, indent=0):
         pad = "  " * indent
         pad = "  " * indent
@@ -136,6 +179,22 @@ class Leaf(Expr):
         """
         return []
 
+    def canonicalize(self) -> "Expr":
+        """Leaf nodes are already in canonical form.
+
+        Returns:
+            Expr: Returns self since leaf nodes are already canonical
+        """
+        return self
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Return the shape of this leaf node.
+
+        Returns:
+            tuple: The shape of the leaf node
+        """
+        return self._shape
+
     def __repr__(self):
         """String representation of the leaf node.
 
@@ -182,6 +241,40 @@ class Add(Expr):
     def children(self):
         return list(self.terms)
 
+    def canonicalize(self) -> "Expr":
+        """Canonicalize addition: flatten, fold constants, eliminate zeros."""
+        terms = []
+        const_vals = []
+
+        for t in self.terms:
+            c = t.canonicalize()
+            if isinstance(c, Add):
+                terms.extend(c.terms)
+            elif isinstance(c, Constant):
+                const_vals.append(c.value)
+            else:
+                terms.append(c)
+
+        if const_vals:
+            total = sum(const_vals)
+            # If not all-zero, keep it
+            if not (isinstance(total, np.ndarray) and np.all(total == 0)):
+                terms.append(Constant(total))
+
+        if not terms:
+            return Constant(np.array(0))
+        if len(terms) == 1:
+            return terms[0]
+        return Add(*terms)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Addition broadcasts shapes like NumPy."""
+        shapes = [child.check_shape() for child in self.children()]
+        try:
+            return np.broadcast_shapes(*shapes)
+        except ValueError as e:
+            raise ValueError(f"Add shapes not broadcastable: {shapes}") from e
+
     def __repr__(self):
         inner = " + ".join(repr(e) for e in self.terms)
         return f"({inner})"
@@ -194,6 +287,22 @@ class Sub(Expr):
 
     def children(self):
         return [self.left, self.right]
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize subtraction: fold constants if both sides are constants."""
+        left = self.left.canonicalize()
+        right = self.right.canonicalize()
+        if isinstance(left, Constant) and isinstance(right, Constant):
+            return Constant(left.value - right.value)
+        return Sub(left, right)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Subtraction broadcasts shapes like NumPy."""
+        shapes = [child.check_shape() for child in self.children()]
+        try:
+            return np.broadcast_shapes(*shapes)
+        except ValueError as e:
+            raise ValueError(f"Sub shapes not broadcastable: {shapes}") from e
 
     def __repr__(self):
         return f"({self.left!r} - {self.right!r})"
@@ -208,6 +317,40 @@ class Mul(Expr):
     def children(self):
         return list(self.factors)
 
+    def canonicalize(self) -> "Expr":
+        """Canonicalize multiplication: flatten, fold constants, eliminate ones."""
+        factors = []
+        const_vals = []
+
+        for f in self.factors:
+            c = f.canonicalize()
+            if isinstance(c, Mul):
+                factors.extend(c.factors)
+            elif isinstance(c, Constant):
+                const_vals.append(c.value)
+            else:
+                factors.append(c)
+
+        if const_vals:
+            prod = np.prod(const_vals)
+            # If prod != 1, keep it
+            if not (isinstance(prod, np.ndarray) and np.all(prod == 1)):
+                factors.append(Constant(prod))
+
+        if not factors:
+            return Constant(np.array(1))
+        if len(factors) == 1:
+            return factors[0]
+        return Mul(*factors)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Multiplication broadcasts shapes like NumPy."""
+        shapes = [child.check_shape() for child in self.children()]
+        try:
+            return np.broadcast_shapes(*shapes)
+        except ValueError as e:
+            raise ValueError(f"Mul shapes not broadcastable: {shapes}") from e
+
     def __repr__(self):
         inner = " * ".join(repr(e) for e in self.factors)
         return f"({inner})"
@@ -221,6 +364,22 @@ class Div(Expr):
     def children(self):
         return [self.left, self.right]
 
+    def canonicalize(self) -> "Expr":
+        """Canonicalize division: fold constants if both sides are constants."""
+        lhs = self.left.canonicalize()
+        rhs = self.right.canonicalize()
+        if isinstance(lhs, Constant) and isinstance(rhs, Constant):
+            return Constant(lhs.value / rhs.value)
+        return Div(lhs, rhs)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Division broadcasts shapes like NumPy."""
+        shapes = [child.check_shape() for child in self.children()]
+        try:
+            return np.broadcast_shapes(*shapes)
+        except ValueError as e:
+            raise ValueError(f"Div shapes not broadcastable: {shapes}") from e
+
     def __repr__(self):
         return f"({self.left!r} / {self.right!r})"
 
@@ -233,6 +392,46 @@ class MatMul(Expr):
     def children(self):
         return [self.left, self.right]
 
+    def canonicalize(self) -> "Expr":
+        """Canonicalize matrix multiplication."""
+        left = self.left.canonicalize()
+        right = self.right.canonicalize()
+        return MatMul(left, right)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Check matrix multiplication shape compatibility and return result shape."""
+        L, R = self.left.check_shape(), self.right.check_shape()
+
+        # Handle different matmul cases:
+        # Matrix @ Matrix: (m,n) @ (n,k) -> (m,k)
+        # Matrix @ Vector: (m,n) @ (n,) -> (m,)
+        # Vector @ Matrix: (m,) @ (m,n) -> (n,)
+        # Vector @ Vector: (m,) @ (m,) -> ()
+
+        if len(L) == 0 or len(R) == 0:
+            raise ValueError(f"MatMul requires at least 1D operands: {L} @ {R}")
+
+        if len(L) == 1 and len(R) == 1:
+            # Vector @ Vector -> scalar
+            if L[0] != R[0]:
+                raise ValueError(f"MatMul incompatible: {L} @ {R}")
+            return ()
+        elif len(L) == 1:
+            # Vector @ Matrix: (m,) @ (m,n) -> (n,)
+            if len(R) < 2 or L[0] != R[-2]:
+                raise ValueError(f"MatMul incompatible: {L} @ {R}")
+            return R[-1:]
+        elif len(R) == 1:
+            # Matrix @ Vector: (m,n) @ (n,) -> (m,)
+            if len(L) < 2 or L[-1] != R[0]:
+                raise ValueError(f"MatMul incompatible: {L} @ {R}")
+            return L[:-1]
+        else:
+            # Matrix @ Matrix: (...,m,n) @ (...,n,k) -> (...,m,k)
+            if len(L) < 2 or len(R) < 2 or L[-1] != R[-2]:
+                raise ValueError(f"MatMul incompatible: {L} @ {R}")
+            return L[:-1] + (R[-1],)
+
     def __repr__(self):
         return f"({self.left!r} * {self.right!r})"
 
@@ -243,6 +442,17 @@ class Neg(Expr):
 
     def children(self):
         return [self.operand]
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize negation: fold if operand is a constant."""
+        o = self.operand.canonicalize()
+        if isinstance(o, Constant):
+            return Constant(-o.value)
+        return Neg(o)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Negation preserves the shape of its operand."""
+        return self.operand.check_shape()
 
     def __repr__(self):
         return f"(-{self.operand!r})"
@@ -257,12 +467,24 @@ class Sum(Expr):
     def children(self):
         return [self.operand]
 
+    def canonicalize(self) -> "Expr":
+        """Canonicalize sum operation."""
+        operand = self.operand.canonicalize()
+        return Sum(operand)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Sum reduces any shape to a scalar."""
+        # Validate that the operand has a valid shape
+        self.operand.check_shape()
+        # Sum always produces a scalar regardless of input shape
+        return ()
+
     def __repr__(self):
         return f"sum({self.operand!r})"
 
 
 class Index(Expr):
-    """Expr that means “take this Expr and index/slice it.”"""
+    """Expr that means "take this Expr and index/slice it." """
 
     def __init__(self, base: Expr, index: Union[int, slice, tuple]):
         self.base = base
@@ -270,6 +492,21 @@ class Index(Expr):
 
     def children(self):
         return [self.base]
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize indexing operation."""
+        base = self.base.canonicalize()
+        return Index(base, self.index)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Compute the shape after indexing."""
+        base_shape = self.base.check_shape()
+        dummy = np.zeros(base_shape)
+        try:
+            result = dummy[self.index]
+        except Exception as e:
+            raise ValueError(f"Bad index {self.index} for shape {base_shape}") from e
+        return result.shape
 
     def __repr__(self):
         return f"{self.base!r}[{self.index!r}]"
@@ -287,6 +524,22 @@ class Concat(Expr):
     def children(self):
         return list(self.exprs)
 
+    def canonicalize(self) -> "Expr":
+        """Canonicalize concatenation operation."""
+        exprs = [e.canonicalize() for e in self.exprs]
+        return Concat(*exprs)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Check concatenation shape compatibility and return result shape."""
+        shapes = [e.check_shape() for e in self.exprs]
+        shapes = [(1,) if len(s) == 0 else s for s in shapes]
+        rank = len(shapes[0])
+        if any(len(s) != rank for s in shapes):
+            raise ValueError(f"Concat rank mismatch: {shapes}")
+        if any(s[1:] != shapes[0][1:] for s in shapes[1:]):
+            raise ValueError(f"Concat non-0 dims differ: {shapes}")
+        return (sum(s[0] for s in shapes),) + shapes[0][1:]
+
     def __repr__(self):
         inner = ", ".join(repr(e) for e in self.exprs)
         return f"Concat({inner})"
@@ -300,6 +553,20 @@ class Power(Expr):
     def children(self):
         return [self.base, self.exponent]
 
+    def canonicalize(self) -> "Expr":
+        """Canonicalize power operation."""
+        base = self.base.canonicalize()
+        exponent = self.exponent.canonicalize()
+        return Power(base, exponent)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Power preserves the broadcasted shape of base and exponent."""
+        shapes = [child.check_shape() for child in self.children()]
+        try:
+            return np.broadcast_shapes(*shapes)
+        except ValueError as e:
+            raise ValueError(f"Power shapes not broadcastable: {shapes}") from e
+
     def __repr__(self):
         return f"({self.base!r})**({self.exponent!r})"
 
@@ -311,6 +578,30 @@ class Constant(Expr):
         if not isinstance(value, np.ndarray):
             value = np.array(value)
         self.value = np.squeeze(value)
+
+    def canonicalize(self) -> "Expr":
+        """Constants are already in canonical form.
+
+        Returns:
+            Expr: Returns self since constants are already canonical
+        """
+        return self
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Return the shape of this constant's value.
+
+        Returns:
+            tuple: The shape of the constant's numpy array value
+        """
+        # Verify the invariant: constants should already be squeezed during construction
+        original_shape = self.value.shape
+        squeezed_shape = np.squeeze(self.value).shape
+        if original_shape != squeezed_shape:
+            raise ValueError(
+                f"Constant not properly normalized: has shape {original_shape} but should have shape {squeezed_shape}. "
+                "Constants should be squeezed during construction."
+            )
+        return self.value.shape
 
     def __repr__(self):
         # Show clean representation - always show as Python values, not numpy arrays
@@ -383,6 +674,29 @@ class Constraint(Expr):
 class Equality(Constraint):
     """Represents lhs == rhs."""
 
+    def canonicalize(self) -> "Expr":
+        """Canonicalize equality constraint to standard form: (lhs - rhs) == 0."""
+        diff = Sub(self.lhs, self.rhs)
+        canon_diff = diff.canonicalize()
+        new_eq = Equality(canon_diff, Constant(np.array(0)))
+        new_eq.is_convex = self.is_convex  # Preserve convex flag
+        return new_eq
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Check that constraint operands are broadcastable. Returns scalar shape."""
+        L_shape = self.lhs.check_shape()
+        R_shape = self.rhs.check_shape()
+
+        # Figure out their broadcasted shape (or error if incompatible)
+        try:
+            np.broadcast_shapes(L_shape, R_shape)
+        except ValueError as e:
+            raise ValueError(f"Equality not broadcastable: {L_shape} vs {R_shape}") from e
+
+        # Allow vector constraints - they're interpreted element-wise
+        # Return () as constraints always produce a scalar
+        return ()
+
     def __repr__(self):
         return f"{self.lhs!r} == {self.rhs!r}"
 
@@ -390,281 +704,28 @@ class Equality(Constraint):
 class Inequality(Constraint):
     """Represents lhs <= rhs"""
 
+    def canonicalize(self) -> "Expr":
+        """Canonicalize inequality constraint to standard form: (lhs - rhs) <= 0."""
+        diff = Sub(self.lhs, self.rhs)
+        canon_diff = diff.canonicalize()
+        new_ineq = Inequality(canon_diff, Constant(np.array(0)))
+        new_ineq.is_convex = self.is_convex  # Preserve convex flag
+        return new_ineq
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Check that constraint operands are broadcastable. Returns scalar shape."""
+        L_shape = self.lhs.check_shape()
+        R_shape = self.rhs.check_shape()
+
+        # Figure out their broadcasted shape (or error if incompatible)
+        try:
+            np.broadcast_shapes(L_shape, R_shape)
+        except ValueError as e:
+            raise ValueError(f"Inequality not broadcastable: {L_shape} vs {R_shape}") from e
+
+        # Allow vector constraints - they're interpreted element-wise
+        # Return () as constraints always produce a scalar
+        return ()
+
     def __repr__(self):
         return f"{self.lhs!r} <= {self.rhs!r}"
-
-
-# Import canonicalization and shape checking systems at the end to avoid circular imports
-import numpy as np
-
-from ..canonicalizer import canon_visitor, canonicalize
-from ..shape_checker import _broadcast_shape_for, check_shape, shape_visitor
-
-
-# Shape visitors for leaf nodes
-@shape_visitor(Parameter)
-@shape_visitor(Constant)
-def check_shape_constant(c):
-    if isinstance(c, Constant):
-        # Verify the invariant: constants should already be squeezed during construction
-        original_shape = c.value.shape
-        squeezed_shape = np.squeeze(c.value).shape
-        if original_shape != squeezed_shape:
-            raise ValueError(
-                f"Constant not properly normalized: has shape {original_shape} but should have shape {squeezed_shape}. "
-                "Constants should be squeezed during construction."
-            )
-        return c.value.shape
-    else:  # Parameter
-        return c.shape
-
-
-# Shape visitors for core operations
-@shape_visitor(Add)
-@shape_visitor(Sub)
-@shape_visitor(Mul)
-@shape_visitor(Div)
-def check_shape_binary_op(node) -> tuple[int, ...]:
-    return _broadcast_shape_for(node)
-
-
-@shape_visitor(MatMul)
-def check_shape_matmul(node: MatMul):
-    L, R = check_shape(node.left), check_shape(node.right)
-
-    # Handle different matmul cases:
-    # Matrix @ Matrix: (m,n) @ (n,k) -> (m,k)
-    # Matrix @ Vector: (m,n) @ (n,) -> (m,)
-    # Vector @ Matrix: (m,) @ (m,n) -> (n,)
-    # Vector @ Vector: (m,) @ (m,) -> ()
-
-    if len(L) == 0 or len(R) == 0:
-        raise ValueError(f"MatMul requires at least 1D operands: {L} @ {R}")
-
-    if len(L) == 1 and len(R) == 1:
-        # Vector @ Vector -> scalar
-        if L[0] != R[0]:
-            raise ValueError(f"MatMul incompatible: {L} @ {R}")
-        return ()
-    elif len(L) == 1:
-        # Vector @ Matrix: (m,) @ (m,n) -> (n,)
-        if len(R) < 2 or L[0] != R[-2]:
-            raise ValueError(f"MatMul incompatible: {L} @ {R}")
-        return R[-1:]
-    elif len(R) == 1:
-        # Matrix @ Vector: (m,n) @ (n,) -> (m,)
-        if len(L) < 2 or L[-1] != R[0]:
-            raise ValueError(f"MatMul incompatible: {L} @ {R}")
-        return L[:-1]
-    else:
-        # Matrix @ Matrix: (...,m,n) @ (...,n,k) -> (...,m,k)
-        if len(L) < 2 or len(R) < 2 or L[-1] != R[-2]:
-            raise ValueError(f"MatMul incompatible: {L} @ {R}")
-        return L[:-1] + (R[-1],)
-
-
-@shape_visitor(Concat)
-def check_shape_concat(node: Concat):
-    shapes = [check_shape(e) for e in node.exprs]
-    shapes = [(1,) if len(s) == 0 else s for s in shapes]
-    rank = len(shapes[0])
-    if any(len(s) != rank for s in shapes):
-        raise ValueError(f"Concat rank mismatch: {shapes}")
-    if any(s[1:] != shapes[0][1:] for s in shapes[1:]):
-        raise ValueError(f"Concat non-0 dims differ: {shapes}")
-    return (sum(s[0] for s in shapes),) + shapes[0][1:]
-
-
-@shape_visitor(Sum)
-def check_shape_sum(node: Sum) -> tuple[int, ...]:
-    """sum() reduces any shape to a scalar"""
-    # Validate that the operand has a valid shape
-    operand_shape = check_shape(node.operand)
-    # Sum always produces a scalar regardless of input shape
-    return ()
-
-
-@shape_visitor(Index)
-def check_shape_index(node: Index):
-    base_shape = check_shape(node.base)
-    dummy = np.zeros(base_shape)
-    try:
-        result = dummy[node.index]
-    except Exception as e:
-        raise ValueError(f"Bad index {node.index} for shape {base_shape}") from e
-    return result.shape
-
-
-@shape_visitor(Neg)
-def check_shape_neg(node: Neg) -> tuple[int, ...]:
-    return check_shape(node.operand)
-
-
-@shape_visitor(Equality)
-@shape_visitor(Inequality)
-def check_shape_constraint(node) -> tuple[int, ...]:
-    # 1) get the two operand shapes
-    L_shape = check_shape(node.lhs)
-    R_shape = check_shape(node.rhs)
-
-    # 2) figure out their broadcasted shape (or error if incompatible)
-    try:
-        np.broadcast_shapes(L_shape, R_shape)
-    except ValueError as e:
-        op = type(node).__name__
-        raise ValueError(f"{op} not broadcastable: {L_shape} vs {R_shape}") from e
-
-    # 3) Allow vector constraints - they're interpreted element-wise
-    # 4) return () as usual
-    return ()
-
-
-@shape_visitor(Power)
-def check_shape_power(node: Power) -> tuple[int, ...]:
-    """power preserves the broadcasted shape of base and exponent"""
-    return _broadcast_shape_for(node)
-
-
-# Canonicalization visitors for leaf nodes
-@canon_visitor(Parameter)
-@canon_visitor(Constant)
-def canon_leaf(node):
-    # Leaf nodes are already canonical
-    return node
-
-
-# Canonicalization visitors for core operations
-@canon_visitor(Add)
-def canon_add(node: Add):
-    # Flatten, recurse, fold, eliminate zero, collapse singleton
-    terms = []
-    const_vals = []
-
-    for t in node.terms:
-        c = canonicalize(t)
-        if isinstance(c, Add):
-            terms.extend(c.terms)
-        elif isinstance(c, Constant):
-            const_vals.append(c.value)
-        else:
-            terms.append(c)
-
-    if const_vals:
-        total = sum(const_vals)
-        # If not all-zero, keep it
-        if not (isinstance(total, np.ndarray) and np.all(total == 0)):
-            terms.append(Constant(total))
-
-    if not terms:
-        return Constant(np.array(0))
-    if len(terms) == 1:
-        return terms[0]
-    return Add(*terms)
-
-
-@canon_visitor(Mul)
-def canon_mul(node: Mul):
-    factors = []
-    const_vals = []
-
-    for f in node.factors:
-        c = canonicalize(f)
-        if isinstance(c, Mul):
-            factors.extend(c.factors)
-        elif isinstance(c, Constant):
-            const_vals.append(c.value)
-        else:
-            factors.append(c)
-
-    if const_vals:
-        prod = np.prod(const_vals)
-        # If prod != 1, keep it
-        if not (isinstance(prod, np.ndarray) and np.all(prod == 1)):
-            factors.append(Constant(prod))
-
-    if not factors:
-        return Constant(np.array(1))
-    if len(factors) == 1:
-        return factors[0]
-    return Mul(*factors)
-
-
-@canon_visitor(Sub)
-def canon_sub(node: Sub):
-    # Canonicalize children, but keep as binary
-    left = canonicalize(node.left)
-    right = canonicalize(node.right)
-    # Maybe special-case Constant-Constant?
-    if isinstance(left, Constant) and isinstance(right, Constant):
-        return Constant(left.value - right.value)
-    return Sub(left, right)
-
-
-@canon_visitor(Div)
-def canon_div(node: Div):
-    lhs = canonicalize(node.left)
-    rhs = canonicalize(node.right)
-    if isinstance(lhs, Constant) and isinstance(rhs, Constant):
-        return Constant(lhs.value / rhs.value)
-    return Div(lhs, rhs)
-
-
-@canon_visitor(Neg)
-def canon_neg(node: Neg):
-    o = canonicalize(node.operand)
-    if isinstance(o, Constant):
-        return Constant(-o.value)
-    return Neg(o)
-
-
-@canon_visitor(Concat)
-def canon_concat(node: Concat):
-    exprs = [canonicalize(e) for e in node.exprs]
-    return Concat(*exprs)
-
-
-@canon_visitor(Index)
-def canon_index(node: Index):
-    base = canonicalize(node.base)
-    return Index(base, node.index)
-
-
-@canon_visitor(Inequality)
-def canon_inequality(node: Inequality):
-    diff = Sub(node.lhs, node.rhs)
-    canon_diff = canonicalize(diff)
-    new_ineq = Inequality(canon_diff, Constant(np.array(0)))
-    new_ineq.is_convex = node.is_convex  # Preserve convex flag
-    return new_ineq
-
-
-@canon_visitor(Equality)
-def canon_equality(node: Equality):
-    diff = Sub(node.lhs, node.rhs)
-    canon_diff = canonicalize(diff)
-    new_eq = Equality(canon_diff, Constant(np.array(0)))
-    new_eq.is_convex = node.is_convex  # Preserve convex flag
-    return new_eq
-
-
-@canon_visitor(MatMul)
-def canon_matmul(node: MatMul):
-    # Canonicalize operands but preserve the operation
-    left = canonicalize(node.left)
-    right = canonicalize(node.right)
-    return MatMul(left, right)
-
-
-@canon_visitor(Sum)
-def canon_sum(node: Sum):
-    # Canonicalize the operand
-    operand = canonicalize(node.operand)
-    return Sum(operand)
-
-
-@canon_visitor(Power)
-def canon_power(node: Power):
-    # Canonicalize both operands
-    base = canonicalize(node.base)
-    exponent = canonicalize(node.exponent)
-    return Power(base, exponent)

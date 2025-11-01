@@ -12,7 +12,20 @@ from openscvx.backend.expr import (
     Variable,
     traverse,
 )
-from openscvx.backend.shape_checker import check_shape, validate_shapes
+
+
+def validate_shapes(exprs: Union[Expr, list[Expr]]) -> None:
+    """Validate shapes for a single expression or list of expressions.
+
+    Args:
+        exprs: Single expression or list of expressions to validate
+
+    Raises:
+        ValueError: If any expression has invalid shapes
+    """
+    exprs = exprs if isinstance(exprs, (list, tuple)) else [exprs]
+    for e in exprs:
+        e.check_shape()  # will raise ValueError if anything's wrong
 
 
 # TODO: (norrisg) allow `traverse` to take a list of visitors, that way we can combine steps
@@ -244,7 +257,7 @@ def validate_dynamics_dimension(
 
     for i, dyn_expr in enumerate(dynamics_list):
         # Get the shape of this dynamics expression
-        dynamics_shape = check_shape(dyn_expr)
+        dynamics_shape = dyn_expr.check_shape()
 
         # Dynamics should be a 1D vector
         if len(dynamics_shape) != 1:
@@ -264,7 +277,7 @@ def validate_dynamics_dimension(
                 f"States: {[(s.name, s.shape) for s in states_list]}"
             )
         else:
-            dynamics_dims = [check_shape(dyn)[0] for dyn in dynamics_list]
+            dynamics_dims = [dyn.check_shape()[0] for dyn in dynamics_list]
             raise ValueError(
                 f"Dynamics dimension mismatch: {len(dynamics_list)} dynamics expressions "
                 f"have combined dimension {total_dynamics_dim} {dynamics_dims}, "
