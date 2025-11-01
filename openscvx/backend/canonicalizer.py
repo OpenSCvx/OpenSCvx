@@ -19,14 +19,3 @@ def canonicalize(expr: Any) -> Any:
     if fn is None:
         raise NotImplementedError(f"No canonicalization rule for {type(expr).__name__}")
     return fn(expr)
-
-
-def dispatch(canon: "Canonicalizer", expr: Any) -> Any:
-    return canonicalize(expr)
-
-
-class Canonicalizer:
-    """Legacy canonicalizer class - kept for backward compatibility."""
-
-    def canonicalize(self, expr: Any) -> Any:
-        return canonicalize(expr)
