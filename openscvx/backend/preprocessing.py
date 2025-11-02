@@ -325,10 +325,12 @@ def validate_dynamics_dict_dimensions(dynamics: Dict[str, Expr], states: List[St
         dyn_expr = dynamics[state.name]
         expected_shape = state.shape
 
-        # Check if expression has a shape attribute and if it matches
-        if hasattr(dyn_expr, "shape") and dyn_expr.shape != expected_shape:
+        # Actually compute the shape of the dynamics expression
+        actual_shape = dyn_expr.check_shape()
+
+        if actual_shape != expected_shape:
             raise ValueError(
-                f"Dynamics for state '{state.name}' has shape {dyn_expr.shape}, "
+                f"Dynamics for state '{state.name}' has shape {actual_shape}, "
                 f"but state has shape {expected_shape}"
             )
 
