@@ -221,7 +221,7 @@ def augment_with_time_state(
     time_min: float,
     time_max: float,
     N: int,
-) -> Tuple[List[State], List[Constraint], int]:
+) -> Tuple[List[State], List[Constraint]]:
     """
     Augment the states list with a time state and add corresponding CTCS constraints.
 
@@ -238,14 +238,10 @@ def augment_with_time_state(
         Tuple of:
         - Updated list of states (including time state appended at end)
         - Updated list of constraints (including time CTCS constraints)
-        - Index where time state starts in the concatenated state vector
     """
     # Create copies to avoid mutating inputs
     states_aug = list(states)
     constraints_aug = list(constraints)
-
-    # Calculate index where time will be inserted
-    idx_time = sum(state.shape[0] for state in states)
 
     # Create time State
     time_state = State("time", shape=(1,))
@@ -276,7 +272,7 @@ def augment_with_time_state(
     constraints_aug.append(CTCS(time_state <= time_state.max))
     constraints_aug.append(CTCS(time_state.min <= time_state))
 
-    return states_aug, constraints_aug, idx_time
+    return states_aug, constraints_aug
 
 
 def augment_dynamics_with_ctcs(

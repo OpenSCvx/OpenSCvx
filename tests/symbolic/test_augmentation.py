@@ -40,7 +40,7 @@ def test_augment_with_time_state_basic():
     constraints = []
     N = 10
 
-    states_aug, constraints_aug, idx_time = augment_with_time_state(
+    states_aug, constraints_aug = augment_with_time_state(
         states,
         constraints,
         time_initial=0.0,
@@ -72,9 +72,6 @@ def test_augment_with_time_state_basic():
     assert time_state.guess.shape == (N, 1)
     assert np.allclose(time_state.guess, np.linspace(0.0, 2.0, N).reshape(-1, 1))
 
-    # Check idx_time
-    assert idx_time == 2  # After the 2D x state
-
     # Should have added 2 CTCS constraints for time bounds
     assert len(constraints_aug) == 2
 
@@ -89,7 +86,7 @@ def test_augment_with_time_state_free_initial():
     constraints = []
     N = 5
 
-    states_aug, constraints_aug, idx_time = augment_with_time_state(
+    states_aug, constraints_aug = augment_with_time_state(
         states,
         constraints,
         time_initial=("free", 1.0),
@@ -122,7 +119,7 @@ def test_augment_with_time_state_minimize_final():
     constraints = []
     N = 8
 
-    states_aug, constraints_aug, idx_time = augment_with_time_state(
+    states_aug, constraints_aug = augment_with_time_state(
         states,
         constraints,
         time_initial=0.0,
@@ -143,7 +140,6 @@ def test_augment_with_time_state_minimize_final():
     # Just check the numeric value, the "minimize" is handled elsewhere
     assert time_state.final[0] == 10.0
     assert np.allclose(time_state.guess, np.linspace(0.0, 10.0, N).reshape(-1, 1))
-    assert idx_time == 3  # After the 3D x state
 
 
 def test_augment_with_time_state_existing_constraints():
@@ -159,7 +155,7 @@ def test_augment_with_time_state_existing_constraints():
     constraints = [existing_constraint]
     N = 5
 
-    states_aug, constraints_aug, idx_time = augment_with_time_state(
+    states_aug, constraints_aug = augment_with_time_state(
         states,
         constraints,
         time_initial=0.0,
@@ -188,7 +184,7 @@ def test_augment_with_time_state_multiple_states():
     constraints = []
     N = 10
 
-    states_aug, constraints_aug, idx_time = augment_with_time_state(
+    states_aug, constraints_aug = augment_with_time_state(
         states,
         constraints,
         time_initial=0.0,
@@ -203,9 +199,6 @@ def test_augment_with_time_state_multiple_states():
     assert states_aug[0] is x1
     assert states_aug[1] is x2
     assert states_aug[2].name == "time"
-
-    # idx_time should be after x1 (2D) and x2 (3D)
-    assert idx_time == 5  # 2 + 3
 
 
 def test_separate_constraints_empty():

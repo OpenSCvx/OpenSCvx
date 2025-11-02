@@ -129,7 +129,7 @@ class TrajOptProblem:
         """
 
         # Augment states with time state and add time constraints
-        x, constraints, idx_time = augment_with_time_state(
+        x, constraints = augment_with_time_state(
             x, constraints, time_initial, time_final, time_min, time_max, N
         )
 
@@ -187,6 +187,12 @@ class TrajOptProblem:
         # Assign slices to augmented states and controls in canonical order
         collect_and_assign_slices(x_aug, u_aug)
 
+        # Find the time state by name and get its slice
+        time_state = next((s for s in x_aug if s.name == "time"), None)
+        if time_state is None:
+            raise ValueError("No state named 'time' found in augmented states")
+        time_slice = time_state.slice
+
         # TODO: (norrisg) allow non-ctcs constraints
         dyn_fn = lower_to_jax(dynamics_aug)
         constraints_nodal_fns = lower_to_jax(constraints_nodal)
@@ -220,13 +226,6 @@ class TrajOptProblem:
         # Time dilation index for reference
         idx_time_dilation = slice(idx_u_true.stop, idx_u_true.stop + 1)
 
-        # Convert idx_time to a slice (time state is always at position idx_time in unified state)
-        # idx_time was returned from augment_with_time_state as the starting index
-        assert idx_time >= 0 and idx_time < len(x_unified.max), (
-            "idx_time must be in the range of the state vector and non-negative"
-        )
-        idx_time_slice = slice(idx_time, idx_time + 1)
-
         if dis is None:
             dis = DiscretizationConfig()
 
@@ -235,13 +234,13 @@ class TrajOptProblem:
                 x=x_unified,
                 x_prop=x_prop,
                 u=u_unified,
-                total_time=x_unified.initial[idx_time_slice][0],
+                total_time=x_unified.initial[time_slice][0],
                 n_states=x_unified.initial.shape[0],
                 n_states_prop=x_prop.initial.shape[0],
                 idx_x_true=idx_x_true,
                 idx_x_true_prop=idx_x_true_prop,
                 idx_u_true=idx_u_true,
-                idx_t=idx_time_slice,
+                idx_t=time_slice,
                 idx_y=idx_constraint_violation,
                 idx_y_prop=idx_constraint_violation_prop,
                 idx_s=idx_time_dilation,
