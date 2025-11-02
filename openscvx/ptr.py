@@ -49,11 +49,26 @@ def PTR_init(params, ocp: cp.Problem, discretization_solver: callable, settings:
 
 def format_result(problem, converged: bool) -> OptimizationResults:
     """Formats the final result as an OptimizationResults object from the problem's state."""
+    # Build nodes dictionary with all states and controls
+    nodes_dict = {}
+
+    # Add all states (user-defined and augmented)
+    for state in problem.states:
+        nodes_dict[state.name] = problem.settings.sim.x.guess[:, state._slice]
+
+    # Add all controls (user-defined and augmented)
+    for control in problem.controls:
+        nodes_dict[control.name] = problem.settings.sim.u.guess[:, control._slice]
+
     return OptimizationResults(
         converged=converged,
         t_final=problem.settings.sim.x.guess[:, problem.settings.sim.idx_t][-1],
         u=problem.settings.sim.u,
         x=problem.settings.sim.x,
+        nodes=nodes_dict,
+        trajectory={},  # Populated by post_process
+        _states=problem.states,
+        _controls=problem.controls,
         x_history=problem.scp_trajs,
         u_history=problem.scp_controls,
         discretization_history=problem.scp_V_multi_shoot_traj,

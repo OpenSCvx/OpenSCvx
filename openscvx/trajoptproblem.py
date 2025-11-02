@@ -187,6 +187,10 @@ class TrajOptProblem:
         # Assign slices to augmented states and controls in canonical order
         collect_and_assign_slices(x_aug, u_aug)
 
+        # Store state and control lists for dictionary-based results access
+        self.states = x_aug
+        self.controls = u_aug
+
         # Find the time state by name and get its slice
         time_state = next((s for s in x_aug if s.name == "time"), None)
         if time_state is None:
