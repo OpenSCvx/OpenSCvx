@@ -52,6 +52,24 @@ def create_connection_line_2d_projected(positions, i, node_a, node_b, color="red
     )
 
 
+def create_closed_polygon_3d(vertices, color="blue", width=10):
+    """Create a 3D closed polygon from a list of vertices."""
+    # Close the polygon by appending the first vertex
+    closed_vertices = vertices + [vertices[0]]
+    x_coords = [v[0] for v in closed_vertices]
+    y_coords = [v[1] for v in closed_vertices]
+    z_coords = [v[2] for v in closed_vertices]
+
+    return go.Scatter3d(
+        x=x_coords,
+        y=y_coords,
+        z=z_coords,
+        mode="lines",
+        showlegend=False,
+        line={"color": color, "width": width},
+    )
+
+
 def plot_dubins_car(results: OptimizationResults, params: Config):
     # Plot the trajectory of the Dubins car in 3d as an animaiton
     fig = go.Figure()
@@ -1657,34 +1675,7 @@ def plot_animation(
     if "vertices" in result:
         for vertices in result["vertices"]:
             # Plot a line through the vertices of the gate
-            fig.add_trace(
-                go.Scatter3d(
-                    x=[
-                        vertices[0][0],
-                        vertices[1][0],
-                        vertices[2][0],
-                        vertices[3][0],
-                        vertices[0][0],
-                    ],
-                    y=[
-                        vertices[0][1],
-                        vertices[1][1],
-                        vertices[2][1],
-                        vertices[3][1],
-                        vertices[0][1],
-                    ],
-                    z=[
-                        vertices[0][2],
-                        vertices[1][2],
-                        vertices[2][2],
-                        vertices[3][2],
-                        vertices[0][2],
-                    ],
-                    mode="lines",
-                    showlegend=False,
-                    line={"color": "blue", "width": 10},
-                )
-            )
+            fig.add_trace(create_closed_polygon_3d(vertices))
 
     # Add ground plane
     fig.add_trace(
@@ -2026,34 +2017,7 @@ def plot_scp_animation(result: dict, params=None, path=""):
     if "vertices" in result:
         for vertices in result["vertices"]:
             # Plot a line through the vertices of the gate
-            fig.add_trace(
-                go.Scatter3d(
-                    x=[
-                        vertices[0][0],
-                        vertices[1][0],
-                        vertices[2][0],
-                        vertices[3][0],
-                        vertices[0][0],
-                    ],
-                    y=[
-                        vertices[0][1],
-                        vertices[1][1],
-                        vertices[2][1],
-                        vertices[3][1],
-                        vertices[0][1],
-                    ],
-                    z=[
-                        vertices[0][2],
-                        vertices[1][2],
-                        vertices[2][2],
-                        vertices[3][2],
-                        vertices[0][2],
-                    ],
-                    mode="lines",
-                    showlegend=False,
-                    line={"color": "blue", "width": 10},
-                )
-            )
+            fig.add_trace(create_closed_polygon_3d(vertices))
 
     # Add the subject positions
     if "n_subs" in result and result["n_subs"] != 0:
@@ -2561,34 +2525,7 @@ def plot_animation_double_integrator(
     if "vertices" in result:
         for vertices in result["vertices"]:
             # Plot a line through the vertices of the gate
-            fig.add_trace(
-                go.Scatter3d(
-                    x=[
-                        vertices[0][0],
-                        vertices[1][0],
-                        vertices[2][0],
-                        vertices[3][0],
-                        vertices[0][0],
-                    ],
-                    y=[
-                        vertices[0][1],
-                        vertices[1][1],
-                        vertices[2][1],
-                        vertices[3][1],
-                        vertices[0][1],
-                    ],
-                    z=[
-                        vertices[0][2],
-                        vertices[1][2],
-                        vertices[2][2],
-                        vertices[3][2],
-                        vertices[0][2],
-                    ],
-                    mode="lines",
-                    showlegend=False,
-                    line={"color": "blue", "width": 10},
-                )
-            )
+            fig.add_trace(create_closed_polygon_3d(vertices))
 
     # Add ground plane
     fig.add_trace(
