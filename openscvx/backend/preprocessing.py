@@ -321,14 +321,23 @@ def validate_dynamics_dict_dimensions(dynamics: Dict[str, Expr], states: List[St
     Raises:
         ValueError: If any dynamics expression dimension doesn't match its state shape
     """
+    def normalize_scalars(shape: Tuple[int, ...]) -> Tuple[int, ...]:
+        """Normalize shape: scalar () becomes (1,)"""
+        return (1,) if len(shape) == 0 else shape
+
     for state in states:
         dyn_expr = dynamics[state.name]
         expected_shape = state.shape
 
-        # Actually compute the shape of the dynamics expression
-        actual_shape = dyn_expr.check_shape()
+        # Handle raw Python numbers (which will be converted to Constant later)
+        if isinstance(dyn_expr, (int, float)):
+            actual_shape = ()  # Scalars have shape ()
+        else:
+            # Compute the shape of the dynamics expression
+            actual_shape = dyn_expr.check_shape()
 
-        if actual_shape != expected_shape:
+        # Normalize both shapes for comparison (consistent with Concat behavior)
+        if normalize_scalars(actual_shape) != normalize_scalars(expected_shape):
             raise ValueError(
                 f"Dynamics for state '{state.name}' has shape {actual_shape}, "
                 f"but state has shape {expected_shape}"
