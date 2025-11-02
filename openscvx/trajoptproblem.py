@@ -158,6 +158,11 @@ class TrajOptProblem:
         idx_time = sum(state.shape[0] for state in x)  # Time will be at this index
         x.append(time_state)
 
+        # Add CTCS constraints for time bounds
+        constraints = list(constraints)  # Make a copy to avoid mutating the input
+        constraints.append(CTCS(time_state <= time_state.max))
+        constraints.append(CTCS(time_state.min <= time_state))
+
         # Step 2: Add time derivative to dynamics dict
         dynamics = dict(dynamics)  # Make a copy to avoid mutating the input
         dynamics["time"] = time_derivative
