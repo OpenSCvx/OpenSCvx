@@ -191,7 +191,7 @@ class TrajOptProblem:
         time_state = next((s for s in x_aug if s.name == "time"), None)
         if time_state is None:
             raise ValueError("No state named 'time' found in augmented states")
-        time_slice = time_state.slice
+        time_slice = time_state._slice
 
         # TODO: (norrisg) allow non-ctcs constraints
         dyn_fn = lower_to_jax(dynamics_aug)
