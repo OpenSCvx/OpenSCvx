@@ -253,15 +253,8 @@ def augment_with_time_state(
     time_state.max = np.array([time_max])
 
     # Set time boundary conditions
-    if isinstance(time_initial, tuple):
-        time_state.initial = [time_initial]
-    else:
-        time_state.initial = [time_initial]
-
-    if isinstance(time_final, tuple):
-        time_state.final = [time_final]
-    else:
-        time_state.final = [time_final]
+    time_state.initial = [time_initial]
+    time_state.final = [time_final]
 
     # Create initial guess for time (linear interpolation)
     time_guess_start = (
