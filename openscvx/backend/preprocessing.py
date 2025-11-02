@@ -1,4 +1,4 @@
-from typing import Callable, Iterable, Set, Tuple, Union
+from typing import Callable, Iterable, List, Set, Tuple, Union
 
 import numpy as np
 
@@ -75,21 +75,18 @@ def validate_variable_names(
 
 
 def collect_and_assign_slices(
-    exprs: Iterable[Expr], *, start_index: int = 0
+    states: List[State], controls: List[Control], *, start_index: int = 0
 ) -> Tuple[list[State], list[Control]]:
-    # 1) collect all State/Control nodes
-    states, controls = [], []
+    """Assign slices to states and controls in the provided order.
 
-    def visitor(node):
-        # Cannot simply use `if node not in states` check since we have overloaded `__eq__` operator
-        if isinstance(node, State) and not any(node is s for s in states):
-            states.append(node)
+    Args:
+        states: List of State objects in canonical order
+        controls: List of Control objects in canonical order
+        start_index: Starting index for slice assignment (default 0)
 
-        if isinstance(node, Control) and not any(node is c for c in controls):
-            controls.append(node)
-
-    for e in exprs:
-        traverse(e, visitor)
+    Returns:
+        Tuple of (states, controls) with slices assigned
+    """
 
     def assign(vars_list, start_index):
         # split into manual vs auto

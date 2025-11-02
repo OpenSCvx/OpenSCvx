@@ -204,7 +204,7 @@ class TrajOptProblem:
         # Validate expressions
         all_exprs = [dynamics_concat] + constraints
         validate_variable_names(all_exprs)
-        collect_and_assign_slices(all_exprs)
+        collect_and_assign_slices(x, u)
         validate_shapes(all_exprs)
         validate_constraints_at_root(constraints)
         validate_and_normalize_constraint_nodes(constraints, N)
@@ -241,9 +241,8 @@ class TrajOptProblem:
             time_dilation_factor_max=time_dilation_factor_max,
         )
 
-        # TODO: (norrisg) this is somewhat of a hack; using x_aug, u_aug as leaf-node expressions to
-        # assign slices, should probably move into the augmentation functions themselves
-        collect_and_assign_slices(all_exprs + x_aug + u_aug)
+        # Assign slices to augmented states and controls in canonical order
+        collect_and_assign_slices(x_aug, u_aug)
 
         # TODO: (norrisg) allow non-ctcs constraints
         dyn_fn = lower_to_jax(dynamics_aug)
