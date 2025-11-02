@@ -1,9 +1,11 @@
-from typing import Callable, Iterable, List, Set, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Set, Tuple, Union
 
 import numpy as np
 
 from openscvx.backend.expr import (
     CTCS,
+    Concat,
+    Constant,
     Constraint,
     Control,
     Expr,
@@ -281,3 +283,82 @@ def validate_dynamics_dimension(
                 f"but total state dimension is {total_state_dim}. "
                 f"States: {[(s.name, s.shape) for s in states_list]}"
             )
+
+
+def validate_dynamics_dict(dynamics: Dict[str, Expr], states: List[State]) -> None:
+    """
+    Validate that the dynamics dictionary keys match the state names exactly.
+
+    Args:
+        dynamics: Dictionary mapping state names to their dynamics expressions
+        states: List of State objects
+
+    Raises:
+        ValueError: If there's a mismatch between state names and dynamics keys
+    """
+    state_names_set = set(state.name for state in states)
+    dynamics_names_set = set(dynamics.keys())
+
+    if dynamics_names_set != state_names_set:
+        missing_in_dynamics = state_names_set - dynamics_names_set
+        extra_in_dynamics = dynamics_names_set - state_names_set
+        error_msg = "Mismatch between state names and dynamics keys.\n"
+        if missing_in_dynamics:
+            error_msg += f"  States missing from dynamics: {missing_in_dynamics}\n"
+        if extra_in_dynamics:
+            error_msg += f"  Extra keys in dynamics: {extra_in_dynamics}\n"
+        raise ValueError(error_msg)
+
+
+def validate_dynamics_dict_dimensions(dynamics: Dict[str, Expr], states: List[State]) -> None:
+    """
+    Validate that each dynamics expression dimension matches the corresponding state shape.
+
+    Args:
+        dynamics: Dictionary mapping state names to their dynamics expressions
+        states: List of State objects
+
+    Raises:
+        ValueError: If any dynamics expression dimension doesn't match its state shape
+    """
+    for state in states:
+        dyn_expr = dynamics[state.name]
+        expected_shape = state.shape
+
+        # Check if expression has a shape attribute and if it matches
+        if hasattr(dyn_expr, "shape") and dyn_expr.shape != expected_shape:
+            raise ValueError(
+                f"Dynamics for state '{state.name}' has shape {dyn_expr.shape}, "
+                f"but state has shape {expected_shape}"
+            )
+
+
+def convert_dynamics_dict_to_expr(
+    dynamics: Dict[str, Expr], states: List[State]
+) -> Tuple[Dict[str, Expr], Expr]:
+    """
+    Convert a dynamics dictionary to a concatenated Expr, ordered by the states list.
+    Also converts scalar values to Constant expressions.
+
+    Args:
+        dynamics: Dictionary mapping state names to their dynamics expressions
+        states: List of State objects defining the canonical order
+
+    Returns:
+        Tuple of:
+        - Updated dynamics dictionary (with scalars converted to Constant)
+        - Concatenated dynamics expression ordered by states list
+    """
+    # Create a copy to avoid mutating the input
+    dynamics_converted = dict(dynamics)
+
+    # Convert scalar values to Constant expressions
+    for state_name, dyn_expr in dynamics_converted.items():
+        if isinstance(dyn_expr, (int, float)):
+            dynamics_converted[state_name] = Constant(dyn_expr)
+
+    # Create concatenated expression ordered by states list
+    dynamics_exprs = [dynamics_converted[state.name] for state in states]
+    dynamics_concat = Concat(*dynamics_exprs)
+
+    return dynamics_converted, dynamics_concat

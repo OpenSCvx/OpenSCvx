@@ -213,6 +213,79 @@ def get_nodal_constraints_from_ctcs(constraints_ctcs: List[CTCS]) -> List[Constr
     return nodal_ctcs
 
 
+def augment_with_time_state(
+    states: List[State],
+    constraints: List[Constraint],
+    time_initial: float | tuple,
+    time_final: float | tuple,
+    time_min: float,
+    time_max: float,
+    N: int,
+) -> Tuple[List[State], List[Constraint], int]:
+    """
+    Augment the states list with a time state and add corresponding CTCS constraints.
+
+    Args:
+        states: List of State objects (will not be modified)
+        constraints: List of constraints (will not be modified)
+        time_initial: Initial time boundary condition (float or tuple like ("free", value))
+        time_final: Final time boundary condition (float or tuple like ("free", value))
+        time_min: Minimum bound for time variable
+        time_max: Maximum bound for time variable
+        N: Number of discretization nodes
+
+    Returns:
+        Tuple of:
+        - Updated list of states (including time state appended at end)
+        - Updated list of constraints (including time CTCS constraints)
+        - Index where time state starts in the concatenated state vector
+    """
+    # Create copies to avoid mutating inputs
+    states_aug = list(states)
+    constraints_aug = list(constraints)
+
+    # Calculate index where time will be inserted
+    idx_time = sum(state.shape[0] for state in states)
+
+    # Create time State
+    time_state = State("time", shape=(1,))
+    time_state.min = np.array([time_min])
+    time_state.max = np.array([time_max])
+
+    # Set time boundary conditions
+    if isinstance(time_initial, tuple):
+        time_state.initial = [time_initial]
+    else:
+        time_state.initial = [time_initial]
+
+    if isinstance(time_final, tuple):
+        time_state.final = [time_final]
+    else:
+        time_state.final = [time_final]
+
+    # Create initial guess for time (linear interpolation)
+    time_guess_start = (
+        time_state.initial[0]
+        if isinstance(time_state.initial[0], (int, float))
+        else time_state.initial[0][1]
+    )
+    time_guess_end = (
+        time_state.final[0]
+        if isinstance(time_state.final[0], (int, float))
+        else time_state.final[0][1]
+    )
+    time_state.guess = np.linspace(time_guess_start, time_guess_end, N).reshape(-1, 1)
+
+    # Add time state to the list
+    states_aug.append(time_state)
+
+    # Add CTCS constraints for time bounds
+    constraints_aug.append(CTCS(time_state <= time_state.max))
+    constraints_aug.append(CTCS(time_state.min <= time_state))
+
+    return states_aug, constraints_aug, idx_time
+
+
 def augment_dynamics_with_ctcs(
     xdot: Expr,
     states: List[State],

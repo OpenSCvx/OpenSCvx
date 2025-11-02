@@ -14,6 +14,7 @@ os.environ["EQX_ON_ERROR"] = "nan"
 from openscvx import io
 from openscvx.backend.augmentation import (
     augment_dynamics_with_ctcs,
+    augment_with_time_state,
     decompose_vector_nodal_constraints,
     separate_constraints,
     sort_ctcs_constraints,
@@ -24,8 +25,11 @@ from openscvx.backend.expr.state import State
 from openscvx.backend.lower import lower_to_jax
 from openscvx.backend.preprocessing import (
     collect_and_assign_slices,
+    convert_dynamics_dict_to_expr,
     validate_and_normalize_constraint_nodes,
     validate_constraints_at_root,
+    validate_dynamics_dict,
+    validate_dynamics_dict_dimensions,
     validate_dynamics_dimension,
     validate_shapes,
     validate_variable_names,
@@ -124,82 +128,21 @@ class TrajOptProblem:
             None
         """
 
-        # Step 1: Create time State and add to states list
-        time_state = State("time", shape=(1,))
-        time_state.min = np.array([time_min])
-        time_state.max = np.array([time_max])
-
-        # Set time boundary conditions
-        if isinstance(time_initial, tuple):
-            time_state.initial = [time_initial]
-        else:
-            time_state.initial = [time_initial]
-
-        if isinstance(time_final, tuple):
-            time_state.final = [time_final]
-        else:
-            time_state.final = [time_final]
-
-        # Create initial guess for time (linear interpolation)
-        time_guess_start = (
-            time_state.initial[0]
-            if isinstance(time_state.initial[0], (int, float))
-            else time_state.initial[0][1]
+        # Augment states with time state and add time constraints
+        x, constraints, idx_time = augment_with_time_state(
+            x, constraints, time_initial, time_final, time_min, time_max, N
         )
-        time_guess_end = (
-            time_state.final[0]
-            if isinstance(time_state.final[0], (int, float))
-            else time_state.final[0][1]
-        )
-        time_state.guess = np.linspace(time_guess_start, time_guess_end, N).reshape(-1, 1)
 
-        # Add time state to the list and track its index
-        x = list(x)  # Make a copy to avoid mutating the input
-        idx_time = sum(state.shape[0] for state in x)  # Time will be at this index
-        x.append(time_state)
-
-        # Add CTCS constraints for time bounds
-        constraints = list(constraints)  # Make a copy to avoid mutating the input
-        constraints.append(CTCS(time_state <= time_state.max))
-        constraints.append(CTCS(time_state.min <= time_state))
-
-        # Step 2: Add time derivative to dynamics dict
+        # Add time derivative to dynamics dict
         dynamics = dict(dynamics)  # Make a copy to avoid mutating the input
         dynamics["time"] = time_derivative
 
-        # Step 3: Validate that dynamics dict keys match state names
-        state_names = [state.name for state in x]
-        dynamics_names = set(dynamics.keys())
-        state_names_set = set(state_names)
+        # Validate dynamics dict matches state names and dimensions
+        validate_dynamics_dict(dynamics, x)
+        validate_dynamics_dict_dimensions(dynamics, x)
 
-        if dynamics_names != state_names_set:
-            missing_in_dynamics = state_names_set - dynamics_names
-            extra_in_dynamics = dynamics_names - state_names_set
-            error_msg = "Mismatch between state names and dynamics keys.\n"
-            if missing_in_dynamics:
-                error_msg += f"  States missing from dynamics: {missing_in_dynamics}\n"
-            if extra_in_dynamics:
-                error_msg += f"  Extra keys in dynamics: {extra_in_dynamics}\n"
-            raise ValueError(error_msg)
-
-        # Step 4: Validate that each dynamics expression has the right dimension
-        for state in x:
-            dyn_expr = dynamics[state.name]
-            # Convert scalars to Expr if needed
-            if isinstance(dyn_expr, (int, float)):
-                dyn_expr = Constant(dyn_expr)
-                dynamics[state.name] = dyn_expr
-            # Check dimension
-            expected_shape = state.shape
-            if hasattr(dyn_expr, "shape") and dyn_expr.shape != expected_shape:
-                raise ValueError(
-                    f"Dynamics for state '{state.name}' has shape {dyn_expr.shape}, "
-                    f"but state has shape {expected_shape}"
-                )
-
-        # Step 5: Convert dict dynamics to concatenated Expr, ordered by x
-        dynamics_exprs = [dynamics[state.name] for state in x]
-        dynamics_concat = Concat(*dynamics_exprs)
+        # Convert dynamics dict to concatenated expression
+        dynamics, dynamics_concat = convert_dynamics_dict_to_expr(dynamics, x)
 
         # Validate expressions
         all_exprs = [dynamics_concat] + constraints
@@ -277,8 +220,8 @@ class TrajOptProblem:
         # Time dilation index for reference
         idx_time_dilation = slice(idx_u_true.stop, idx_u_true.stop + 1)
 
-        # Calculate idx_time as a slice (time state is always at position idx_time in unified state)
-        # idx_time was calculated earlier as the starting index before time was appended
+        # Convert idx_time to a slice (time state is always at position idx_time in unified state)
+        # idx_time was returned from augment_with_time_state as the starting index
         assert idx_time >= 0 and idx_time < len(x_unified.max), (
             "idx_time must be in the range of the state vector and non-negative"
         )
