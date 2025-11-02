@@ -321,6 +321,7 @@ def validate_dynamics_dict_dimensions(dynamics: Dict[str, Expr], states: List[St
     Raises:
         ValueError: If any dynamics expression dimension doesn't match its state shape
     """
+
     def normalize_scalars(shape: Tuple[int, ...]) -> Tuple[int, ...]:
         """Normalize shape: scalar () becomes (1,)"""
         return (1,) if len(shape) == 0 else shape
