@@ -70,6 +70,496 @@ def create_closed_polygon_3d(vertices, color="blue", width=10):
     )
 
 
+def create_sphere_surface(center, radius=1.0, rotation_matrix=None, n_points=20):
+    """Create a sphere or ellipsoid surface mesh.
+
+    Args:
+        center: 3D center point (array-like)
+        radius: scalar or 3-element array for ellipsoid radii
+        rotation_matrix: optional 3x3 rotation matrix
+        n_points: mesh resolution
+
+    Returns:
+        points: (n_points**2, 3) array of mesh vertices
+        n_points: resolution (useful for reshaping)
+    """
+    u = np.linspace(0, 2 * np.pi, n_points)
+    v = np.linspace(0, np.pi, n_points)
+
+    x = np.outer(np.cos(u), np.sin(v))
+    y = np.outer(np.sin(u), np.sin(v))
+    z = np.outer(np.ones(np.size(u)), np.cos(v))
+
+    # Handle scalar or vector radius
+    if np.isscalar(radius):
+        radius = np.array([radius, radius, radius])
+    else:
+        radius = np.asarray(radius)
+
+    x = radius[0] * x
+    y = radius[1] * y
+    z = radius[2] * z
+
+    points = np.array([x.flatten(), y.flatten(), z.flatten()])
+
+    if rotation_matrix is not None:
+        points = rotation_matrix @ points
+
+    points = points.T + np.asarray(center)
+    return points, n_points
+
+
+def generate_subject_colors(result_or_count, min_rgb=0, max_rgb=255):
+    """Generate random RGB colors for subjects/keypoints.
+
+    Args:
+        result_or_count: either a result dictionary (checks for 'init_poses') or an integer count
+        min_rgb: minimum RGB value (0-255)
+        max_rgb: maximum RGB value (0-255)
+
+    Returns:
+        List of RGB color strings
+    """
+    if isinstance(result_or_count, int):
+        n_subjects = result_or_count
+    else:
+        n_subjects = len(result_or_count["init_poses"]) if "init_poses" in result_or_count else 1
+    return [
+        f"rgb({random.randint(min_rgb, max_rgb)}, {random.randint(min_rgb, max_rgb)}, {random.randint(min_rgb, max_rgb)})"
+        for _ in range(n_subjects)
+    ]
+
+
+def compute_cone_projection(values, A, norm_type, fixed_axis_value=0, axis_index=0):
+    """Compute 1D projection of conic constraint.
+
+    Args:
+        values: array of values to evaluate along one axis
+        A: conic constraint matrix (2x2)
+        norm_type: "inf" or numeric norm order
+        fixed_axis_value: value for the fixed axis (default 0)
+        axis_index: 0 for x-projection, 1 for y-projection
+
+    Returns:
+        Array of z-values defining the cone boundary
+    """
+    z = []
+    for val in values:
+        vector = [0, 0]
+        vector[axis_index] = val
+        vector[1 - axis_index] = fixed_axis_value
+
+        if norm_type == "inf":
+            z.append(np.linalg.norm(A @ np.array(vector), axis=0, ord=np.inf))
+        else:
+            z.append(np.linalg.norm(A @ np.array(vector), axis=0, ord=norm_type))
+    return np.array(z)
+
+
+def frame_args(duration):
+    """Create frame arguments for plotly animations.
+
+    Args:
+        duration: duration in milliseconds
+
+    Returns:
+        Dictionary of frame arguments
+    """
+    return {
+        "frame": {"duration": duration},
+        "mode": "immediate",
+        "fromcurrent": True,
+        "transition": {"duration": duration, "easing": "linear"},
+    }
+
+
+# Modular component functions for building plots
+def add_animation_controls(
+    fig, slider_x=0.15, slider_y=0.32, play_speed=50, frame_speed=500, button_x=None, button_y=None
+):
+    """Add animation slider and play/pause controls to a plotly figure.
+
+    Args:
+        fig: plotly figure with frames already set
+        slider_x: x position of slider (0-1)
+        slider_y: y position of slider (0-1)
+        play_speed: play button frame duration in ms
+        frame_speed: slider frame duration in ms
+        button_x: optional x position of buttons (defaults to slider_x)
+        button_y: optional y position of buttons (defaults to slider_y)
+
+    Returns:
+        fig: modified figure
+    """
+    # Default button position to slider position if not specified
+    if button_x is None:
+        button_x = slider_x
+    if button_y is None:
+        button_y = slider_y
+
+    sliders = [
+        {
+            "pad": {"b": 10, "t": 60},
+            "len": 0.8,
+            "x": slider_x,
+            "y": slider_y,
+            "steps": [
+                {
+                    "args": [[f.name], frame_args(frame_speed)],
+                    "label": f.name,
+                    "method": "animate",
+                }
+                for f in fig.frames
+            ],
+        }
+    ]
+
+    updatemenus = [
+        {
+            "buttons": [
+                {
+                    "args": [None, frame_args(play_speed)],
+                    "label": "Play",
+                    "method": "animate",
+                },
+                {
+                    "args": [[None], frame_args(0)],
+                    "label": "Pause",
+                    "method": "animate",
+                },
+            ],
+            "direction": "left",
+            "pad": {"r": 10, "t": 70},
+            "type": "buttons",
+            "x": button_x,
+            "y": button_y,
+        }
+    ]
+
+    fig.update_layout(updatemenus=updatemenus, sliders=sliders)
+    return fig
+
+
+def add_obstacles(fig, centers, axes, radii, opacity=0.5, color=None, n_points=20):
+    """Add ellipsoidal obstacle surfaces to a plotly figure.
+
+    Args:
+        fig: plotly figure
+        centers: list of 3D center points
+        axes: list of 3x3 rotation matrices
+        radii: list of 3-element radius arrays
+        opacity: surface opacity (0-1)
+        color: optional colorscale name
+        n_points: mesh resolution
+
+    Returns:
+        fig: modified figure
+    """
+    for center, axis, radius in zip(centers, axes, radii):
+        # Use inverse radius for scaling (matches original behavior)
+        inv_radius = 1.0 / np.asarray(radius)
+        points, n = create_sphere_surface(center, inv_radius, axis, n_points)
+
+        trace_kwargs = {
+            "x": points[:, 0].reshape(n, n),
+            "y": points[:, 1].reshape(n, n),
+            "z": points[:, 2].reshape(n, n),
+            "opacity": opacity,
+            "showscale": False,
+        }
+        if color:
+            trace_kwargs["colorscale"] = color
+
+        fig.add_trace(go.Surface(**trace_kwargs))
+    return fig
+
+
+def add_range_spheres(fig, center, min_range, max_range, n_points=20):
+    """Add min and max range sphere surfaces around a center point.
+
+    Args:
+        fig: plotly figure
+        center: 3D center point
+        min_range: minimum range radius
+        max_range: maximum range radius
+        n_points: mesh resolution
+
+    Returns:
+        fig: modified figure
+    """
+    points_min, n = create_sphere_surface(center, min_range, n_points=n_points)
+    points_max, _ = create_sphere_surface(center, max_range, n_points=n_points)
+
+    fig.add_trace(
+        go.Surface(
+            x=points_min[:, 0].reshape(n, n),
+            y=points_min[:, 1].reshape(n, n),
+            z=points_min[:, 2].reshape(n, n),
+            opacity=0.2,
+            colorscale="reds",
+            name="Minimum Range",
+            showlegend=True,
+            showscale=False,
+        )
+    )
+    fig.add_trace(
+        go.Surface(
+            x=points_max[:, 0].reshape(n, n),
+            y=points_max[:, 1].reshape(n, n),
+            z=points_max[:, 2].reshape(n, n),
+            opacity=0.2,
+            colorscale="blues",
+            name="Maximum Range",
+            showlegend=True,
+            showscale=False,
+        )
+    )
+    return fig
+
+
+def add_ground_plane(fig, size=200, z_level=0, opacity=0.3):
+    """Add a ground plane surface to a plotly figure.
+
+    Args:
+        fig: plotly figure
+        size: half-width of square plane
+        z_level: z-coordinate of plane
+        opacity: surface opacity (0-1)
+
+    Returns:
+        fig: modified figure
+    """
+    fig.add_trace(
+        go.Surface(
+            x=[-size, size, size, -size],
+            y=[-size, -size, size, size],
+            z=[[z_level, z_level], [z_level, z_level], [z_level, z_level], [z_level, z_level]],
+            opacity=opacity,
+            showscale=False,
+            colorscale="Greys",
+            showlegend=True,
+            name="Ground Plane",
+        )
+    )
+    return fig
+
+
+def add_velocity_trajectory(
+    fig,
+    positions,
+    velocities,
+    end_index=None,
+    marker_size=5,
+    colorscale="Viridis",
+    name="Trajectory",
+):
+    """Add a trajectory trace colored by velocity magnitude.
+
+    Args:
+        fig: plotly figure
+        positions: Nx3 array of positions
+        velocities: Nx3 array of velocities
+        end_index: optional end index (None for full trajectory)
+        marker_size: marker size
+        colorscale: plotly colorscale name
+        name: trace name
+
+    Returns:
+        fig: modified figure
+    """
+    if end_index is None:
+        end_index = len(positions) - 1
+
+    pos_slice = positions[: end_index + 1]
+    vel_slice = velocities[: end_index + 1]
+
+    fig.add_trace(
+        go.Scatter3d(
+            x=pos_slice[:, 0],
+            y=pos_slice[:, 1],
+            z=pos_slice[:, 2],
+            mode="markers",
+            marker={
+                "size": marker_size,
+                "color": np.linalg.norm(vel_slice, axis=1),
+                "colorscale": colorscale,
+                "colorbar": {
+                    "title": "Velocity Norm (m/s)",
+                    "x": 0.02,
+                    "y": 0.55,
+                    "len": 0.75,
+                },
+            },
+            name=name,
+        )
+    )
+    return fig
+
+
+def add_cone_surface(fig, A, norm_type, x_range, y_range, opacity=0.25, n_points=20):
+    """Add a second-order cone surface to a plotly figure.
+
+    Args:
+        fig: plotly figure
+        A: 2x2 conic constraint matrix
+        norm_type: "inf" or numeric norm order
+        x_range: (min, max) tuple for x values
+        y_range: (min, max) tuple for y values
+        opacity: surface opacity (0-1)
+        n_points: mesh resolution
+
+    Returns:
+        fig: modified figure
+    """
+    x = np.linspace(x_range[0], x_range[1], n_points)
+    y = np.linspace(y_range[0], y_range[1], n_points)
+    X, Y = np.meshgrid(x, y)
+
+    z = []
+    for x_val in x:
+        for y_val in y:
+            if norm_type == "inf":
+                z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord=np.inf))
+            else:
+                z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord=norm_type))
+    z = np.array(z)
+
+    fig.add_trace(
+        go.Surface(x=X, y=Y, z=z.reshape(n_points, n_points), opacity=opacity, showscale=False)
+    )
+    return fig
+
+
+def add_cone_projections(
+    fig, A, norm_type, x_vals, y_vals, x_range, y_range, color="grey", width=3
+):
+    """Add x-z and y-z plane projections of a cone to a plotly figure.
+
+    Args:
+        fig: plotly figure
+        A: 2x2 conic constraint matrix
+        norm_type: "inf" or numeric norm order
+        x_vals: x-coordinate(s) for y-z projection plane
+        y_vals: y-coordinate(s) for x-z projection plane
+        x_range: (min, max) tuple for x values
+        y_range: (min, max) tuple for y values
+        color: line color
+        width: line width
+
+    Returns:
+        fig: modified figure
+    """
+    x = np.linspace(x_range[0], x_range[1], 20)
+    y = np.linspace(y_range[0], y_range[1], 20)
+
+    # X-Z plane projection (y fixed)
+    z_x = compute_cone_projection(x, A, norm_type, fixed_axis_value=0, axis_index=0)
+    fig.add_trace(
+        go.Scatter3d(
+            y=x,
+            x=y_vals,
+            z=z_x,
+            mode="lines",
+            showlegend=False,
+            line={"color": color, "width": width},
+        )
+    )
+
+    # Y-Z plane projection (x fixed)
+    z_y = compute_cone_projection(y, A, norm_type, fixed_axis_value=0, axis_index=1)
+    fig.add_trace(
+        go.Scatter3d(
+            y=x_vals,
+            x=y,
+            z=z_y,
+            mode="lines",
+            showlegend=False,
+            line={"color": color, "width": width},
+        )
+    )
+
+    return fig
+
+
+# Helper functions that return traces (for use in animation frames)
+def create_velocity_trajectory_trace(
+    positions, velocities, end_index, marker_size=5, colorscale="Viridis", name="Trajectory"
+):
+    """Create a trajectory trace colored by velocity magnitude.
+
+    Args:
+        positions: Nx3 array of positions
+        velocities: Nx3 array of velocities
+        end_index: end index for slicing
+        marker_size: marker size
+        colorscale: plotly colorscale name
+        name: trace name
+
+    Returns:
+        go.Scatter3d trace
+    """
+    pos_slice = positions[: end_index + 1]
+    vel_slice = velocities[: end_index + 1]
+
+    return go.Scatter3d(
+        x=pos_slice[:, 0],
+        y=pos_slice[:, 1],
+        z=pos_slice[:, 2],
+        mode="markers",
+        marker={
+            "size": marker_size,
+            "color": np.linalg.norm(vel_slice, axis=1),
+            "colorscale": colorscale,
+            "colorbar": {
+                "title": "Velocity Norm (m/s)",
+                "x": 0.02,
+                "y": 0.55,
+                "len": 0.75,
+            },
+        },
+        name=name,
+    )
+
+
+def create_range_sphere_traces(center, min_range, max_range, n_points=20):
+    """Create min and max range sphere surface traces.
+
+    Args:
+        center: 3D center point
+        min_range: minimum range radius
+        max_range: maximum range radius
+        n_points: mesh resolution
+
+    Returns:
+        List of two go.Surface traces
+    """
+    points_min, n = create_sphere_surface(center, min_range, n_points=n_points)
+    points_max, _ = create_sphere_surface(center, max_range, n_points=n_points)
+
+    return [
+        go.Surface(
+            x=points_min[:, 0].reshape(n, n),
+            y=points_min[:, 1].reshape(n, n),
+            z=points_min[:, 2].reshape(n, n),
+            opacity=0.2,
+            colorscale="reds",
+            name="Minimum Range",
+            showlegend=True,
+            showscale=False,
+        ),
+        go.Surface(
+            x=points_max[:, 0].reshape(n, n),
+            y=points_max[:, 1].reshape(n, n),
+            z=points_max[:, 2].reshape(n, n),
+            opacity=0.2,
+            colorscale="blues",
+            name="Maximum Range",
+            showlegend=True,
+            showscale=False,
+        ),
+    ]
+
+
 def plot_dubins_car(results: OptimizationResults, params: Config):
     # Plot the trajectory of the Dubins car in 3d as an animaiton
     fig = go.Figure()
@@ -238,15 +728,6 @@ def full_subject_traj_time(results: OptimizationResults, params: Config):
         return subs_traj, subs_traj_sen, subs_traj_node, subs_traj_sen_node
     else:
         raise ValueError("`R_sb` not found in results. Cannot compute sensor frame.")
-
-
-def frame_args(duration):
-    return {
-        "frame": {"duration": duration},
-        "mode": "immediate",
-        "fromcurrent": True,
-        "transition": {"duration": duration, "easing": "linear"},
-    }
 
 
 def plot_camera_view(result: OptimizationResults, params: Config) -> None:
@@ -437,10 +918,7 @@ def plot_camera_animation(result: dict, params: Config, path="") -> None:
     )
 
     # Choose a random color for each subject
-    colors = [
-        f"rgb({random.randint(10, 255)}, {random.randint(10, 255)}, {random.randint(10, 255)})"
-        for _ in subs_positions_sen
-    ]
+    colors = generate_subject_colors(len(subs_positions_sen), min_rgb=10, max_rgb=255)
 
     frames = []
     # Animate the subjects along their trajectories
@@ -481,49 +959,8 @@ def plot_camera_animation(result: dict, params: Config, path="") -> None:
 
     fig.frames = frames
 
-    sliders = [
-        {
-            "pad": {"b": 10, "t": 60},
-            "len": 0.8,
-            "x": 0.15,
-            "y": 0.15,
-            "steps": [
-                {
-                    "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
-                    "label": f.name,
-                    "method": "animate",
-                }
-                for f in fig.frames
-            ],
-        }
-    ]
-
-    fig.update_layout(
-        updatemenus=[
-            {
-                "buttons": [
-                    {
-                        "args": [None, frame_args(50)],
-                        "label": "Play",
-                        "method": "animate",
-                    },
-                    {
-                        "args": [[None], frame_args(0)],
-                        "label": "Pause",
-                        "method": "animate",
-                    },
-                ],
-                "direction": "left",
-                "pad": {"r": 10, "t": 70},
-                "type": "buttons",
-                "x": 0.15,
-                "y": 0.15,
-            }
-        ],
-        sliders=sliders,
-    )
-
-    fig.update_layout(sliders=sliders)
+    # Add animation controls using modular component
+    add_animation_controls(fig, slider_x=0.15, slider_y=0.15, play_speed=50, frame_speed=500)
 
     # Center the title for the plot
     fig.update_layout(title=title, title_x=0.5)
@@ -717,49 +1154,8 @@ def plot_camera_polytope_animation(result: dict, params: Config, path="") -> Non
 
     fig.frames = frames
 
-    sliders = [
-        {
-            "pad": {"b": 10, "t": 60},
-            "len": 0.8,
-            "x": 0.15,
-            "y": 0.15,
-            "steps": [
-                {
-                    "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
-                    "label": f.name,
-                    "method": "animate",
-                }
-                for f in fig.frames
-            ],
-        }
-    ]
-
-    fig.update_layout(
-        updatemenus=[
-            {
-                "buttons": [
-                    {
-                        "args": [None, frame_args(50)],
-                        "label": "Play",
-                        "method": "animate",
-                    },
-                    {
-                        "args": [[None], frame_args(0)],
-                        "label": "Pause",
-                        "method": "animate",
-                    },
-                ],
-                "direction": "left",
-                "pad": {"r": 10, "t": 70},
-                "type": "buttons",
-                "x": 0.15,
-                "y": 0.15,
-            }
-        ],
-        sliders=sliders,
-    )
-
-    fig.update_layout(sliders=sliders)
+    # Add animation controls using modular component
+    add_animation_controls(fig, slider_x=0.15, slider_y=0.15, play_speed=50, frame_speed=500)
 
     # Center the title for the plot
     # fig.update_layout(title=title, title_x=0.5)
@@ -847,21 +1243,10 @@ def plot_conic_view_animation(result: dict, params: Config, path="") -> None:
     X, Y = np.meshgrid(x, y)
 
     if "norm_type" in result:
-        # Define the condition for the second order cone
-        z = []
-        for x_val in x:
-            for y_val in y:
-                if result["norm_type"] == "inf":
-                    z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord=np.inf))
-                else:
-                    z.append(
-                        np.linalg.norm(
-                            A @ np.array([x_val, y_val]), axis=0, ord=result["norm_type"]
-                        )
-                    )
-        z = np.array(z)
-
-        fig.add_trace(go.Surface(x=X, y=Y, z=z.reshape(20, 20), opacity=0.25, showscale=False))
+        # Add cone surface using helper function
+        x_range = (x[0], x[-1])
+        y_range = (y[0], y[-1])
+        add_cone_surface(fig, A, result["norm_type"], x_range, y_range, opacity=0.25, n_points=20)
         frames = []
 
         if "moving_subject" in result:
@@ -871,53 +1256,15 @@ def plot_conic_view_animation(result: dict, params: Config, path="") -> None:
             x_vals = 110 * np.ones_like(np.array(sub_positions_sen[0])[:, 0])
             y_vals = 110 * np.ones_like(np.array(sub_positions_sen[0])[:, 0])
 
-        # Add the projection of the second order cone onto the x-z plane
-        z = []
-        for x_val in x:
-            if result["norm_type"] == "inf":
-                z.append(np.linalg.norm(A @ np.array([x_val, 0]), axis=0, ord=np.inf))
-            else:
-                z.append(np.linalg.norm(A @ np.array([x_val, 0]), axis=0, ord=result["norm_type"]))
-        z = np.array(z)
-        fig.add_trace(
-            go.Scatter3d(
-                y=x,
-                x=y_vals,
-                z=z,
-                mode="lines",
-                showlegend=False,
-                line={"color": "grey", "width": 3},
-            )
-        )
-
-        # Add the projection of the second order cone onto the y-z plane
-        z = []
-        for y_val in y:
-            if result["norm_type"] == "inf":
-                z.append(np.linalg.norm(A @ np.array([0, y_val]), axis=0, ord=np.inf))
-            else:
-                z.append(np.linalg.norm(A @ np.array([0, y_val]), axis=0, ord=result["norm_type"]))
-        z = np.array(z)
-        fig.add_trace(
-            go.Scatter3d(
-                y=x_vals,
-                x=y,
-                z=z,
-                mode="lines",
-                showlegend=False,
-                line={"color": "grey", "width": 3},
-            )
-        )
+        # Add cone projections using helper function
+        x_range = (x[0], x[-1])
+        y_range = (y[0], y[-1])
+        add_cone_projections(fig, A, result["norm_type"], x_vals, y_vals, x_range, y_range)
     else:
         raise ValueError("`norm_type` not found in result dictionary.")
 
     # Choose a random color for each subject
-    colors = []
-    for sub_traj in sub_positions_sen:
-        color = (
-            f"rgb({random.randint(10, 255)}, {random.randint(10, 255)}, {random.randint(10, 255)})"
-        )
-        colors.append(color)
+    colors = generate_subject_colors(len(sub_positions_sen), min_rgb=10, max_rgb=255)
 
     sub_node_plot = []
     for i in range(0, len(sub_positions_sen[0]), 4):
@@ -993,49 +1340,8 @@ def plot_conic_view_animation(result: dict, params: Config, path="") -> None:
 
     fig.frames = frames
 
-    sliders = [
-        {
-            "pad": {"b": 10, "t": 60},
-            "len": 0.8,
-            "x": 0.15,
-            "y": 0.32,
-            "steps": [
-                {
-                    "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
-                    "label": f.name,
-                    "method": "animate",
-                }
-                for f in fig.frames
-            ],
-        }
-    ]
-
-    fig.update_layout(
-        updatemenus=[
-            {
-                "buttons": [
-                    {
-                        "args": [None, frame_args(50)],
-                        "label": "Play",
-                        "method": "animate",
-                    },
-                    {
-                        "args": [[None], frame_args(0)],
-                        "label": "Pause",
-                        "method": "animate",
-                    },
-                ],
-                "direction": "left",
-                "pad": {"r": 10, "t": 70},
-                "type": "buttons",
-                "x": 0.15,
-                "y": 0.32,
-            }
-        ],
-        sliders=sliders,
-    )
-
-    fig.update_layout(sliders=sliders)
+    # Add animation controls using modular component
+    add_animation_controls(fig, slider_x=0.15, slider_y=0.32, play_speed=50, frame_speed=500)
 
     # Set camera position
     fig.update_layout(
@@ -1115,17 +1421,10 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
 
     X, Y = np.meshgrid(x, y)
 
-    # Define the condition for the second order cone
-    z = []
-    for x_val in x:
-        for y_val in y:
-            if params.vp.norm == "inf":
-                z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord=np.inf))
-            else:
-                z.append(np.linalg.norm(A @ np.array([x_val, y_val]), axis=0, ord=params.vp.norm))
-    z = np.array(z)
-
-    fig.add_trace(go.Surface(x=X, y=Y, z=z.reshape(20, 20), opacity=0.25, showscale=False))
+    # Add cone surface using helper function
+    x_range = (x[0], x[-1])
+    y_range = (y[0], y[-1])
+    add_cone_surface(fig, A, params.vp.norm, x_range, y_range, opacity=0.25, n_points=20)
     frames = []
 
     if params.vp.tracking:
@@ -1135,41 +1434,13 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
         x_vals = 110 * np.ones_like(np.array(sub_positions_sen[0])[:, 0])
         y_vals = 110 * np.ones_like(np.array(sub_positions_sen[0])[:, 0])
 
-    # Add the projection of the second order cone onto the x-z plane
-    z = []
-    for x_val in x:
-        if params.vp.norm == "inf":
-            z.append(np.linalg.norm(A @ np.array([x_val, 0]), axis=0, ord=np.inf))
-        else:
-            z.append(np.linalg.norm(A @ np.array([x_val, 0]), axis=0, ord=params.vp.norm))
-    z = np.array(z)
-    fig.add_trace(
-        go.Scatter3d(
-            y=x, x=y_vals, z=z, mode="lines", showlegend=False, line={"color": "grey", "width": 3}
-        )
-    )
-
-    # Add the projection of the second order cone onto the y-z plane
-    z = []
-    for y_val in y:
-        if params.vp.norm == "inf":
-            z.append(np.linalg.norm(A @ np.array([0, y_val]), axis=0, ord=np.inf))
-        else:
-            z.append(np.linalg.norm(A @ np.array([0, y_val]), axis=0, ord=params.vp.norm))
-    z = np.array(z)
-    fig.add_trace(
-        go.Scatter3d(
-            y=x_vals, x=y, z=z, mode="lines", showlegend=False, line={"color": "grey", "width": 3}
-        )
-    )
+    # Add cone projections using helper function
+    x_range = (x[0], x[-1])
+    y_range = (y[0], y[-1])
+    add_cone_projections(fig, A, params.vp.norm, x_vals, y_vals, x_range, y_range)
 
     # Choose a random color for each subject
-    colors = []
-    for sub_traj in sub_positions_sen:
-        color = (
-            f"rgb({random.randint(10, 255)}, {random.randint(10, 255)}, {random.randint(10, 255)})"
-        )
-        colors.append(color)
+    colors = generate_subject_colors(len(sub_positions_sen), min_rgb=10, max_rgb=255)
 
     for i in range(0, len(sub_positions_sen[0]), 4):
         frame = go.Frame(name=str(i))
@@ -1268,49 +1539,8 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
 
     fig.frames = frames
 
-    sliders = [
-        {
-            "pad": {"b": 10, "t": 60},
-            "len": 0.8,
-            "x": 0.15,
-            "y": 0.32,
-            "steps": [
-                {
-                    "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
-                    "label": f.name,
-                    "method": "animate",
-                }
-                for f in fig.frames
-            ],
-        }
-    ]
-
-    fig.update_layout(
-        updatemenus=[
-            {
-                "buttons": [
-                    {
-                        "args": [None, frame_args(50)],
-                        "label": "Play",
-                        "method": "animate",
-                    },
-                    {
-                        "args": [[None], frame_args(0)],
-                        "label": "Pause",
-                        "method": "animate",
-                    },
-                ],
-                "direction": "left",
-                "pad": {"r": 10, "t": 70},
-                "type": "buttons",
-                "x": 0.15,
-                "y": 0.32,
-            }
-        ],
-        sliders=sliders,
-    )
-
-    fig.update_layout(sliders=sliders)
+    # Add animation controls using modular component
+    add_animation_controls(fig, slider_x=0.15, slider_y=0.32, play_speed=50, frame_speed=500)
 
     # Set camera position
     fig.update_layout(
@@ -1400,17 +1630,7 @@ def plot_animation(
     i = 0
     # Generate a color for each keypoint
     if "init_poses" in result or "moving_subject" in result:
-        color_kp = []
-        if "init_poses" in result:
-            for j in range(len(result["init_poses"])):
-                color_kp.append(
-                    f"rgb({random.randint(0, 255)}, {random.randint(0, 255)}, {random.randint(0, 255)})"
-                )
-        else:
-            for j in range(1):
-                color_kp.append(
-                    f"rgb({random.randint(0, 255)}, {random.randint(0, 255)}, {random.randint(0, 255)})"
-                )
+        color_kp = generate_subject_colors(result)
 
     # Draw drone attitudes as axes
     for i in range(0, len(indices) - 1, step):
@@ -1537,26 +1757,10 @@ def plot_animation(
             # if params.vp.n_subs != 1:
             j += 1
 
+        # Add velocity-colored trajectory using helper function
         data.append(
-            go.Scatter3d(
-                x=drone_positions[: indices[i] + 1, 0],
-                y=drone_positions[: indices[i] + 1, 1],
-                z=drone_positions[: indices[i] + 1, 2],
-                mode="markers",
-                marker={
-                    "size": 5,
-                    "color": np.linalg.norm(
-                        drone_velocities[: indices[i] + 1], axis=1
-                    ),  # set color to an array/list of desired values
-                    "colorscale": "Viridis",  # choose a colorscale
-                    "colorbar": {
-                        "title": "Velocity Norm (m/s)",
-                        "x": 0.02,
-                        "y": 0.55,
-                        "len": 0.75,
-                    },  # add colorbar
-                },
-                name="Nonlinear Propagation",
+            create_velocity_trajectory_trace(
+                drone_positions, drone_velocities, indices[i], name="Nonlinear Propagation"
             )
         )
 
@@ -1577,163 +1781,51 @@ def plot_animation(
 
                     sub_position = sub_positions[indices[i]]
 
-                    # Plot two spheres as a surface at the location of the subject to represent the minimum and maximum allowed range from the subject
-                    n = 20
-                    # Generate points on the unit sphere
-                    u = np.linspace(0, 2 * np.pi, n)
-                    v = np.linspace(0, np.pi, n)
-
-                    x = np.outer(np.cos(u), np.sin(v))
-                    y = np.outer(np.sin(u), np.sin(v))
-                    z = np.outer(np.ones(np.size(u)), np.cos(v))
-
+                    # Add range spheres using helper function
                     if "min_range" in result and "max_range" in result:
-                        # Scale points by minimum range
-                        x_min = result["min_range"] * x
-                        y_min = result["min_range"] * y
-                        z_min = result["min_range"] * z
-
-                        # Scale points by maximum range
-                        x_max = result["max_range"] * x
-                        y_max = result["max_range"] * y
-                        z_max = result["max_range"] * z
+                        data.extend(
+                            create_range_sphere_traces(
+                                sub_position, result["min_range"], result["max_range"]
+                            )
+                        )
                     else:
                         raise ValueError(
                             "`min_range` and `max_range` not found in result dictionary."
                         )
-
-                    # Rotate and translate points
-                    points_min = np.array([x_min.flatten(), y_min.flatten(), z_min.flatten()])
-                    points_max = np.array([x_max.flatten(), y_max.flatten(), z_max.flatten()])
-
-                    points_min = points_min.T + sub_position
-                    points_max = points_max.T + sub_position
-
-                    data.append(
-                        go.Surface(
-                            x=points_min[:, 0].reshape(n, n),
-                            y=points_min[:, 1].reshape(n, n),
-                            z=points_min[:, 2].reshape(n, n),
-                            opacity=0.2,
-                            colorscale="reds",
-                            name="Minimum Range",
-                            showlegend=True,
-                            showscale=False,
-                        )
-                    )
-                    data.append(
-                        go.Surface(
-                            x=points_max[:, 0].reshape(n, n),
-                            y=points_max[:, 1].reshape(n, n),
-                            z=points_max[:, 2].reshape(n, n),
-                            opacity=0.2,
-                            colorscale="blues",
-                            name="Maximum Range",
-                            showlegend=True,
-                            showscale=False,
-                        )
-                    )
 
         frame.data = data
         frames.append(frame)
 
     fig.frames = frames
 
+    # Add obstacles using modular component
     if "obstacles_centers" in result:
-        for center, axes, radius in zip(
-            result["obstacles_centers"], result["obstacles_axes"], result["obstacles_radii"]
-        ):
-            n = 20
-            # Generate points on the unit sphere
-            u = np.linspace(0, 2 * np.pi, n)
-            v = np.linspace(0, np.pi, n)
+        add_obstacles(
+            fig,
+            result["obstacles_centers"],
+            result["obstacles_axes"],
+            result["obstacles_radii"],
+            opacity=0.5,
+        )
 
-            x = np.outer(np.cos(u), np.sin(v))
-            y = np.outer(np.sin(u), np.sin(v))
-            z = np.outer(np.ones(np.size(u)), np.cos(v))
-
-            # Scale points by radii
-            x = 1 / radius[0] * x
-            y = 1 / radius[1] * y
-            z = 1 / radius[2] * z
-
-            # Rotate and translate points
-            points = np.array([x.flatten(), y.flatten(), z.flatten()])
-            points = axes @ points
-            points = points.T + center
-
-            fig.add_trace(
-                go.Surface(
-                    x=points[:, 0].reshape(n, n),
-                    y=points[:, 1].reshape(n, n),
-                    z=points[:, 2].reshape(n, n),
-                    opacity=0.5,
-                    showscale=False,
-                )
-            )
-
+    # Add gate vertices
     if "vertices" in result:
         for vertices in result["vertices"]:
-            # Plot a line through the vertices of the gate
             fig.add_trace(create_closed_polygon_3d(vertices))
 
-    # Add ground plane
-    fig.add_trace(
-        go.Surface(
-            x=[-200, 200, 200, -200],
-            y=[-200, -200, 200, 200],
-            z=[[0, 0], [0, 0], [0, 0], [0, 0]],
-            opacity=0.3,
-            showscale=False,
-            colorscale="Greys",
-            showlegend=True,
-            name="Ground Plane",
-        )
+    # Add ground plane using modular component
+    add_ground_plane(fig, size=200, z_level=0, opacity=0.3)
+
+    # Add animation controls using modular component
+    add_animation_controls(
+        fig,
+        slider_x=0.15,
+        slider_y=0.32,
+        play_speed=50,
+        frame_speed=500,
+        button_x=0.22,
+        button_y=0.37,
     )
-
-    sliders = [
-        {
-            "pad": {"b": 10, "t": 60},
-            "len": 0.8,
-            "x": 0.15,
-            "y": 0.32,
-            "steps": [
-                {
-                    "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
-                    "label": f.name,
-                    "method": "animate",
-                }
-                for f in fig.frames
-            ],
-        }
-    ]
-
-    fig.update_layout(
-        updatemenus=[
-            {
-                "buttons": [
-                    {
-                        "args": [None, frame_args(50)],
-                        "label": "Play",
-                        "method": "animate",
-                    },
-                    {
-                        "args": [[None], frame_args(0)],
-                        "label": "Pause",
-                        "method": "animate",
-                    },
-                ],
-                "direction": "left",
-                "pad": {"r": 10, "t": 70},
-                "type": "buttons",
-                "x": 0.1,
-                "y": 0,
-            }
-        ],
-        sliders=sliders,
-    )
-
-    fig.update_layout(sliders=sliders)
 
     fig.update_layout(template="plotly_dark")  # , title=title)
 
@@ -1759,32 +1851,6 @@ def plot_animation(
 
     # Overlay the title onto the plot
     fig.update_layout(title_y=0.95, title_x=0.5)
-
-    # Overlay the sliders and buttons onto the plot
-    fig.update_layout(
-        updatemenus=[
-            {
-                "buttons": [
-                    {
-                        "args": [None, frame_args(50)],
-                        "label": "Play",
-                        "method": "animate",
-                    },
-                    {
-                        "args": [[None], frame_args(0)],
-                        "label": "Pause",
-                        "method": "animate",
-                    },
-                ],
-                "direction": "left",
-                "pad": {"r": 10, "t": 70},
-                "type": "buttons",
-                "x": 0.22,
-                "y": 0.37,
-            }
-        ],
-        sliders=sliders,
-    )
 
     # Show the legend overlayed on the plot
     fig.update_layout(legend={"yanchor": "top", "y": 0.9, "xanchor": "left", "x": 0.75})
@@ -1981,38 +2047,15 @@ def plot_scp_animation(result: dict, params=None, path=""):
     fig.frames = frames
 
     i = 1
+    # Add obstacles using helper function (extract .value from centers)
     if "obstacles_centers" in result:
-        for center, axes, radius in zip(
-            result["obstacles_centers"], result["obstacles_axes"], result["obstacles_radii"]
-        ):
-            n = 20
-            # Generate points on the unit sphere
-            u = np.linspace(0, 2 * np.pi, n)
-            v = np.linspace(0, np.pi, n)
-
-            x = np.outer(np.cos(u), np.sin(v))
-            y = np.outer(np.sin(u), np.sin(v))
-            z = np.outer(np.ones(np.size(u)), np.cos(v))
-
-            # Scale points by radii
-            x = 1 / radius[0] * x
-            y = 1 / radius[1] * y
-            z = 1 / radius[2] * z
-
-            # Rotate and translate points
-            points = np.array([x.flatten(), y.flatten(), z.flatten()])
-            points = axes @ points
-            points = points.T + center.value
-
-            fig.add_trace(
-                go.Surface(
-                    x=points[:, 0].reshape(n, n),
-                    y=points[:, 1].reshape(n, n),
-                    z=points[:, 2].reshape(n, n),
-                    opacity=0.5,
-                    showscale=False,
-                )
-            )
+        add_obstacles(
+            fig,
+            [c.value for c in result["obstacles_centers"]],
+            result["obstacles_axes"],
+            result["obstacles_radii"],
+            opacity=0.5,
+        )
 
     if "vertices" in result:
         for vertices in result["vertices"]:
@@ -2048,95 +2091,19 @@ def plot_scp_animation(result: dict, params=None, path=""):
                     )
                 )
 
-    fig.add_trace(
-        go.Surface(
-            x=[-2000, 2000, 2000, -2000],
-            y=[-2000, -2000, 2000, 2000],
-            z=[[0, 0], [0, 0], [0, 0], [0, 0]],
-            opacity=0.3,
-            showscale=False,
-            colorscale="Greys",
-            showlegend=True,
-            name="Ground Plane",
-        )
-    )
+    # Add ground plane using helper function
+    add_ground_plane(fig, size=2000, z_level=0, opacity=0.3)
     fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 10, "y": 10, "z": 10}})
     # fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
 
-    sliders = [
-        {
-            "pad": {"b": 10, "t": 60},
-            "len": 0.8,
-            "x": 0.15,
-            "y": 0.32,
-            "steps": [
-                {
-                    "args": [[f.name], frame_args(0)],
-                    "label": f.name,
-                    "method": "animate",
-                }
-                for f in fig.frames
-            ],
-        }
-    ]
-
-    fig.update_layout(
-        updatemenus=[
-            {
-                "buttons": [
-                    {
-                        "args": [None, frame_args(50)],
-                        "label": "Play",
-                        "method": "animate",
-                    },
-                    {
-                        "args": [[None], frame_args(0)],
-                        "label": "Pause",
-                        "method": "animate",
-                    },
-                ],
-                "direction": "left",
-                "pad": {"r": 10, "t": 70},
-                "type": "buttons",
-                "x": 0.15,
-                "y": 0.32,
-            }
-        ],
-        sliders=sliders,
-    )
-    fig.update_layout(sliders=sliders)
+    # Add animation controls using helper function
+    add_animation_controls(fig, slider_x=0.15, slider_y=0.32, play_speed=50, frame_speed=0)
 
     fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 10, "y": 10, "z": 10}})
     # fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
 
     # Overlay the title onto the plot
     fig.update_layout(title_y=0.95, title_x=0.5)
-
-    # Overlay the sliders and buttons onto the plot
-    fig.update_layout(
-        updatemenus=[
-            {
-                "buttons": [
-                    {
-                        "args": [None, frame_args(50)],
-                        "label": "Play",
-                        "method": "animate",
-                    },
-                    {
-                        "args": [[None], frame_args(0)],
-                        "label": "Pause",
-                        "method": "animate",
-                    },
-                ],
-                "direction": "left",
-                "pad": {"r": 10, "t": 70},
-                "type": "buttons",
-                "x": 0.15,
-                "y": 0.32,
-            }
-        ],
-        sliders=sliders,
-    )
 
     # Show the legend overlayed on the plot
     fig.update_layout(legend={"yanchor": "top", "y": 0.9, "xanchor": "left", "x": 0.75})
@@ -2309,17 +2276,7 @@ def plot_animation_double_integrator(
     i = 0
     # Generate a color for each keypoint
     if "init_poses" in result or "moving_subject" in result:
-        color_kp = []
-        if "init_poses" in result:
-            for j in range(len(result["init_poses"])):
-                color_kp.append(
-                    f"rgb({random.randint(0, 255)}, {random.randint(0, 255)}, {random.randint(0, 255)})"
-                )
-        else:
-            for j in range(1):
-                color_kp.append(
-                    f"rgb({random.randint(0, 255)}, {random.randint(0, 255)}, {random.randint(0, 255)})"
-                )
+        color_kp = generate_subject_colors(result)
 
     # Draw drone attitudes as axes
     for i in range(0, len(indices) - 1, step):
@@ -2387,26 +2344,10 @@ def plot_animation_double_integrator(
             # if params.vp.n_subs != 1:
             j += 1
 
+        # Add velocity-colored trajectory using helper function
         data.append(
-            go.Scatter3d(
-                x=drone_positions[: indices[i] + 1, 0],
-                y=drone_positions[: indices[i] + 1, 1],
-                z=drone_positions[: indices[i] + 1, 2],
-                mode="markers",
-                marker={
-                    "size": 5,
-                    "color": np.linalg.norm(
-                        drone_velocities[: indices[i] + 1], axis=1
-                    ),  # set color to an array/list of desired values
-                    "colorscale": "Viridis",  # choose a colorscale
-                    "colorbar": {
-                        "title": "Velocity Norm (m/s)",
-                        "x": 0.02,
-                        "y": 0.55,
-                        "len": 0.75,
-                    },  # add colorbar
-                },
-                name="Nonlinear Propagation",
+            create_velocity_trajectory_trace(
+                drone_positions, drone_velocities, indices[i], name="Nonlinear Propagation"
             )
         )
 
@@ -2427,163 +2368,51 @@ def plot_animation_double_integrator(
 
                     sub_position = sub_positions[indices[i]]
 
-                    # Plot two spheres as a surface at the location of the subject to represent the minimum and maximum allowed range from the subject
-                    n = 20
-                    # Generate points on the unit sphere
-                    u = np.linspace(0, 2 * np.pi, n)
-                    v = np.linspace(0, np.pi, n)
-
-                    x = np.outer(np.cos(u), np.sin(v))
-                    y = np.outer(np.sin(u), np.sin(v))
-                    z = np.outer(np.ones(np.size(u)), np.cos(v))
-
+                    # Add range spheres using helper function
                     if "min_range" in result and "max_range" in result:
-                        # Scale points by minimum range
-                        x_min = result["min_range"] * x
-                        y_min = result["min_range"] * y
-                        z_min = result["min_range"] * z
-
-                        # Scale points by maximum range
-                        x_max = result["max_range"] * x
-                        y_max = result["max_range"] * y
-                        z_max = result["max_range"] * z
+                        data.extend(
+                            create_range_sphere_traces(
+                                sub_position, result["min_range"], result["max_range"]
+                            )
+                        )
                     else:
                         raise ValueError(
                             "`min_range` and `max_range` not found in result dictionary."
                         )
-
-                    # Rotate and translate points
-                    points_min = np.array([x_min.flatten(), y_min.flatten(), z_min.flatten()])
-                    points_max = np.array([x_max.flatten(), y_max.flatten(), z_max.flatten()])
-
-                    points_min = points_min.T + sub_position
-                    points_max = points_max.T + sub_position
-
-                    data.append(
-                        go.Surface(
-                            x=points_min[:, 0].reshape(n, n),
-                            y=points_min[:, 1].reshape(n, n),
-                            z=points_min[:, 2].reshape(n, n),
-                            opacity=0.2,
-                            colorscale="reds",
-                            name="Minimum Range",
-                            showlegend=True,
-                            showscale=False,
-                        )
-                    )
-                    data.append(
-                        go.Surface(
-                            x=points_max[:, 0].reshape(n, n),
-                            y=points_max[:, 1].reshape(n, n),
-                            z=points_max[:, 2].reshape(n, n),
-                            opacity=0.2,
-                            colorscale="blues",
-                            name="Maximum Range",
-                            showlegend=True,
-                            showscale=False,
-                        )
-                    )
 
         frame.data = data
         frames.append(frame)
 
     fig.frames = frames
 
+    # Add obstacles using modular component
     if "obstacles_centers" in result:
-        for center, axes, radius in zip(
-            result["obstacles_centers"], result["obstacles_axes"], result["obstacles_radii"]
-        ):
-            n = 20
-            # Generate points on the unit sphere
-            u = np.linspace(0, 2 * np.pi, n)
-            v = np.linspace(0, np.pi, n)
+        add_obstacles(
+            fig,
+            result["obstacles_centers"],
+            result["obstacles_axes"],
+            result["obstacles_radii"],
+            opacity=0.5,
+        )
 
-            x = np.outer(np.cos(u), np.sin(v))
-            y = np.outer(np.sin(u), np.sin(v))
-            z = np.outer(np.ones(np.size(u)), np.cos(v))
-
-            # Scale points by radii
-            x = 1 / radius[0] * x
-            y = 1 / radius[1] * y
-            z = 1 / radius[2] * z
-
-            # Rotate and translate points
-            points = np.array([x.flatten(), y.flatten(), z.flatten()])
-            points = axes @ points
-            points = points.T + center
-
-            fig.add_trace(
-                go.Surface(
-                    x=points[:, 0].reshape(n, n),
-                    y=points[:, 1].reshape(n, n),
-                    z=points[:, 2].reshape(n, n),
-                    opacity=0.5,
-                    showscale=False,
-                )
-            )
-
+    # Add gate vertices
     if "vertices" in result:
         for vertices in result["vertices"]:
-            # Plot a line through the vertices of the gate
             fig.add_trace(create_closed_polygon_3d(vertices))
 
-    # Add ground plane
-    fig.add_trace(
-        go.Surface(
-            x=[-200, 200, 200, -200],
-            y=[-200, -200, 200, 200],
-            z=[[0, 0], [0, 0], [0, 0], [0, 0]],
-            opacity=0.3,
-            showscale=False,
-            colorscale="Greys",
-            showlegend=True,
-            name="Ground Plane",
-        )
+    # Add ground plane using modular component
+    add_ground_plane(fig, size=200, z_level=0, opacity=0.3)
+
+    # Add animation controls using modular component
+    add_animation_controls(
+        fig,
+        slider_x=0.15,
+        slider_y=0.32,
+        play_speed=50,
+        frame_speed=500,
+        button_x=0.22,
+        button_y=0.37,
     )
-
-    sliders = [
-        {
-            "pad": {"b": 10, "t": 60},
-            "len": 0.8,
-            "x": 0.15,
-            "y": 0.32,
-            "steps": [
-                {
-                    "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
-                    "label": f.name,
-                    "method": "animate",
-                }
-                for f in fig.frames
-            ],
-        }
-    ]
-
-    fig.update_layout(
-        updatemenus=[
-            {
-                "buttons": [
-                    {
-                        "args": [None, frame_args(50)],
-                        "label": "Play",
-                        "method": "animate",
-                    },
-                    {
-                        "args": [[None], frame_args(0)],
-                        "label": "Pause",
-                        "method": "animate",
-                    },
-                ],
-                "direction": "left",
-                "pad": {"r": 10, "t": 70},
-                "type": "buttons",
-                "x": 0.1,
-                "y": 0,
-            }
-        ],
-        sliders=sliders,
-    )
-
-    fig.update_layout(sliders=sliders)
 
     fig.update_layout(template="plotly_dark")  # , title=title)
 
@@ -2609,32 +2438,6 @@ def plot_animation_double_integrator(
 
     # Overlay the title onto the plot
     fig.update_layout(title_y=0.95, title_x=0.5)
-
-    # Overlay the sliders and buttons onto the plot
-    fig.update_layout(
-        updatemenus=[
-            {
-                "buttons": [
-                    {
-                        "args": [None, frame_args(50)],
-                        "label": "Play",
-                        "method": "animate",
-                    },
-                    {
-                        "args": [[None], frame_args(0)],
-                        "label": "Pause",
-                        "method": "animate",
-                    },
-                ],
-                "direction": "left",
-                "pad": {"r": 10, "t": 70},
-                "type": "buttons",
-                "x": 0.22,
-                "y": 0.37,
-            }
-        ],
-        sliders=sliders,
-    )
 
     # Show the legend overlayed on the plot
     fig.update_layout(legend={"yanchor": "top", "y": 0.9, "xanchor": "left", "x": 0.75})
@@ -2729,26 +2532,10 @@ def plot_animation_3DoF_rocket(
                     )
                 )
 
+        # Add velocity-colored trajectory using helper function
         data.append(
-            go.Scatter3d(
-                x=drone_positions[: indices[i] + 1, 0],
-                y=drone_positions[: indices[i] + 1, 1],
-                z=drone_positions[: indices[i] + 1, 2],
-                mode="markers",
-                marker={
-                    "size": 5,
-                    "color": np.linalg.norm(
-                        drone_velocities[: indices[i] + 1], axis=1
-                    ),  # set color to an array/list of desired values
-                    "colorscale": "Viridis",  # choose a colorscale
-                    "colorbar": {
-                        "title": "Velocity Norm (m/s)",
-                        "x": 0.02,
-                        "y": 0.55,
-                        "len": 0.75,
-                    },  # add colorbar
-                },
-                name="Nonlinear Propagation",
+            create_velocity_trajectory_trace(
+                drone_positions, drone_velocities, indices[i], name="Nonlinear Propagation"
             )
         )
 
@@ -2757,63 +2544,19 @@ def plot_animation_3DoF_rocket(
 
     fig.frames = frames
 
-    # Add ground plane
-    fig.add_trace(
-        go.Surface(
-            x=[-200, 200, 200, -200],
-            y=[-200, -200, 200, 200],
-            z=[[0, 0], [0, 0], [0, 0], [0, 0]],
-            opacity=0.3,
-            showscale=False,
-            colorscale="Greys",
-            showlegend=True,
-            name="Ground Plane",
-        )
+    # Add ground plane using helper function
+    add_ground_plane(fig, size=200, z_level=0, opacity=0.3)
+
+    # Add animation controls using helper function
+    add_animation_controls(
+        fig,
+        slider_x=0.15,
+        slider_y=0.32,
+        play_speed=50,
+        frame_speed=500,
+        button_x=0.22,
+        button_y=0.37,
     )
-
-    sliders = [
-        {
-            "pad": {"b": 10, "t": 60},
-            "len": 0.8,
-            "x": 0.15,
-            "y": 0.32,
-            "steps": [
-                {
-                    "args": [[f.name], frame_args(500)],  # Use the frame name as the argument
-                    "label": f.name,
-                    "method": "animate",
-                }
-                for f in fig.frames
-            ],
-        }
-    ]
-
-    fig.update_layout(
-        updatemenus=[
-            {
-                "buttons": [
-                    {
-                        "args": [None, frame_args(50)],
-                        "label": "Play",
-                        "method": "animate",
-                    },
-                    {
-                        "args": [[None], frame_args(0)],
-                        "label": "Pause",
-                        "method": "animate",
-                    },
-                ],
-                "direction": "left",
-                "pad": {"r": 10, "t": 70},
-                "type": "buttons",
-                "x": 0.1,
-                "y": 0,
-            }
-        ],
-        sliders=sliders,
-    )
-
-    fig.update_layout(sliders=sliders)
 
     fig.update_layout(template="plotly_dark")  # , title=title)
 
@@ -2830,32 +2573,6 @@ def plot_animation_3DoF_rocket(
 
     # Overlay the title onto the plot
     fig.update_layout(title_y=0.95, title_x=0.5)
-
-    # Overlay the sliders and buttons onto the plot
-    fig.update_layout(
-        updatemenus=[
-            {
-                "buttons": [
-                    {
-                        "args": [None, frame_args(50)],
-                        "label": "Play",
-                        "method": "animate",
-                    },
-                    {
-                        "args": [[None], frame_args(0)],
-                        "label": "Pause",
-                        "method": "animate",
-                    },
-                ],
-                "direction": "left",
-                "pad": {"r": 10, "t": 70},
-                "type": "buttons",
-                "x": 0.22,
-                "y": 0.37,
-            }
-        ],
-        sliders=sliders,
-    )
 
     # Show the legend overlayed on the plot
     fig.update_layout(legend={"yanchor": "top", "y": 0.9, "xanchor": "left", "x": 0.75})
