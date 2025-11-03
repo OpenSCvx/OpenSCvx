@@ -24,28 +24,24 @@ position.max = np.array([200.0, 100, 50])
 position.min = np.array([-200.0, -100, 15])
 position.initial = np.array([10.0, 0, 20])
 position.final = [10.0, 0, 20]
-position.guess = np.linspace(position.initial, position.final, n)
 
 velocity = ox.State("velocity", shape=(3,))  # 3D velocity [vx, vy, vz]
 velocity.max = np.array([100, 100, 100])
 velocity.min = np.array([-100, -100, -100])
 velocity.initial = np.array([0, 0, 0])
 velocity.final = [("free", 0), ("free", 0), ("free", 0)]
-velocity.guess = np.linspace(velocity.initial, [0, 0, 0], n)
 
 attitude = ox.State("attitude", shape=(4,))  # Quaternion [qw, qx, qy, qz]
 attitude.max = np.array([1, 1, 1, 1])
 attitude.min = np.array([-1, -1, -1, -1])
 attitude.initial = [("free", 1.0), ("free", 0), ("free", 0), ("free", 0)]
 attitude.final = [("free", 1.0), ("free", 0), ("free", 0), ("free", 0)]
-attitude.guess = np.tile([1, 0, 0, 0], (n, 1))
 
 angular_velocity = ox.State("angular_velocity", shape=(3,))  # Angular velocity [wx, wy, wz]
 angular_velocity.max = np.array([10, 10, 10])
 angular_velocity.min = np.array([-10, -10, -10])
 angular_velocity.initial = [("free", 0), ("free", 0), ("free", 0)]
 angular_velocity.final = [("free", 0), ("free", 0), ("free", 0)]
-angular_velocity.guess = np.zeros((n, 3))
 
 # Define control components
 thrust_force = ox.Control("thrust_force", shape=(3,))  # Thrust forces [fx, fy, fz]
@@ -170,9 +166,13 @@ dynamics = {
 }
 
 
-# Generate initial guess for position trajectory through gates
+# Initialize initial guess (will be modified by gate logic)
 position_bar = np.linspace(position.initial, position.final, n)
+velocity_bar = np.zeros((n, 3))
+attitude_bar = np.tile([1, 0, 0, 0], (n, 1))
+angular_velocity_bar = np.zeros((n, 3))
 
+# Modify position to go through gates
 i = 0
 origins = [position.initial]
 ends = []
@@ -189,8 +189,7 @@ for _ in range(n_gates + 1):
         i += 1
     gate_idx += 1
 
-# Generate initial guess for attitude to point sensor at submarines
-attitude_bar = np.tile([1, 0, 0, 0], (n, 1))
+# Modify attitude to point sensor at targets
 R_sb = R_sb  # Sensor to body frame
 b = R_sb @ np.array([0, 1, 0])
 for k in range(n):
@@ -206,8 +205,11 @@ for k in range(n):
     q = q_no_norm / la.norm(q_no_norm)
     attitude_bar[k] = q
 
+# Set all guesses
 position.guess = position_bar
+velocity.guess = velocity_bar
 attitude.guess = attitude_bar
+angular_velocity.guess = angular_velocity_bar
 
 problem = TrajOptProblem(
     dynamics=dynamics,
