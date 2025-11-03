@@ -73,12 +73,16 @@ for center in gate_centers:
     vertices.append(gen_vertices(center, radii))
 ### End Gate Parameters ###
 
-constraint_exprs = [
-    ox.ctcs(position <= position.max),
-    ox.ctcs(position.min <= position),
-    ox.ctcs(velocity <= velocity.max),
-    ox.ctcs(velocity.min <= velocity),
-]
+# Define list of all states (needed for TrajOptProblem and constraints)
+states = [position, velocity]
+controls = [force]
+
+# Generate box constraints for all states
+constraint_exprs = []
+for state in states:
+    constraint_exprs.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
+
+# Add gate constraints
 for node, cen in zip(gate_nodes, A_gate_cen):
     A_gate_const = A_gate
     c_const = cen
@@ -119,8 +123,8 @@ position.guess = position_bar
 
 problem = TrajOptProblem(
     dynamics=dynamics,
-    x=[position, velocity],
-    u=[force],
+    x=states,
+    u=controls,
     time_initial=0.0,
     time_final=("minimize", total_time),
     time_derivative=1.0,

@@ -40,6 +40,10 @@ theta.max = np.array([100.5 * jnp.pi / 180])
 theta.min = np.array([0.0])
 theta.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1)
 
+# Define list of all states (needed for TrajOptProblem and constraints)
+states = [position, velocity]
+controls = [theta]
+
 # Define dynamics as dictionary mapping state names to their derivatives
 dynamics = {
     "position": ox.Concat(
@@ -49,18 +53,15 @@ dynamics = {
     "velocity": g * ox.Cos(theta[0]),
 }
 
-# Define constraints
-constraint_exprs = [
-    ox.ctcs(position <= position.max),
-    ox.ctcs(position.min <= position),
-    ox.ctcs(velocity <= velocity.max),
-    ox.ctcs(velocity.min <= velocity),
-]
+# Generate box constraints for all states
+constraint_exprs = []
+for state in states:
+    constraint_exprs.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
 
 problem = TrajOptProblem(
     dynamics=dynamics,
-    x=[position, velocity],
-    u=[theta],
+    x=states,
+    u=controls,
     time_initial=0.0,
     time_final=("minimize", total_time),
     time_derivative=1.0,  # Real time
