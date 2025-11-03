@@ -191,42 +191,32 @@ def symbolic_diag(v):
         raise NotImplementedError("Only 3x3 diagonal matrices supported")
 
 
-# Create symbolic dynamics using named states
-v = velocity
-q = attitude
-q_norm = ox.linalg.Norm(q)  # Cleaner than Sqrt(Sum(q * q))
-q_normalized = q / q_norm
-w = angular_velocity
-
-f = thrust_force
-tau = torque
+# Create symbolic dynamics
+# Normalize quaternion for dynamics
+q_norm = ox.linalg.Norm(attitude)
+attitude_normalized = attitude / q_norm
 
 # Option 1: Full symbolic dynamics (more flexible but potentially slower)
-# r_dot = v
-# v_dot = (Constant(1.0 / m)) * symbolic_qdcm(q) @ f + Constant(
+# r_dot = velocity
+# v_dot = (Constant(1.0 / m)) * symbolic_qdcm(attitude) @ thrust_force + Constant(
 #     np.array([0, 0, g_const], dtype=np.float64)
 # )
-# q_dot = Constant(0.5) * symbolic_ssmp(w) @ q
+# q_dot = Constant(0.5) * symbolic_ssmp(angular_velocity) @ attitude
 # J_b_inv = Constant(1.0 / J_b)
 # J_b_diag = symbolic_diag([Constant(J_b[0]), Constant(J_b[1]), Constant(J_b[2])])
-# w_dot = symbolic_diag([J_b_inv[0], J_b_inv[1], J_b_inv[2]]) @ (tau - symbolic_ssm(w) @ J_b_diag @ w)
+# w_dot = symbolic_diag([J_b_inv[0], J_b_inv[1], J_b_inv[2]]) @ (torque - symbolic_ssm(angular_velocity) @ J_b_diag @ angular_velocity)
 
 # Option 2: Efficient dynamics using direct JAX lowering (better performance)
-r_dot = v
-v_dot = (1.0 / m) * ox.spatial.QDCM(q_normalized) @ f + ox.Constant(
-    np.array([0, 0, g_const], dtype=np.float64)
-)
-q_dot = 0.5 * ox.spatial.SSMP(w) @ q_normalized
 J_b_inv = 1.0 / J_b
 J_b_diag = ox.linalg.Diag(J_b)
-w_dot = ox.linalg.Diag(J_b_inv) @ (tau - ox.spatial.SSM(w) @ J_b_diag @ w)
 
-# Define dynamics as dictionary mapping state names to their derivatives
 dynamics = {
-    "position": r_dot,
-    "velocity": v_dot,
-    "attitude": q_dot,
-    "angular_velocity": w_dot,
+    "position": velocity,
+    "velocity": (1.0 / m) * ox.spatial.QDCM(attitude_normalized) @ thrust_force
+    + ox.Constant(np.array([0, 0, g_const], dtype=np.float64)),
+    "attitude": 0.5 * ox.spatial.SSMP(angular_velocity) @ attitude_normalized,
+    "angular_velocity": ox.linalg.Diag(J_b_inv)
+    @ (torque - ox.spatial.SSM(angular_velocity) @ J_b_diag @ angular_velocity),
 }
 
 
