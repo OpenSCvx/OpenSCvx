@@ -564,10 +564,9 @@ def plot_dubins_car(results: OptimizationResults, params: Config):
     # Plot the trajectory of the Dubins car in 3d as an animaiton
     fig = go.Figure()
 
-    x = results.x_full[:, 0]
-    y = results.x_full[:, 1]
-
-    results.x_full[:, 2]
+    position = results.trajectory["position"]
+    x = position[:, 0]
+    y = position[:, 1]
 
     obs_center = results.plotting_data["obs_center"]
     obs_radius = results.plotting_data["obs_radius"]
@@ -599,10 +598,11 @@ def plot_dubins_car_disjoint(results: OptimizationResults, params: Config):
     # Plot the trajectory of the Dubins car, but show wp1 and wp2 as circles with centers and radii
     fig = go.Figure()
 
-    x = results.x_full[:, 0]
-    y = results.x_full[:, 1]
+    position = results.trajectory["position"]
+    x = position[:, 0]
+    y = position[:, 1]
     # Use the forward velocity from the control input
-    velocity = results.u_full[:, 0] if "u_full" in results else np.zeros_like(x)
+    velocity = results.trajectory.get("velocity", np.zeros_like(x))
 
     # Plot the trajectory colored by velocity
     fig.add_trace(
@@ -1607,9 +1607,9 @@ def plot_animation(
     result["t_final"]
     # Make title say quadrotor simulation and insert the variable tof into the title
     # title = 'Quadrotor Simulation: Time of Flight = ' + str(tof) + 's'
-    drone_positions = result.x_full[:, :3]
-    drone_velocities = result.x_full[:, 3:6]
-    drone_attitudes = result.x_full[:, 6:10]
+    drone_positions = result.trajectory["position"]
+    drone_velocities = result.trajectory["velocity"]
+    drone_attitudes = result.trajectory.get("attitude", None)
     if "moving_subject" in result or "init_poses" in result:
         subs_positions, _, _, _ = full_subject_traj_time(result, params)
 
@@ -1873,8 +1873,9 @@ def plot_brachistochrone_position(result: OptimizationResults, params=None):
     # Plot the position of the brachistochrone problem
     fig = go.Figure()
 
-    x = result.x_full[:, 0]
-    y = result.x_full[:, 1]
+    position = result.trajectory["position"]
+    x = position[:, 0]
+    y = position[:, 1]
 
     fig.add_trace(
         go.Scatter(x=x, y=y, mode="lines", line={"color": "blue", "width": 2}, name="Position")
@@ -1900,10 +1901,9 @@ def plot_brachistochrone_velocity(results: OptimizationResults, params=None):
     fig = go.Figure()
 
     tof = results.t_final
-    x_full = results.x_full
     t_full = results.t_full
 
-    v = x_full[:, 3]  # velocity is the 4th state
+    v = results.trajectory["velocity"].squeeze()  # scalar velocity
 
     fig.add_trace(
         go.Scatter(x=t_full, y=v, mode="lines", line={"color": "blue", "width": 2}, name="Velocity")
@@ -1918,9 +1918,9 @@ def plot_brachistochrone_velocity(results: OptimizationResults, params=None):
 def plot_scp_animation(result: dict, params=None, path=""):
     tof = result["t_final"]
     title = f"SCP Simulation: {tof} seconds"
-    drone_positions = result.x_full[:, :3]
-    drone_attitudes = result.x_full[:, 6:10]
-    result.u_full[:, :3]
+    drone_positions = result.trajectory["position"]
+    drone_attitudes = result.trajectory.get("attitude", None)
+    result.trajectory.get("force", None)
     scp_traj_interp(result["x_history"], params)
     scp_ctcs_trajs = result["x_history"]
     scp_multi_shoot = result["discretization_history"]
@@ -2133,7 +2133,7 @@ def plot_scp_animation(result: dict, params=None, path=""):
 
 
 def plot_xy_xz_yz(result: dict, params: Config):
-    x_full = result["x_full"]
+    position = result.trajectory["position"]
     result["t_full"]
 
     fig = make_subplots(
@@ -2146,8 +2146,8 @@ def plot_xy_xz_yz(result: dict, params: Config):
     # Add trajectory traces
     fig.add_trace(
         go.Scatter(
-            x=x_full[:, 0],
-            y=x_full[:, 1],
+            x=position[:, 0],
+            y=position[:, 1],
             mode="lines",
             line={"color": "blue", "width": 2},
             name="Trajectory XY Plane",
@@ -2158,8 +2158,8 @@ def plot_xy_xz_yz(result: dict, params: Config):
 
     fig.add_trace(
         go.Scatter(
-            x=x_full[:, 0],
-            y=x_full[:, 2],
+            x=position[:, 0],
+            y=position[:, 2],
             mode="lines",
             line={"color": "blue", "width": 2},
             name="Trajectory XZ Plane",
@@ -2170,8 +2170,8 @@ def plot_xy_xz_yz(result: dict, params: Config):
 
     fig.add_trace(
         go.Scatter(
-            x=x_full[:, 1],
-            y=x_full[:, 2],
+            x=position[:, 1],
+            y=position[:, 2],
             mode="lines",
             line={"color": "blue", "width": 2},
             name="Trajectory YZ Plane",
@@ -2204,7 +2204,7 @@ def plot_control_norm(results: OptimizationResults, params: Config):
     # Plot the control norm over time
     fig = go.Figure()
 
-    u_full = results.u_full[:, :3]
+    u_full = results.trajectory["force"]
     t_full = results.t_full
 
     # Compute the norm of the control vector
@@ -2254,8 +2254,8 @@ def plot_animation_double_integrator(
     result["t_final"]
     # Make title say quadrotor simulation and insert the variable tof into the title
     # title = 'Quadrotor Simulation: Time of Flight = ' + str(tof) + 's'
-    drone_positions = result["x_full"][:, :3]
-    drone_velocities = result["x_full"][:, 3:6]
+    drone_positions = result.trajectory["position"]
+    drone_velocities = result.trajectory["velocity"]
     if "moving_subject" in result or "init_poses" in result:
         subs_positions, _, _, _ = full_subject_traj_time(result, params)
 
@@ -2464,9 +2464,9 @@ def plot_animation_3DoF_rocket(
     result["t_final"]
     # Make title say quadrotor simulation and insert the variable tof into the title
     # title = 'Quadrotor Simulation: Time of Flight = ' + str(tof) + 's'
-    drone_positions = result["x_full"][:, :3]
-    drone_velocities = result["x_full"][:, 3:6]
-    drone_forces = 0.01 * result["u_full"][:, :3]
+    drone_positions = result.trajectory["position"]
+    drone_velocities = result.trajectory["velocity"]
+    drone_forces = 0.01 * result.trajectory["force"]
 
     step = 2
     indices = np.array(
@@ -2621,9 +2621,9 @@ def plot_animation_pyqtgraph(result, params, step=2):
     w.setGeometry(0, 110, 1280, 720)
 
     # Extract data
-    drone_positions = result["x_full"][:, :3]
-    drone_velocities = result["x_full"][:, 3:6]
-    drone_attitudes = result["x_full"][:, 6:10] if result["x_full"].shape[1] >= 10 else None
+    drone_positions = result.trajectory["position"]
+    drone_velocities = result.trajectory["velocity"]
+    drone_attitudes = result.trajectory.get("attitude", None)
     velocity_norm = np.linalg.norm(drone_velocities, axis=1)
     n_points = drone_positions.shape[0]
     indices = np.array([*list(range(n_points - 1)[::step]), n_points - 1])
@@ -3001,10 +3001,10 @@ def plot_animation_vispy(result, params, step=2):
     main_widget.show()
 
     # Extract data and convert JAX arrays to NumPy arrays
-    drone_positions = np.array(result["x_full"][:, :3])
-    drone_velocities = np.array(result["x_full"][:, 3:6])
+    drone_positions = np.array(result.trajectory["position"])
+    drone_velocities = np.array(result.trajectory["velocity"])
     drone_attitudes = (
-        np.array(result["x_full"][:, 6:10]) if result["x_full"].shape[1] >= 10 else None
+        np.array(result.trajectory["attitude"]) if "attitude" in result.trajectory else None
     )
     velocity_norm = np.linalg.norm(drone_velocities, axis=1)
     n_points = drone_positions.shape[0]
@@ -3306,9 +3306,9 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
 
     # Extract data
     tof = result["t_final"]
-    drone_positions = result["x_full"][:, :3]
-    result["x_full"][:, 3:6]
-    drone_attitudes = result["x_full"][:, 6:10] if result["x_full"].shape[1] >= 10 else None
+    drone_positions = result.trajectory["position"]
+    result.trajectory["velocity"]
+    drone_attitudes = result.trajectory.get("attitude", None)
     scp_traj_interp(result["x_history"], params)
     scp_ctcs_trajs = result["x_history"]
     scp_multi_shoot = result["discretization_history"]
