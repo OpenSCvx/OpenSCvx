@@ -18,51 +18,41 @@ from openscvx.utils import gen_vertices, rot
 n = 33  # Number of Nodes
 total_time = 30.0  # Total time for the simulation
 
-x = ox.State("x", shape=(14,))  # State variable with 14 dimensions
+# Define state components
+position = ox.State("position", shape=(3,))  # 3D position [x, y, z]
+position.max = np.array([200.0, 100, 50])
+position.min = np.array([-200.0, -100, 15])
+position.initial = np.array([10.0, 0, 20])
+position.final = [10.0, 0, 20]
 
-x.max = np.array(
-    [200.0, 100, 50, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100]
-)  # Upper Bound on the states
-x.min = np.array(
-    [-200.0, -100, 15, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0]
-)  # Lower Bound on the states
-x.initial = [
-    10.0,
-    0,
-    20,
-    0,
-    0,
-    0,
-    ("free", 1.0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    0,
-]
-x.final = [
-    10.0,
-    0,
-    20,
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 1.0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("minimize", total_time),
-]
+velocity = ox.State("velocity", shape=(3,))  # 3D velocity [vx, vy, vz]
+velocity.max = np.array([100, 100, 100])
+velocity.min = np.array([-100, -100, -100])
+velocity.initial = np.array([0, 0, 0])
+velocity.final = [("free", 0), ("free", 0), ("free", 0)]
 
-u = ox.Control("u", shape=(6,))  # Control variable with 6 dimensions
-u.max = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])  # Upper Bound on the controls
-u.min = np.array([0, 0, 0, -18.665, -18.665, -0.55562])  # Lower Bound on the controls
-u.guess = np.repeat(np.expand_dims(np.array([0.0, 0.0, 10.0, 0.0, 0.0, 0.0]), axis=0), n, axis=0)
+attitude = ox.State("attitude", shape=(4,))  # Quaternion [qw, qx, qy, qz]
+attitude.max = np.array([1, 1, 1, 1])
+attitude.min = np.array([-1, -1, -1, -1])
+attitude.initial = [("free", 1.0), ("free", 0), ("free", 0), ("free", 0)]
+attitude.final = [("free", 1.0), ("free", 0), ("free", 0), ("free", 0)]
+
+angular_velocity = ox.State("angular_velocity", shape=(3,))  # Angular velocity [wx, wy, wz]
+angular_velocity.max = np.array([10, 10, 10])
+angular_velocity.min = np.array([-10, -10, -10])
+angular_velocity.initial = [("free", 0), ("free", 0), ("free", 0)]
+angular_velocity.final = [("free", 0), ("free", 0), ("free", 0)]
+
+# Define control components
+thrust_force = ox.Control("thrust_force", shape=(3,))  # Thrust forces [fx, fy, fz]
+thrust_force.max = np.array([0, 0, 4.179446268 * 9.81])
+thrust_force.min = np.array([0, 0, 0])
+thrust_force.guess = np.repeat(np.array([[0.0, 0, 10]]), n, axis=0)
+
+torque = ox.Control("torque", shape=(3,))  # Control torques [tau_x, tau_y, tau_z]
+torque.max = np.array([18.665, 18.665, 0.55562])
+torque.min = np.array([-18.665, -18.665, -0.55562])
+torque.guess = np.zeros((n, 3))
 
 
 ### Sensor Params ###
@@ -121,78 +111,85 @@ for i in range(n_subs):
 init_poses = init_poses
 
 
+# Define list of all states (needed for TrajOptProblem and constraints)
+states = [position, velocity, attitude, angular_velocity]
+controls = [thrust_force, torque]
+
+
+# Symbolic sensor visibility constraint function
 def g_vp(p_s_I, x_pos, x_quat):
     p_s_s = R_sb @ ox.spatial.QDCM(x_quat).T @ (p_s_I - x_pos)
     return ox.linalg.Norm(A_cone @ p_s_s, ord=norm_type) - (c.T @ p_s_s)
 
 
-# Create symbolic constraints
-constraints = [
-    ox.ctcs(x <= x.max),
-    ox.ctcs(x.min <= x),
-]
+# Generate box constraints for all states
+constraints = []
+for state in states:
+    constraints.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
 
 # Add visibility constraints for submarines using symbolic expressions
 for pose in init_poses:
-    constraints.append((g_vp(pose, x[:3], x[6:10]) <= 0.0))
+    constraints.append((g_vp(pose, position, attitude) <= 0.0))
 
 # Add gate constraints using symbolic expressions
 for node, cen in zip(gate_nodes, A_gate_cen):
     A_gate_const = A_gate
     cen_const = cen
-    pos = x[:3]
 
     # Gate constraint: ||A @ pos - c||_inf <= 1
     gate_constraint = (
-        (ox.linalg.Norm(A_gate_const @ pos - cen_const, ord="inf") <= 1.0).convex().at([node])
+        (ox.linalg.Norm(A_gate_const @ position - cen_const, ord="inf") <= 1.0).convex().at([node])
     )
     constraints.append(gate_constraint)
 
 
-# Create symbolic dynamics
+# Define dynamics
 m = 1.0  # Mass of the drone
 g_const = -9.81
 J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
 
-# Unpack the state and control vectors using symbolic expressions
-v = x[3:6]
-q = x[6:10]
-q_norm = ox.linalg.Norm(q)
-q_normalized = q / q_norm
-w = x[10:13]
+# Normalize quaternion for dynamics
+q_norm = ox.linalg.Norm(attitude)
+attitude_normalized = attitude / q_norm
 
-f = u[:3]
-tau = u[3:]
-
-# Define dynamics using symbolic expressions
-r_dot = v
-v_dot = (1.0 / m) * ox.spatial.QDCM(q_normalized) @ f + np.array([0, 0, g_const], dtype=np.float64)
-q_dot = 0.5 * ox.spatial.SSMP(w) @ q_normalized
+# Define dynamics as dictionary mapping state names to their derivatives
 J_b_inv = 1.0 / J_b
 J_b_diag = ox.linalg.Diag(J_b)
-w_dot = ox.linalg.Diag(J_b_inv) @ (tau - ox.spatial.SSM(w) @ J_b_diag @ w)
-t_dot = 1.0
-dynamics = ox.Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
+
+dynamics = {
+    "position": velocity,
+    "velocity": (1.0 / m) * ox.spatial.QDCM(attitude_normalized) @ thrust_force
+    + np.array([0, 0, g_const], dtype=np.float64),
+    "attitude": 0.5 * ox.spatial.SSMP(angular_velocity) @ attitude_normalized,
+    "angular_velocity": ox.linalg.Diag(J_b_inv)
+    @ (torque - ox.spatial.SSM(angular_velocity) @ J_b_diag @ angular_velocity),
+}
 
 
-x_bar = np.linspace(x.initial, x.final, n)
+# Initialize initial guess (will be modified by gate logic)
+position_bar = np.linspace(position.initial, position.final, n)
+velocity_bar = np.zeros((n, 3))
+attitude_bar = np.tile([1.0, 0.0, 0.0, 0.0], (n, 1))
+angular_velocity_bar = np.zeros((n, 3))
 
+# Modify position to go through gates
 i = 0
-origins = [x.initial[:3]]
+origins = [position.initial]
 ends = []
 for center in gate_centers:
     origins.append(center)
     ends.append(center)
-ends.append(x.final[:3])
+ends.append(position.final)
 gate_idx = 0
 for _ in range(n_gates + 1):
     for k in range(n // (n_gates + 1)):
-        x_bar[i, :3] = origins[gate_idx] + (k / (n // (n_gates + 1))) * (
+        position_bar[i] = origins[gate_idx] + (k / (n // (n_gates + 1))) * (
             ends[gate_idx] - origins[gate_idx]
         )
         i += 1
     gate_idx += 1
 
+# Modify attitude to point sensor at targets
 R_sb = R_sb  # Sensor to body frame
 b = R_sb @ np.array([0, 1, 0])
 for k in range(n):
@@ -200,22 +197,30 @@ for k in range(n):
     for pose in init_poses:
         kp.append(pose)
     kp = np.mean(kp, axis=0)
-    a = kp - x_bar[k, :3]
+    a = kp - position_bar[k]
     # Determine the direction cosine matrix that aligns the z-axis of the sensor frame with the relative position vector
     q_xyz = np.cross(b, a)
     q_w = np.sqrt(la.norm(a) ** 2 + la.norm(b) ** 2) + np.dot(a, b)
     q_no_norm = np.hstack((q_w, q_xyz))
     q = q_no_norm / la.norm(q_no_norm)
-    x_bar[k, 6:10] = q
+    attitude_bar[k] = q
 
-x.guess = x_bar
+# Set all guesses
+position.guess = position_bar
+velocity.guess = velocity_bar
+attitude.guess = attitude_bar
+angular_velocity.guess = angular_velocity_bar
 
 problem = TrajOptProblem(
     dynamics=dynamics,
-    x=x,
-    u=u,
+    x=states,
+    u=controls,
+    time_initial=0.0,
+    time_final=("minimize", total_time),
+    time_derivative=1.0,  # Real time
+    time_min=0.0,
+    time_max=total_time,
     constraints=constraints,
-    idx_time=len(x.max) - 1,
     N=n,
 )
 
