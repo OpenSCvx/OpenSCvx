@@ -159,7 +159,7 @@ J_b_diag = ox.linalg.Diag(J_b)
 dynamics = {
     "position": velocity,
     "velocity": (1.0 / m) * ox.spatial.QDCM(attitude_normalized) @ thrust_force
-    + ox.Constant(np.array([0, 0, g_const], dtype=np.float64)),
+    + np.array([0, 0, g_const], dtype=np.float64),
     "attitude": 0.5 * ox.spatial.SSMP(angular_velocity) @ attitude_normalized,
     "angular_velocity": ox.linalg.Diag(J_b_inv)
     @ (torque - ox.spatial.SSM(angular_velocity) @ J_b_diag @ angular_velocity),
@@ -169,7 +169,7 @@ dynamics = {
 # Initialize initial guess (will be modified by gate logic)
 position_bar = np.linspace(position.initial, position.final, n)
 velocity_bar = np.zeros((n, 3))
-attitude_bar = np.tile([1, 0, 0, 0], (n, 1))
+attitude_bar = np.tile([1.0, 0.0, 0.0, 0.0], (n, 1))
 angular_velocity_bar = np.zeros((n, 3))
 
 # Modify position to go through gates

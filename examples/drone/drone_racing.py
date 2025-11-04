@@ -36,7 +36,7 @@ attitude.max = np.array([1, 1, 1, 1])
 attitude.min = np.array([-1, -1, -1, -1])
 attitude.initial = [("free", 1.0), ("free", 0), ("free", 0), ("free", 0)]
 attitude.final = [("free", 1), ("free", 0), ("free", 0), ("free", 0)]
-attitude.guess = np.tile([1, 0, 0, 0], (n, 1))
+attitude.guess = np.tile([1.0, 0.0, 0.0, 0.0], (n, 1))
 
 angular_velocity = ox.State("angular_velocity", shape=(3,))  # Angular velocity [wx, wy, wz]
 angular_velocity.max = np.array([10, 10, 10])
