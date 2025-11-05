@@ -16,74 +16,69 @@ from openscvx.utils import generate_orthogonal_unit_vectors
 n = 6
 total_time = 4.0  # Total time for the simulation
 
-x = ox.State("x", shape=(14,))  # State variable with 14 dimensions
+# Define state components
+position = ox.State("position", shape=(3,))  # 3D position [x, y, z]
+position.max = np.array([200.0, 10, 20])
+position.min = np.array([-200.0, -100, 0])
+position.initial = np.array([10.0, 0, 2])
+position.final = [-10.0, 0, 2]
 
-x.max = np.array([200.0, 10, 20, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 100])
-x.min = np.array([-200.0, -100, 0, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0])
+velocity = ox.State("velocity", shape=(3,))  # 3D velocity [vx, vy, vz]
+velocity.max = np.array([100, 100, 100])
+velocity.min = np.array([-100, -100, -100])
+velocity.initial = np.array([0, 0, 0])
+velocity.final = [("free", 0), ("free", 0), ("free", 0)]
 
-x.initial = [
-    10.0,
-    0,
-    2,
-    0,
-    0,
-    0,
-    ("free", 1.0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    0,
-]
-x.final = [
-    -10.0,
-    0,
-    2,
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 1.0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("minimize", total_time),
-]
+attitude = ox.State("attitude", shape=(4,))  # Quaternion [qw, qx, qy, qz]
+attitude.max = np.array([1, 1, 1, 1])
+attitude.min = np.array([-1, -1, -1, -1])
+attitude.initial = [("free", 1.0), ("free", 0), ("free", 0), ("free", 0)]
+attitude.final = [("free", 1.0), ("free", 0), ("free", 0), ("free", 0)]
 
-u = ox.Control("u", shape=(6,))  # Control variable with 6 dimensions
-u.max = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])  # Upper Bound on the controls
-u.min = np.array([0, 0, 0, -18.665, -18.665, -0.55562])  # Lower Bound on the controls
-initial_control = np.array([0.0, 0.0, 50.0, 0.0, 0.0, 0.0])
-u.guess = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
+angular_velocity = ox.State("angular_velocity", shape=(3,))  # Angular velocity [wx, wy, wz]
+angular_velocity.max = np.array([10, 10, 10])
+angular_velocity.min = np.array([-10, -10, -10])
+angular_velocity.initial = [("free", 0), ("free", 0), ("free", 0)]
+angular_velocity.final = [("free", 0), ("free", 0), ("free", 0)]
+
+# Define control components
+thrust_force = ox.Control("thrust_force", shape=(3,))  # Thrust forces [fx, fy, fz]
+thrust_force.max = np.array([0, 0, 4.179446268 * 9.81])
+thrust_force.min = np.array([0, 0, 0])
+initial_control = np.array([0.0, 0.0, 50.0])
+thrust_force.guess = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
+
+torque = ox.Control("torque", shape=(3,))  # Control torques [tau_x, tau_y, tau_z]
+torque.max = np.array([18.665, 18.665, 0.55562])
+torque.min = np.array([-18.665, -18.665, -0.55562])
+torque.guess = np.zeros((n, 3))
+
+
+# Define list of all states (needed for TrajOptProblem and constraints)
+states = [position, velocity, attitude, angular_velocity]
+controls = [thrust_force, torque]
 
 
 m = 1.0  # Mass of the drone
 g_const = -9.18
 J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
 
-# Create symbolic dynamics
-v = x[3:6]
-q = x[6:10]
-q_norm = ox.linalg.Norm(q)
-q_normalized = q / q_norm
-w = x[10:13]
+# Normalize quaternion for dynamics
+q_norm = ox.linalg.Norm(attitude)
+attitude_normalized = attitude / q_norm
 
-f = u[:3]
-tau = u[3:]
-
-# Define dynamics using symbolic expressions
-r_dot = v
-v_dot = (1.0 / m) * ox.spatial.QDCM(q_normalized) @ f + np.array([0, 0, g_const], dtype=np.float64)
-q_dot = 0.5 * ox.spatial.SSMP(w) @ q_normalized
+# Define dynamics as dictionary mapping state names to their derivatives
 J_b_inv = 1.0 / J_b
 J_b_diag = ox.linalg.Diag(J_b)
-w_dot = ox.linalg.Diag(J_b_inv) @ (tau - ox.spatial.SSM(w) @ J_b_diag @ w)
-t_dot = 1.0
-dyn_expr = ox.Concat(r_dot, v_dot, q_dot, w_dot, t_dot)
+
+dynamics = {
+    "position": velocity,
+    "velocity": (1.0 / m) * ox.spatial.QDCM(attitude_normalized) @ thrust_force
+    + np.array([0, 0, g_const], dtype=np.float64),
+    "attitude": 0.5 * ox.spatial.SSMP(angular_velocity) @ attitude_normalized,
+    "angular_velocity": ox.linalg.Diag(J_b_inv)
+    @ (torque - ox.spatial.SSM(angular_velocity) @ J_b_diag @ angular_velocity),
+}
 
 
 A_obs = []
@@ -112,22 +107,25 @@ for _ in obstacle_center_positions:
     radius.append(rad)
     A_obs.append(ax @ np.diag(rad**2) @ ax.T)
 
-constraints = [
-    ox.ctcs(x <= x.max),
-    ox.ctcs(x.min <= x),
-]
+# Generate box constraints for all states
+constraints = []
+for state in states:
+    constraints.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
 
-# Add obstacle constraints using symbolic expressions
+# Add obstacle constraints using symbolic expressions (as nodal constraints)
 for center, A in zip(obstacle_centers, A_obs):
     A_const = A
-    pos = x[:3]
 
     # Obstacle constraint: (pos - center)^T @ A @ (pos - center) >= 1
-    diff = pos - center
+    diff = position - center
     obstacle_constraint = 1.0 <= diff.T @ A_const @ diff
     constraints.append(obstacle_constraint)
 
-x.guess = np.linspace(x.initial, x.final, n)
+# Set initial guesses
+position.guess = np.linspace(position.initial, position.final, n)
+velocity.guess = np.linspace(velocity.initial, [0, 0, 0], n)
+attitude.guess = np.tile([1.0, 0.0, 0.0, 0.0], (n, 1))
+angular_velocity.guess = np.zeros((n, 3))
 
 # Set parameter values for obstacle centers
 params = {
@@ -137,11 +135,15 @@ params = {
 }
 
 problem = TrajOptProblem(
-    dynamics=dyn_expr,
-    x=x,
-    u=u,
+    dynamics=dynamics,
+    x=states,
+    u=controls,
+    time_initial=0.0,
+    time_final=("minimize", total_time),
+    time_derivative=1.0,  # Real time
+    time_min=0.0,
+    time_max=total_time,
     constraints=constraints,
-    idx_time=len(x.max) - 1,
     N=n,
     params=params,
 )
