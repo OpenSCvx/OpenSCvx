@@ -17,59 +17,55 @@ from openscvx.utils import get_kp_pose
 n = 12  # Number of Nodes
 total_time = 40.0  # Total time for the simulation
 
-fuel_inds = 13  # Fuel Index in State
-t_inds = 14
-s_inds = 6  # Time dilation index in Control
+# Define state components
+position = ox.State("position", shape=(3,))  # 3D position [x, y, z]
+position.max = np.array([200.0, 100, 50])
+position.min = np.array([-100.0, -100, -10])
+position.initial = np.array([8.0, -0.2, 2.2])
+position.final = [("free", -10.0), ("free", 0), ("free", 2)]
 
-x = ox.State("x", shape=(15,))  # State variable with 15 dimensions
-x.max = np.array(
-    [200.0, 100, 50, 100, 100, 100, 1, 1, 1, 1, 10, 10, 10, 2000, 40]
-)  # Upper Bound on the states
-x.min = np.array(
-    [-100.0, -100, -10, -100, -100, -100, -1, -1, -1, -1, -10, -10, -10, 0, 0]
-)  # Lower Bound on the states
+velocity = ox.State("velocity", shape=(3,))  # 3D velocity [vx, vy, vz]
+velocity.max = np.array([100, 100, 100])
+velocity.min = np.array([-100, -100, -100])
+velocity.initial = np.array([0, 0, 0])
+velocity.final = [("free", 0), ("free", 0), ("free", 0)]
 
-x.initial = [
-    8.0,
-    -0.2,
-    2.2,
-    0,
-    0,
-    0,
-    ("free", 1.0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    0,
-    0,
-]
-x.final = [
-    ("free", -10.0),
-    ("free", 0),
-    ("free", 2),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 1.0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("free", 0),
-    ("minimize", 0),
-    40,
-]
+attitude = ox.State("attitude", shape=(4,))  # Quaternion [qw, qx, qy, qz]
+attitude.max = np.array([1, 1, 1, 1])
+attitude.min = np.array([-1, -1, -1, -1])
+attitude.initial = [("free", 1.0), ("free", 0), ("free", 0), ("free", 0)]
+attitude.final = [("free", 1.0), ("free", 0), ("free", 0), ("free", 0)]
 
-u = ox.Control("u", shape=(6,))  # Control variable with 6 dimensions
+angular_velocity = ox.State("angular_velocity", shape=(3,))  # Angular velocity [wx, wy, wz]
+angular_velocity.max = np.array([10, 10, 10])
+angular_velocity.min = np.array([-10, -10, -10])
+angular_velocity.initial = [("free", 0), ("free", 0), ("free", 0)]
+angular_velocity.final = [("free", 0), ("free", 0), ("free", 0)]
 
-u.max = np.array([0, 0, 4.179446268 * 9.81, 18.665, 18.665, 0.55562])
-u.min = np.array([0, 0, 0, -18.665, -18.665, -0.55562])
-initial_control = np.array([0, 0, 10, 0, 0, 0])
-u.guess = np.repeat(np.expand_dims(initial_control, axis=0), n, axis=0)
+fuel = ox.State("fuel", shape=(1,))  # Fuel consumption
+fuel.max = np.array([2000])
+fuel.min = np.array([0])
+fuel.initial = np.array([0])
+fuel.final = [("minimize", 0)]
+
+# Define time state (needed for time-dependent constraints)
+time = ox.State("time", shape=(1,))
+time.max = np.array([total_time])
+time.min = np.array([0.0])
+time.initial = np.array([0.0])
+time.final = np.array([total_time])
+time.guess = np.linspace(0.0, total_time, n).reshape(-1, 1)
+
+# Define control components
+thrust_force = ox.Control("thrust_force", shape=(3,))  # Thrust forces [fx, fy, fz]
+thrust_force.max = np.array([0, 0, 4.179446268 * 9.81])
+thrust_force.min = np.array([0, 0, 0])
+thrust_force.guess = np.repeat(np.array([[0.0, 0, 10]]), n, axis=0)
+
+torque = ox.Control("torque", shape=(3,))  # Control torques [tau_x, tau_y, tau_z]
+torque.max = np.array([18.665, 18.665, 0.55562])
+torque.min = np.array([-18.665, -18.665, -0.55562])
+torque.guess = np.zeros((n, 3))
 
 init_pose = np.array([13.0, 0.0, 2.0])
 min_range = 4.0
@@ -91,33 +87,37 @@ norm_type = "inf"
 R_sb = jnp.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]])
 
 
+# Define list of all states (needed for TrajOptProblem and constraints)
+states = [position, velocity, attitude, angular_velocity, fuel, time]
+controls = [thrust_force, torque]
+
+
 # Create symbolic dynamics
 m = 1.0  # Mass of the drone
 g_const = -9.18
 J_b = jnp.array([1.0, 1.0, 1.0])  # Moment of Inertia of the drone
 
-# Unpack the state and control vectors using symbolic expressions
-v = x[3:6]
-q = x[6:10]
-q_norm = ox.linalg.Norm(q)
-q_normalized = q / q_norm
-w = x[10:13]
+# Normalize quaternion for dynamics
+q_norm = ox.linalg.Norm(attitude)
+attitude_normalized = attitude / q_norm
 
-f = u[:3]
-tau = u[3:]
-
-# Define dynamics using symbolic expressions
-r_dot = v
-v_dot = (1.0 / m) * ox.spatial.QDCM(q_normalized) @ f + ox.Constant(
-    np.array([0, 0, g_const], dtype=np.float64)
-)
-q_dot = 0.5 * ox.spatial.SSMP(w) @ q_normalized
+# Define dynamics as dictionary mapping state names to their derivatives
 J_b_inv = 1.0 / J_b
 J_b_diag = ox.linalg.Diag(J_b)
-w_dot = ox.linalg.Diag(J_b_inv) @ (tau - ox.spatial.SSM(w) @ J_b_diag @ w)
-fuel_dot = ox.linalg.Norm(u)
-t_dot = 1.0
-dynamics = ox.Concat(r_dot, v_dot, q_dot, w_dot, fuel_dot, t_dot)
+
+# Concatenate all controls for fuel calculation
+all_controls = ox.Concat(thrust_force, torque)
+
+dynamics = {
+    "position": velocity,
+    "velocity": (1.0 / m) * ox.spatial.QDCM(attitude_normalized) @ thrust_force
+    + np.array([0, 0, g_const], dtype=np.float64),
+    "attitude": 0.5 * ox.spatial.SSMP(angular_velocity) @ attitude_normalized,
+    "angular_velocity": ox.linalg.Diag(J_b_inv)
+    @ (torque - ox.spatial.SSM(angular_velocity) @ J_b_diag @ angular_velocity),
+    "fuel": ox.linalg.Norm(all_controls),
+    "time": 1.0,  # Real time derivative
+}
 
 
 # Symbolic implementation of get_kp_pose function
@@ -149,22 +149,21 @@ def get_kp_pose_symbolic(t_expr, init_pose):
     return kp_trajectory
 
 
-# Create symbolic constraints
-constraints = [
-    ox.ctcs(x <= x.max),
-    ox.ctcs(x.min <= x),
-]
+# Generate box constraints for all states
+constraints = []
+for state in states:
+    constraints.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
 
 # Get the symbolic keypoint pose based on time
-kp_pose_symbolic = get_kp_pose_symbolic(x[t_inds], init_pose)
+kp_pose_symbolic = get_kp_pose_symbolic(time[0], init_pose)
 
 # View planning constraint using symbolic keypoint pose
-p_s_s = R_sb @ ox.spatial.QDCM(x[6:10]).T @ (kp_pose_symbolic - x[:3])
+p_s_s = R_sb @ ox.spatial.QDCM(attitude).T @ (kp_pose_symbolic - position)
 vp_constraint = np.sqrt(2e1) * (ox.linalg.Norm(A_cone @ p_s_s, ord=norm_type) - (c.T @ p_s_s))
 
 # Range constraints using symbolic keypoint pose
-min_range_constraint = min_range - ox.linalg.Norm(kp_pose_symbolic - x[:3])
-max_range_constraint = ox.linalg.Norm(kp_pose_symbolic - x[:3]) - max_range
+min_range_constraint = min_range - ox.linalg.Norm(kp_pose_symbolic - position)
+max_range_constraint = ox.linalg.Norm(kp_pose_symbolic - position) - max_range
 
 constraints.extend(
     [
@@ -175,29 +174,51 @@ constraints.extend(
 )
 
 
-x_bar = np.linspace(x.initial, x.final, n)
+# Initialize initial guess (will be modified by symbolic trajectory)
+# Extract final values from tuples (position.final has free values, use their default guesses)
+position_final_values = np.array(
+    [
+        position.final[0][1] if isinstance(position.final[0], tuple) else position.final[0],
+        position.final[1][1] if isinstance(position.final[1], tuple) else position.final[1],
+        position.final[2][1] if isinstance(position.final[2], tuple) else position.final[2],
+    ]
+)
+position_bar = np.linspace(position.initial, position_final_values, n)
+velocity_bar = np.zeros((n, 3))  # Velocity is free at final, start with zeros
+attitude_bar = np.tile([1.0, 0.0, 0.0, 0.0], (n, 1))
+angular_velocity_bar = np.zeros((n, 3))
+fuel_bar = np.zeros((n, 1))  # Fuel starts at 0 and is minimized
 
-x_bar[:, :3] = get_kp_pose(x_bar[:, t_inds], init_pose) + jnp.array([-5, 0.2, 0.2])[None, :]
+# Time guess for trajectory computation
+time_bar = np.linspace(0, total_time, n)
 
+# Modify position to follow offset from keypoint trajectory
+position_bar = get_kp_pose(time_bar, init_pose) + np.array([-5, 0.2, 0.2])
+
+# Modify attitude to point sensor at targets
 b = R_sb @ np.array([0, 1, 0])
 for k in range(n):
-    kp = get_kp_pose(x_bar[k, t_inds], init_pose)
-    a = kp - x_bar[k, :3]
+    kp = get_kp_pose(time_bar[k], init_pose)
+    a = kp - position_bar[k]
     # Determine the direction cosine matrix that aligns the z-axis of the sensor frame with the relative position vector
     q_xyz = np.cross(b, a)
     q_w = np.sqrt(la.norm(a) ** 2 + la.norm(b) ** 2) + np.dot(a, b)
     q_no_norm = np.hstack((q_w, q_xyz))
     q = q_no_norm / la.norm(q_no_norm)
-    x_bar[k, 6:10] = q
+    attitude_bar[k] = q
 
-x.guess = x_bar
+# Set all guesses
+position.guess = position_bar
+velocity.guess = velocity_bar
+attitude.guess = attitude_bar
+angular_velocity.guess = angular_velocity_bar
+fuel.guess = fuel_bar
 
 problem = TrajOptProblem(
     dynamics=dynamics,
-    x=x,
-    u=u,
+    x=states,
+    u=controls,
     constraints=constraints,
-    idx_time=t_inds,
     N=n,
     licq_max=1e-8,
 )
