@@ -2204,7 +2204,7 @@ def plot_control_norm(results: OptimizationResults, params: Config):
     # Plot the control norm over time
     fig = go.Figure()
 
-    u_full = results.trajectory["force"]
+    u_full = results.trajectory["thrust"]
     t_full = results.t_full
 
     # Compute the norm of the control vector
