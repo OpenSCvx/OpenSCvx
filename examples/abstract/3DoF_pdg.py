@@ -15,21 +15,31 @@ from openscvx import TrajOptProblem
 n = 30
 total_time = 95.0  # Total simulation time
 
-# Define State and Control symbolic variables
-x = ox.State("x", shape=(8,))
-
-# Set bounds on state
+# Define state components
+position = ox.State("position", shape=(3,))  # 3D position [x, y, z]
 v_max = 500 * 1e3 / 3600  # Maximum velocity in m/s (800 km/h converted to m/s)
-#                      x       y     z      vx      vy      vz     m    t
-x.min = np.array([-3000, -3000, 0, -v_max, -v_max, -v_max, 1505, 0])
-x.max = np.array([3000, 3000, 3000, v_max, v_max, v_max, 1905, 1e2])
+position.max = np.array([3000, 3000, 3000])
+position.min = np.array([-3000, -3000, 0])
+position.initial = np.array([2000, 0, 1500])
+position.final = np.array([0, 0, 0])
+position.guess = np.linspace(position.initial, position.final, n)
 
-# Set initial, final, and guess
-x.initial = [2000, 0, 1500, 80, 30, -75, 1905, 0]
-x.final = [0, 0, 0, 0, 0, 0, ("maximize", 1590), ("free", total_time)]
-x.guess = np.linspace(x.initial, x.final, n)
+velocity = ox.State("velocity", shape=(3,))  # 3D velocity [vx, vy, vz]
+velocity.max = np.array([v_max, v_max, v_max])
+velocity.min = np.array([-v_max, -v_max, -v_max])
+velocity.initial = np.array([80, 30, -75])
+velocity.final = np.array([0, 0, 0])
+velocity.guess = np.linspace(velocity.initial, velocity.final, n)
 
-u = ox.Control("u", shape=(3,))
+mass = ox.State("mass", shape=(1,))  # Vehicle mass
+mass.max = np.array([1905])
+mass.min = np.array([1505])
+mass.initial = np.array([1905])
+mass.final = [("maximize", 1590)]
+mass.guess = np.linspace(mass.initial, 1590, n).reshape(-1, 1)
+
+# Define control
+thrust = ox.Control("thrust", shape=(3,))  # Thrust force vector [Tx, Ty, Tz]
 
 T_bar = 3.1 * 1e3
 T1 = 0.3 * T_bar
@@ -37,11 +47,15 @@ T2 = 0.8 * T_bar
 n_eng = 6
 
 # Set bounds on control
-u.min = n_eng * np.array([-T_bar, -T_bar, -T_bar])
-u.max = n_eng * np.array([T_bar, T_bar, T_bar])
+thrust.min = n_eng * np.array([-T_bar, -T_bar, -T_bar])
+thrust.max = n_eng * np.array([T_bar, T_bar, T_bar])
 
 # Set initial control guess
-u.guess = np.repeat(np.expand_dims(np.array([0, 0, n_eng * (T2) / 2]), axis=0), n, axis=0)
+thrust.guess = np.repeat(np.expand_dims(np.array([0, 0, n_eng * (T2) / 2]), axis=0), n, axis=0)
+
+# Define list of all states and controls
+states = [position, velocity, mass]
+controls = [thrust]
 
 
 # Define Parameters for physical constants
@@ -57,30 +71,43 @@ theta_val = 27 * np.pi / 180  # Cant angle value for parameter setup
 rho_min = n_eng * T1 * np.cos(theta_val)  # Minimum thrust-to-weight ratio
 rho_max = n_eng * T2 * np.cos(theta_val)  # Maximum thrust-to-weight ratio
 
-# Define constraints using symbolic expressions
-constraints = [
-    # State bounds
-    ox.ctcs(x <= x.max, idx=0),
-    ox.ctcs(x.min <= x, idx=0),
-    # Thrust magnitude constraints
-    ox.ctcs(rho_min <= ox.linalg.Norm(u[:3]), idx=1),
-    ox.ctcs(ox.linalg.Norm(u[:3]) <= rho_max, idx=1),
-    # Thrust pointing constraint (thrust cant angle)
-    ox.ctcs(np.cos((180 - 40 * np.pi / 180)) <= u[2] / ox.linalg.Norm(u[:3]), idx=2),
-    # Glideslope constraint
-    ox.ctcs(ox.linalg.Norm(x[:2]) <= np.tan(86 * np.pi / 180) * x[2], idx=3),
-]
+# Generate box constraints for all states
+constraints = []
+for state in states:
+    constraints.extend(
+        [
+            ox.ctcs(state <= state.max, idx=0),
+            ox.ctcs(state.min <= state, idx=0),
+        ]
+    )
+
+# Thrust magnitude constraints
+constraints.extend(
+    [
+        ox.ctcs(rho_min <= ox.linalg.Norm(thrust), idx=1),
+        ox.ctcs(ox.linalg.Norm(thrust) <= rho_max, idx=1),
+    ]
+)
+
+# Thrust pointing constraint (thrust cant angle)
+constraints.append(
+    ox.ctcs(np.cos((180 - 40 * np.pi / 180)) <= thrust[2] / ox.linalg.Norm(thrust), idx=2)
+)
+
+# Glideslope constraint
+constraints.append(
+    ox.ctcs(ox.linalg.Norm(position[:2]) <= np.tan(86 * np.pi / 180) * position[2], idx=3)
+)
 
 
-# Define dynamics using symbolic expressions
-m = x[6]
-T = u
-r_dot = x[3:6]
+# Define dynamics as dictionary mapping state names to their derivatives
 g_vec = np.array([0, 0, 1], dtype=np.float64) * g  # Gravitational acceleration vector
-v_dot = T / m - g_vec
-m_dot = -ox.linalg.Norm(T) / (I_sp * g_e * np.cos(theta_val))
-t_dot = 1.0
-dynamics_expr = ox.Concat(r_dot, v_dot, m_dot, t_dot)
+
+dynamics = {
+    "position": velocity,
+    "velocity": thrust / mass[0] - g_vec,
+    "mass": -ox.linalg.Norm(thrust) / (I_sp * g_e * np.cos(theta_val)),
+}
 
 
 # Set parameter values
@@ -92,26 +119,32 @@ params = {
 
 # Build the problem
 problem = TrajOptProblem(
-    dynamics=dynamics_expr,
-    x=x,
-    u=u,
+    dynamics=dynamics,
+    x=states,
+    u=controls,
     params=params,
-    idx_time=7,  # Index of time variable in state vector
+    time_initial=0.0,
+    time_final=("free", total_time),
+    time_derivative=1.0,  # Real time
+    time_min=0.0,
+    time_max=1e2,
     constraints=constraints,
     N=n,
 )
 
-# Apply custom scaling to the mass term (assume mass is at index 6 in the state vector)
+# Apply custom scaling overrides (if needed)
+# Note: In the new API, state indices refer to components within each state in the states list
+# states = [position (3D), velocity (3D), mass (1D)] -> indices 0-2, 3-5, 6
 problem.settings.sim.scaling_x_overrides = [
-    # (1800, 1505, 6),
-    # (200, 0, 7)
+    # Example: (upper_bound, lower_bound, idx)
+    # (1800, 1505, 6),  # Custom scaling for mass (index 6 in flattened state)
 ]
 
 # problem.settings.sim.scaling_u_overrides = [
 #     # Example: (upper_bound, lower_bound, idx)
-#     (n_eng * T_bar, -n_eng * T_bar, 0),  # Custom scaling for control 0
-#     (n_eng * T_bar, -n_eng * T_bar, 1),  # Custom scaling for control 1
-#     (n_eng * T_bar, -n_eng * T_bar, 2),  # Custom scaling for control 2
+#     (n_eng * T_bar, -n_eng * T_bar, 0),  # Custom scaling for thrust[0]
+#     (n_eng * T_bar, -n_eng * T_bar, 1),  # Custom scaling for thrust[1]
+#     (n_eng * T_bar, -n_eng * T_bar, 2),  # Custom scaling for thrust[2]
 # ]
 
 
