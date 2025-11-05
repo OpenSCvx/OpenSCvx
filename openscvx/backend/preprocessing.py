@@ -345,6 +345,82 @@ def validate_dynamics_dict_dimensions(dynamics: Dict[str, Expr], states: List[St
             )
 
 
+def validate_time_parameters(
+    states: List[State],
+    time_initial: Union[float, tuple, None],
+    time_final: Union[float, tuple, None],
+    time_derivative: Union[float, Expr, None],
+    time_min: Union[float, None],
+    time_max: Union[float, None],
+) -> Tuple[
+    bool,
+    Union[float, tuple, None],
+    Union[float, tuple, None],
+    Union[float, Expr, None],
+    Union[float, None],
+    Union[float, None],
+]:
+    """
+    Validate time parameter usage and determine which approach the user is taking.
+
+    There are two valid approaches:
+    1. Auto-create time: Don't include "time" in states, provide time_initial/time_final
+    2. User-provided time: Include "time" State in states, don't provide time parameters
+
+    Args:
+        states: List of State objects
+        time_initial: Initial time boundary condition (or None)
+        time_final: Final time boundary condition (or None)
+        time_derivative: Time derivative expression (or None)
+        time_min: Minimum time bound (or None)
+        time_max: Maximum time bound (or None)
+
+    Returns:
+        Tuple of (has_time_state, time_initial, time_final, time_derivative, time_min, time_max)
+        where has_time_state is True if user provided a time state, and the remaining values
+        are processed parameters (with defaults applied) or None if user-provided.
+
+    Raises:
+        ValueError: If validation fails or approaches are mixed
+    """
+    has_time_state = any(state.name == "time" for state in states)
+
+    if has_time_state:
+        # Approach 2: User-provided time state
+        if (
+            time_initial is not None
+            or time_final is not None
+            or time_derivative is not None
+            or time_min is not None
+            or time_max is not None
+        ):
+            raise ValueError(
+                "When providing a 'time' state in the states list, "
+                "do not provide time_initial, time_final, time_derivative, time_min, or time_max "
+                "to TrajOptProblem. Set these properties on the time State object instead."
+            )
+        # Return None for all time parameters since user handles everything
+        return True, None, None, None, None, None
+    else:
+        # Approach 1: Auto-create time state
+        if time_initial is None or time_final is None:
+            raise ValueError(
+                "When not providing a 'time' state, you must specify "
+                "time_initial and time_final in TrajOptProblem."
+            )
+        # Set defaults for optional parameters
+        if time_derivative is None:
+            time_derivative = 1.0
+        if time_min is None:
+            time_min = 0.0
+        if time_max is None:
+            # Use a sensible default based on time_final
+            time_final_val = time_final if isinstance(time_final, (int, float)) else time_final[1]
+            time_max = max(100.0, time_final_val * 2.0)
+
+        return False, time_initial, time_final, time_derivative, time_min, time_max
+
+
 def convert_dynamics_dict_to_expr(
     dynamics: Dict[str, Expr], states: List[State]
 ) -> Tuple[Dict[str, Expr], Expr]:

@@ -243,34 +243,42 @@ def augment_with_time_state(
     states_aug = list(states)
     constraints_aug = list(constraints)
 
-    # Create time State
-    time_state = State("time", shape=(1,))
-    time_state.min = np.array([time_min])
-    time_state.max = np.array([time_max])
+    # Check if a time state already exists
+    time_state = None
+    for state in states_aug:
+        if state.name == "time":
+            time_state = state
+            break
 
-    # Set time boundary conditions
-    time_state.initial = [time_initial]
-    time_state.final = [time_final]
+    if time_state is None:
+        # Create time State only if it doesn't exist
+        time_state = State("time", shape=(1,))
+        time_state.min = np.array([time_min])
+        time_state.max = np.array([time_max])
 
-    # Create initial guess for time (linear interpolation)
-    time_guess_start = (
-        time_state.initial[0]
-        if isinstance(time_state.initial[0], (int, float))
-        else time_state.initial[0][1]
-    )
-    time_guess_end = (
-        time_state.final[0]
-        if isinstance(time_state.final[0], (int, float))
-        else time_state.final[0][1]
-    )
-    time_state.guess = np.linspace(time_guess_start, time_guess_end, N).reshape(-1, 1)
+        # Set time boundary conditions
+        time_state.initial = [time_initial]
+        time_state.final = [time_final]
 
-    # Add time state to the list
-    states_aug.append(time_state)
+        # Create initial guess for time (linear interpolation)
+        time_guess_start = (
+            time_state.initial[0]
+            if isinstance(time_state.initial[0], (int, float))
+            else time_state.initial[0][1]
+        )
+        time_guess_end = (
+            time_state.final[0]
+            if isinstance(time_state.final[0], (int, float))
+            else time_state.final[0][1]
+        )
+        time_state.guess = np.linspace(time_guess_start, time_guess_end, N).reshape(-1, 1)
 
-    # Add CTCS constraints for time bounds
-    constraints_aug.append(CTCS(time_state <= time_state.max))
-    constraints_aug.append(CTCS(time_state.min <= time_state))
+        # Add time state to the list
+        states_aug.append(time_state)
+
+        # Add CTCS constraints for time bounds
+        constraints_aug.append(CTCS(time_state <= time_state.max))
+        constraints_aug.append(CTCS(time_state.min <= time_state))
 
     return states_aug, constraints_aug
 

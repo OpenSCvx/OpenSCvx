@@ -32,6 +32,7 @@ from openscvx.backend.preprocessing import (
     validate_dynamics_dict_dimensions,
     validate_dynamics_dimension,
     validate_shapes,
+    validate_time_parameters,
     validate_variable_names,
 )
 from openscvx.backend.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
@@ -72,11 +73,11 @@ class TrajOptProblem:
         x: List[State],
         u: List[Control],
         N: int,
-        time_initial: Union[float, tuple] = 0.0,
-        time_final: Union[float, tuple] = ("minimize", 10.0),
-        time_derivative: Union[float, Expr] = 1.0,
-        time_min: float = 0.0,
-        time_max: float = 100.0,
+        time_initial: Union[float, tuple] = None,
+        time_final: Union[float, tuple] = None,
+        time_derivative: Union[float, Expr] = None,
+        time_min: float = None,
+        time_max: float = None,
         params: Optional[dict] = None,
         dynamics_prop: Optional[callable] = None,
         x_prop: State = None,
@@ -100,16 +101,22 @@ class TrajOptProblem:
                 representing the derivative of that state.
             constraints (List[Union[CTCSConstraint, NodalConstraint]]):
                 List of constraints decorated with @ctcs or @nodal
-            x (List[State]): List of State objects representing the state variables
+            x (List[State]): List of State objects representing the state variables.
+                May optionally include a State named "time" (see time parameters below).
             u (List[Control]): List of Control objects representing the control variables
             N (int): Number of segments in the trajectory
-            time_initial (float or tuple): Initial time boundary condition. Can be a float
-                (fixed) or tuple like ("free", value) or ("minimize", value).
-            time_final (float or tuple): Final time boundary condition. Can be a float
-                (fixed) or tuple like ("free", value) or ("minimize", value).
-            time_derivative (float or Expr): Derivative of time (default 1.0 for real time)
-            time_min (float): Minimum bound for time variable
-            time_max (float): Maximum bound for time variable
+            time_initial (float or tuple): Initial time boundary condition. Only provide if
+                NOT including a "time" state in x. Can be a float (fixed) or tuple like
+                ("free", value) or ("minimize", value). Default: None (required if no time state).
+            time_final (float or tuple): Final time boundary condition. Only provide if
+                NOT including a "time" state in x. Can be a float (fixed) or tuple like
+                ("free", value) or ("minimize", value). Default: None (required if no time state).
+            time_derivative (float or Expr): Derivative of time (default 1.0 for real time).
+                Only used if NOT including a "time" state in x. Default: None (uses 1.0).
+            time_min (float): Minimum bound for time variable. Only used if NOT including
+                a "time" state in x. Default: None (uses 0.0).
+            time_max (float): Maximum bound for time variable. Only used if NOT including
+                a "time" state in x. Default: None (uses sensible default based on time_final).
             params (dict): Optional parameters dictionary for runtime parameter changes
             dynamics_prop: Propagation dynamics function (optional)
             x_prop: Propagation state (optional)
@@ -126,16 +133,31 @@ class TrajOptProblem:
 
         Returns:
             None
+
+        Note:
+            There are two approaches for handling time:
+            1. Auto-create (simple): Don't include "time" in x, provide time_initial/time_final
+            2. User-provided (for time-dependent constraints): Include "time" State in x and
+               in dynamics dict, don't provide time_initial/time_final parameters
         """
 
-        # Augment states with time state and add time constraints
-        x, constraints = augment_with_time_state(
-            x, constraints, time_initial, time_final, time_min, time_max, N
+        # Validate time handling approach and get processed parameters
+        has_time_state, time_initial, time_final, time_derivative, time_min, time_max = (
+            validate_time_parameters(
+                x, time_initial, time_final, time_derivative, time_min, time_max
+            )
         )
 
-        # Add time derivative to dynamics dict
+        # Augment states with time state if needed (auto-create approach)
+        if not has_time_state:
+            x, constraints = augment_with_time_state(
+                x, constraints, time_initial, time_final, time_min, time_max, N
+            )
+
+        # Add time derivative to dynamics dict (if not already present)
         dynamics = dict(dynamics)  # Make a copy to avoid mutating the input
-        dynamics["time"] = time_derivative
+        if "time" not in dynamics:
+            dynamics["time"] = time_derivative
 
         # Validate dynamics dict matches state names and dimensions
         validate_dynamics_dict(dynamics, x)
