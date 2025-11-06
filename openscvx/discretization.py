@@ -124,7 +124,7 @@ def calculate_discretization(
     """Calculate the discretized system matrices.
 
     This function computes the discretized system matrices (A_bar, B_bar, C_bar)
-    and defect vector (z_bar) using numerical integration.
+    and propagated state (x_prop) using numerical integration.
 
     Args:
         x: State trajectory.
@@ -144,11 +144,11 @@ def calculate_discretization(
         **kwargs: Additional parameters passed to state_dot, A, and B.
 
     Returns:
-        tuple: (A_bar, B_bar, C_bar, z_bar, Vmulti) where:
+        tuple: (A_bar, B_bar, C_bar, x_prop, Vmulti) where:
             - A_bar: Discretized state transition matrix
             - B_bar: Discretized control influence matrix
             - C_bar: Discretized control influence matrix for next node
-            - z_bar: Defect vector
+            - x_prop: Propagated state vector
             - Vmulti: Full augmented state trajectory
     """
     # Define indices for slicing the augmented state vector

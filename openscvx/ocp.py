@@ -2,8 +2,6 @@ import os
 
 import cvxpy as cp
 import numpy as np
-import numpy.linalg as la
-from numpy import block
 
 from openscvx.config import Config
 
@@ -37,7 +35,6 @@ def OptimalControlProblem(settings: Config):
 
     # Affine Scaling for State
     S_x = settings.sim.S_x
-    inv_S_x = settings.sim.inv_S_x
     c_x = settings.sim.c_x
 
     # Control
@@ -49,7 +46,6 @@ def OptimalControlProblem(settings: Config):
 
     # Affine Scaling for Control
     S_u = settings.sim.S_u
-    inv_S_u = settings.sim.inv_S_u
     c_u = settings.sim.c_u
 
     # Discretized Augmented Dynamics Constraints
@@ -187,12 +183,6 @@ def OptimalControlProblem(settings: Config):
     # COSTS
     ########
 
-    inv = block(
-        [
-            [inv_S_x, np.zeros((S_x.shape[0], S_u.shape[1]))],
-            [np.zeros((S_u.shape[0], S_x.shape[1])), inv_S_u],
-        ]
-    )
     cost += sum(
         w_tr * cp.sum_squares(cp.hstack((dx[i], du[i]))) for i in range(settings.scp.n)
     )  # Trust Region Cost

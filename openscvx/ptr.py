@@ -33,7 +33,7 @@ def PTR_init(params, ocp: cp.Problem, discretization_solver: callable, settings:
     if "x_term" in ocp.param_dict:
         ocp.param_dict["x_term"].value = settings.sim.x.final
 
-    # Solve a dumb problem to intilize DPP and JAX jacobians
+    # Solve a dumb problem to initialize DPP and JAX jacobians
     _ = PTR_subproblem(
         params.items(),
         cpg_solve,
@@ -114,10 +114,10 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
 
     i = 0
     costs = [0]
-    for type in x.final_type:
-        if type == "Minimize":
+    for final_type in x.final_type:
+        if final_type == "Minimize":
             costs += x_new_guess[:, i]
-        if type == "Maximize":
+        if final_type == "Maximize":
             costs -= x_new_guess[:, i]
         i += 1
 
