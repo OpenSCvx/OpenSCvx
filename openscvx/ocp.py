@@ -62,7 +62,7 @@ def OptimalControlProblem(settings: Config):
     C_d = cp.Parameter(
         (settings.scp.n - 1, settings.sim.n_states * settings.sim.n_controls), name="C_d"
     )
-    z_d = cp.Parameter((settings.scp.n - 1, settings.sim.n_states), name="z_d")
+    x_prop = cp.Parameter((settings.scp.n - 1, settings.sim.n_states), name="x_prop")
     nu = cp.Variable((settings.scp.n - 1, settings.sim.n_states), name="nu")  # Virtual Control
 
     # Linearized Nonconvex Nodal Constraints
@@ -91,9 +91,13 @@ def OptimalControlProblem(settings: Config):
     # Applying the affine scaling to state and control
     x_nonscaled = []
     u_nonscaled = []
+    dx_nonscaled = []
+    du_nonscaled = []
     for k in range(settings.scp.n):
         x_nonscaled.append(S_x @ x[k] + c_x)
         u_nonscaled.append(S_u @ u[k] + c_u)
+        dx_nonscaled.append(S_x @ dx[k])
+        du_nonscaled.append(S_u @ du[k])
 
     constr = []
     cost = lam_cost * 0
@@ -147,20 +151,20 @@ def OptimalControlProblem(settings: Config):
         ]
 
     constr += [
-        la.inv(S_x) @ (x_nonscaled[i] - x_bar[i] - dx[i]) == 0 for i in range(settings.scp.n)
+        (x[i] - np.linalg.inv(S_x) @ (x_bar[i] - c_x) - dx[i]) == 0 for i in range(settings.scp.n)
     ]  # State Error
     constr += [
-        la.inv(S_u) @ (u_nonscaled[i] - u_bar[i] - du[i]) == 0 for i in range(settings.scp.n)
+        (u[i] - np.linalg.inv(S_u) @ (u_bar[i] - c_u) - du[i]) == 0 for i in range(settings.scp.n)
     ]  # Control Error
 
     constr += [
         x_nonscaled[i]
         == cp.reshape(A_d[i - 1], (settings.sim.n_states, settings.sim.n_states))
-        @ x_nonscaled[i - 1]
+        @ dx_nonscaled[i - 1]
         + cp.reshape(B_d[i - 1], (settings.sim.n_states, settings.sim.n_controls))
-        @ u_nonscaled[i - 1]
-        + cp.reshape(C_d[i - 1], (settings.sim.n_states, settings.sim.n_controls)) @ u_nonscaled[i]
-        + z_d[i - 1]
+        @ du_nonscaled[i - 1]
+        + cp.reshape(C_d[i - 1], (settings.sim.n_states, settings.sim.n_controls)) @ du_nonscaled[i]
+        + x_prop[i - 1]
         + nu[i - 1]
         for i in range(1, settings.scp.n)
     ]  # Dynamics Constraint
@@ -190,7 +194,7 @@ def OptimalControlProblem(settings: Config):
         ]
     )
     cost += sum(
-        w_tr * cp.sum_squares(inv @ cp.hstack((dx[i], du[i]))) for i in range(settings.scp.n)
+        w_tr * cp.sum_squares(cp.hstack((dx[i], du[i]))) for i in range(settings.scp.n)
     )  # Trust Region Cost
     cost += sum(
         settings.scp.lam_vc * cp.sum(cp.abs(nu[i - 1])) for i in range(1, settings.scp.n)
