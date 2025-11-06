@@ -56,8 +56,6 @@ def stable_function_hash(
                         # Parse the lambda expression as an expression
                         src = f"({lambda_expr})"
                         parsed = ast.parse(src, mode='eval')
-                        # Extract the lambda node from the expression
-                        lambda_node = parsed.body
                     else:
                         # Fallback: try to parse the whole source
                         parsed = ast.parse(src)
