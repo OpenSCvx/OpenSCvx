@@ -74,7 +74,7 @@ def test_discretization_shapes(settings, dynamics):
     x = jnp.ones((settings.scp.n, settings.sim.n_states))
     u = jnp.ones((settings.scp.n, settings.sim.n_controls + 1))  # +1 slack
 
-    A_bar, B_bar, C_bar, z_bar, Vmulti = solver(x, u)
+    A_bar, B_bar, C_bar, x_prop, Vmulti = solver(x, u)
 
     # expected shapes
     N = settings.scp.n
@@ -82,7 +82,7 @@ def test_discretization_shapes(settings, dynamics):
     assert A_bar.shape == ((N - 1), n_x * n_x)
     assert B_bar.shape == ((N - 1), n_x * n_u)
     assert C_bar.shape == ((N - 1), n_x * n_u)
-    assert z_bar.shape == ((N - 1), n_x)
+    assert x_prop.shape == ((N - 1), n_x)
     # assert Vmulti.shape == (N, (n_x + n_x*n_x + 2*n_x*n_u + n_x))
 
 
@@ -90,7 +90,7 @@ def test_jit_dVdt_compiles(settings):
     # prepare trivial inputs
     n_x, n_u = settings.sim.n_states, settings.sim.n_controls
     N = settings.scp.n
-    aug_dim = n_x + n_x * n_x + 2 * n_x * n_u + n_x
+    aug_dim = n_x + n_x * n_x + 2 * n_x * n_u
 
     tau = jnp.array(0.3)
     V_flat = jnp.ones((N - 1) * aug_dim)
