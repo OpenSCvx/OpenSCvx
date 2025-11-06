@@ -129,7 +129,7 @@ problem.settings.sim.scaling_x_overrides = [
 # Set solver parameters
 problem.settings.prp.dt = 0.01
 
-problem.settings.sim.save_compiled = False
+# problem.settings.sim.save_compiled = False
 
 problem.settings.scp.w_tr_adapt = 1.04
 problem.settings.scp.w_tr = 2e0

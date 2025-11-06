@@ -24,7 +24,47 @@ def stable_function_hash(
         try:
             src = inspect.getsource(func)
             src = textwrap.dedent(src)  # <<< Fix: remove extra indent
-            parsed = ast.parse(src)
+            src_stripped = src.strip()
+            
+            # Handle lambda functions - extract just the lambda expression
+            # inspect.getsource on lambdas returns the entire line including function calls
+            if "lambda" in src_stripped:
+                # Find the lambda keyword position
+                lambda_pos = src_stripped.find("lambda")
+                if lambda_pos >= 0:
+                    # Extract from lambda to the end, but we need to find where the lambda ends
+                    # Try to parse just the lambda part by finding the matching colon and expression
+                    # For simplicity, try parsing as expression first
+                    lambda_part = src_stripped[lambda_pos:]
+                    
+                    # Try to extract just the lambda expression by finding where it ends
+                    # This is tricky - we'll try incremental parsing
+                    lambda_expr = None
+                    for end_pos in range(len(lambda_part), 0, -1):
+                        try:
+                            test_expr = lambda_part[:end_pos].rstrip().rstrip(',')
+                            # Try parsing as expression wrapped in parentheses
+                            parsed_test = ast.parse(f"({test_expr})", mode='eval')
+                            # If successful, check if it's a lambda
+                            if isinstance(parsed_test.body, ast.Lambda):
+                                lambda_expr = test_expr
+                                break
+                        except (SyntaxError, ValueError):
+                            continue
+                    
+                    if lambda_expr:
+                        # Parse the lambda expression as an expression
+                        src = f"({lambda_expr})"
+                        parsed = ast.parse(src, mode='eval')
+                        # Extract the lambda node from the expression
+                        lambda_node = parsed.body
+                    else:
+                        # Fallback: try to parse the whole source
+                        parsed = ast.parse(src)
+                else:
+                    parsed = ast.parse(src)
+            else:
+                parsed = ast.parse(src)
 
             # Remove docstrings from the AST
             for node in ast.walk(parsed):
