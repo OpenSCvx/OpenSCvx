@@ -48,8 +48,8 @@ constraint_exprs = [
 
 problem = TrajOptProblem(
     dynamics={"x": dyn_expr},  # Dictionary mapping state name to dynamics
-    x=[x],  # Wrapped in list for new API
-    u=[u],  # Wrapped in list for new API
+    states=[x],  # Wrapped in list for new API
+    controls=[u],  # Wrapped in list for new API
     time_initial=0.0,
     time_final=("minimize", total_time),
     time_derivative=1.0,  # Real time

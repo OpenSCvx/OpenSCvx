@@ -136,8 +136,8 @@ params = {
 
 problem = TrajOptProblem(
     dynamics=dynamics,
-    x=states,
-    u=controls,
+    states=states,
+    controls=controls,
     time_initial=0.0,
     time_final=("minimize", total_time),
     time_derivative=1.0,  # Real time

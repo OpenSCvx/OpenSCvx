@@ -109,8 +109,8 @@ constraints.append(ctcs(lambda x_, u_: x.true.min - x_))
 x.guess = np.linspace(x.initial, x.final, n)
 problem = TrajOptProblem(
     dynamics=dynamics,
-    x=x,
-    u=u,
+    states=x,
+    controls=u,
     params=Parameter.get_all(),
     constraints=constraints,
     idx_time=len(x.max) - 1,

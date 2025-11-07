@@ -90,8 +90,8 @@ params = {
 # Build the problem
 problem = TrajOptProblem(
     dynamics=dynamics,
-    x=states,
-    u=controls,
+    states=states,
+    controls=controls,
     params=params,
     time_initial=0.0,
     time_final=("minimize", total_time),

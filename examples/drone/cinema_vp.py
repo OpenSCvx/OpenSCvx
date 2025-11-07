@@ -216,8 +216,8 @@ fuel.guess = fuel_bar
 
 problem = TrajOptProblem(
     dynamics=dynamics,
-    x=states,
-    u=controls,
+    states=states,
+    controls=controls,
     constraints=constraints,
     N=n,
     licq_max=1e-8,

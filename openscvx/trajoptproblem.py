@@ -70,8 +70,8 @@ class TrajOptProblem:
         self,
         dynamics: dict,
         constraints: List[Union[Constraint, CTCS]],
-        x: List[State],
-        u: List[Control],
+        states: List[State],
+        controls: List[Control],
         N: int,
         time_initial: Union[float, tuple] = None,
         time_final: Union[float, tuple] = None,
@@ -144,14 +144,14 @@ class TrajOptProblem:
         # Validate time handling approach and get processed parameters
         has_time_state, time_initial, time_final, time_derivative, time_min, time_max = (
             validate_time_parameters(
-                x, time_initial, time_final, time_derivative, time_min, time_max
+                states, time_initial, time_final, time_derivative, time_min, time_max
             )
         )
 
         # Augment states with time state if needed (auto-create approach)
         if not has_time_state:
-            x, constraints = augment_with_time_state(
-                x, constraints, time_initial, time_final, time_min, time_max, N
+            states, constraints = augment_with_time_state(
+                states, constraints, time_initial, time_final, time_min, time_max, N
             )
 
         # Add time derivative to dynamics dict (if not already present)
@@ -160,20 +160,20 @@ class TrajOptProblem:
             dynamics["time"] = time_derivative
 
         # Validate dynamics dict matches state names and dimensions
-        validate_dynamics_dict(dynamics, x)
-        validate_dynamics_dict_dimensions(dynamics, x)
+        validate_dynamics_dict(dynamics, states)
+        validate_dynamics_dict_dimensions(dynamics, states)
 
         # Convert dynamics dict to concatenated expression
-        dynamics, dynamics_concat = convert_dynamics_dict_to_expr(dynamics, x)
+        dynamics, dynamics_concat = convert_dynamics_dict_to_expr(dynamics, states)
 
         # Validate expressions
         all_exprs = [dynamics_concat] + constraints
         validate_variable_names(all_exprs)
-        collect_and_assign_slices(x, u)
+        collect_and_assign_slices(states, controls)
         validate_shapes(all_exprs)
         validate_constraints_at_root(constraints)
         validate_and_normalize_constraint_nodes(constraints, N)
-        validate_dynamics_dimension(dynamics_concat, x)
+        validate_dynamics_dimension(dynamics_concat, states)
 
         # Canonicalize all expressions after validation
         dynamics_concat = dynamics_concat.canonicalize()
@@ -196,8 +196,8 @@ class TrajOptProblem:
         # Augment dynamics, states, and controls with CTCS constraints, time dilation
         dynamics_aug, x_aug, u_aug = augment_dynamics_with_ctcs(
             dynamics_concat,
-            x,
-            u,
+            states,
+            controls,
             constraints_ctcs,
             N,
             licq_min=licq_min,
