@@ -15,26 +15,35 @@ from openscvx import TrajOptProblem
 n = 8
 total_time = 1.2  # Total simulation time
 
-# Define State and Control symbolic variables
-x = ox.State("x", shape=(4,))
+# Define state components
+position = ox.State("position", shape=(2,))  # 2D position [x, y]
+position.min = np.array([-5.0, -5.0])
+position.max = np.array([5.0, 5.0])
+position.initial = np.array([0, -2])
+position.final = np.array([0, 2])
+position.guess = np.linspace(position.initial, position.final, n)
 
-u = ox.Control("u", shape=(2,))
+theta = ox.State("theta", shape=(1,))  # Heading angle
+theta.min = np.array([-2 * jnp.pi])
+theta.max = np.array([2 * jnp.pi])
+theta.initial = np.array([0])
+theta.final = [("free", 0)]
+theta.guess = np.zeros((n, 1))
 
-# Set bounds on state
-x.min = np.array([-5.0, -5.0, -2 * jnp.pi, 0])
-x.max = np.array([5.0, 5.0, 2 * jnp.pi, 20])
+# Define control components
+speed = ox.Control("speed", shape=(1,))  # Forward speed
+speed.min = np.array([0])
+speed.max = np.array([10])
+speed.guess = np.zeros((n, 1))
 
-# Set initial, final, and guess for state trajectory using symbolic boundary expressions
-x.initial = [0, -2, 0, 0]
-x.final = [0, 2, ("free", 0), ("minimize", total_time)]
-x.guess = np.linspace([0, -2, 0, 0], [0, 2, 0, total_time], n)
+angular_rate = ox.Control("angular_rate", shape=(1,))  # Angular velocity
+angular_rate.min = np.array([-5])
+angular_rate.max = np.array([5])
+angular_rate.guess = np.zeros((n, 1))
 
-# Set bounds on control
-u.min = np.array([0, -5])
-u.max = np.array([10, 5])
-
-# Set initial control guess
-u.guess = np.repeat(np.expand_dims(np.array([0, 0]), axis=0), n, axis=0)
+# Define list of all states and controls
+states = [position, theta]
+controls = [speed, angular_rate]
 
 # Define Parameters for obstacle radius and center
 obs_center = ox.Parameter("obs_center", shape=(2,))
@@ -43,20 +52,23 @@ obs_radius = ox.Parameter("obs_radius", shape=())
 
 # Parameter values will be set through params dictionary
 
-# Define constraints using symbolic expressions
-constraints = [
-    ox.ctcs(obs_radius <= ox.linalg.Norm(x[:2] - obs_center)),
-    ox.ctcs(x <= x.max),
-    ox.ctcs(x.min <= x),
-]
+# Generate box constraints for all states
+constraints = []
+for state in states:
+    constraints.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
+
+# Add obstacle avoidance constraint
+constraints.append(ox.ctcs(obs_radius <= ox.linalg.Norm(position - obs_center)))
 
 
-# Define dynamics using symbolic expressions
-rx_dot = u[0] * ox.Sin(x[2])
-ry_dot = u[0] * ox.Cos(x[2])
-theta_dot = u[1]
-t_dot = 1.0
-dynamics = ox.Concat(rx_dot, ry_dot, theta_dot, t_dot)
+# Define dynamics as dictionary mapping state names to their derivatives
+dynamics = {
+    "position": ox.Concat(
+        speed[0] * ox.Sin(theta[0]),  # x_dot
+        speed[0] * ox.Cos(theta[0]),  # y_dot
+    ),
+    "theta": angular_rate[0],
+}
 
 
 # Set parameter values
@@ -68,10 +80,14 @@ params = {
 # Build the problem
 problem = TrajOptProblem(
     dynamics=dynamics,
-    x=x,
-    u=u,
+    x=states,
+    u=controls,
     params=params,
-    idx_time=3,  # Index of time variable in state vector
+    time_initial=0.0,
+    time_final=("minimize", total_time),
+    time_derivative=1.0,  # Real time
+    time_min=0.0,
+    time_max=20,
     constraints=constraints,
     N=n,
     licq_max=1e-8,
@@ -114,8 +130,10 @@ if __name__ == "__main__":
     problem.settings.scp.lam_cost = 1e-1  # Disable minimal time objective for second run
     problem.settings.scp.w_tr = 1e0
     problem.settings.scp.lam_vc = 1e2  # Adjust virtual control weight
-    x.guess[:, 0:4] = np.linspace([0, -2, 0, 0], [0, 2, 0, total_time], n)
-    u.guess[:, 0:2] = np.repeat(np.expand_dims(np.array([0, 0]), axis=0), n, axis=0)
+    position.guess = np.linspace([0, -2], [0, 2], n)
+    theta.guess = np.zeros((n, 1))
+    speed.guess = np.zeros((n, 1))
+    angular_rate.guess = np.zeros((n, 1))
 
     plotting_dict["obs_center"] = np.array([0.5, 0.0])
 
