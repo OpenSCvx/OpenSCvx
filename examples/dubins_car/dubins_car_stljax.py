@@ -17,21 +17,36 @@ from openscvx import TrajOptProblem
 #     pip install stljax
 n = 8
 total_time = 4.0  # Total simulation time
-# Define State and Control symbolic variables
-x = ox.State("x", shape=(4,))
-u = ox.Control("u", shape=(2,))
-# Set bounds on state
-x.min = np.array([-5.0, -5.0, -2 * jnp.pi, 0])
-x.max = np.array([5.0, 5.0, 2 * jnp.pi, 10])
-# Set initial, final, and guess for state trajectory using symbolic boundary expressions
-x.initial = [0, -2, 0, 0]
-x.final = [0, 2, ("free", 0), ("minimize", total_time)]
-x.guess = np.linspace([0, -2, 0, 0], [0, 2, 0, total_time], n)
-# Set bounds on control
-u.min = np.array([0, -5])
-u.max = np.array([10, 5])
-# Set initial control guess
-u.guess = np.repeat(np.expand_dims(np.array([0, 0]), axis=0), n, axis=0)
+
+# Define state components
+position = ox.State("position", shape=(2,))  # 2D position [x, y]
+position.min = np.array([-5.0, -5.0])
+position.max = np.array([5.0, 5.0])
+position.initial = np.array([0, -2])
+position.final = np.array([0, 2])
+position.guess = np.linspace(position.initial, position.final, n)
+
+theta = ox.State("theta", shape=(1,))  # Heading angle
+theta.min = np.array([-2 * jnp.pi])
+theta.max = np.array([2 * jnp.pi])
+theta.initial = np.array([0])
+theta.final = [("free", 0)]
+theta.guess = np.zeros((n, 1))
+
+# Define control components
+speed = ox.Control("speed", shape=(1,))  # Forward speed
+speed.min = np.array([0])
+speed.max = np.array([10])
+speed.guess = np.zeros((n, 1))
+
+angular_rate = ox.Control("angular_rate", shape=(1,))  # Angular velocity
+angular_rate.min = np.array([-5])
+angular_rate.max = np.array([5])
+angular_rate.guess = np.zeros((n, 1))
+
+# Define list of all states and controls
+states = [position, theta]
+controls = [speed, angular_rate]
 # Define Parameters for wp radius and center
 wp1_center = ox.Parameter("wp1_center", shape=(2,))
 wp1_radius = ox.Parameter("wp1_radius", shape=())
@@ -39,35 +54,29 @@ wp2_center = ox.Parameter("wp2_center", shape=(2,))
 wp2_radius = ox.Parameter("wp2_radius", shape=())
 
 
-# Create symbolic expressions for the dynamics
-pos = x[:2]
-theta = x[2]
-time = x[3]
-velocity = u[0]
-angular_velocity = u[1]
-
-# Define dynamics using symbolic expressions
-rx_dot = velocity * ox.Sin(theta)
-ry_dot = velocity * ox.Cos(theta)
-theta_dot = angular_velocity
-t_dot = 1.0
-dyn_expr = ox.Concat(rx_dot, ry_dot, theta_dot, t_dot)
+# Define dynamics as dictionary mapping state names to their derivatives
+dynamics = {
+    "position": ox.Concat(
+        speed[0] * ox.Sin(theta[0]),  # x_dot
+        speed[0] * ox.Cos(theta[0]),  # y_dot
+    ),
+    "theta": angular_rate[0],
+}
 
 # Create symbolic expressions for waypoint predicates
-wp1_pred = wp1_radius - ox.linalg.Norm(pos - wp1_center)
-wp2_pred = wp2_radius - ox.linalg.Norm(pos - wp2_center)
+wp1_pred = wp1_radius - ox.linalg.Norm(position - wp1_center)
+wp2_pred = wp2_radius - ox.linalg.Norm(position - wp2_center)
 
 # Create symbolic OR expression using the new Or node
 visit_wp_or_expr = ox.stl.Or(wp1_pred, wp2_pred)
 
-# Define constraints using symbolic expressions
-constraints = [
-    # Visit waypoint constraints using symbolic Or
-    ox.ctcs(-visit_wp_or_expr <= 0.0).over((3, 5)),
-    # State bounds constraints
-    ox.ctcs(x <= x.max),
-    ox.ctcs(x.min <= x),
-]
+# Generate box constraints for all states
+constraints = []
+for state in states:
+    constraints.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
+
+# Visit waypoint constraints using symbolic Or
+constraints.append(ox.ctcs(-visit_wp_or_expr <= 0.0).over((3, 5)))
 
 
 # Set parameter values
@@ -80,11 +89,15 @@ params = {
 
 # Build the problem
 problem = TrajOptProblem(
-    dynamics=dyn_expr,
-    x=x,
-    u=u,
+    dynamics=dynamics,
+    x=states,
+    u=controls,
     params=params,
-    idx_time=3,  # Index of time variable in state vector
+    time_initial=0.0,
+    time_final=("minimize", total_time),
+    time_derivative=1.0,  # Real time
+    time_min=0.0,
+    time_max=10,
     constraints=constraints,
     N=n,
     licq_max=1e-8,
