@@ -12,18 +12,18 @@ from jax import jacfwd
 os.environ["EQX_ON_ERROR"] = "nan"
 
 from openscvx import io
-from openscvx.backend.augmentation import (
+from openscvx.symbolic.augmentation import (
     augment_dynamics_with_ctcs,
     augment_with_time_state,
     decompose_vector_nodal_constraints,
     separate_constraints,
     sort_ctcs_constraints,
 )
-from openscvx.backend.expr import CTCS, Concat, Constant, Constraint, Expr
-from openscvx.backend.expr.control import Control
-from openscvx.backend.expr.state import State
-from openscvx.backend.lower import lower_to_jax
-from openscvx.backend.preprocessing import (
+from openscvx.symbolic.expr import CTCS, Concat, Constant, Constraint, Expr
+from openscvx.symbolic.expr.control import Control
+from openscvx.symbolic.expr.state import State
+from openscvx.symbolic.lower import lower_to_jax
+from openscvx.symbolic.preprocessing import (
     collect_and_assign_slices,
     convert_dynamics_dict_to_expr,
     validate_and_normalize_constraint_nodes,
@@ -35,7 +35,7 @@ from openscvx.backend.preprocessing import (
     validate_time_parameters,
     validate_variable_names,
 )
-from openscvx.backend.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
+from openscvx.symbolic.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
 from openscvx.caching import (
     get_solver_cache_paths,
     load_or_compile_discretization_solver,

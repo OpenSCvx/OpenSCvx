@@ -10,8 +10,8 @@ from typing import List, Optional
 
 import numpy as np
 
-from openscvx.backend.expr.control import Control
-from openscvx.backend.expr.state import State
+from openscvx.symbolic.expr.control import Control
+from openscvx.symbolic.expr.state import State
 
 
 @dataclass

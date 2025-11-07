@@ -2,7 +2,7 @@ from typing import Callable, Dict, Iterable, List, Set, Tuple, Union
 
 import numpy as np
 
-from openscvx.backend.expr import (
+from openscvx.symbolic.expr import (
     CTCS,
     Concat,
     Constant,

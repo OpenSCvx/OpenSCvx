@@ -172,15 +172,15 @@ class CTCS(Expr):
         lhs = self.constraint.lhs
 
         if self.penalty == "squared_relu":
-            from openscvx.backend.expr.math import PositivePart, Square
+            from openscvx.symbolic.expr.math import PositivePart, Square
 
             penalty = Square(PositivePart(lhs))
         elif self.penalty == "huber":
-            from openscvx.backend.expr.math import Huber, PositivePart
+            from openscvx.symbolic.expr.math import Huber, PositivePart
 
             penalty = Huber(PositivePart(lhs))
         elif self.penalty == "smooth_relu":
-            from openscvx.backend.expr.math import SmoothReLU
+            from openscvx.symbolic.expr.math import SmoothReLU
 
             penalty = SmoothReLU(lhs)
         else:

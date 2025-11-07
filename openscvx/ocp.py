@@ -134,10 +134,10 @@ def lower_convex_constraints(constraints_nodal_convex, ocp_vars: Dict) -> List[c
     The CVXPy variables x and u are already (n_nodes, n_states/n_controls) shaped,
     so we apply constraints at specific nodes using x[k] and u[k].
     """
-    from openscvx.backend.expr import traverse
-    from openscvx.backend.expr.control import Control
-    from openscvx.backend.expr.state import State
-    from openscvx.backend.lowerers.cvxpy import lower_to_cvxpy
+    from openscvx.symbolic.expr import traverse
+    from openscvx.symbolic.expr.control import Control
+    from openscvx.symbolic.expr.state import State
+    from openscvx.symbolic.lowerers.cvxpy import lower_to_cvxpy
 
     if not constraints_nodal_convex:
         return []

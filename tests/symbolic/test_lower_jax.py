@@ -2,7 +2,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from openscvx.backend.expr import (
+from openscvx.symbolic.expr import (
     CTCS,
     QDCM,
     SSM,
@@ -33,8 +33,8 @@ from openscvx.backend.expr import (
     Sub,
     Vstack,
 )
-from openscvx.backend.lower import lower, lower_to_jax
-from openscvx.backend.lowerers.jax import JaxLowerer
+from openscvx.symbolic.lower import lower, lower_to_jax
+from openscvx.symbolic.lowerers.jax import JaxLowerer
 
 
 class UnregisteredExpr(Expr):

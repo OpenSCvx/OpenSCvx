@@ -2,8 +2,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from openscvx.backend.expr import Add, Concat, Constant, Control, Hstack, State, Vstack
-from openscvx.backend.preprocessing import (
+from openscvx.symbolic.expr import Add, Concat, Constant, Control, Hstack, State, Vstack
+from openscvx.symbolic.preprocessing import (
     collect_and_assign_slices,
     convert_dynamics_dict_to_expr,
     validate_constraints_at_root,
@@ -234,7 +234,7 @@ def test_nested_constraint_raises():
 
 def test_ctcs_at_root_with_wrapped_constraint_passes():
     """CTCS(x <= 5) at root level should be valid, even though the constraint is at depth 1"""
-    from openscvx.backend.expr import ctcs
+    from openscvx.symbolic.expr import ctcs
 
     x = State("x", (1,))
     constraint = x <= 5
@@ -246,7 +246,7 @@ def test_ctcs_at_root_with_wrapped_constraint_passes():
 
 def test_nested_ctcs_wrapper_raises():
     """Add(a, CTCS(x <= 5)) should raise error because CTCS is nested"""
-    from openscvx.backend.expr import ctcs
+    from openscvx.symbolic.expr import ctcs
 
     a = Constant(np.array([1.0]))
     x = State("x", (1,))
@@ -544,7 +544,7 @@ def test_constraint_broadcasting_passes():
 
 def test_ctcs_basic_shape_validation():
     """Test basic CTCS shape validation with penalty expression checking"""
-    from openscvx.backend.expr import ctcs
+    from openscvx.symbolic.expr import ctcs
 
     x = State("x", (3,))
     constraint = x <= np.ones((3,))
@@ -556,7 +556,7 @@ def test_ctcs_basic_shape_validation():
 
 def test_ctcs_penalty_shape_consistency():
     """Test that penalty expressions have same shape as constraint LHS"""
-    from openscvx.backend.expr import ctcs
+    from openscvx.symbolic.expr import ctcs
 
     x = State("x", (2, 2))  # matrix state
     constraint = x >= np.zeros((2, 2))
@@ -572,7 +572,7 @@ def test_ctcs_penalty_shape_consistency():
 
 def test_ctcs_constraint_shape_mismatch_raises():
     """Test that CTCS catches underlying constraint shape mismatches"""
-    from openscvx.backend.expr import ctcs
+    from openscvx.symbolic.expr import ctcs
 
     x = State("x", (2,))
     # Create constraint with mismatched shapes
@@ -638,7 +638,7 @@ def test_constant_normalization_validation_invariant():
 
 def test_to_expr_normalization_consistency():
     """Test that to_expr creates properly normalized constants"""
-    from openscvx.backend.expr import to_expr
+    from openscvx.symbolic.expr import to_expr
 
     # Different ways of creating same value through to_expr
     expr1 = to_expr(5.0)

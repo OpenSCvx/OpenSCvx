@@ -4,10 +4,10 @@ import os
 os.environ["EQX_ON_ERROR"] = "nan"
 
 # Core symbolic expressions - flat namespace for most common functions
-import openscvx.backend.expr.linalg as linalg
-import openscvx.backend.expr.spatial as spatial
-import openscvx.backend.expr.stl as stl
-from openscvx.backend.expr import (
+import openscvx.symbolic.expr.linalg as linalg
+import openscvx.symbolic.expr.spatial as spatial
+import openscvx.symbolic.expr.stl as stl
+from openscvx.symbolic.expr import (
     CTCS,
     Add,
     Concat,

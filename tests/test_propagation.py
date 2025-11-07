@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from jax import export
 
-from openscvx.backend.expr import Control, State
+from openscvx.symbolic.expr import Control, State
 from openscvx.propagation import get_propagation_solver, prop_aug_dy, s_to_t, t_to_tau
 
 

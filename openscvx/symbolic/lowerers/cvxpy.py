@@ -2,7 +2,7 @@ from typing import Any, Callable, Dict, Type
 
 import cvxpy as cp
 
-from openscvx.backend.expr import (
+from openscvx.symbolic.expr import (
     CTCS,
     Add,
     Concat,
@@ -32,8 +32,8 @@ from openscvx.backend.expr import (
     Sum,
     Transpose,
 )
-from openscvx.backend.expr.control import Control
-from openscvx.backend.expr.state import State
+from openscvx.symbolic.expr.control import Control
+from openscvx.symbolic.expr.state import State
 
 _CVXPY_VISITORS: Dict[Type[Expr], Callable] = {}
 

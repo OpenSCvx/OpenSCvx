@@ -1,6 +1,6 @@
 import numpy as np
 
-from openscvx.backend.expr import (
+from openscvx.symbolic.expr import (
     Add,
     Concat,
     Constant,

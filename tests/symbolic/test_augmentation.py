@@ -2,14 +2,14 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from openscvx.backend.augmentation import (
+from openscvx.symbolic.augmentation import (
     augment_dynamics_with_ctcs,
     augment_with_time_state,
     decompose_vector_nodal_constraints,
     separate_constraints,
     sort_ctcs_constraints,
 )
-from openscvx.backend.expr import (
+from openscvx.symbolic.expr import (
     CTCS,
     Add,
     Concat,
@@ -27,7 +27,7 @@ from openscvx.backend.expr import (
     Sum,
     ctcs,
 )
-from openscvx.backend.lower import lower_to_jax
+from openscvx.symbolic.lower import lower_to_jax
 
 
 def test_augment_with_time_state_basic():

@@ -1,7 +1,7 @@
 import numpy as np
 
-from openscvx.backend.expr import Control, State
-from openscvx.backend.unified import unify_controls, unify_states
+from openscvx.symbolic.expr import Control, State
+from openscvx.symbolic.unified import unify_controls, unify_states
 
 
 # Test unify_states function

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from openscvx.backend.expr import (
+from openscvx.symbolic.expr import (
     CTCS,
     Add,
     Constant,
@@ -271,7 +271,7 @@ def test_add_mul_requires_at_least_two_terms():
 
 def test_sum_node_creation_and_children():
     """Test Sum node creation and tree structure."""
-    from openscvx.backend.expr import Sum
+    from openscvx.symbolic.expr import Sum
 
     x = Variable("x", shape=(3,))
     sum_expr = Sum(x)
@@ -283,7 +283,7 @@ def test_sum_node_creation_and_children():
 
 def test_sum_wraps_constants_and_expressions():
     """Test Sum node with various input types."""
-    from openscvx.backend.expr import Sum
+    from openscvx.symbolic.expr import Sum
 
     # Sum of a constant array
     arr = np.array([1.0, 2.0, 3.0])
@@ -451,7 +451,7 @@ def test_ctcs_pretty_print():
 
 def test_penalty_expressions():
     """Test the penalty expression building blocks."""
-    from openscvx.backend.expr import Huber, PositivePart, SmoothReLU, Square
+    from openscvx.symbolic.expr import Huber, PositivePart, SmoothReLU, Square
 
     x = Variable("x", shape=(1,))
 
@@ -480,7 +480,7 @@ def test_penalty_expressions():
 
 def test_ctcs_penalty_expr_method():
     """Test building penalty expressions from CTCS constraints."""
-    from openscvx.backend.expr import Huber, PositivePart, SmoothReLU, Square
+    from openscvx.symbolic.expr import Huber, PositivePart, SmoothReLU, Square
 
     x = Variable("x", shape=(2,))
     constraint = x <= 1.0

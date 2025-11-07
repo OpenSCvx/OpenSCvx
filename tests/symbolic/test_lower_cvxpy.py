@@ -2,7 +2,7 @@ import cvxpy as cp
 import numpy as np
 import pytest
 
-from openscvx.backend.expr import (
+from openscvx.symbolic.expr import (
     Add,
     Concat,
     Constant,
@@ -27,7 +27,7 @@ from openscvx.backend.expr import (
     Sum,
     ctcs,
 )
-from openscvx.backend.lowerers.cvxpy import CvxpyLowerer, lower_to_cvxpy
+from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer, lower_to_cvxpy
 
 
 class TestCvxpyLowerer:

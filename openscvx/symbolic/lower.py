@@ -1,6 +1,6 @@
 from typing import Any, Sequence, Union
 
-from openscvx.backend.expr import Expr
+from openscvx.symbolic.expr import Expr
 
 
 def lower(expr: Expr, lowerer: Any):
@@ -18,7 +18,7 @@ def lower_to_jax(exprs: Union[Expr, Sequence[Expr]]) -> Union[callable, list[cal
     If `exprs` is a single Expr, returns a single callable.
     Otherwise (a list/tuple of Exprs), returns a list of callables.
     """
-    from openscvx.backend.lowerers.jax import JaxLowerer
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
 
     jl = JaxLowerer()
     if isinstance(exprs, Expr):

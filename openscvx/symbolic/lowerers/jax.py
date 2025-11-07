@@ -3,7 +3,7 @@ from typing import Any, Callable, Dict, Type
 import jax.numpy as jnp
 from jax.lax import cond
 
-from openscvx.backend.expr import (
+from openscvx.symbolic.expr import (
     CTCS,
     QDCM,
     SSM,
@@ -42,8 +42,8 @@ from openscvx.backend.expr import (
     Transpose,
     Vstack,
 )
-from openscvx.backend.expr.control import Control
-from openscvx.backend.expr.state import State
+from openscvx.symbolic.expr.control import Control
+from openscvx.symbolic.expr.state import State
 
 _JAX_VISITORS: Dict[Type[Expr], Callable] = {}
 
