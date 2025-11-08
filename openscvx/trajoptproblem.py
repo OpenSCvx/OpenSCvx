@@ -64,6 +64,46 @@ if TYPE_CHECKING:
     import cvxpy as cp
 
 
+class _ParameterDictWrapper(dict):
+    """Internal wrapper that intercepts dictionary modifications to update CVXPy parameters.
+
+    This class acts as a transparent proxy to the actual _parameters dict, but
+    automatically updates CVXPy Parameter objects when values are modified.
+    """
+
+    def __init__(self, problem):
+        """Initialize wrapper with reference to parent problem.
+
+        Args:
+            problem: The TrajOptProblem instance that owns the parameters
+        """
+        self._problem = problem
+        super().__init__(problem._parameters)
+
+    def __setitem__(self, key, value):
+        """Set a parameter value and update CVXPy if needed."""
+        self._problem._parameters[key] = value
+        # Update CVXPy parameter if it exists
+        if (hasattr(self._problem, 'cvxpy_params') and
+            self._problem.cvxpy_params is not None and
+            key in self._problem.cvxpy_params):
+            self._problem.cvxpy_params[key].value = value
+        # Update our own dict for dict-like behavior
+        super().__setitem__(key, value)
+
+    def update(self, other=None, **kwargs):
+        """Update multiple parameters."""
+        if other is not None:
+            if hasattr(other, "items"):
+                for key, value in other.items():
+                    self[key] = value
+            else:
+                for key, value in other:
+                    self[key] = value
+        for key, value in kwargs.items():
+            self[key] = value
+
+
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
 class TrajOptProblem:
     def __init__(
@@ -231,7 +271,8 @@ class TrajOptProblem:
         u_unified: UnifiedControl = unify_controls(u_aug)
 
         # Store parameters dictionary for runtime parameter changes
-        self.parameters = params or {}
+        self._parameters = params or {}
+        self.cvxpy_params = None  # Will be set during initialize()
 
         if dynamics_prop is None:
             dynamics_prop = Dynamics(dyn_fn)
@@ -360,6 +401,37 @@ class TrajOptProblem:
         self.scp_controls = []
         self.scp_V_multi_shoot_traj = []
 
+    @property
+    def parameters(self):
+        """Get the parameters dictionary.
+
+        The returned dictionary is a special wrapper that automatically updates
+        CVXPy parameters when values are modified:
+
+        Example:
+            >>> problem.parameters["gate_0_center"] = new_center  # Auto-updates CVXPy
+            >>> problem.parameters.update({"gate_1_center": center2})  # Also works
+
+        Returns:
+            dict: The parameters dictionary for JAX and CVXPy
+        """
+        # Return a wrapper that intercepts updates
+        return _ParameterDictWrapper(self)
+
+    @parameters.setter
+    def parameters(self, value):
+        """Set the entire parameters dictionary and update CVXPy parameters.
+
+        Args:
+            value: New parameters dictionary
+        """
+        self._parameters = dict(value)  # Make a copy
+        # Update CVXPy parameters if they exist
+        if hasattr(self, 'cvxpy_params') and self.cvxpy_params is not None:
+            for param_name, param_value in self._parameters.items():
+                if param_name in self.cvxpy_params:
+                    self.cvxpy_params[param_name].value = param_value
+
     def initialize(self):
         io.intro()
 
@@ -404,8 +476,8 @@ class TrajOptProblem:
         ocp_vars = create_cvxpy_variables(self.settings)
 
         # Phase 2: Lower convex constraints to CVXPy
-        lowered_convex_constraints = lower_convex_constraints(
-            self.settings.sim.constraints_nodal_convex, ocp_vars
+        lowered_convex_constraints, self.cvxpy_params = lower_convex_constraints(
+            self.settings.sim.constraints_nodal_convex, ocp_vars, self.parameters
         )
 
         # Store lowered constraints back in settings for Phase 3
