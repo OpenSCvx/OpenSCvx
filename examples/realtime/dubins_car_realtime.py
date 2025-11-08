@@ -336,10 +336,11 @@ def plot_thread_func():
                 i2 = i1 + n_x * n_x
                 i3 = i2 + n_x * n_u
                 i4 = i3 + n_x * n_u
+                i5 = i4 + n_x
                 all_pos_segments = []
                 for i_node in range(V_multi_shoot.shape[1]):
                     node_data = V_multi_shoot[:, i_node]
-                    segments_for_node = node_data.reshape(-1, i4)
+                    segments_for_node = node_data.reshape(-1, i5)
                     pos_segments = segments_for_node[:, :2]
                     all_pos_segments.append(pos_segments)
                 if all_pos_segments:
