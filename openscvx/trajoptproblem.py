@@ -64,35 +64,28 @@ if TYPE_CHECKING:
     import cvxpy as cp
 
 
-class _ParameterDictWrapper(dict):
-    """Internal wrapper that intercepts dictionary modifications to update CVXPy parameters.
+class _ParameterDict(dict):
+    """Dictionary that syncs to CVXPy parameters on item assignment.
 
-    This class acts as a transparent proxy to the actual _parameters dict, but
-    automatically updates CVXPy Parameter objects when values are modified.
+    This allows users to naturally update parameters like:
+        problem.parameters["obs_radius"] = 2.0
+
+    And have the change automatically propagate to CVXPy.
     """
 
-    def __init__(self, problem):
-        """Initialize wrapper with reference to parent problem.
-
-        Args:
-            problem: The TrajOptProblem instance that owns the parameters
-        """
+    def __init__(self, problem, *args, **kwargs):
         self._problem = problem
-        super().__init__(problem._parameters)
+        super().__init__(*args, **kwargs)
 
     def __setitem__(self, key, value):
-        """Set a parameter value and update CVXPy if needed."""
-        self._problem._parameters[key] = value
-        # Update CVXPy parameter if it exists
-        if (hasattr(self._problem, 'cvxpy_params') and
-            self._problem.cvxpy_params is not None and
+        super().__setitem__(key, value)
+        # Sync this parameter to CVXPy if it exists
+        if (self._problem.cvxpy_params is not None and
             key in self._problem.cvxpy_params):
             self._problem.cvxpy_params[key].value = value
-        # Update our own dict for dict-like behavior
-        super().__setitem__(key, value)
 
     def update(self, other=None, **kwargs):
-        """Update multiple parameters."""
+        """Update multiple parameters and sync to CVXPy."""
         if other is not None:
             if hasattr(other, "items"):
                 for key, value in other.items():
@@ -102,6 +95,8 @@ class _ParameterDictWrapper(dict):
                     self[key] = value
         for key, value in kwargs.items():
             self[key] = value
+
+
 
 
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
@@ -270,8 +265,8 @@ class TrajOptProblem:
         x_unified: UnifiedState = unify_states(x_aug)
         u_unified: UnifiedControl = unify_controls(u_aug)
 
-        # Store parameters dictionary for runtime parameter changes
-        self._parameters = params or {}
+        # Wrap parameters in _ParameterDict for auto-syncing to CVXPy
+        self._parameters = _ParameterDict(self, params if params is not None else {})
         self.cvxpy_params = None  # Will be set during initialize()
 
         if dynamics_prop is None:
@@ -405,32 +400,31 @@ class TrajOptProblem:
     def parameters(self):
         """Get the parameters dictionary.
 
-        The returned dictionary is a special wrapper that automatically updates
-        CVXPy parameters when values are modified:
-
-        Example:
-            >>> problem.parameters["gate_0_center"] = new_center  # Auto-updates CVXPy
-            >>> problem.parameters.update({"gate_1_center": center2})  # Also works
+        The returned dictionary automatically syncs to CVXPy when modified:
+            problem.parameters["obs_radius"] = 2.0  # Auto-syncs to CVXPy
+            problem.parameters.update({"gate_0_center": center})  # Also syncs
 
         Returns:
-            dict: The parameters dictionary for JAX and CVXPy
+            _ParameterDict: Special dict that syncs to CVXPy on assignment
         """
-        # Return a wrapper that intercepts updates
-        return _ParameterDictWrapper(self)
+        return self._parameters
 
     @parameters.setter
-    def parameters(self, value):
-        """Set the entire parameters dictionary and update CVXPy parameters.
+    def parameters(self, new_params: dict):
+        """Replace the entire parameters dictionary and sync to CVXPy.
 
         Args:
-            value: New parameters dictionary
+            new_params: New parameters dictionary
         """
-        self._parameters = dict(value)  # Make a copy
-        # Update CVXPy parameters if they exist
-        if hasattr(self, 'cvxpy_params') and self.cvxpy_params is not None:
-            for param_name, param_value in self._parameters.items():
-                if param_name in self.cvxpy_params:
-                    self.cvxpy_params[param_name].value = param_value
+        self._parameters = _ParameterDict(self, new_params)
+        self._sync_parameters()
+
+    def _sync_parameters(self):
+        """Sync all parameter values to CVXPy parameters."""
+        if self.cvxpy_params is not None:
+            for name, value in self._parameters.items():
+                if name in self.cvxpy_params:
+                    self.cvxpy_params[name].value = value
 
     def initialize(self):
         io.intro()
@@ -601,6 +595,9 @@ class TrajOptProblem:
     def solve(
         self, max_iters: Optional[int] = None, continuous: bool = False
     ) -> OptimizationResults:
+        # Sync parameters before solving
+        self._sync_parameters()
+
         # Ensure parameter sizes and normalization are correct
         self.settings.scp.__post_init__()
         self.settings.sim.__post_init__()
