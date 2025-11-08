@@ -125,7 +125,7 @@ if __name__ == "__main__":
     plot_dubins_car(results, problem.settings).show()
 
     # Second run with different parameters
-    params["obs_center"] = np.array([0.5, 0.0])
+    problem.parameters["obs_center"] = np.array([0.5, 0.0])
     total_time = 0.7  # Adjust total time for second run
     problem.settings.scp.lam_cost = 1e-1  # Disable minimal time objective for second run
     problem.settings.scp.w_tr = 1e0
