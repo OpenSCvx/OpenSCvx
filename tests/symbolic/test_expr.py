@@ -537,19 +537,19 @@ def test_nodal_constraint_convex_method_chaining():
 
 def test_parameter_creation():
     """Test basic Parameter node creation."""
-    p1 = Parameter("mass")
+    p1 = Parameter("mass", value=1.0)
     assert p1.name == "mass"
     assert p1.shape == ()
     assert isinstance(p1, Parameter)
 
-    p2 = Parameter("position", shape=(3,))
+    p2 = Parameter("position", shape=(3,), value=np.array([0.0, 0.0, 0.0]))
     assert p2.name == "position"
     assert p2.shape == (3,)
 
 
 def test_parameter_arithmetic_operations():
     """Test Parameter in arithmetic operations."""
-    p = Parameter("param")
+    p = Parameter("param", value=1.0)
     x = Variable("x", shape=())
 
     add_expr = p + x
@@ -564,7 +564,7 @@ def test_parameter_arithmetic_operations():
 
 def test_parameter_in_constraints():
     """Test Parameter in constraint creation."""
-    p = Parameter("threshold")
+    p = Parameter("threshold", value=1.0)
     x = Variable("x", shape=())
 
     ineq = x <= p
