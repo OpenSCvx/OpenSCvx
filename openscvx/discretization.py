@@ -50,10 +50,9 @@ def dVdt(
     i2 = i1 + n_x * n_x
     i3 = i2 + n_x * n_u
     i4 = i3 + n_x * n_u
-    i5 = i4 + n_x
 
     # Unflatten V
-    V = V.reshape(-1, i5)
+    V = V.reshape(-1, i4)
 
     # Compute the interpolation factor based on the discretization type
     if dis_type == "ZOH":
@@ -102,11 +101,6 @@ def dVdt(
     )
     dVdt = dVdt.at[:, i3:i4].set(
         (jnp.matmul(sdfdx, V[:, i3:i4].reshape(-1, n_x, n_u)) + dfdu * beta).reshape(-1, n_x * n_u)
-    )
-    dVdt = dVdt.at[:, i4:i5].set(
-        (
-            jnp.matmul(sdfdx, V[:, i4:i5].reshape(-1, n_x)[..., None]).squeeze(-1) + z
-        ).reshape(-1, n_x)
     )
     # fmt: on
 
@@ -161,14 +155,14 @@ def calculate_discretization(
             - Vmulti: Full augmented state trajectory
     """
     # Define indices for slicing the augmented state vector
+    i0 = 0
     i1 = n_x
     i2 = i1 + n_x * n_x
     i3 = i2 + n_x * n_u
     i4 = i3 + n_x * n_u
-    i5 = i4 + n_x
 
     # Initial augmented state
-    V0 = jnp.zeros((N - 1, i5))
+    V0 = jnp.zeros((N - 1, i4))
     V0 = V0.at[:, :n_x].set(x[:-1].astype(float))
     V0 = V0.at[:, n_x : n_x + n_x * n_x].set(jnp.eye(n_x).reshape(1, -1).repeat(N - 1, axis=0))
 
@@ -211,8 +205,10 @@ def calculate_discretization(
             extra_kwargs=None,
         )
 
-    Vend = sol[-1].T.reshape(-1, i5)
+    Vend = sol[-1].T.reshape(-1, i4)
     Vmulti = sol.T
+
+    x_prop = Vend[:, i0:i1]
 
     A_bar = (
         Vend[:, i1:i2]
@@ -235,9 +231,8 @@ def calculate_discretization(
         .reshape(n_x * n_u, -1, order="F")
         .T
     )
-    z_bar = Vend[:, i4:i5]
 
-    return A_bar, B_bar, C_bar, z_bar, Vmulti
+    return A_bar, B_bar, C_bar, x_prop, Vmulti
 
 
 def get_discretization_solver(dyn: Dynamics, settings, param_map):

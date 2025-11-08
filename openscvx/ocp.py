@@ -4,7 +4,6 @@ from typing import Dict, List
 import cvxpy as cp
 import numpy as np
 import numpy.linalg as la
-from numpy import block
 
 from openscvx.config import Config
 
@@ -64,7 +63,7 @@ def create_cvxpy_variables(settings: Config) -> Dict:
     C_d = cp.Parameter(
         (settings.scp.n - 1, settings.sim.n_states * settings.sim.n_controls), name="C_d"
     )
-    z_d = cp.Parameter((settings.scp.n - 1, settings.sim.n_states), name="z_d")
+    x_prop = cp.Parameter((settings.scp.n - 1, settings.sim.n_states), name="x_prop")
     nu = cp.Variable((settings.scp.n - 1, settings.sim.n_states), name="nu")  # Virtual Control
 
     # Linearized Nonconvex Nodal Constraints
@@ -92,9 +91,13 @@ def create_cvxpy_variables(settings: Config) -> Dict:
     # Applying the affine scaling to state and control
     x_nonscaled = []
     u_nonscaled = []
+    dx_nonscaled = []
+    du_nonscaled = []
     for k in range(settings.scp.n):
         x_nonscaled.append(S_x @ x[k] + c_x)
         u_nonscaled.append(S_u @ u[k] + c_u)
+        dx_nonscaled.append(S_x @ dx[k])
+        du_nonscaled.append(S_u @ du[k])
 
     return {
         "w_tr": w_tr,
@@ -110,7 +113,7 @@ def create_cvxpy_variables(settings: Config) -> Dict:
         "A_d": A_d,
         "B_d": B_d,
         "C_d": C_d,
-        "z_d": z_d,
+        "x_prop": x_prop,
         "nu": nu,
         "g": g,
         "grad_g_x": grad_g_x,
@@ -124,6 +127,8 @@ def create_cvxpy_variables(settings: Config) -> Dict:
         "c_u": c_u,
         "x_nonscaled": x_nonscaled,
         "u_nonscaled": u_nonscaled,
+        "dx_nonscaled": dx_nonscaled,
+        "du_nonscaled": du_nonscaled,
     }
 
 
@@ -219,7 +224,7 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     A_d = ocp_vars["A_d"]
     B_d = ocp_vars["B_d"]
     C_d = ocp_vars["C_d"]
-    z_d = ocp_vars["z_d"]
+    x_prop = ocp_vars["x_prop"]
     nu = ocp_vars["nu"]
     g = ocp_vars["g"]
     grad_g_x = ocp_vars["grad_g_x"]
@@ -233,6 +238,8 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     c_u = ocp_vars["c_u"]
     x_nonscaled = ocp_vars["x_nonscaled"]
     u_nonscaled = ocp_vars["u_nonscaled"]
+    dx_nonscaled = ocp_vars["dx_nonscaled"]
+    du_nonscaled = ocp_vars["du_nonscaled"]
 
     constr = []
     cost = lam_cost * 0
@@ -283,20 +290,21 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
         ]
 
     constr += [
-        la.inv(S_x) @ (x_nonscaled[i] - x_bar[i] - dx[i]) == 0 for i in range(settings.scp.n)
+        (x[i] - np.linalg.inv(S_x) @ (x_bar[i] - c_x) - dx[i]) == 0 for i in range(settings.scp.n)
     ]  # State Error
     constr += [
-        la.inv(S_u) @ (u_nonscaled[i] - u_bar[i] - du[i]) == 0 for i in range(settings.scp.n)
+        (u[i] - np.linalg.inv(S_u) @ (u_bar[i] - c_u) - du[i]) == 0 for i in range(settings.scp.n)
     ]  # Control Error
 
     constr += [
         x_nonscaled[i]
         == cp.reshape(A_d[i - 1], (settings.sim.n_states, settings.sim.n_states))
-        @ x_nonscaled[i - 1]
+        @ dx_nonscaled[i - 1]
         + cp.reshape(B_d[i - 1], (settings.sim.n_states, settings.sim.n_controls))
-        @ u_nonscaled[i - 1]
-        + cp.reshape(C_d[i - 1], (settings.sim.n_states, settings.sim.n_controls)) @ u_nonscaled[i]
-        + z_d[i - 1]
+        @ du_nonscaled[i - 1]
+        + cp.reshape(C_d[i - 1], (settings.sim.n_states, settings.sim.n_controls)) 
+        @ du_nonscaled[i]
+        + x_prop[i - 1]
         + nu[i - 1]
         for i in range(1, settings.scp.n)
     ]  # Dynamics Constraint
@@ -316,14 +324,8 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     # COSTS
     ########
 
-    inv = block(
-        [
-            [inv_S_x, np.zeros((S_x.shape[0], S_u.shape[1]))],
-            [np.zeros((S_u.shape[0], S_x.shape[1])), inv_S_u],
-        ]
-    )
     cost += sum(
-        w_tr * cp.sum_squares(inv @ cp.hstack((dx[i], du[i]))) for i in range(settings.scp.n)
+        w_tr * cp.sum_squares(cp.hstack((dx[i], du[i]))) for i in range(settings.scp.n)
     )  # Trust Region Cost
     cost += sum(
         settings.scp.lam_vc * cp.sum(cp.abs(nu[i - 1])) for i in range(1, settings.scp.n)
