@@ -12,6 +12,29 @@ from jax import jacfwd
 os.environ["EQX_ON_ERROR"] = "nan"
 
 from openscvx import io
+from openscvx.caching import (
+    get_solver_cache_paths,
+    load_or_compile_discretization_solver,
+    load_or_compile_propagation_solver,
+    prime_propagation_solver,
+)
+from openscvx.config import (
+    Config,
+    ConvexSolverConfig,
+    DevConfig,
+    DiscretizationConfig,
+    PropagationConfig,
+    ScpConfig,
+    SimConfig,
+)
+from openscvx.constraints.lowered import LoweredNodalConstraint
+from openscvx.discretization import get_discretization_solver
+from openscvx.dynamics import Dynamics
+from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables, lower_convex_constraints
+from openscvx.post_processing import propagate_trajectory_results
+from openscvx.propagation import get_propagation_solver
+from openscvx.ptr import PTR_init, PTR_step, format_result
+from openscvx.results import OptimizationResults
 from openscvx.symbolic.augmentation import (
     augment_dynamics_with_ctcs,
     augment_with_time_state,
@@ -36,29 +59,6 @@ from openscvx.symbolic.preprocessing import (
     validate_variable_names,
 )
 from openscvx.symbolic.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
-from openscvx.caching import (
-    get_solver_cache_paths,
-    load_or_compile_discretization_solver,
-    load_or_compile_propagation_solver,
-    prime_propagation_solver,
-)
-from openscvx.config import (
-    Config,
-    ConvexSolverConfig,
-    DevConfig,
-    DiscretizationConfig,
-    PropagationConfig,
-    ScpConfig,
-    SimConfig,
-)
-from openscvx.constraints.lowered import LoweredNodalConstraint
-from openscvx.discretization import get_discretization_solver
-from openscvx.dynamics import Dynamics
-from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables, lower_convex_constraints
-from openscvx.post_processing import propagate_trajectory_results
-from openscvx.propagation import get_propagation_solver
-from openscvx.ptr import PTR_init, PTR_step, format_result
-from openscvx.results import OptimizationResults
 
 if TYPE_CHECKING:
     import cvxpy as cp
@@ -85,8 +85,7 @@ class _ParameterDict(dict):
         # Sync to internal dict for JAX
         self._internal_dict[key] = value
         # Sync to CVXPy if it exists
-        if (self._problem.cvxpy_params is not None and
-            key in self._problem.cvxpy_params):
+        if self._problem.cvxpy_params is not None and key in self._problem.cvxpy_params:
             self._problem.cvxpy_params[key].value = value
 
     def update(self, other=None, **kwargs):
@@ -100,8 +99,6 @@ class _ParameterDict(dict):
                     self[key] = value
         for key, value in kwargs.items():
             self[key] = value
-
-
 
 
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
@@ -221,6 +218,7 @@ class TrajOptProblem:
         from openscvx.symbolic.expr import Parameter, traverse
 
         parameters = {}
+
         def collect_param_values(expr):
             if isinstance(expr, Parameter):
                 if expr.name not in parameters:
