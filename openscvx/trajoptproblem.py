@@ -118,7 +118,6 @@ class TrajOptProblem:
         time_derivative: Union[float, Expr] = None,
         time_min: float = None,
         time_max: float = None,
-        params: Optional[dict] = None,
         dynamics_prop: Optional[callable] = None,
         x_prop: State = None,
         scp: Optional[ScpConfig] = None,
@@ -157,7 +156,6 @@ class TrajOptProblem:
                 a "time" state in x. Default: None (uses 0.0).
             time_max (float): Maximum bound for time variable. Only used if NOT including
                 a "time" state in x. Default: None (uses sensible default based on time_final).
-            params (dict): Optional parameters dictionary for runtime parameter changes
             dynamics_prop: Propagation dynamics function (optional)
             x_prop: Propagation state (optional)
             scp: SCP configuration object
@@ -230,10 +228,6 @@ class TrajOptProblem:
 
         for constraint in constraints:
             traverse(constraint, collect_param_values)
-
-        # Merge with user-provided params (user params override defaults)
-        if params is not None:
-            parameters.update(params)
 
         # Sort and separate constraints first
         constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
