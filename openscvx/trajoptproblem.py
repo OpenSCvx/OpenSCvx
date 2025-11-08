@@ -214,6 +214,22 @@ class TrajOptProblem:
         dynamics_concat = dynamics_concat.canonicalize()
         constraints = [expr.canonicalize() for expr in constraints]
 
+        # Collect parameter values from all constraints before any processing
+        from openscvx.symbolic.expr import Parameter, traverse
+
+        param_values = {}
+        def collect_param_values(expr):
+            if isinstance(expr, Parameter):
+                if expr.name not in param_values:
+                    param_values[expr.name] = expr.value
+
+        for constraint in constraints:
+            traverse(constraint, collect_param_values)
+
+        # Merge with user-provided params (user params override defaults)
+        if params is not None:
+            param_values.update(params)
+
         # Sort and separate constraints first
         constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
             constraints, N
@@ -265,8 +281,8 @@ class TrajOptProblem:
         x_unified: UnifiedState = unify_states(x_aug)
         u_unified: UnifiedControl = unify_controls(u_aug)
 
-        # Wrap parameters in _ParameterDict for auto-syncing to CVXPy
-        self._parameters = _ParameterDict(self, params if params is not None else {})
+        # Wrap collected parameter values in _ParameterDict for auto-syncing to CVXPy
+        self._parameters = _ParameterDict(self, param_values)
         self.cvxpy_params = None  # Will be set during initialize()
 
         if dynamics_prop is None:
@@ -503,7 +519,7 @@ class TrajOptProblem:
         self.discretization_solver = load_or_compile_discretization_solver(
             self.discretization_solver,
             dis_solver_file,
-            self.parameters,
+            dict(self.parameters),  # Convert _ParameterDict to plain dict for JAX
             self.settings.scp.n,
             self.settings.sim.n_states,
             self.settings.sim.n_controls,
@@ -520,7 +536,7 @@ class TrajOptProblem:
         self.propagation_solver = load_or_compile_propagation_solver(
             self.propagation_solver,
             prop_solver_file,
-            self.parameters,
+            dict(self.parameters),  # Convert _ParameterDict to plain dict for JAX
             self.settings.sim.n_states_prop,
             self.settings.sim.n_controls,
             self.settings.prp.max_tau_len,
@@ -551,7 +567,7 @@ class TrajOptProblem:
         print("Total Initialization Time: ", self.timing_init)
 
         # Prime the propagation solver
-        prime_propagation_solver(self.propagation_solver, self.parameters, self.settings)
+        prime_propagation_solver(self.propagation_solver, dict(self.parameters), self.settings)
 
         if self.settings.dev.profiling:
             pr.disable()
@@ -650,7 +666,7 @@ class TrajOptProblem:
 
         t_0_post = time.time()
         result = propagate_trajectory_results(
-            self.parameters, self.settings, result, self.propagation_solver
+            dict(self.parameters), self.settings, result, self.propagation_solver
         )
         t_f_post = time.time()
 

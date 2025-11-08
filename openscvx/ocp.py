@@ -139,7 +139,7 @@ def lower_convex_constraints(
     Args:
         constraints_nodal_convex: List of convex constraints to lower
         ocp_vars: Dictionary of CVXPy variables
-        params: Optional dictionary of parameter values for runtime parameter changes
+        params: Optional dictionary of parameter values to override the defaults
 
     Returns:
         Tuple of (list of CVXPy constraints, dict of CVXPy Parameter objects)
@@ -150,7 +150,7 @@ def lower_convex_constraints(
     from openscvx.symbolic.lowerers.cvxpy import lower_to_cvxpy
 
     if not constraints_nodal_convex:
-        return []
+        return [], {}
 
     # Get the full trajectory CVXPy variables (n_nodes, n_states/n_controls)
     x_nonscaled = ocp_vars["x_nonscaled"]  # List of x_nonscaled[k] for each node k
@@ -158,23 +158,22 @@ def lower_convex_constraints(
 
     # Collect all unique Parameters across all constraints and create cp.Parameter objects
     all_params = {}
-    if params:
 
-        def collect_params(expr):
-            if isinstance(expr, Parameter):
-                if expr.name not in all_params:
-                    # Create a CVXPy Parameter with the same shape and set its value
-                    param_value = params.get(expr.name)
-                    if param_value is None:
-                        raise ValueError(
-                            f"Parameter '{expr.name}' referenced in constraint but not found in params dict"
-                        )
-                    cvx_param = cp.Parameter(expr.shape, value=param_value, name=expr.name)
-                    all_params[expr.name] = cvx_param
+    def collect_params(expr):
+        if isinstance(expr, Parameter):
+            if expr.name not in all_params:
+                # Use value from params dict if provided, otherwise use Parameter's initial value
+                if params and expr.name in params:
+                    param_value = params[expr.name]
+                else:
+                    param_value = expr.value
 
-        # Collect all parameters from all constraints
-        for constraint in constraints_nodal_convex:
-            traverse(constraint.constraint, collect_params)
+                cvx_param = cp.Parameter(expr.shape, value=param_value, name=expr.name)
+                all_params[expr.name] = cvx_param
+
+    # Collect all parameters from all constraints
+    for constraint in constraints_nodal_convex:
+        traverse(constraint.constraint, collect_params)
 
     cvxpy_constraints = []
 

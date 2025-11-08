@@ -45,12 +45,9 @@ angular_rate.guess = np.zeros((n, 1))
 states = [position, theta]
 controls = [speed, angular_rate]
 
-# Define Parameters for obstacle radius and center
-obs_center = ox.Parameter("obs_center", shape=(2,))
-obs_radius = ox.Parameter("obs_radius", shape=())
-
-
-# Parameter values will be set through params dictionary
+# Define Parameters with initial values for obstacle radius and center
+obs_center = ox.Parameter("obs_center", shape=(2,), value=np.array([-2.01, 0.0]))
+obs_radius = ox.Parameter("obs_radius", shape=(), value=1.0)
 
 # Generate box constraints for all states
 constraints = []
@@ -71,18 +68,11 @@ dynamics = {
 }
 
 
-# Set parameter values
-params = {
-    "obs_radius": 1.0,
-    "obs_center": np.array([-2.01, 0.0]),
-}
-
-# Build the problem
+# Build the problem (parameters auto-collected from Parameter objects)
 problem = TrajOptProblem(
     dynamics=dynamics,
     states=states,
     controls=controls,
-    params=params,
     time_initial=0.0,
     time_final=("minimize", total_time),
     time_derivative=1.0,  # Real time
@@ -112,8 +102,8 @@ problem.settings.cvx.solver_args = {}
 
 
 plotting_dict = {
-    "obs_radius": params["obs_radius"],
-    "obs_center": params["obs_center"],
+    "obs_radius": problem.parameters["obs_radius"],
+    "obs_center": problem.parameters["obs_center"],
 }
 
 if __name__ == "__main__":

@@ -91,12 +91,12 @@ for center in initial_gate_centers:
     modified_center[2] = modified_center[2] + 2.5
     modified_centers.append(modified_center)
 
-# Create symbolic parameters for each gate center
+# Create symbolic parameters for each gate center with initial values
 A_gate_const = A_gate
 gate_center_params = []
 for i, modified_center in enumerate(modified_centers):
-    # Create a Parameter for each gate center
-    param = ox.Parameter(f"gate_{i}_center", shape=(3,))
+    # Create a Parameter with initial value
+    param = ox.Parameter(f"gate_{i}_center", shape=(3,), value=modified_center)
     gate_center_params.append(param)
 
 nodes_per_gate = 2
@@ -249,11 +249,6 @@ for _ in range(n_gates + 1):
 
 position.guess = position_bar
 
-# Create parameter dictionary with actual values
-params = {}
-for i, modified_center in enumerate(modified_centers):
-    params[f"gate_{i}_center"] = modified_center
-
 problem = TrajOptProblem(
     dynamics=dynamics,
     states=states,
@@ -265,7 +260,6 @@ problem = TrajOptProblem(
     time_max=total_time,
     constraints=constraints,
     N=n,
-    params=params,  # Pass the parameter dictionary
     # licq_max=1E-8
 )
 

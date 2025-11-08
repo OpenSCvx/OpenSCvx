@@ -207,19 +207,27 @@ class Leaf(Expr):
 class Parameter(Leaf):
     """Parameter that can be changed at runtime without recompilation.
 
-    Parameters are symbolic variables whose values are provided at solve time
+    Parameters are symbolic variables with initial values that can be updated
     through the problem's parameter dictionary. They allow for efficient
     parameter sweeps without needing to recompile the optimization problem.
+
+    Example:
+        obs_center = ox.Parameter("obs_center", shape=(3,), value=np.array([1.0, 0.0, 0.0]))
+        # Later: problem.parameters["obs_center"] = new_value
     """
 
-    def __init__(self, name: str, shape: tuple = ()):
+    def __init__(self, name: str, shape: tuple = (), value=None):
         """Initialize a Parameter node.
 
         Args:
             name (str): Name identifier for the parameter
-            shape (tuple): Shape of the parameter
+            shape (tuple): Shape of the parameter (default: scalar)
+            value: Initial value for the parameter (required)
         """
         super().__init__(name, shape)
+        if value is None:
+            raise ValueError(f"Parameter '{name}' requires an initial value")
+        self.value = np.asarray(value)
 
 
 def to_expr(x: Union[Expr, float, int, np.ndarray]) -> Expr:
