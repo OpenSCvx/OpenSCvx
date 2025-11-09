@@ -1,7 +1,5 @@
 from typing import Tuple
 
-import numpy as np
-
 from .expr import Expr, to_expr
 
 
@@ -180,7 +178,8 @@ class Hstack(Expr):
                 )
             if shape[2:] != first_shape[2:]:
                 raise ValueError(
-                    f"Hstack array {i} has trailing dimensions {shape[2:]}, but array 0 has {first_shape[2:]}"
+                    f"Hstack array {i} has trailing dimensions {shape[2:]}, "
+                    f"but array 0 has {first_shape[2:]}"
                 )
 
         # Result shape: concatenate along axis 1 (columns)
@@ -226,7 +225,8 @@ class Vstack(Expr):
         for i, shape in enumerate(array_shapes[1:], 1):
             if shape[1:] != first_shape[1:]:
                 raise ValueError(
-                    f"Vstack array {i} has trailing dimensions {shape[1:]}, but array 0 has {first_shape[1:]}"
+                    f"Vstack array {i} has trailing dimensions {shape[1:]}, "
+                    f"but array 0 has {first_shape[1:]}"
                 )
 
         # Result shape: concatenate along axis 0 (rows)

@@ -11,7 +11,6 @@ from openscvx.symbolic.expr import (
     Expr,
     NodalConstraint,
     State,
-    Variable,
     traverse,
 )
 

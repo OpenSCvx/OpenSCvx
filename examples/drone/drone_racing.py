@@ -212,7 +212,9 @@ attitude_normalized = attitude / q_norm
 # q_dot = Constant(0.5) * symbolic_ssmp(angular_velocity) @ attitude
 # J_b_inv = Constant(1.0 / J_b)
 # J_b_diag = symbolic_diag([Constant(J_b[0]), Constant(J_b[1]), Constant(J_b[2])])
-# w_dot = symbolic_diag([J_b_inv[0], J_b_inv[1], J_b_inv[2]]) @ (torque - symbolic_ssm(angular_velocity) @ J_b_diag @ angular_velocity)
+# w_dot = symbolic_diag([J_b_inv[0], J_b_inv[1], J_b_inv[2]]) @ (
+#     torque - symbolic_ssm(angular_velocity) @ J_b_diag @ angular_velocity
+# )
 
 # Option 2: Efficient dynamics using direct JAX lowering (better performance)
 J_b_inv = 1.0 / J_b

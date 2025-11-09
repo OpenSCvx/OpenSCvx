@@ -606,7 +606,8 @@ class Constant(Expr):
         squeezed_shape = np.squeeze(self.value).shape
         if original_shape != squeezed_shape:
             raise ValueError(
-                f"Constant not properly normalized: has shape {original_shape} but should have shape {squeezed_shape}. "
+                f"Constant not properly normalized: has shape {original_shape} "
+                "but should have shape {squeezed_shape}. "
                 "Constants should be squeezed during construction."
             )
         return self.value.shape

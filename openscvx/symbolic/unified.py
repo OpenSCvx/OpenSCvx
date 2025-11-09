@@ -396,7 +396,8 @@ def unify_states(states: List[State], name: str = "unified_state") -> UnifiedSta
     if not states:
         return UnifiedState(name=name, shape=(0,))
 
-    # Sort states: true states (not starting with '_') first, then augmented states (starting with '_')
+    # Sort states: true states (not starting with '_') first, then augmented states
+    # (starting with '_')
     true_states = [state for state in states if not state.name.startswith("_")]
     augmented_states = [state for state in states if state.name.startswith("_")]
     sorted_states = true_states + augmented_states
@@ -496,7 +497,8 @@ def unify_controls(controls: List[Control], name: str = "unified_control") -> Un
     if not controls:
         return UnifiedControl(name=name, shape=(0,))
 
-    # Sort controls: true controls (not starting with '_') first, then augmented controls (starting with '_')
+    # Sort controls: true controls (not starting with '_') first, then augmented controls
+    # (starting with '_')
     true_controls = [control for control in controls if not control.name.startswith("_")]
     augmented_controls = [control for control in controls if control.name.startswith("_")]
     sorted_controls = true_controls + augmented_controls
@@ -555,5 +557,6 @@ def unify_controls(controls: List[Control], name: str = "unified_control") -> Un
 # # Now use unified_x and unified_u as drop-in replacements in TrajOptProblem
 # problem = TrajOptProblem(dynamics, constraints, unified_x, unified_u, N, idx_time)
 
-# The dataclasses preserve all expected properties and methods, so the existing optimization code in trajoptproblem.py should work without modification. The translation layer
+# The dataclasses preserve all expected properties and methods, so the existing optimization code
+# in trajoptproblem.py should work without modification. The translation layer
 # keeps the aggregation logic separate and functional as requested.

@@ -6,7 +6,6 @@ from copy import deepcopy
 from typing import TYPE_CHECKING, List, Optional, Union
 
 import jax
-import numpy as np
 from jax import jacfwd
 
 os.environ["EQX_ON_ERROR"] = "nan"
@@ -42,7 +41,7 @@ from openscvx.symbolic.augmentation import (
     separate_constraints,
     sort_ctcs_constraints,
 )
-from openscvx.symbolic.expr import CTCS, Concat, Constant, Constraint, Expr
+from openscvx.symbolic.expr import CTCS, Constraint, Expr
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.lower import lower_to_jax

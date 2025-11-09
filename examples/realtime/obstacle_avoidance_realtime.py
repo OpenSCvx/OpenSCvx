@@ -248,7 +248,6 @@ class Obstacle3DPlotWidget(QWidget):
             slider.setValue(slider_value)
             label.setText(f"{center[i]:.2f}")
 
-
     def keyPressEvent(self, event):
         """Handle keyboard shortcuts"""
         if event.key() == Qt.Key_Escape:

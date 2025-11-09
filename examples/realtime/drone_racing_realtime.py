@@ -530,7 +530,8 @@ class DroneRacingGUI(QMainWindow):
 
     def update_metrics(self, metrics):
         """Update the metrics display - kept for compatibility"""
-        # This method is kept for compatibility but the main update is done in update_optimization_metrics
+        # This method is kept for compatibility but the main update is done
+        # in update_optimization_metrics
         pass
 
     def reset_gate_positions(self):

@@ -138,7 +138,7 @@ problem = TrajOptProblem(
     time_min=0.0,
     time_max=total_time,
     constraints=constraints,
-    N=n
+    N=n,
 )
 
 problem.settings.prp.dt = 0.01
@@ -163,4 +163,4 @@ if __name__ == "__main__":
 
     results.update(plotting_dict)
 
-    # plot_animation(results, problem.settings).show()
+    plot_animation(results, problem.settings).show()

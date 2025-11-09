@@ -200,7 +200,8 @@ b = R_sb @ np.array([0, 1, 0])
 for k in range(n):
     kp = get_kp_pose(time_bar[k], init_pose)
     a = kp - position_bar[k]
-    # Determine the direction cosine matrix that aligns the z-axis of the sensor frame with the relative position vector
+    # Determine the direction cosine matrix that aligns the z-axis of the sensor frame with the
+    # relative position vector
     q_xyz = np.cross(b, a)
     q_w = np.sqrt(la.norm(a) ** 2 + la.norm(b) ** 2) + np.dot(a, b)
     q_no_norm = np.hstack((q_w, q_xyz))

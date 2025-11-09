@@ -126,7 +126,8 @@ def separate_constraints(
                 constraints_nodal.append(nodal_constraint)
         else:
             raise ValueError(
-                f"Constraints must be `Constraint`, `NodalConstraint`, or `CTCS`, got {type(c).__name__}"
+                "Constraints must be `Constraint`, `NodalConstraint`, or `CTCS`, "
+                f"got {type(c).__name__}"
             )
 
     # Add nodal constraints from CTCS constraints that have check_nodally=True

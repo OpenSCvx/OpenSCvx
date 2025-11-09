@@ -90,7 +90,8 @@ class CTCS(Expr):
         if nodes is not None:
             if not isinstance(nodes, tuple) or len(nodes) != 2:
                 raise ValueError(
-                    "CTCS constraints must specify nodes as a tuple of (start, end) or None for all nodes"
+                    "CTCS constraints must specify nodes as a tuple of (start, end) or None "
+                    "for all nodes"
                 )
             if not all(isinstance(n, int) for n in nodes):
                 raise ValueError("CTCS node indices must be integers")

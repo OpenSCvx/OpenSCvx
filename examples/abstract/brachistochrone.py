@@ -94,5 +94,5 @@ if __name__ == "__main__":
 
     results.update(plotting_dict)
 
-    # plot_brachistochrone_position(results).show()
-    # plot_brachistochrone_velocity(results).show()
+    plot_brachistochrone_position(results).show()
+    plot_brachistochrone_velocity(results).show()

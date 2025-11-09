@@ -1711,7 +1711,9 @@ def test_log_with_exp_identity():
 
 
 def test_constant_vs_implicit_conversion_equivalence():
-    """Test that expressions with explicit Constant() and implicit conversion via to_expr produce identical results."""
+    """Test that expressions with explicit Constant() and implicit conversion via to_expr produce
+    identical results.
+    """
     x = jnp.array([1.0, 2.0, 3.0])
     u = jnp.array([0.5, 1.0])
 

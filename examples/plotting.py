@@ -125,7 +125,8 @@ def generate_subject_colors(result_or_count, min_rgb=0, max_rgb=255):
     else:
         n_subjects = len(result_or_count["init_poses"]) if "init_poses" in result_or_count else 1
     return [
-        f"rgb({random.randint(min_rgb, max_rgb)}, {random.randint(min_rgb, max_rgb)}, {random.randint(min_rgb, max_rgb)})"
+        f"rgb({random.randint(min_rgb, max_rgb)}, {random.randint(min_rgb, max_rgb)}, "
+        f"{random.randint(min_rgb, max_rgb)})"
         for _ in range(n_subjects)
     ]
 
@@ -998,23 +999,6 @@ def plot_camera_animation(result: dict, params: Config, path="") -> None:
     # Remove marigns
     fig.update_layout(margin={"l": 0, "r": 0, "b": 0, "t": 0})
 
-    # # Make the background transparent
-    # fig.update_layout(scene=dict(bgcolor='rgba(0,0,0,0)'))
-    # # Make the axis backgrounds transparent
-    # fig.update_layout(scene=dict(
-    #     xaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
-    #     yaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
-    #     zaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey')
-    # ))
-    # # Remove the plot background
-    # fig.update_layout(plot_bgcolor='rgba(0,0,0,0)')
-
-    # # Make ticks themselves transparent
-    # fig.update_layout(scene=dict(xaxis=dict(showticklabels=False), yaxis=dict(showticklabels=False), zaxis=dict(showticklabels=False)))
-
-    # # Remove the paper background
-    # fig.update_layout(paper_bgcolor='rgba(0,0,0,0)')
-
     return fig
 
 
@@ -1193,22 +1177,6 @@ def plot_camera_polytope_animation(result: dict, params: Config, path="") -> Non
     # Remove marigns
     fig.update_layout(margin={"l": 0, "r": 0, "b": 0, "t": 0})
 
-    # # Make the background transparent
-    # fig.update_layout(scene=dict(bgcolor='rgba(0,0,0,0)'))
-    # # Make the axis backgrounds transparent
-    # fig.update_layout(scene=dict(
-    #     xaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
-    #     yaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
-    #     zaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey')
-    # ))
-    # # Remove the plot background
-    # fig.update_layout(plot_bgcolor='rgba(0,0,0,0)')
-
-    # # Make ticks themselves transparent
-    # fig.update_layout(scene=dict(xaxis=dict(showticklabels=False), yaxis=dict(showticklabels=False), zaxis=dict(showticklabels=False)))
-
-    # # Remove the paper background
-    # fig.update_layout(paper_bgcolor='rgba(0,0,0,0)')
     return fig
 
 
@@ -1234,11 +1202,9 @@ def plot_conic_view_animation(result: dict, params: Config, path="") -> None:
     if "moving_subject" in result:
         x = np.linspace(-6, 6, 20)
         y = np.linspace(-6, 6, 20)
-        z = np.linspace(-6, 6, 20)
     else:
         x = np.linspace(-80, 80, 20)
         y = np.linspace(-80, 80, 20)
-        z = np.linspace(-80, 80, 20)
 
     X, Y = np.meshgrid(x, y)
 
@@ -1305,7 +1271,6 @@ def plot_conic_view_animation(result: dict, params: Config, path="") -> None:
             )
 
             # Add subject position to data
-            # color = f'rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})'
             sub_traj = np.array(sub_traj)
             data.append(
                 go.Scatter3d(
@@ -1374,23 +1339,6 @@ def plot_conic_view_animation(result: dict, params: Config, path="") -> None:
     # Remove marigns
     fig.update_layout(margin={"l": 0, "r": 0, "b": 0, "t": 0})
 
-    # # Make the background transparent
-    # fig.update_layout(scene=dict(bgcolor='rgba(0,0,0,0)'))
-    # # Make the axis backgrounds transparent
-    # fig.update_layout(scene=dict(
-    #     xaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
-    #     yaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
-    #     zaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey')
-    # ))
-    # # Remove the plot background
-    # fig.update_layout(plot_bgcolor='rgba(0,0,0,0)')
-
-    # # Make ticks themselves transparent
-    # fig.update_layout(scene=dict(xaxis=dict(showticklabels=False), yaxis=dict(showticklabels=False), zaxis=dict(showticklabels=False)))
-
-    # # Remove the paper background
-    # fig.update_layout(paper_bgcolor='rgba(0,0,0,0)')
-
     return fig
 
 
@@ -1413,11 +1361,9 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
     if params.vp.tracking:
         x = np.linspace(-6, 6, 20)
         y = np.linspace(-6, 6, 20)
-        z = np.linspace(-6, 6, 20)
     else:
         x = np.linspace(-80, 80, 20)
         y = np.linspace(-80, 80, 20)
-        z = np.linspace(-80, 80, 20)
 
     X, Y = np.meshgrid(x, y)
 
@@ -1438,9 +1384,6 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
     x_range = (x[0], x[-1])
     y_range = (y[0], y[-1])
     add_cone_projections(fig, A, params.vp.norm, x_vals, y_vals, x_range, y_range)
-
-    # Choose a random color for each subject
-    colors = generate_subject_colors(len(sub_positions_sen), min_rgb=10, max_rgb=255)
 
     for i in range(0, len(sub_positions_sen[0]), 4):
         frame = go.Frame(name=str(i))
@@ -1480,7 +1423,6 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
             )
 
             # Add subject position to data
-            # color = f'rgb({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)})'
             sub_traj = np.array(sub_traj)
             data.append(
                 go.Scatter3d(
@@ -1496,8 +1438,6 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
             # Add in node when loop has reached point where node is present
             scaled_index = int((i // (sub_traj.shape[0] / sub_traj_nodal.shape[0])) + 1)
             sub_traj_nodal[:scaled_index]
-
-            # data.append(go.Scatter3d(x=sub_node_plot[:, 0], y=sub_node_plot[:, 1], z=sub_node_plot[:, 2], mode='markers', marker=dict(color='darkblue', size=5), showlegend=False))
 
             sub_idx += 1
 
@@ -1572,29 +1512,6 @@ def plot_conic_view_polytope_animation(result: dict, params: Config, path="") ->
 
     # Remove marigns
     fig.update_layout(margin={"l": 0, "r": 0, "b": 0, "t": 0})
-
-    # # Make the background transparent
-    # fig.update_layout(scene=dict(bgcolor='rgba(0,0,0,0)'))
-    # # Make the axis backgrounds transparent
-    # fig.update_layout(scene=dict(
-    #     xaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
-    #     yaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey'),
-    #     zaxis=dict(backgroundcolor='rgba(0,0,0,0)', showbackground=False, showgrid=True, gridcolor='grey')
-    # ))
-    # # Remove the plot background
-    # fig.update_layout(plot_bgcolor='rgba(0,0,0,0)')
-
-    # # Make ticks themselves transparent
-    # fig.update_layout(scene=dict(xaxis=dict(showticklabels=False), yaxis=dict(showticklabels=False), zaxis=dict(showticklabels=False)))
-
-    # # Remove the paper background
-    # fig.update_layout(paper_bgcolor='rgba(0,0,0,0)')
-
-    # # Generate embded html
-    # html_str = fig.to_html(full_html=False, include_plotlyjs='cdn', auto_play=False)
-    # # Save the html string to a file
-    # with open(f'{path}results/conic_animation.html', 'w') as f:
-    #     f.write(html_str)
 
     return fig
 
@@ -1959,7 +1876,6 @@ def plot_scp_animation(result: dict, params=None, path=""):
     fig.update_layout(template="plotly_dark", title=title)
 
     fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 10, "y": 10, "z": 10}})
-    # fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
 
     # Extract the number of states and controls from the parameters
     n_x = params.sim.n_states
@@ -2094,13 +2010,11 @@ def plot_scp_animation(result: dict, params=None, path=""):
     # Add ground plane using helper function
     add_ground_plane(fig, size=2000, z_level=0, opacity=0.3)
     fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 10, "y": 10, "z": 10}})
-    # fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
 
     # Add animation controls using helper function
     add_animation_controls(fig, slider_x=0.15, slider_y=0.32, play_speed=50, frame_speed=0)
 
     fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 10, "y": 10, "z": 10}})
-    # fig.update_layout(scene=dict(xaxis=dict(range=[-200, 200]), yaxis=dict(range=[-200, 200]), zaxis=dict(range=[-200, 200])))
 
     # Overlay the title onto the plot
     fig.update_layout(title_y=0.95, title_x=0.5)
@@ -2288,22 +2202,16 @@ def plot_animation_double_integrator(
             for sub_positions in subs_positions:
                 subs_pose.append(sub_positions[indices[i]])
 
-        # Extract axes from rotation matrix
-        axes = 20 * np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-
         # Meshgrid
         if "moving_subject" in result:
             x = np.linspace(-5, 5, 20)
             y = np.linspace(-5, 5, 20)
-            z = np.linspace(-5, 5, 20)
         elif "covariance" in result:
             x = np.linspace(-2000, 2000, 20)
             y = np.linspace(-2000, 2000, 20)
-            z = np.linspace(-2000, 2000, 20)
         else:
             x = np.linspace(-30, 30, 20)
             y = np.linspace(-30, 30, 20)
-            z = np.linspace(-30, 30, 20)
 
         X, Y = np.meshgrid(x, y)
 
@@ -3599,7 +3507,7 @@ def plot_camera_animation_pyqtgraph(result, params, step=2):
         )
 
     """
-    PyQtGraph version of plot_camera_animation: animates subject projections in the camera frame (2D).
+    PyQtGraph version of plot_camera_animation: animates subject projections in camera frame (2D).
     """
     import sys
 

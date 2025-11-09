@@ -86,7 +86,9 @@ def optimization_loop():
                 results["cost"] = 0.0
             # Print iteration info to CLI
             print(
-                f"Iteration {iteration}: J_tr={results['J_tr']:.2e}, J_vb={results['J_vb']:.2e}, J_vc={results['J_vc']:.2e}, Cost={results['cost']:.2e}, Status={results['prob_stat']}"
+                f"Iteration {iteration}: J_tr={results['J_tr']:.2e}, J_vb={results['J_vb']:.2e}, "
+                f"J_vc={results['J_vc']:.2e}, Cost={results['cost']:.2e}, "
+                f"Status={results['prob_stat']}"
             )
             # Optionally skip post_process for speed
             # results = problem.post_process(results)
@@ -132,7 +134,7 @@ class ObstaclePlotWidget(pg.PlotWidget):
         mouse_x, mouse_y = pos.x(), pos.y()
         dx = mouse_x - problem.parameters["obs_center"][0]
         dy = mouse_y - problem.parameters["obs_center"][1]
-        if dx**2 + dy**2 <= problem.parameters["obs_radius"]**2:
+        if dx**2 + dy**2 <= problem.parameters["obs_radius"] ** 2:
             self.dragging = True
             # Do NOT call super() if starting drag (prevents plot pan)
         else:

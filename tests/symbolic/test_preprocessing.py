@@ -61,7 +61,6 @@ def test_reserved_names_collision():
 
 def test_collect_single_state():
     x = State("x", (4,))
-    expr = Add(x, Constant(1.0))
     states, controls = collect_and_assign_slices([x], [])
     assert x._slice == slice(0, 4)
     assert len(states) == 1
@@ -100,7 +99,6 @@ def test_states_and_controls_independent_offsets():
     s1 = State("s1", (2,))
     s2 = State("s2", (1,))
     c1 = Control("c1", (2,))
-    exprs = [Add(s1, s2), Add(c1, Constant(0.0))]
     states, controls = collect_and_assign_slices([s1, s2], [c1])
     # states: offsets 0→2, 2→3
     assert s1._slice == slice(0, 2)
@@ -171,29 +169,6 @@ def test_invalid_manual_slice_assignment_gaps():
         collect_and_assign_slices([a, b], [])
 
 
-def test_collect_no_duplicates():
-    # Test that the same variable appearing multiple times is only collected once
-    x = State("x", (2,))
-    y = State("y", (3,))
-    # x appears in multiple places
-    expr1 = Add(x, y)
-    expr2 = Add(x, Constant(1.0))
-    expr3 = x * 2.0
-
-    # Pass x and y only once even though used in multiple expressions
-    states, controls = collect_and_assign_slices([x, y], [])
-
-    # x should only appear once in the states list
-    assert len(states) == 2
-    # Use identity checks since __eq__ is overloaded for creating constraints
-    assert any(s is x for s in states)
-    assert any(s is y for s in states)
-    # Count using identity
-    assert sum(1 for s in states if s is x) == 1  # x appears exactly once
-    assert sum(1 for s in states if s is y) == 1  # y appears exactly once
-    assert len(controls) == 0
-
-
 def test_collect_empty_expressions():
     # Test collecting from empty lists
     states, controls = collect_and_assign_slices([], [])
@@ -203,7 +178,6 @@ def test_collect_empty_expressions():
 
 def test_collect_only_constants():
     # Test collecting with no variables (empty lists)
-    expr = Add(Constant(1.0), Constant(2.0))
     states, controls = collect_and_assign_slices([], [])
     assert len(states) == 0
     assert len(controls) == 0

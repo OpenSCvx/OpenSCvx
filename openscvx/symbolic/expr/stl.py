@@ -34,7 +34,7 @@ class Or(Expr):
         return Or(*operands)
 
     def check_shape(self) -> Tuple[int, ...]:
-        """Logical OR operation for STL expressions - validates operand shapes and returns scalar."""
+        """Validates operand shapes and returns scalar."""
         if len(self.operands) < 2:
             raise ValueError("Or requires at least two operands")
 

@@ -3,7 +3,6 @@ from typing import Dict, List
 
 import cvxpy as cp
 import numpy as np
-import numpy.linalg as la
 
 from openscvx.config import Config
 
@@ -263,10 +262,8 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     grad_g_u = ocp_vars["grad_g_u"]
     nu_vb = ocp_vars["nu_vb"]
     S_x = ocp_vars["S_x"]
-    inv_S_x = ocp_vars["inv_S_x"]
     c_x = ocp_vars["c_x"]
     S_u = ocp_vars["S_u"]
-    inv_S_u = ocp_vars["inv_S_u"]
     c_u = ocp_vars["c_u"]
     x_nonscaled = ocp_vars["x_nonscaled"]
     u_nonscaled = ocp_vars["u_nonscaled"]
@@ -334,8 +331,7 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
         @ dx_nonscaled[i - 1]
         + cp.reshape(B_d[i - 1], (settings.sim.n_states, settings.sim.n_controls))
         @ du_nonscaled[i - 1]
-        + cp.reshape(C_d[i - 1], (settings.sim.n_states, settings.sim.n_controls)) 
-        @ du_nonscaled[i]
+        + cp.reshape(C_d[i - 1], (settings.sim.n_states, settings.sim.n_controls)) @ du_nonscaled[i]
         + x_prop[i - 1]
         + nu[i - 1]
         for i in range(1, settings.scp.n)
