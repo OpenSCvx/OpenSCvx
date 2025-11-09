@@ -264,14 +264,14 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
     param_dict = dict(params)
 
     t0 = time.time()
-    A_bar, B_bar, C_bar, z_bar, V_multi_shoot = aug_dy.call(
+    A_bar, B_bar, C_bar, x_prop, V_multi_shoot = aug_dy.call(
         x.guess, u.guess.astype(float), param_dict
     )
 
     prob.param_dict["A_d"].value = A_bar.__array__()
     prob.param_dict["B_d"].value = B_bar.__array__()
     prob.param_dict["C_d"].value = C_bar.__array__()
-    prob.param_dict["z_d"].value = z_bar.__array__()
+    prob.param_dict["x_prop"].value = x_prop.__array__()
     dis_time = time.time() - t0
 
     # TODO: (norrisg) investigate why we are passing `0` for the node here
