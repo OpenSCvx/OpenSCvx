@@ -28,8 +28,6 @@ grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 from examples.drone.drone_racing import (
-    A_gate_c_params,
-    A_gate_param,
     gate_center_params,
     gen_vertices,
     initial_gate_centers,
@@ -51,17 +49,16 @@ class OptimizationWorker(QObject):
         self.running = False
         self.problem = problem
         self.gate_center_params = gate_center_params
-        self.A_gate_param = A_gate_param
-        self.A_gate_c_params = A_gate_c_params
 
     def update_gate_position(self, gate_idx, x, y, z):
         if 0 <= gate_idx < len(self.gate_center_params):
             # User input now represents the actual center position (no offset needed)
             new_center = np.array([x, y, z])
-            # Update gate center parameter to the new center
+            # Update gate center parameter value
             self.gate_center_params[gate_idx].value = new_center
-            # Update A_gate_c parameter with the new center
-            self.A_gate_c_params[gate_idx].value = self.A_gate_param.value @ new_center
+            # Sync the parameter to the problem's parameter dictionary
+            param_name = self.gate_center_params[gate_idx].name
+            self.problem.parameters[param_name] = new_center
 
     def run_optimization(self):
         self.running = True
@@ -109,7 +106,6 @@ class OptimizationWorker(QObject):
                     {
                         "vertices": vertices,
                         "gate_center_params": self.gate_center_params,
-                        "A_gate_param": self.A_gate_param,
                     }
                 )
                 self.results_ready.emit(results)
@@ -406,11 +402,10 @@ class DroneRacingGUI(QMainWindow):
                     i2 = i1 + n_x * n_x
                     i3 = i2 + n_x * n_u
                     i4 = i3 + n_x * n_u
-                    i5 = i4 + n_x
                     all_pos_segments = []
                     for i_node in range(V_multi_shoot.shape[1]):
                         node_data = V_multi_shoot[:, i_node]
-                        segments_for_node = node_data.reshape(-1, i5)
+                        segments_for_node = node_data.reshape(-1, i4)
                         pos_segments = segments_for_node[:, :3]
                         all_pos_segments.append(pos_segments)
                     if all_pos_segments:
