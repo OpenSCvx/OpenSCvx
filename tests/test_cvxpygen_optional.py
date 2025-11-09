@@ -6,9 +6,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from openscvx.symbolic.expr import Control, State
 from openscvx.constraints import ctcs
 from openscvx.dynamics import dynamics
+from openscvx.symbolic.expr import Control, State
 from openscvx.trajoptproblem import TrajOptProblem
 
 # Conditionally import cvxpygen to see if it's installed

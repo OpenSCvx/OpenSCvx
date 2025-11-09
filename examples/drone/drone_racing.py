@@ -91,11 +91,13 @@ for center in initial_gate_centers:
     modified_center[2] = modified_center[2] + 2.5
     modified_centers.append(modified_center)
 
-# Create symbolic parameters matching original structure
+# Create symbolic parameters for each gate center with initial values
 A_gate_const = A_gate
-A_gate_c_params = []
-for modified_center in modified_centers:
-    A_gate_c_params.append(A_gate @ modified_center)
+gate_center_params = []
+for i, modified_center in enumerate(modified_centers):
+    # Create a Parameter with initial value
+    param = ox.Parameter(f"gate_{i}_center", shape=(3,), value=modified_center)
+    gate_center_params.append(param)
 
 nodes_per_gate = 2
 gate_nodes = np.arange(nodes_per_gate, n, nodes_per_gate)
@@ -115,9 +117,15 @@ for state in states:
     constraints.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
 
 # Add gate constraints
-for node, A_c in zip(gate_nodes, A_gate_c_params):
+for node, gate_center_param in zip(gate_nodes, gate_center_params):
+    # Symbolically compute A_gate @ position - A_gate @ gate_center
     gate_constraint = (
-        (ox.linalg.Norm(A_gate_const @ position - A_c, ord="inf") <= 1.0).convex().at([node])
+        (
+            ox.linalg.Norm(A_gate_const @ position - A_gate_const @ gate_center_param, ord="inf")
+            <= 1.0
+        )
+        .convex()
+        .at([node])
     )
     constraints.append(gate_constraint)
 
@@ -274,7 +282,7 @@ plotting_dict = {
     "vertices": vertices,
     "gate_centers": modified_centers,
     "A_gate": A_gate_const,
-    "A_gate_c_params": A_gate_c_params,
+    "A_gate_c_params": [A_gate @ center for center in modified_centers],
 }
 
 if __name__ == "__main__":

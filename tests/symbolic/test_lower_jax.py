@@ -111,7 +111,7 @@ def test_jax_lower_control_with_slice():
 
 def test_jax_lower_parameter_scalar():
     """Test Parameter node with scalar value."""
-    param = Parameter("alpha", ())
+    param = Parameter("alpha", (), value=5.0)
     jl = JaxLowerer()
     f = jl.visit_parameter(param)
     parameters = dict(alpha=5.0)
@@ -131,7 +131,7 @@ def test_jax_lower_parameter_scalar():
 
 def test_jax_lower_parameter_vector():
     """Test Parameter node with vector value."""
-    param = Parameter("weights", (3,))
+    param = Parameter("weights", (3,), value=np.array([1.0, 2.0, 3.0]))
     jl = JaxLowerer()
     f = jl.visit_parameter(param)
 
@@ -150,7 +150,7 @@ def test_jax_lower_parameter_vector():
 
 def test_jax_lower_parameter_matrix():
     """Test Parameter node with matrix value."""
-    param = Parameter("transform", (2, 3))
+    param = Parameter("transform", (2, 3), value=np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]))
     jl = JaxLowerer()
     f = jl.visit_parameter(param)
 
@@ -168,7 +168,7 @@ def test_parameter_in_arithmetic_expression():
 
     state = State("x", (3,))
     state._slice = slice(0, 3)
-    gain = Parameter("gain", ())
+    gain = Parameter("gain", (), value=2.5)
 
     # Expression: gain * x
     expr = Mul(gain, state)
@@ -182,7 +182,7 @@ def test_parameter_in_arithmetic_expression():
 
 def test_parameter_with_lower_to_jax():
     """Test Parameter nodes with the top-level lower_to_jax function."""
-    param = Parameter("threshold", (2,))
+    param = Parameter("threshold", (2,), value=np.array([1.5, 2.5]))
 
     fn = lower_to_jax(param)
     param_val = np.array([1.5, 2.5])
@@ -205,8 +205,8 @@ def test_parameter_in_double_integrator_dynamics():
     control._slice = slice(0, 2)
 
     # Parameters for physical system
-    mass = Parameter("m", ())
-    gravity = Parameter("g", ())
+    mass = Parameter("m", (), value=2.0)
+    gravity = Parameter("g", (), value=9.81)
 
     # Extract state components
     # pos = state[0:2]  # [pos_x, pos_y]
@@ -251,8 +251,8 @@ def test_parameter_dynamics_with_jit_and_vmap():
     control = Control("u", (2,))
     control._slice = slice(0, 2)
 
-    mass = Parameter("m", ())
-    gravity = Parameter("g", ())
+    mass = Parameter("m", (), value=2.0)
+    gravity = Parameter("g", (), value=9.81)
 
     # Dynamics: pos_dot = vel, vel_dot = u/m + [0, -g]
     pos_dot = state[2:4]  # velocity

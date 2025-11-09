@@ -127,24 +127,53 @@ def create_cvxpy_variables(settings: Config) -> Dict:
     }
 
 
-def lower_convex_constraints(constraints_nodal_convex, ocp_vars: Dict) -> List[cp.Constraint]:
+def lower_convex_constraints(
+    constraints_nodal_convex, ocp_vars: Dict, params: Dict = None
+) -> tuple[List[cp.Constraint], Dict[str, cp.Parameter]]:
     """Phase 2: Lower symbolic convex constraints to CVXPy constraints with node-awareness.
 
     Note: One symbolic constraint applied at N nodes becomes N CVXPy constraints.
     The CVXPy variables x and u are already (n_nodes, n_states/n_controls) shaped,
     so we apply constraints at specific nodes using x[k] and u[k].
+
+    Args:
+        constraints_nodal_convex: List of convex constraints to lower
+        ocp_vars: Dictionary of CVXPy variables
+        params: Optional dictionary of parameter values to override the defaults
+
+    Returns:
+        Tuple of (list of CVXPy constraints, dict of CVXPy Parameter objects)
     """
-    from openscvx.symbolic.expr import traverse
+    from openscvx.symbolic.expr import Parameter, traverse
     from openscvx.symbolic.expr.control import Control
     from openscvx.symbolic.expr.state import State
     from openscvx.symbolic.lowerers.cvxpy import lower_to_cvxpy
 
     if not constraints_nodal_convex:
-        return []
+        return [], {}
 
     # Get the full trajectory CVXPy variables (n_nodes, n_states/n_controls)
     x_nonscaled = ocp_vars["x_nonscaled"]  # List of x_nonscaled[k] for each node k
     u_nonscaled = ocp_vars["u_nonscaled"]  # List of u_nonscaled[k] for each node k
+
+    # Collect all unique Parameters across all constraints and create cp.Parameter objects
+    all_params = {}
+
+    def collect_params(expr):
+        if isinstance(expr, Parameter):
+            if expr.name not in all_params:
+                # Use value from params dict if provided, otherwise use Parameter's initial value
+                if params and expr.name in params:
+                    param_value = params[expr.name]
+                else:
+                    param_value = expr.value
+
+                cvx_param = cp.Parameter(expr.shape, value=param_value, name=expr.name)
+                all_params[expr.name] = cvx_param
+
+    # Collect all parameters from all constraints
+    for constraint in constraints_nodal_convex:
+        traverse(constraint.constraint, collect_params)
 
     cvxpy_constraints = []
 
@@ -178,6 +207,9 @@ def lower_convex_constraints(constraints_nodal_convex, ocp_vars: Dict) -> List[c
             if control_vars:
                 variable_map["u"] = u_nonscaled[node]  # Full control vector at this node
 
+            # Add all CVXPy Parameter objects to the variable map
+            variable_map.update(all_params)
+
             # Verify all variables have slices (should be guaranteed by preprocessing)
             for state_name, state_var in state_vars.items():
                 if state_var._slice is None:
@@ -200,7 +232,7 @@ def lower_convex_constraints(constraints_nodal_convex, ocp_vars: Dict) -> List[c
             cvxpy_constraint = lower_to_cvxpy(constraint.constraint, variable_map)
             cvxpy_constraints.append(cvxpy_constraint)
 
-    return cvxpy_constraints
+    return cvxpy_constraints, all_params
 
 
 def OptimalControlProblem(settings: Config, ocp_vars: Dict):
