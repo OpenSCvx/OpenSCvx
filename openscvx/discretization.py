@@ -86,9 +86,6 @@ def dVdt(
     dfdu = dfdu.at[:, :, :-1].set(s[:, None, None] * dfdu_veh)
     dfdu = dfdu.at[:, :, -1].set(f)
 
-    # Compute the defect
-    z = F - jnp.einsum("ijk,ik->ij", sdfdx, x) - jnp.einsum("ijk,ik->ij", dfdu, u)
-
     # Stack up the results into the augmented state vector
     # fmt: off
     dVdt = jnp.zeros_like(V)
