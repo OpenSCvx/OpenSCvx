@@ -3,8 +3,7 @@ from typing import Callable, Optional
 
 import numpy as np
 
-from openscvx.backend.control import Control
-from openscvx.backend.state import State
+from openscvx.symbolic.unified import UnifiedControl, UnifiedState
 
 
 def get_affine_scaling_matrices(n, minimum, maximum):
@@ -186,9 +185,9 @@ class SimConfig:
 
     def __init__(
         self,
-        x: State,
-        x_prop: State,
-        u: Control,
+        x: UnifiedState,
+        x_prop: UnifiedState,
+        u: UnifiedControl,
         total_time: float,
         idx_x_true: slice,
         idx_x_true_prop: slice,
@@ -201,6 +200,7 @@ class SimConfig:
         ctcs_node_intervals: Optional[list] = None,
         constraints_ctcs: Optional[list[Callable]] = None,
         constraints_nodal: Optional[list[Callable]] = None,
+        constraints_nodal_convex: Optional[list[Callable]] = None,
         n_states: Optional[int] = None,
         n_states_prop: Optional[int] = None,
         n_controls: Optional[int] = None,
@@ -237,6 +237,7 @@ class SimConfig:
                 constraints.
             constraints_ctcs (list, optional): List of CTCS constraints.
             constraints_nodal (list, optional): List of nodal constraints.
+            constraints_nodal_convex (list, optional): List of convex nodal constraints.
             n_states (int, optional): The number of state variables. Defaults to
                 `None` (inferred from x.max).
             n_states_prop (int, optional): The number of propagation state
@@ -271,6 +272,9 @@ class SimConfig:
         self.ctcs_node_intervals = ctcs_node_intervals
         self.constraints_ctcs = constraints_ctcs if constraints_ctcs is not None else []
         self.constraints_nodal = constraints_nodal if constraints_nodal is not None else []
+        self.constraints_nodal_convex = (
+            constraints_nodal_convex if constraints_nodal_convex is not None else []
+        )
         self.n_states = n_states
         self.n_states_prop = n_states_prop
         self.n_controls = n_controls

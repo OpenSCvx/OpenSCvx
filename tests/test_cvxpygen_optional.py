@@ -6,10 +6,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from openscvx.backend.control import Control
-from openscvx.backend.state import State
 from openscvx.constraints import ctcs
 from openscvx.dynamics import dynamics
+from openscvx.symbolic.expr import Control, State
 from openscvx.trajoptproblem import TrajOptProblem
 
 # Conditionally import cvxpygen to see if it's installed
@@ -64,7 +63,13 @@ def test_cvxpygen_disabled_by_default():
     constraints = [ctcs(lambda x_, u_: x_ - x.true.max), ctcs(lambda x_, u_: x.true.min - x_)]
 
     problem = TrajOptProblem(
-        dynamics=simple_dynamics, x=x, u=u, params=[], idx_time=1, constraints=constraints, N=n
+        dynamics=simple_dynamics,
+        states=x,
+        controls=u,
+        params=[],
+        idx_time=1,
+        constraints=constraints,
+        N=n,
     )
 
     # Check that cvxpygen is disabled by default
@@ -96,7 +101,13 @@ def test_cvxpygen_enabled_raises_error_without_install():
     constraints = [ctcs(lambda x_, u_: x_ - x.true.max), ctcs(lambda x_, u_: x.true.min - x_)]
 
     problem = TrajOptProblem(
-        dynamics=simple_dynamics, x=x, u=u, params=[], idx_time=1, constraints=constraints, N=n
+        dynamics=simple_dynamics,
+        states=x,
+        controls=u,
+        params=[],
+        idx_time=1,
+        constraints=constraints,
+        N=n,
     )
 
     # Enable cvxpygen

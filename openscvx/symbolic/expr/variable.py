@@ -1,9 +1,9 @@
 import numpy as np
 
-from openscvx.backend.expr import Expr
+from .expr import Leaf
 
 
-class Variable(Expr):
+class Variable(Leaf):
     """A base class for variables in an optimal control problem.
 
     The Variable class provides the fundamental structure for state and control variables,
@@ -26,21 +26,14 @@ class Variable(Expr):
             name (str): Name identifier for the variable
             shape (tuple): Shape of the variable vector
         """
-        super().__init__()
-        self.name = name
-        self._shape = shape
+        super().__init__(name, shape)
+        self._slice = None
         self._min = None
         self._max = None
         self._guess = None
 
-    @property
-    def shape(self):
-        """Get the shape of the variable.
-
-        Returns:
-            tuple: Shape of the variable vector
-        """
-        return self._shape
+    def __repr__(self):
+        return f"Var({self.name!r})"
 
     @property
     def min(self):
@@ -181,45 +174,3 @@ class Variable(Expr):
                 if guess_arr.shape[1] != 1:
                     guess_arr = guess_arr.T
                 self._guess = np.concatenate([self._guess, guess_arr], axis=1)
-
-    def __getitem__(self, idx):
-        """Get a subset of the variable.
-
-        Args:
-            idx (int or slice): Index or slice to select variables
-
-        Returns:
-            Variable: A new Variable object containing the selected variables
-
-        Raises:
-            TypeError: If idx is not an int or slice
-        """
-        if isinstance(idx, int):
-            new_shape = ()
-        elif isinstance(idx, slice):
-            new_shape = (len(range(*idx.indices(self.shape[0]))),)
-        else:
-            raise TypeError("Variable indices must be int or slice")
-
-        sliced = Variable(f"{self.name}[{idx}]", new_shape)
-
-        def slice_attr(attr):
-            """Slice an attribute array based on the index.
-
-            Args:
-                attr (np.ndarray): Attribute array to slice
-
-            Returns:
-                np.ndarray: Sliced attribute array
-            """
-            if attr is None:
-                return None
-            if attr.ndim == 2 and attr.shape[1] == self.shape[0]:
-                return attr[:, idx]
-            return attr[idx]
-
-        sliced._min = slice_attr(self._min)
-        sliced._max = slice_attr(self._max)
-        sliced._guess = slice_attr(self._guess)
-
-        return sliced

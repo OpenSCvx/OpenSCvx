@@ -15,7 +15,7 @@ def prop_aug_dy(
     state_dot: callable,
     dis_type: str,
     N: int,
-    *params,
+    params,
 ) -> np.ndarray:
     """Compute the augmented dynamics for propagation.
 
@@ -33,7 +33,7 @@ def prop_aug_dy(
         state_dot (callable): Function computing state derivatives.
         dis_type (str): Discretization type ("ZOH" or "FOH").
         N (int): Number of nodes in trajectory.
-        *params: Additional parameters passed to state_dot.
+        params: Dictionary of additional parameters passed to state_dot.
 
     Returns:
         np.ndarray: Time-scaled state derivatives.
@@ -46,7 +46,7 @@ def prop_aug_dy(
         beta = (tau - tau_init) * N
     u = u_current + beta * (u_next - u_current)
 
-    return u[:, idx_s] * state_dot(x, u[:, :-1], node, *params).squeeze()
+    return u[:, idx_s] * state_dot(x, u[:, :-1], node, params).squeeze()
 
 
 def get_propagation_solver(state_dot, settings, param_map):
@@ -65,9 +65,9 @@ def get_propagation_solver(state_dot, settings, param_map):
     """
 
     def propagation_solver(
-        V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask, *params
+        V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask, params
     ):
-        param_map_update = dict(zip(param_map.keys(), params))
+        param_map_update = params
         return solve_ivp_diffrax_prop(
             f=prop_aug_dy,
             tau_final=tau_grid[1],  # scalar
@@ -81,7 +81,7 @@ def get_propagation_solver(state_dot, settings, param_map):
                 state_dot,  # function or array
                 settings.dis.dis_type,
                 settings.scp.n,
-                *param_map_update.items(),
+                param_map_update,
                 # additional named parameters as **kwargs
             ),
             tau_0=tau_grid[0],  # scalar
@@ -182,9 +182,6 @@ def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_sol
     n_states = x_0.shape[0]
     n_tau = len(tau_vals)
 
-    params = params.items()
-    param_values = tuple([param.value for _, param in params])
-
     states = np.empty((n_states, n_tau))
     tau = np.linspace(0, 1, settings.scp.n)
 
@@ -226,7 +223,7 @@ def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_sol
             settings.sim.idx_s.stop,
             tau_cur_padded,
             mask_padded,
-            *param_values,
+            params,
         )
 
         # Only store the valid portion (excluding the final point which becomes next x_0)

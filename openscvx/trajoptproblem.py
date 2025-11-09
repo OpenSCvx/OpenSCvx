@@ -3,20 +3,20 @@ import queue
 import threading
 import time
 from copy import deepcopy
-from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Union
 
 import jax
-import numpy as np
-from jax import export
+from jax import jacfwd
 
 os.environ["EQX_ON_ERROR"] = "nan"
 
 from openscvx import io
-from openscvx.augmentation.ctcs import sort_ctcs_constraints
-from openscvx.augmentation.dynamics_augmentation import build_augmented_dynamics
-from openscvx.backend.control import Control
-from openscvx.backend.state import Free, State
+from openscvx.caching import (
+    get_solver_cache_paths,
+    load_or_compile_discretization_solver,
+    load_or_compile_propagation_solver,
+    prime_propagation_solver,
+)
 from openscvx.config import (
     Config,
     ConvexSolverConfig,
@@ -26,33 +26,94 @@ from openscvx.config import (
     ScpConfig,
     SimConfig,
 )
-from openscvx.constraints.ctcs import CTCSConstraint
-from openscvx.constraints.nodal import NodalConstraint
-from openscvx.constraints.violation import get_g_funcs
+from openscvx.constraints.lowered import LoweredNodalConstraint
 from openscvx.discretization import get_discretization_solver
 from openscvx.dynamics import Dynamics
-from openscvx.ocp import OptimalControlProblem
+from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables, lower_convex_constraints
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
-from openscvx.ptr import PTR_init, PTR_subproblem, format_result
+from openscvx.ptr import PTR_init, PTR_step, format_result
 from openscvx.results import OptimizationResults
-from openscvx.utils import stable_function_hash
+from openscvx.symbolic.augmentation import (
+    augment_dynamics_with_ctcs,
+    augment_with_time_state,
+    decompose_vector_nodal_constraints,
+    separate_constraints,
+    sort_ctcs_constraints,
+)
+from openscvx.symbolic.expr import CTCS, Constraint, Expr
+from openscvx.symbolic.expr.control import Control
+from openscvx.symbolic.expr.state import State
+from openscvx.symbolic.lower import lower_to_jax
+from openscvx.symbolic.preprocessing import (
+    collect_and_assign_slices,
+    convert_dynamics_dict_to_expr,
+    validate_and_normalize_constraint_nodes,
+    validate_constraints_at_root,
+    validate_dynamics_dict,
+    validate_dynamics_dict_dimensions,
+    validate_dynamics_dimension,
+    validate_shapes,
+    validate_time_parameters,
+    validate_variable_names,
+)
+from openscvx.symbolic.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
 
 if TYPE_CHECKING:
     import cvxpy as cp
+
+
+class _ParameterDict(dict):
+    """Dictionary that syncs to both internal _parameters dict and CVXPy parameters.
+
+    This allows users to naturally update parameters like:
+        problem.parameters["obs_radius"] = 2.0
+
+    Changes automatically propagate to:
+    1. Internal _parameters dict (plain dict for JAX)
+    2. CVXPy parameters (for optimization)
+    """
+
+    def __init__(self, problem, internal_dict, *args, **kwargs):
+        self._problem = problem
+        self._internal_dict = internal_dict  # Reference to plain dict for JAX
+        super().__init__(*args, **kwargs)
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        # Sync to internal dict for JAX
+        self._internal_dict[key] = value
+        # Sync to CVXPy if it exists
+        if self._problem.cvxpy_params is not None and key in self._problem.cvxpy_params:
+            self._problem.cvxpy_params[key].value = value
+
+    def update(self, other=None, **kwargs):
+        """Update multiple parameters and sync to internal dict and CVXPy."""
+        if other is not None:
+            if hasattr(other, "items"):
+                for key, value in other.items():
+                    self[key] = value
+            else:
+                for key, value in other:
+                    self[key] = value
+        for key, value in kwargs.items():
+            self[key] = value
 
 
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
 class TrajOptProblem:
     def __init__(
         self,
-        dynamics: Dynamics,
-        constraints: List[Union[CTCSConstraint, NodalConstraint]],
-        x: State,
-        u: Control,
+        dynamics: dict,
+        constraints: List[Union[Constraint, CTCS]],
+        states: List[State],
+        controls: List[Control],
         N: int,
-        idx_time: int,
-        params: Optional[dict] = None,
+        time_initial: Union[float, tuple] = None,
+        time_final: Union[float, tuple] = None,
+        time_derivative: Union[float, Expr] = None,
+        time_min: float = None,
+        time_max: float = None,
         dynamics_prop: Optional[callable] = None,
         x_prop: State = None,
         scp: Optional[ScpConfig] = None,
@@ -69,121 +130,194 @@ class TrajOptProblem:
         """
         The primary class in charge of compiling and exporting the solvers
 
-
         Args:
-            dynamics (Dynamics): Dynamics function decorated with @dynamics
+            dynamics (dict): Dictionary mapping state names to their dynamics expressions.
+                Each key should be a state name, and each value should be an Expr
+                representing the derivative of that state.
             constraints (List[Union[CTCSConstraint, NodalConstraint]]):
                 List of constraints decorated with @ctcs or @nodal
-            idx_time (int): Index of the time variable in the state vector
+            x (List[State]): List of State objects representing the state variables.
+                May optionally include a State named "time" (see time parameters below).
+            u (List[Control]): List of Control objects representing the control variables
             N (int): Number of segments in the trajectory
-            time_init (float): Initial time for the trajectory
-            x_guess (jnp.ndarray): Initial guess for the state trajectory
-            u_guess (jnp.ndarray): Initial guess for the control trajectory
-            initial_state (BoundaryConstraint): Initial state constraint
-            final_state (BoundaryConstraint): Final state constraint
-            x_max (jnp.ndarray): Upper bound on the state variables
-            x_min (jnp.ndarray): Lower bound on the state variables
-            u_max (jnp.ndarray): Upper bound on the control variables
-            u_min (jnp.ndarray): Lower bound on the control variables
-            dynamics_prop: Propagation dynamics function decorated with @dynamics
-            initial_state_prop: Propagation initial state constraint
+            time_initial (float or tuple): Initial time boundary condition. Only provide if
+                NOT including a "time" state in x. Can be a float (fixed) or tuple like
+                ("free", value) or ("minimize", value). Default: None (required if no time state).
+            time_final (float or tuple): Final time boundary condition. Only provide if
+                NOT including a "time" state in x. Can be a float (fixed) or tuple like
+                ("free", value) or ("minimize", value). Default: None (required if no time state).
+            time_derivative (float or Expr): Derivative of time (default 1.0 for real time).
+                Only used if NOT including a "time" state in x. Default: None (uses 1.0).
+            time_min (float): Minimum bound for time variable. Only used if NOT including
+                a "time" state in x. Default: None (uses 0.0).
+            time_max (float): Maximum bound for time variable. Only used if NOT including
+                a "time" state in x. Default: None (uses sensible default based on time_final).
+            dynamics_prop: Propagation dynamics function (optional)
+            x_prop: Propagation state (optional)
             scp: SCP configuration object
             dis: Discretization configuration object
             prp: Propagation configuration object
             sim: Simulation configuration object
             dev: Development configuration object
             cvx: Convex solver configuration object
+            licq_min: Minimum LICQ constraint value
+            licq_max: Maximum LICQ constraint value
+            time_dilation_factor_min: Minimum time dilation factor
+            time_dilation_factor_max: Maximum time dilation factor
 
         Returns:
             None
+
+        Note:
+            There are two approaches for handling time:
+            1. Auto-create (simple): Don't include "time" in x, provide time_initial/time_final
+            2. User-provided (for time-dependent constraints): Include "time" State in x and
+               in dynamics dict, don't provide time_initial/time_final parameters
         """
 
-        if params is None:
-            params = {}
-        self.params = params
-
-        if dynamics_prop is None:
-            dynamics_prop = dynamics
-
-        if x_prop is None:
-            x_prop = deepcopy(x)
-
-        # TODO (norrisg) move this into some augmentation function, if we want to
-        # make this be executed after the init (i.e. within problem.initialize)
-        # need to rethink how problem is defined
-        constraints_ctcs = []
-        constraints_nodal = []
-        for constraint in constraints:
-            if isinstance(constraint, CTCSConstraint):
-                constraints_ctcs.append(constraint)
-            elif isinstance(constraint, NodalConstraint):
-                constraints_nodal.append(constraint)
-            else:
-                raise ValueError(
-                    f"Unknown constraint type: {type(constraint)}, All constraints must be"
-                    " decorated with @ctcs or @nodal"
-                )
-
-        constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(
-            constraints_ctcs, N
+        # Validate time handling approach and get processed parameters
+        has_time_state, time_initial, time_final, time_derivative, time_min, time_max = (
+            validate_time_parameters(
+                states, time_initial, time_final, time_derivative, time_min, time_max
+            )
         )
 
+        # Augment states with time state if needed (auto-create approach)
+        if not has_time_state:
+            states, constraints = augment_with_time_state(
+                states, constraints, time_initial, time_final, time_min, time_max, N
+            )
+
+        # Add time derivative to dynamics dict (if not already present)
+        dynamics = dict(dynamics)  # Make a copy to avoid mutating the input
+        if "time" not in dynamics:
+            dynamics["time"] = time_derivative
+
+        # Validate dynamics dict matches state names and dimensions
+        validate_dynamics_dict(dynamics, states)
+        validate_dynamics_dict_dimensions(dynamics, states)
+
+        # Convert dynamics dict to concatenated expression
+        dynamics, dynamics_concat = convert_dynamics_dict_to_expr(dynamics, states)
+
+        # Validate expressions
+        all_exprs = [dynamics_concat] + constraints
+        validate_variable_names(all_exprs)
+        collect_and_assign_slices(states, controls)
+        validate_shapes(all_exprs)
+        validate_constraints_at_root(constraints)
+        validate_and_normalize_constraint_nodes(constraints, N)
+        validate_dynamics_dimension(dynamics_concat, states)
+
+        # Canonicalize all expressions after validation
+        dynamics_concat = dynamics_concat.canonicalize()
+        constraints = [expr.canonicalize() for expr in constraints]
+
+        # Collect parameter values from all constraints before any processing
+        from openscvx.symbolic.expr import Parameter, traverse
+
+        parameters = {}
+
+        def collect_param_values(expr):
+            if isinstance(expr, Parameter):
+                if expr.name not in parameters:
+                    parameters[expr.name] = expr.value
+
+        for constraint in constraints:
+            traverse(constraint, collect_param_values)
+
+        # Sort and separate constraints first
+        constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
+            constraints, N
+        )
+
+        # Decompose vector-valued nodal constraints into scalar constraints
+        # This is necessary for nonconvex nodal constraints that get lowered to JAX
+        constraints_nodal = decompose_vector_nodal_constraints(constraints_nodal)
+
+        # Sort CTCS constraints by their idx to get node_intervals
+        constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(
+            constraints_ctcs
+        )
+
+        # Augment dynamics, states, and controls with CTCS constraints, time dilation
+        dynamics_aug, x_aug, u_aug = augment_dynamics_with_ctcs(
+            dynamics_concat,
+            states,
+            controls,
+            constraints_ctcs,
+            N,
+            licq_min=licq_min,
+            licq_max=licq_max,
+            time_dilation_factor_min=time_dilation_factor_min,
+            time_dilation_factor_max=time_dilation_factor_max,
+        )
+
+        # Assign slices to augmented states and controls in canonical order
+        collect_and_assign_slices(x_aug, u_aug)
+
+        # Store state and control lists for dictionary-based results access
+        self.states = x_aug
+        self.controls = u_aug
+
+        # Find the time state by name and get its slice
+        time_state = next((s for s in x_aug if s.name == "time"), None)
+        if time_state is None:
+            raise ValueError("No state named 'time' found in augmented states")
+        time_slice = time_state._slice
+
+        # TODO: (norrisg) allow non-ctcs constraints
+        dyn_fn = lower_to_jax(dynamics_aug)
+        constraints_nodal_fns = lower_to_jax(constraints_nodal)
+
+        # Lower convex constraints to CVXPy
+        # Note: CVXPy lowering will happen later in the OCP when CVXPy variables are available
+        # For now, we just store the symbolic constraints
+
+        x_unified: UnifiedState = unify_states(x_aug)
+        u_unified: UnifiedControl = unify_controls(u_aug)
+
+        # Store parameters in two forms:
+        # 1. _param_values: plain dict for JAX functions
+        # 2. _parameters: wrapper dict for user access that auto-syncs
+        self._parameters = parameters  # Plain dict for JAX
+        self._parameter_wrapper = _ParameterDict(self, self._parameters, parameters)
+        self.cvxpy_params = None  # Will be set during initialize()
+
+        if dynamics_prop is None:
+            dynamics_prop = Dynamics(dyn_fn)
+
+        if x_prop is None:
+            x_prop = deepcopy(x_unified)
+
         # Index tracking
-        idx_x_true = slice(0, x.shape[0])
+        # TODO: (norrisg) use the `_slice` attribute of the State, Control
+        idx_x_true = slice(0, x_unified.true.shape[0])
         idx_x_true_prop = slice(0, x_prop.shape[0])
-        idx_u_true = slice(0, u.shape[0])
+        idx_u_true = slice(0, u_unified.true.shape[0])
         idx_constraint_violation = slice(idx_x_true.stop, idx_x_true.stop + num_augmented_states)
         idx_constraint_violation_prop = slice(
             idx_x_true_prop.stop, idx_x_true_prop.stop + num_augmented_states
         )
 
+        # Time dilation index for reference
         idx_time_dilation = slice(idx_u_true.stop, idx_u_true.stop + 1)
-
-        # check that idx_time is in the correct range
-        assert idx_time >= 0 and idx_time < len(x.max), (
-            "idx_time must be in the range of the state vector and non-negative"
-        )
-        idx_time = slice(idx_time, idx_time + 1)
-
-        # Create a new state object for the augmented states
-        if num_augmented_states != 0:
-            y = State(name="y", shape=(num_augmented_states,))
-            y.initial = np.zeros((num_augmented_states,))
-            y.final = np.array([Free(0)] * num_augmented_states)
-            y.guess = np.zeros(
-                (
-                    N,
-                    num_augmented_states,
-                )
-            )
-            y.min = np.zeros((num_augmented_states,))
-            y.max = licq_max * np.ones((num_augmented_states,))
-
-            x.append(y, augmented=True)
-            x_prop.append(y, augmented=True)
-
-        s = Control(name="s", shape=(1,))
-        s.min = np.array([time_dilation_factor_min * x.final[idx_time][0]])
-        s.max = np.array([time_dilation_factor_max * x.final[idx_time][0]])
-        s.guess = np.ones((N, 1)) * x.final[idx_time][0]
-
-        u.append(s, augmented=True)
 
         if dis is None:
             dis = DiscretizationConfig()
 
         if sim is None:
             sim = SimConfig(
-                x=x,
+                x=x_unified,
                 x_prop=x_prop,
-                u=u,
-                total_time=x.initial[idx_time][0],
-                n_states=x.initial.shape[0],
+                u=u_unified,
+                total_time=x_unified.initial[time_slice][0],
+                n_states=x_unified.initial.shape[0],
                 n_states_prop=x_prop.initial.shape[0],
                 idx_x_true=idx_x_true,
                 idx_x_true_prop=idx_x_true_prop,
                 idx_u_true=idx_u_true,
-                idx_t=idx_time,
+                idx_t=time_slice,
                 idx_y=idx_constraint_violation,
                 idx_y_prop=idx_constraint_violation_prop,
                 idx_s=idx_time_dilation,
@@ -205,15 +339,36 @@ class TrajOptProblem:
         if prp is None:
             prp = PropagationConfig()
 
-        sim.constraints_ctcs = constraints_ctcs
-        sim.constraints_nodal = constraints_nodal
+        # Create LoweredConstraint objects with Jacobians computed automatically
+        lowered_constraints_nodal = []
+        for i, fn in enumerate(constraints_nodal_fns):
+            # Apply vectorization to handle (N, n_x) and (N, n_u) inputs
+            # The lowered functions have signature (x, u, node, **kwargs), so we need to handle node
+            # parameter, node is broadcast (same for all),
+            constraint = LoweredNodalConstraint(
+                func=jax.vmap(fn, in_axes=(0, 0, None, None)),
+                grad_g_x=jax.vmap(jacfwd(fn, argnums=0), in_axes=(0, 0, None, None)),
+                grad_g_u=jax.vmap(jacfwd(fn, argnums=1), in_axes=(0, 0, None, None)),
+                nodes=constraints_nodal[i].nodes,
+            )
+            lowered_constraints_nodal.append(constraint)
 
-        ctcs_violation_funcs = get_g_funcs(constraints_ctcs)
-        self.dynamics_augmented = build_augmented_dynamics(
-            dynamics, ctcs_violation_funcs, idx_x_true, idx_u_true
+        sim.constraints_ctcs = []
+        sim.constraints_nodal = lowered_constraints_nodal
+        sim.constraints_nodal_convex = constraints_nodal_convex
+
+        # Create dynamics objects from the symbolic augmented dynamics
+        self.dynamics_augmented = Dynamics(
+            f=dyn_fn,
+            A=jacfwd(dyn_fn, argnums=0),
+            B=jacfwd(dyn_fn, argnums=1),
         )
-        self.dynamics_augmented_prop = build_augmented_dynamics(
-            dynamics_prop, ctcs_violation_funcs, idx_x_true_prop, idx_u_true
+        # For propagation, use the same augmented dynamics function
+        # (since CTCS augmentation applies to both discretization and propagation)
+        self.dynamics_augmented_prop = Dynamics(
+            f=dyn_fn,
+            A=jacfwd(dyn_fn, argnums=0),
+            B=jacfwd(dyn_fn, argnums=1),
         )
 
         self.settings = Config(
@@ -256,6 +411,37 @@ class TrajOptProblem:
         self.scp_controls = []
         self.scp_V_multi_shoot_traj = []
 
+    @property
+    def parameters(self):
+        """Get the parameters dictionary.
+
+        The returned dictionary automatically syncs to CVXPy when modified:
+            problem.parameters["obs_radius"] = 2.0  # Auto-syncs to CVXPy
+            problem.parameters.update({"gate_0_center": center})  # Also syncs
+
+        Returns:
+            _ParameterDict: Special dict that syncs to CVXPy on assignment
+        """
+        return self._parameter_wrapper
+
+    @parameters.setter
+    def parameters(self, new_params: dict):
+        """Replace the entire parameters dictionary and sync to CVXPy.
+
+        Args:
+            new_params: New parameters dictionary
+        """
+        self._parameters = dict(new_params)  # Create new plain dict
+        self._parameter_wrapper = _ParameterDict(self, self._parameters, new_params)
+        self._sync_parameters()
+
+    def _sync_parameters(self):
+        """Sync all parameter values to CVXPy parameters."""
+        if self.cvxpy_params is not None:
+            for name, value in self._parameter_wrapper.items():
+                if name in self.cvxpy_params:
+                    self.cvxpy_params[name].value = value
+
     def initialize(self):
         io.intro()
 
@@ -275,35 +461,40 @@ class TrajOptProblem:
         self.settings.sim.__post_init__()
 
         # Compile dynamics and jacobians
-        self.dynamics_augmented.f = jax.vmap(
-            self.dynamics_augmented.f, in_axes=(0, 0, 0, *(None,) * len(self.params))
-        )
-        self.dynamics_augmented.A = jax.vmap(
-            self.dynamics_augmented.A, in_axes=(0, 0, 0, *(None,) * len(self.params))
-        )
-        self.dynamics_augmented.B = jax.vmap(
-            self.dynamics_augmented.B, in_axes=(0, 0, 0, *(None,) * len(self.params))
-        )
+        self.dynamics_augmented.f = jax.vmap(self.dynamics_augmented.f, in_axes=(0, 0, 0, None))
+        self.dynamics_augmented.A = jax.vmap(self.dynamics_augmented.A, in_axes=(0, 0, 0, None))
+        self.dynamics_augmented.B = jax.vmap(self.dynamics_augmented.B, in_axes=(0, 0, 0, None))
 
         self.dynamics_augmented_prop.f = jax.vmap(
-            self.dynamics_augmented_prop.f, in_axes=(0, 0, 0, *(None,) * len(self.params))
+            self.dynamics_augmented_prop.f, in_axes=(0, 0, 0, None)
         )
 
         for constraint in self.settings.sim.constraints_nodal:
-            if not constraint.convex:
-                # TODO: (haynec) switch to AOT instead of JIT
-                constraint.g = jax.jit(constraint.g)
-                constraint.grad_g_x = jax.jit(constraint.grad_g_x)
-                constraint.grad_g_u = jax.jit(constraint.grad_g_u)
+            # TODO: (haynec) switch to AOT instead of JIT
+            constraint.func = jax.jit(constraint.func)
+            constraint.grad_g_x = jax.jit(constraint.grad_g_x)
+            constraint.grad_g_u = jax.jit(constraint.grad_g_u)
 
         # Generate solvers and optimal control problem
         self.discretization_solver = get_discretization_solver(
-            self.dynamics_augmented, self.settings, self.params
+            self.dynamics_augmented, self.settings, self.parameters
         )
         self.propagation_solver = get_propagation_solver(
-            self.dynamics_augmented_prop.f, self.settings, self.params
+            self.dynamics_augmented_prop.f, self.settings, self.parameters
         )
-        self.optimal_control_problem = OptimalControlProblem(self.settings)
+        # Phase 1: Create CVXPy variables
+        ocp_vars = create_cvxpy_variables(self.settings)
+
+        # Phase 2: Lower convex constraints to CVXPy
+        lowered_convex_constraints, self.cvxpy_params = lower_convex_constraints(
+            self.settings.sim.constraints_nodal_convex, ocp_vars, self._parameters
+        )
+
+        # Store lowered constraints back in settings for Phase 3
+        self.settings.sim.constraints_nodal_convex = lowered_convex_constraints
+
+        # Phase 3: Build complete optimal control problem
+        self.optimal_control_problem = OptimalControlProblem(self.settings, ocp_vars)
 
         # Collect all relevant functions
         functions_to_hash = [self.dynamics_augmented.f, self.dynamics_augmented_prop.f]
@@ -312,8 +503,8 @@ class TrajOptProblem:
         for constraint in self.settings.sim.constraints_ctcs:
             functions_to_hash.append(constraint.func)
 
-        # Get unique source-based hash
-        function_hash = stable_function_hash(
+        # Get cache file paths
+        dis_solver_file, prop_solver_file = get_solver_cache_paths(
             functions_to_hash,
             n_discretization_nodes=self.settings.scp.n,
             dt=self.settings.prp.dt,
@@ -324,105 +515,38 @@ class TrajOptProblem:
             control_min=self.settings.sim.u.min,
         )
 
-        solver_dir = Path(".tmp")
-        solver_dir.mkdir(parents=True, exist_ok=True)
-        dis_solver_file = solver_dir / f"compiled_discretization_solver_{function_hash}.jax"
-        prop_solver_file = solver_dir / f"compiled_propagation_solver_{function_hash}.jax"
+        # Compile the discretization solver
+        self.discretization_solver = load_or_compile_discretization_solver(
+            self.discretization_solver,
+            dis_solver_file,
+            self._parameters,  # Plain dict for JAX
+            self.settings.scp.n,
+            self.settings.sim.n_states,
+            self.settings.sim.n_controls,
+            save_compiled=self.settings.sim.save_compiled,
+            debug=self.settings.dev.debug,
+        )
 
-        # Compile the solvers
-        if not self.settings.dev.debug:
-            if self.settings.sim.save_compiled:
-                # Check if the compiled file already exists
-                try:
-                    with open(dis_solver_file, "rb") as f:
-                        serial_dis = f.read()
-                    # Load the compiled code
-                    self.discretization_solver = export.deserialize(serial_dis)
-                    print("✓ Loaded existing discretization solver")
-                except FileNotFoundError:
-                    print("Compiling discretization solver...")
-                    # Extract parameter values and names in order
-                    param_values = [param.value for _, param in self.params.items()]
-
-                    self.discretization_solver = export.export(jax.jit(self.discretization_solver))(
-                        np.ones((self.settings.scp.n, self.settings.sim.n_states)),
-                        np.ones((self.settings.scp.n, self.settings.sim.n_controls)),
-                        *param_values,
-                    )
-                    # Serialize and Save the compiled code in a temp directory
-                    with open(dis_solver_file, "wb") as f:
-                        f.write(self.discretization_solver.serialize())
-                    print("✓ Discretization solver compiled and saved")
-            else:
-                print("Compiling discretization solver (not saving/loading from disk)...")
-                param_values = [param.value for _, param in self.params.items()]
-                self.discretization_solver = export.export(jax.jit(self.discretization_solver))(
-                    np.ones((self.settings.scp.n, self.settings.sim.n_states)),
-                    np.ones((self.settings.scp.n, self.settings.sim.n_controls)),
-                    *param_values,
-                )
-
-        # Compile the discretization solver and save it
+        # Setup propagation solver parameters
         dtau = 1.0 / (self.settings.scp.n - 1)
         dt_max = self.settings.sim.u.max[self.settings.sim.idx_s][0] * dtau
-
         self.settings.prp.max_tau_len = int(dt_max / self.settings.prp.dt) + 2
 
-        # Check if the compiled file already exists
-        if self.settings.sim.save_compiled:
-            try:
-                with open(prop_solver_file, "rb") as f:
-                    serial_prop = f.read()
-                # Load the compiled code
-                self.propagation_solver = export.deserialize(serial_prop)
-                print("✓ Loaded existing propagation solver")
-            except FileNotFoundError:
-                print("Compiling propagation solver...")
-                # Extract parameter values and names in order
-                param_values = [param.value for _, param in self.params.items()]
-
-                propagation_solver = export.export(jax.jit(self.propagation_solver))(
-                    np.ones(self.settings.sim.n_states_prop),  # x_0
-                    (0.0, 0.0),  # time span
-                    np.ones((1, self.settings.sim.n_controls)),  # controls_current
-                    np.ones((1, self.settings.sim.n_controls)),  # controls_next
-                    np.ones((1, 1)),  # tau_0
-                    np.ones((1, 1)).astype("int"),  # segment index
-                    0,  # idx_s_stop
-                    np.ones((self.settings.prp.max_tau_len,)),  # save_time (tau_cur_padded)
-                    np.ones(
-                        (self.settings.prp.max_tau_len,), dtype=bool
-                    ),  # mask_padded (boolean mask)
-                    *param_values,  # additional parameters
-                )
-
-                # Serialize and Save the compiled code in a temp directory
-                self.propagation_solver = propagation_solver
-
-                with open(prop_solver_file, "wb") as f:
-                    f.write(self.propagation_solver.serialize())
-                print("✓ Propagation solver compiled and saved")
-        else:
-            print("Compiling propagation solver (not saving/loading from disk)...")
-            param_values = [param.value for _, param in self.params.items()]
-            propagation_solver = export.export(jax.jit(self.propagation_solver))(
-                np.ones(self.settings.sim.n_states_prop),  # x_0
-                (0.0, 0.0),  # time span
-                np.ones((1, self.settings.sim.n_controls)),  # controls_current
-                np.ones((1, self.settings.sim.n_controls)),  # controls_next
-                np.ones((1, 1)),  # tau_0
-                np.ones((1, 1)).astype("int"),  # segment index
-                0,  # idx_s_stop
-                np.ones((self.settings.prp.max_tau_len,)),  # save_time (tau_cur_padded)
-                np.ones((self.settings.prp.max_tau_len,), dtype=bool),  # mask_padded (boolean mask)
-                *param_values,  # additional parameters
-            )
-            self.propagation_solver = propagation_solver
+        # Compile the propagation solver
+        self.propagation_solver = load_or_compile_propagation_solver(
+            self.propagation_solver,
+            prop_solver_file,
+            self._parameters,  # Plain dict for JAX
+            self.settings.sim.n_states_prop,
+            self.settings.sim.n_controls,
+            self.settings.prp.max_tau_len,
+            save_compiled=self.settings.sim.save_compiled,
+        )
 
         # Initialize the PTR loop
         print("Initializing the SCvx Subproblem Solver...")
         self.cpg_solve = PTR_init(
-            self.params,
+            self._parameters,  # Plain dict for JAX/CVXPy
             self.optimal_control_problem,
             self.discretization_solver,
             self.settings,
@@ -442,41 +566,8 @@ class TrajOptProblem:
         self.timing_init = t_f_while - t_0_while
         print("Total Initialization Time: ", self.timing_init)
 
-        # Robust priming call for propagation_solver.call (no debug prints)
-        try:
-            x_0 = np.ones(
-                self.settings.sim.x_prop.initial.shape, dtype=self.settings.sim.x_prop.initial.dtype
-            )
-            tau_grid = (0.0, 1.0)
-            controls_current = np.ones(
-                (1, self.settings.sim.u.shape[0]), dtype=self.settings.sim.u.guess.dtype
-            )
-            controls_next = np.ones(
-                (1, self.settings.sim.u.shape[0]), dtype=self.settings.sim.u.guess.dtype
-            )
-            tau_init = np.array([[0.0]], dtype=np.float64)
-            node = np.array([[0]], dtype=np.int64)
-            idx_s_stop = self.settings.sim.idx_s.stop
-            save_time = np.ones((self.settings.prp.max_tau_len,), dtype=np.float64)
-            mask_padded = np.ones((self.settings.prp.max_tau_len,), dtype=bool)
-            param_values = [
-                np.ones_like(param.value) if hasattr(param.value, "shape") else float(param.value)
-                for _, param in self.params.items()
-            ]
-            self.propagation_solver.call(
-                x_0,
-                tau_grid,
-                controls_current,
-                controls_next,
-                tau_init,
-                node,
-                idx_s_stop,
-                save_time,
-                mask_padded,
-                *param_values,
-            )
-        except Exception as e:
-            print(f"[Initialization] Priming propagation_solver.call failed: {e}")
+        # Prime the propagation solver
+        prime_propagation_solver(self.propagation_solver, self._parameters, self.settings)
 
         if self.settings.dev.profiling:
             pr.disable()
@@ -493,83 +584,36 @@ class TrajOptProblem:
         Returns:
             dict: Dictionary containing convergence status and current state
         """
-        x = self.settings.sim.x
-        u = self.settings.sim.u
-
-        # Run the subproblem
-        (
-            x_sol,
-            u_sol,
-            cost,
-            J_total,
-            J_vb_vec,
-            J_vc_vec,
-            J_tr_vec,
-            prob_stat,
-            V_multi_shoot,
-            subprop_time,
-            dis_time,
-        ) = PTR_subproblem(
-            self.params.items(),
-            self.cpg_solve,
-            x,
-            u,
-            self.discretization_solver,
-            self.optimal_control_problem,
+        result = PTR_step(
+            self._parameters,  # Plain dict for JAX/CVXPy
             self.settings,
+            self.optimal_control_problem,
+            self.discretization_solver,
+            self.cpg_solve,
+            self.emitter_function,
+            self.scp_k,
+            self.scp_J_tr,
+            self.scp_J_vb,
+            self.scp_J_vc,
+            self.scp_trajs,
+            self.scp_controls,
+            self.scp_V_multi_shoot_traj,
         )
 
-        # Update state
-        self.scp_V_multi_shoot_traj.append(V_multi_shoot)
-        x.guess = x_sol
-        u.guess = u_sol
-        self.scp_trajs.append(x.guess)
-        self.scp_controls.append(u.guess)
+        # Update instance state from result
+        self.scp_k = result["scp_k"]
+        self.scp_J_tr = result["scp_J_tr"]
+        self.scp_J_vb = result["scp_J_vb"]
+        self.scp_J_vc = result["scp_J_vc"]
 
-        self.scp_J_tr = np.sum(np.array(J_tr_vec))
-        self.scp_J_vb = np.sum(np.array(J_vb_vec))
-        self.scp_J_vc = np.sum(np.array(J_vc_vec))
-
-        # Update weights
-        self.settings.scp.w_tr = min(
-            self.settings.scp.w_tr * self.settings.scp.w_tr_adapt, self.settings.scp.w_tr_max
-        )
-        if self.scp_k > self.settings.scp.cost_drop:
-            self.settings.scp.lam_cost = self.settings.scp.lam_cost * self.settings.scp.cost_relax
-
-        # Emit data
-        self.emitter_function(
-            {
-                "iter": self.scp_k,
-                "dis_time": dis_time * 1000.0,
-                "subprop_time": subprop_time * 1000.0,
-                "J_total": J_total,
-                "J_tr": self.scp_J_tr,
-                "J_vb": self.scp_J_vb,
-                "J_vc": self.scp_J_vc,
-                "cost": cost[-1],
-                "prob_stat": prob_stat,
-            }
-        )
-
-        # Increment counter
-        self.scp_k += 1
-
-        # Create a result dictionary for this step
-        return {
-            "converged": (
-                (self.scp_J_tr < self.settings.scp.ep_tr)
-                and (self.scp_J_vb < self.settings.scp.ep_vb)
-                and (self.scp_J_vc < self.settings.scp.ep_vc)
-            ),
-            "u": u,
-            "x": x,
-            "V_multi_shoot": V_multi_shoot,
-        }
+        return result
 
     def solve(
         self, max_iters: Optional[int] = None, continuous: bool = False
     ) -> OptimizationResults:
+        # Sync parameters before solving
+        self._sync_parameters()
+
         # Ensure parameter sizes and normalization are correct
         self.settings.scp.__post_init__()
         self.settings.sim.__post_init__()
@@ -622,7 +666,7 @@ class TrajOptProblem:
 
         t_0_post = time.time()
         result = propagate_trajectory_results(
-            self.params, self.settings, result, self.propagation_solver
+            self._parameters, self.settings, result, self.propagation_solver
         )
         t_f_post = time.time()
 

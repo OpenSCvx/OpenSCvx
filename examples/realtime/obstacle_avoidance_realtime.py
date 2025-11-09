@@ -16,17 +16,15 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(grandparent_dir)
 
-from drone.obstacle_avoidance_realtime_test import (
-    obs_center_1,
-    obs_center_2,
-    obs_center_3,
+from examples.drone.obstacle_avoidance_realtime_base import (
+    obstacle_centers,
     plotting_dict,
     problem,
 )
-
-from openscvx.utils import generate_orthogonal_unit_vectors
 
 # Import PyQtGraph OpenGL modules
 try:
@@ -50,15 +48,9 @@ new_result_event = threading.Event()
 class Obstacle3DPlotWidget(QWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Generate axes and radii as in obstacle_avoidance.py (only one call per obstacle)
-        np.random.seed(0)
-        self.ellipsoid_axes = []
-        self.ellipsoid_radii = []
-        for _ in range(3):
-            ax = generate_orthogonal_unit_vectors()
-            self.ellipsoid_axes.append(ax)
-            rad = np.random.rand(3) + 0.1 * np.ones(3)
-            self.ellipsoid_radii.append(rad)
+        # Use axes and radii from plotting_dict (from obstacle_avoidance.py)
+        self.ellipsoid_axes = plotting_dict["obstacles_axes"]
+        self.ellipsoid_radii = plotting_dict["obstacles_radii"]
         layout = QVBoxLayout()
         self.setLayout(layout)
         if HAS_OPENGL:
@@ -134,7 +126,7 @@ class Obstacle3DPlotWidget(QWidget):
         lam_cost_input = QLineEdit()
         lam_cost_input.setText(f"{problem.settings.scp.lam_cost:.2E}")
         lam_cost_input.setFixedWidth(80)
-        lam_cost_input.returnPressed.connect(lambda: self.on_lam_cost_changed(lam_cost_input))
+        lam_cost_input.returnPressed.connect(lambda: on_lam_cost_changed(lam_cost_input))
         lam_cost_label = QLabel("λ_cost:")
         lam_cost_label.setAlignment(Qt.AlignLeft)
         lam_cost_layout.addWidget(lam_cost_input)
@@ -146,7 +138,7 @@ class Obstacle3DPlotWidget(QWidget):
         lam_tr_input = QLineEdit()
         lam_tr_input.setText(f"{problem.settings.scp.w_tr:.2E}")
         lam_tr_input.setFixedWidth(80)
-        lam_tr_input.returnPressed.connect(lambda: self.on_lam_tr_changed(lam_tr_input))
+        lam_tr_input.returnPressed.connect(lambda: on_lam_tr_changed(lam_tr_input))
         lam_tr_label = QLabel("λ_tr:")
         lam_tr_label.setAlignment(Qt.AlignLeft)
         lam_tr_layout.addWidget(lam_tr_input)
@@ -156,7 +148,7 @@ class Obstacle3DPlotWidget(QWidget):
         control_layout.addWidget(weights_group)
         # Sliders for each obstacle
         for i in range(3):
-            obs_group = QGroupBox(f"Obstacle {i+1} Position")
+            obs_group = QGroupBox(f"Obstacle {i + 1} Position")
             obs_layout = QVBoxLayout()
             obs_group.setLayout(obs_layout)
             # X, Y, Z sliders
@@ -183,6 +175,18 @@ class Obstacle3DPlotWidget(QWidget):
             setattr(self, f"obs_{i}_sliders", sliders)
             control_layout.addWidget(obs_group)
         control_layout.addStretch()
+        # Create labels dictionary for metrics update
+        self.labels_dict = {
+            "iter_label": self.iter_label,
+            "j_tr_label": self.j_tr_label,
+            "j_vb_label": self.j_vb_label,
+            "j_vc_label": self.j_vc_label,
+            "objective_label": self.objective_label,
+            "lam_cost_display_label": self.lam_cost_display_label,
+            "dis_time_label": self.dis_time_label,
+            "solve_time_label": self.solve_time_label,
+            "status_label": self.status_label,
+        }
 
     def create_obstacle_ellipsoids(self):
         if not HAS_OPENGL:
@@ -211,15 +215,12 @@ class Obstacle3DPlotWidget(QWidget):
         # Convert slider value (-100 to 100) to world coordinates (-5 to 5)
         world_value = value * 0.05
         # Update the parameter
-        centers = [obs_center_1.value, obs_center_2.value, obs_center_3.value]
-        center = centers[obstacle_idx].copy()
+        param_name = f"obstacle_center_{obstacle_idx + 1}"
+        center = problem.parameters[param_name].copy()
         center[axis] = world_value
-        if obstacle_idx == 0:
-            obs_center_1.value = center
-        elif obstacle_idx == 1:
-            obs_center_2.value = center
-        else:
-            obs_center_3.value = center
+        # Update both the Parameter object's value and problem.parameters
+        obstacle_centers[obstacle_idx].value = center
+        problem.parameters[param_name] = center
         # Update visualization
         self.update_obstacle_position(obstacle_idx)
         # Update label
@@ -229,8 +230,8 @@ class Obstacle3DPlotWidget(QWidget):
         """Update obstacle position in 3D view"""
         if not HAS_OPENGL:
             return
-        centers = [obs_center_1.value, obs_center_2.value, obs_center_3.value]
-        center = centers[obstacle_idx]
+        param_name = f"obstacle_center_{obstacle_idx + 1}"
+        center = problem.parameters[param_name]
         # Update ellipsoid position
         ellipsoid = self.obs_ellipsoids[obstacle_idx]
         ellipsoid.resetTransform()
@@ -238,8 +239,8 @@ class Obstacle3DPlotWidget(QWidget):
 
     def update_slider_values(self, obstacle_idx):
         """Update slider values to match current obstacle position"""
-        centers = [obs_center_1.value, obs_center_2.value, obs_center_3.value]
-        center = centers[obstacle_idx]
+        param_name = f"obstacle_center_{obstacle_idx + 1}"
+        center = problem.parameters[param_name]
         sliders = getattr(self, f"obs_{obstacle_idx}_sliders")
         for i, (slider, label) in enumerate(sliders):
             # Convert world coordinates to slider values
@@ -247,63 +248,66 @@ class Obstacle3DPlotWidget(QWidget):
             slider.setValue(slider_value)
             label.setText(f"{center[i]:.2f}")
 
-    def on_lam_cost_changed(self, input_widget):
-        """Handle lambda cost input changes"""
-        # Extract the new value from the input widget
-        new_value = input_widget.text()
-        try:
-            # Convert the new value to a float
-            lam_cost_value = float(new_value)
-            problem.settings.scp.lam_cost = lam_cost_value
-            # Update the display
-            input_widget.setText(f"{lam_cost_value:.2E}")
-        except ValueError:
-            print("Invalid input. Please enter a valid number.")
-
-    def on_lam_tr_changed(self, input_widget):
-        """Handle lambda trust region input changes"""
-        # Extract the new value from the input widget
-        new_value = input_widget.text()
-        try:
-            # Convert the new value to a float
-            lam_tr_value = float(new_value)
-            problem.settings.scp.w_tr = lam_tr_value
-            # Update the display
-            input_widget.setText(f"{lam_tr_value:.2E}")
-        except ValueError:
-            print("Invalid input. Please enter a valid number.")
-
-    def update_optimization_metrics(self, results):
-        """Update the optimization metrics display"""
-        if results is None:
-            return
-        # Extract metrics from results
-        iter_num = results.get("iter", 0)
-        j_tr = results.get("J_tr", 0.0)
-        j_vb = results.get("J_vb", 0.0)
-        j_vc = results.get("J_vc", 0.0)
-        cost = results.get("cost", 0.0)
-        status = results.get("prob_stat", "--")
-        # Get timing information (these would need to be tracked separately)
-        dis_time = results.get("dis_time", 0.0)
-        solve_time = results.get("solve_time", 0.0)
-        # Update labels
-        self.iter_label.setText(f"Iteration: {iter_num}")
-        self.j_tr_label.setText(f"J_tr: {j_tr:.2e}")
-        self.j_vb_label.setText(f"J_vb: {j_vb:.2e}")
-        self.j_vc_label.setText(f"J_vc: {j_vc:.2e}")
-        self.objective_label.setText(f"Objective: {cost:.2e}")
-        self.lam_cost_display_label.setText(f"λ_cost: {problem.settings.scp.lam_cost:.2E}")
-        self.dis_time_label.setText(f"Dis Time: {dis_time:.1f}ms")
-        self.solve_time_label.setText(f"Solve Time: {solve_time:.1f}ms")
-        self.status_label.setText(f"Status: {status}")
-
     def keyPressEvent(self, event):
         """Handle keyboard shortcuts"""
         if event.key() == Qt.Key_Escape:
             self.close()
         else:
             super().keyPressEvent(event)
+
+
+def on_lam_cost_changed(input_widget):
+    """Handle lambda cost input changes"""
+    # Extract the new value from the input widget
+    new_value = input_widget.text()
+    try:
+        # Convert the new value to a float
+        lam_cost_value = float(new_value)
+        problem.settings.scp.lam_cost = lam_cost_value
+        # Update the display with scientific notation
+        input_widget.setText(f"{lam_cost_value:.2E}")
+    except ValueError:
+        print("Invalid input. Please enter a valid number.")
+
+
+def on_lam_tr_changed(input_widget):
+    """Handle lambda trust region input changes"""
+    # Extract the new value from the input widget
+    new_value = input_widget.text()
+    try:
+        # Convert the new value to a float
+        lam_tr_value = float(new_value)
+        problem.settings.scp.w_tr = lam_tr_value
+        # Update the display with scientific notation
+        input_widget.setText(f"{lam_tr_value:.2E}")
+    except ValueError:
+        print("Invalid input. Please enter a valid number.")
+
+
+def update_optimization_metrics(results, labels_dict):
+    """Update the optimization metrics display"""
+    if results is None:
+        return
+    # Extract metrics from results
+    iter_num = results.get("iter", 0)
+    j_tr = results.get("J_tr", 0.0)
+    j_vb = results.get("J_vb", 0.0)
+    j_vc = results.get("J_vc", 0.0)
+    cost = results.get("cost", 0.0)
+    status = results.get("prob_stat", "--")
+    # Get timing information (these would need to be tracked separately)
+    dis_time = results.get("dis_time", 0.0)
+    solve_time = results.get("solve_time", 0.0)
+    # Update labels
+    labels_dict["iter_label"].setText(f"Iteration: {iter_num}")
+    labels_dict["j_tr_label"].setText(f"J_tr: {j_tr:.2E}")
+    labels_dict["j_vb_label"].setText(f"J_vb: {j_vb:.2E}")
+    labels_dict["j_vc_label"].setText(f"J_vc: {j_vc:.2E}")
+    labels_dict["objective_label"].setText(f"Objective: {cost:.2E}")
+    labels_dict["lam_cost_display_label"].setText(f"λ_cost: {problem.settings.scp.lam_cost:.2E}")
+    labels_dict["dis_time_label"].setText(f"Dis Time: {dis_time:.1f}ms")
+    labels_dict["solve_time_label"].setText(f"Solve Time: {solve_time:.1f}ms")
+    labels_dict["status_label"].setText(f"Status: {status}")
 
 
 def optimization_loop():
@@ -381,11 +385,10 @@ def plot_thread_func():
                 i2 = i1 + n_x * n_x
                 i3 = i2 + n_x * n_u
                 i4 = i3 + n_x * n_u
-                i5 = i4 + n_x
                 all_pos_segments = []
                 for i_node in range(V_multi_shoot.shape[1]):
                     node_data = V_multi_shoot[:, i_node]
-                    segments_for_node = node_data.reshape(-1, i5)
+                    segments_for_node = node_data.reshape(-1, i4)
                     pos_segments = segments_for_node[:, :3]  # 3D positions
                     all_pos_segments.append(pos_segments)
                 if all_pos_segments:
@@ -393,25 +396,21 @@ def plot_thread_func():
                     if HAS_OPENGL:
                         plot_widget.traj_scatter.setData(pos=full_traj)
                         # Update obstacle positions (reset and translate for ellipsoids)
-                        centers = [obs_center_1.value, obs_center_2.value, obs_center_3.value]
                         for i, ellipsoid in enumerate(plot_widget.obs_ellipsoids):
+                            param_name = f"obstacle_center_{i + 1}"
+                            center = problem.parameters[param_name]
                             ellipsoid.resetTransform()
-                            ellipsoid.translate(*centers[i])
+                            ellipsoid.translate(*center)
                     else:
                         # 2D fallback - plot X vs Y
                         plot_widget.traj_curve.setData(full_traj[:, 0], full_traj[:, 1])
                         # Update obstacle positions in 2D
-                        plot_widget.obs_scatters[0].setData(
-                            [obs_center_1.value[0]], [obs_center_1.value[1]]
-                        )
-                        plot_widget.obs_scatters[1].setData(
-                            [obs_center_2.value[0]], [obs_center_2.value[1]]
-                        )
-                        plot_widget.obs_scatters[2].setData(
-                            [obs_center_3.value[0]], [obs_center_3.value[1]]
-                        )
+                        for i in range(3):
+                            param_name = f"obstacle_center_{i + 1}"
+                            center = problem.parameters[param_name]
+                            plot_widget.obs_scatters[i].setData([center[0]], [center[1]])
                 # Update optimization metrics display
-                plot_widget.update_optimization_metrics(latest_results["results"])
+                update_optimization_metrics(latest_results["results"], plot_widget.labels_dict)
             except Exception as e:
                 print(f"Plot update error: {e}")
                 if "x" in latest_results["results"]:
