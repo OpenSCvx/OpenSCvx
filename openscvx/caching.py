@@ -190,10 +190,11 @@ def prime_propagation_solver(
         idx_s_stop = settings.sim.idx_s.stop
         save_time = np.ones((settings.prp.max_tau_len,), dtype=np.float64)
         mask_padded = np.ones((settings.prp.max_tau_len,), dtype=bool)
-        param_values = [
-            np.ones_like(param.value) if hasattr(param.value, "shape") else float(param.value)
-            for _, param in params.items()
-        ]
+        # Create dummy params dict with same structure
+        dummy_params = {
+            name: np.ones_like(value) if hasattr(value, "shape") else float(value)
+            for name, value in params.items()
+        }
         propagation_solver.call(
             x_0,
             tau_grid,
@@ -204,7 +205,7 @@ def prime_propagation_solver(
             idx_s_stop,
             save_time,
             mask_padded,
-            *param_values,
+            dummy_params,
         )
     except Exception as e:
         print(f"[Initialization] Priming propagation_solver.call failed: {e}")

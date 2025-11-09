@@ -10,11 +10,11 @@ sys.path.append(grandparent_dir)
 
 from examples.plotting import plot_animation
 from openscvx import TrajOptProblem
+from openscvx.constraints import ctcs
+from openscvx.dynamics import dynamics
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import Free, Minimize, State
 from openscvx.symbolic.parameter import Parameter
-from openscvx.constraints import ctcs
-from openscvx.dynamics import dynamics
 from openscvx.utils import (
     SSM,
     SSMP,

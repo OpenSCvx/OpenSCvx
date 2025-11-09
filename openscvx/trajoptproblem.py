@@ -12,6 +12,29 @@ from jax import jacfwd
 os.environ["EQX_ON_ERROR"] = "nan"
 
 from openscvx import io
+from openscvx.caching import (
+    get_solver_cache_paths,
+    load_or_compile_discretization_solver,
+    load_or_compile_propagation_solver,
+    prime_propagation_solver,
+)
+from openscvx.config import (
+    Config,
+    ConvexSolverConfig,
+    DevConfig,
+    DiscretizationConfig,
+    PropagationConfig,
+    ScpConfig,
+    SimConfig,
+)
+from openscvx.constraints.lowered import LoweredNodalConstraint
+from openscvx.discretization import get_discretization_solver
+from openscvx.dynamics import Dynamics
+from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables, lower_convex_constraints
+from openscvx.post_processing import propagate_trajectory_results
+from openscvx.propagation import get_propagation_solver
+from openscvx.ptr import PTR_init, PTR_step, format_result
+from openscvx.results import OptimizationResults
 from openscvx.symbolic.augmentation import (
     augment_dynamics_with_ctcs,
     augment_with_time_state,
@@ -36,32 +59,46 @@ from openscvx.symbolic.preprocessing import (
     validate_variable_names,
 )
 from openscvx.symbolic.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
-from openscvx.caching import (
-    get_solver_cache_paths,
-    load_or_compile_discretization_solver,
-    load_or_compile_propagation_solver,
-    prime_propagation_solver,
-)
-from openscvx.config import (
-    Config,
-    ConvexSolverConfig,
-    DevConfig,
-    DiscretizationConfig,
-    PropagationConfig,
-    ScpConfig,
-    SimConfig,
-)
-from openscvx.constraints.lowered import LoweredNodalConstraint
-from openscvx.discretization import get_discretization_solver
-from openscvx.dynamics import Dynamics
-from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables, lower_convex_constraints
-from openscvx.post_processing import propagate_trajectory_results
-from openscvx.propagation import get_propagation_solver
-from openscvx.ptr import PTR_init, PTR_step, format_result
-from openscvx.results import OptimizationResults
 
 if TYPE_CHECKING:
     import cvxpy as cp
+
+
+class _ParameterDict(dict):
+    """Dictionary that syncs to both internal _parameters dict and CVXPy parameters.
+
+    This allows users to naturally update parameters like:
+        problem.parameters["obs_radius"] = 2.0
+
+    Changes automatically propagate to:
+    1. Internal _parameters dict (plain dict for JAX)
+    2. CVXPy parameters (for optimization)
+    """
+
+    def __init__(self, problem, internal_dict, *args, **kwargs):
+        self._problem = problem
+        self._internal_dict = internal_dict  # Reference to plain dict for JAX
+        super().__init__(*args, **kwargs)
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        # Sync to internal dict for JAX
+        self._internal_dict[key] = value
+        # Sync to CVXPy if it exists
+        if self._problem.cvxpy_params is not None and key in self._problem.cvxpy_params:
+            self._problem.cvxpy_params[key].value = value
+
+    def update(self, other=None, **kwargs):
+        """Update multiple parameters and sync to internal dict and CVXPy."""
+        if other is not None:
+            if hasattr(other, "items"):
+                for key, value in other.items():
+                    self[key] = value
+            else:
+                for key, value in other:
+                    self[key] = value
+        for key, value in kwargs.items():
+            self[key] = value
 
 
 # TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
@@ -78,7 +115,6 @@ class TrajOptProblem:
         time_derivative: Union[float, Expr] = None,
         time_min: float = None,
         time_max: float = None,
-        params: Optional[dict] = None,
         dynamics_prop: Optional[callable] = None,
         x_prop: State = None,
         scp: Optional[ScpConfig] = None,
@@ -117,7 +153,6 @@ class TrajOptProblem:
                 a "time" state in x. Default: None (uses 0.0).
             time_max (float): Maximum bound for time variable. Only used if NOT including
                 a "time" state in x. Default: None (uses sensible default based on time_final).
-            params (dict): Optional parameters dictionary for runtime parameter changes
             dynamics_prop: Propagation dynamics function (optional)
             x_prop: Propagation state (optional)
             scp: SCP configuration object
@@ -179,6 +214,19 @@ class TrajOptProblem:
         dynamics_concat = dynamics_concat.canonicalize()
         constraints = [expr.canonicalize() for expr in constraints]
 
+        # Collect parameter values from all constraints before any processing
+        from openscvx.symbolic.expr import Parameter, traverse
+
+        parameters = {}
+
+        def collect_param_values(expr):
+            if isinstance(expr, Parameter):
+                if expr.name not in parameters:
+                    parameters[expr.name] = expr.value
+
+        for constraint in constraints:
+            traverse(constraint, collect_param_values)
+
         # Sort and separate constraints first
         constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
             constraints, N
@@ -230,8 +278,12 @@ class TrajOptProblem:
         x_unified: UnifiedState = unify_states(x_aug)
         u_unified: UnifiedControl = unify_controls(u_aug)
 
-        # Store parameters dictionary for runtime parameter changes
-        self.parameters = params or {}
+        # Store parameters in two forms:
+        # 1. _param_values: plain dict for JAX functions
+        # 2. _parameters: wrapper dict for user access that auto-syncs
+        self._parameters = parameters  # Plain dict for JAX
+        self._parameter_wrapper = _ParameterDict(self, self._parameters, parameters)
+        self.cvxpy_params = None  # Will be set during initialize()
 
         if dynamics_prop is None:
             dynamics_prop = Dynamics(dyn_fn)
@@ -360,6 +412,37 @@ class TrajOptProblem:
         self.scp_controls = []
         self.scp_V_multi_shoot_traj = []
 
+    @property
+    def parameters(self):
+        """Get the parameters dictionary.
+
+        The returned dictionary automatically syncs to CVXPy when modified:
+            problem.parameters["obs_radius"] = 2.0  # Auto-syncs to CVXPy
+            problem.parameters.update({"gate_0_center": center})  # Also syncs
+
+        Returns:
+            _ParameterDict: Special dict that syncs to CVXPy on assignment
+        """
+        return self._parameter_wrapper
+
+    @parameters.setter
+    def parameters(self, new_params: dict):
+        """Replace the entire parameters dictionary and sync to CVXPy.
+
+        Args:
+            new_params: New parameters dictionary
+        """
+        self._parameters = dict(new_params)  # Create new plain dict
+        self._parameter_wrapper = _ParameterDict(self, self._parameters, new_params)
+        self._sync_parameters()
+
+    def _sync_parameters(self):
+        """Sync all parameter values to CVXPy parameters."""
+        if self.cvxpy_params is not None:
+            for name, value in self._parameter_wrapper.items():
+                if name in self.cvxpy_params:
+                    self.cvxpy_params[name].value = value
+
     def initialize(self):
         io.intro()
 
@@ -404,8 +487,8 @@ class TrajOptProblem:
         ocp_vars = create_cvxpy_variables(self.settings)
 
         # Phase 2: Lower convex constraints to CVXPy
-        lowered_convex_constraints = lower_convex_constraints(
-            self.settings.sim.constraints_nodal_convex, ocp_vars
+        lowered_convex_constraints, self.cvxpy_params = lower_convex_constraints(
+            self.settings.sim.constraints_nodal_convex, ocp_vars, self._parameters
         )
 
         # Store lowered constraints back in settings for Phase 3
@@ -437,7 +520,7 @@ class TrajOptProblem:
         self.discretization_solver = load_or_compile_discretization_solver(
             self.discretization_solver,
             dis_solver_file,
-            self.parameters,
+            self._parameters,  # Plain dict for JAX
             self.settings.scp.n,
             self.settings.sim.n_states,
             self.settings.sim.n_controls,
@@ -454,7 +537,7 @@ class TrajOptProblem:
         self.propagation_solver = load_or_compile_propagation_solver(
             self.propagation_solver,
             prop_solver_file,
-            self.parameters,
+            self._parameters,  # Plain dict for JAX
             self.settings.sim.n_states_prop,
             self.settings.sim.n_controls,
             self.settings.prp.max_tau_len,
@@ -464,7 +547,7 @@ class TrajOptProblem:
         # Initialize the PTR loop
         print("Initializing the SCvx Subproblem Solver...")
         self.cpg_solve = PTR_init(
-            self.parameters,
+            self._parameters,  # Plain dict for JAX/CVXPy
             self.optimal_control_problem,
             self.discretization_solver,
             self.settings,
@@ -485,7 +568,7 @@ class TrajOptProblem:
         print("Total Initialization Time: ", self.timing_init)
 
         # Prime the propagation solver
-        prime_propagation_solver(self.propagation_solver, self.parameters, self.settings)
+        prime_propagation_solver(self.propagation_solver, self._parameters, self.settings)
 
         if self.settings.dev.profiling:
             pr.disable()
@@ -503,7 +586,7 @@ class TrajOptProblem:
             dict: Dictionary containing convergence status and current state
         """
         result = PTR_step(
-            self.parameters,
+            self._parameters,  # Plain dict for JAX/CVXPy
             self.settings,
             self.optimal_control_problem,
             self.discretization_solver,
@@ -529,6 +612,9 @@ class TrajOptProblem:
     def solve(
         self, max_iters: Optional[int] = None, continuous: bool = False
     ) -> OptimizationResults:
+        # Sync parameters before solving
+        self._sync_parameters()
+
         # Ensure parameter sizes and normalization are correct
         self.settings.scp.__post_init__()
         self.settings.sim.__post_init__()
@@ -581,7 +667,7 @@ class TrajOptProblem:
 
         t_0_post = time.time()
         result = propagate_trajectory_results(
-            self.parameters, self.settings, result, self.propagation_solver
+            self._parameters, self.settings, result, self.propagation_solver
         )
         t_f_post = time.time()
 

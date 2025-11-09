@@ -108,7 +108,7 @@ class TestCvxpyLowerer:
         lowerer = CvxpyLowerer(variable_map)
 
         # Create symbolic parameter
-        param = Parameter("alpha", ())
+        param = Parameter("alpha", (), value=5.0)
         result = lowerer.lower(param)
 
         # Should return the CVXPy parameter
@@ -122,7 +122,7 @@ class TestCvxpyLowerer:
         lowerer = CvxpyLowerer(variable_map)
 
         # Create symbolic parameter
-        param = Parameter("weights", (3,))
+        param = Parameter("weights", (3,), value=np.array([1.0, 2.0, 3.0]))
         result = lowerer.lower(param)
 
         # Should return the CVXPy parameter
@@ -137,7 +137,7 @@ class TestCvxpyLowerer:
         lowerer = CvxpyLowerer(variable_map)
 
         # Create symbolic parameter
-        param = Parameter("transform", (2, 3))
+        param = Parameter("transform", (2, 3), value=np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]))
         result = lowerer.lower(param)
 
         # Should return the CVXPy parameter
@@ -149,7 +149,7 @@ class TestCvxpyLowerer:
         lowerer = CvxpyLowerer({})
 
         # Create symbolic parameter
-        param = Parameter("missing_param", ())
+        param = Parameter("missing_param", (), value=1.0)
 
         # Should raise ValueError when parameter is missing
         with pytest.raises(ValueError, match="Parameter 'missing_param' not found"):
@@ -165,7 +165,7 @@ class TestCvxpyLowerer:
 
         # Symbolic expressions
         state = State("x", (3,))
-        gain = Parameter("gain", ())
+        gain = Parameter("gain", (), value=2.5)
 
         # Expression: gain * x
         expr = Mul(gain, state)
@@ -180,7 +180,7 @@ class TestCvxpyLowerer:
         variable_map = {"threshold": threshold_param}
 
         # Create symbolic parameter
-        param = Parameter("threshold", (2,))
+        param = Parameter("threshold", (2,), value=np.array([1.5, 2.5]))
 
         result = lower_to_cvxpy(param, variable_map)
         assert result is threshold_param
@@ -196,7 +196,7 @@ class TestCvxpyLowerer:
 
         # Symbolic expressions
         state = State("x", (3,))
-        limit = Parameter("limit", (3,))
+        limit = Parameter("limit", (3,), value=np.array([1.0, 2.0, 3.0]))
 
         # Constraint: x <= limit
         constraint = Inequality(state, limit)
@@ -220,8 +220,8 @@ class TestCvxpyLowerer:
         state._slice = slice(0, 4)
         control = Control("u", (2,))
         control._slice = slice(0, 2)
-        mass = Parameter("mass", ())
-        gravity = Parameter("gravity", ())
+        mass = Parameter("mass", (), value=2.0)
+        gravity = Parameter("gravity", (), value=9.81)
 
         # Extract state components: pos = x[0:2], vel = x[2:4]
         # pos = Index(state, slice(0, 2))
