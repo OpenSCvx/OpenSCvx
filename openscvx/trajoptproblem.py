@@ -293,7 +293,7 @@ class TrajOptProblem:
         # Index tracking
         # TODO: (norrisg) use the `_slice` attribute of the State, Control
         idx_x_true = slice(0, x_unified.true.shape[0])
-        idx_x_true_prop = slice(0, x_prop.shape[0])
+        idx_x_true_prop = slice(0, x_prop.true.shape[0])
         idx_u_true = slice(0, u_unified.true.shape[0])
         idx_constraint_violation = slice(idx_x_true.stop, idx_x_true.stop + num_augmented_states)
         idx_constraint_violation_prop = slice(
