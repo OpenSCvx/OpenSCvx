@@ -1965,9 +1965,7 @@ def plot_scp_animation(result: dict, params=None, path=""):
     i = 1
     # Add obstacles using helper function (extract .value from centers if needed)
     if "obstacles_centers" in result:
-        centers = [
-            c.value if hasattr(c, "value") else c for c in result["obstacles_centers"]
-        ]
+        centers = [c.value if hasattr(c, "value") else c for c in result["obstacles_centers"]]
         add_obstacles(
             fig,
             centers,
