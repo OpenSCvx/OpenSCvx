@@ -61,9 +61,9 @@ controls = [thrust]
 g_e = 9.807  # Gravitational acceleration on Earth in m/s^2
 
 # Create parameters for the problem
-I_sp = ox.Parameter("I_sp")
-g = ox.Parameter("g")
-theta = ox.Parameter("theta")
+I_sp = ox.Parameter("I_sp", value=225)
+g = ox.Parameter("g", value=3.7114)
+theta = ox.Parameter("theta", value=27 * np.pi / 180)
 
 # These will be computed symbolically in constraints
 theta_val = 27 * np.pi / 180  # Cant angle value for parameter setup
@@ -108,20 +108,11 @@ dynamics = {
     "mass": -ox.linalg.Norm(thrust) / (I_sp * g_e * np.cos(theta_val)),
 }
 
-
-# Set parameter values
-params = {
-    "I_sp": 225,  # Specific impulse in seconds
-    "g": 3.7114,  # Gravitational acceleration on Mars in m/s^2
-    "theta": theta_val,  # Cant angle of the thrusters in radians
-}
-
 # Build the problem
 problem = TrajOptProblem(
     dynamics=dynamics,
     states=states,
     controls=controls,
-    params=params,
     time_initial=0.0,
     time_final=("free", total_time),
     time_derivative=1.0,  # Real time

@@ -31,7 +31,7 @@ from .expr import (
 from .linalg import Diag, Hstack, Norm, Stack, Transpose, Vstack
 
 # Mathematical functions
-from .math import Cos, Exp, Huber, Log, PositivePart, Sin, SmoothReLU, Sqrt, Square
+from .math import Cos, Exp, Huber, Log, Max, PositivePart, Sin, SmoothReLU, Sqrt, Square
 
 # Spatial/3D operations
 from .spatial import QDCM, SSM, SSMP
@@ -83,6 +83,7 @@ __all__ = [
     "SmoothReLU",
     "Exp",
     "Log",
+    "Max",
     # Linear algebra operations
     "Transpose",
     "Stack",

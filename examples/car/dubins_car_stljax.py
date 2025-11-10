@@ -48,10 +48,10 @@ angular_rate.guess = np.zeros((n, 1))
 states = [position, theta]
 controls = [speed, angular_rate]
 # Define Parameters for wp radius and center
-wp1_center = ox.Parameter("wp1_center", shape=(2,))
-wp1_radius = ox.Parameter("wp1_radius", shape=())
-wp2_center = ox.Parameter("wp2_center", shape=(2,))
-wp2_radius = ox.Parameter("wp2_radius", shape=())
+wp1_center = ox.Parameter("wp1_center", shape=(2,), value=np.array([-2.1, 0.0]))
+wp1_radius = ox.Parameter("wp1_radius", shape=(), value=0.5)
+wp2_center = ox.Parameter("wp2_center", shape=(2,), value=np.array([2.1, 0.0]))
+wp2_radius = ox.Parameter("wp2_radius", shape=(), value=0.5)
 
 
 # Define dynamics as dictionary mapping state names to their derivatives
@@ -78,21 +78,11 @@ for state in states:
 # Visit waypoint constraints using symbolic Or
 constraints.append(ox.ctcs(-visit_wp_or_expr <= 0.0).over((3, 5)))
 
-
-# Set parameter values
-params = {
-    "wp1_center": np.array([-2.1, 0.0]),
-    "wp1_radius": 0.5,
-    "wp2_center": np.array([1.9, 0.0]),
-    "wp2_radius": 0.5,
-}
-
 # Build the problem
 problem = TrajOptProblem(
     dynamics=dynamics,
     states=states,
     controls=controls,
-    params=params,
     time_initial=0.0,
     time_final=("minimize", total_time),
     time_derivative=1.0,  # Real time
@@ -109,12 +99,7 @@ problem.settings.scp.w_tr = 1e0
 problem.settings.scp.lam_cost = 1e-1
 problem.settings.scp.lam_vc = 6e2
 problem.settings.scp.uniform_time_grid = True
-plotting_dict = {
-    "wp1_radius": params["wp1_radius"],
-    "wp1_center": params["wp1_center"],
-    "wp2_radius": params["wp2_radius"],
-    "wp2_center": params["wp2_center"],
-}
+
 if __name__ == "__main__":
     problem.initialize()
     results = problem.solve()

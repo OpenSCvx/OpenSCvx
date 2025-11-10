@@ -1,5 +1,7 @@
 from typing import Tuple
 
+import numpy as np
+
 from .expr import Expr, to_expr
 
 
@@ -123,6 +125,57 @@ class Log(Expr):
 
     def __repr__(self):
         return f"log({self.operand!r})"
+
+
+class Max(Expr):
+    """Maximum of two or more operands: max(a, b, c, ...)"""
+
+    def __init__(self, *args):
+        if len(args) < 2:
+            raise ValueError("Max requires two or more operands")
+        self.operands = [to_expr(a) for a in args]
+
+    def children(self):
+        return list(self.operands)
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize max: flatten nested Max, fold constants."""
+        from .expr import Constant
+
+        operands = []
+        const_vals = []
+
+        for op in self.operands:
+            c = op.canonicalize()
+            if isinstance(c, Max):
+                operands.extend(c.operands)
+            elif isinstance(c, Constant):
+                const_vals.append(c.value)
+            else:
+                operands.append(c)
+
+        # If we have constants, compute their max and keep it
+        if const_vals:
+            max_const = np.maximum.reduce(const_vals)
+            operands.append(Constant(max_const))
+
+        if not operands:
+            raise ValueError("Max must have at least one operand after canonicalization")
+        if len(operands) == 1:
+            return operands[0]
+        return Max(*operands)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Max broadcasts shapes like NumPy."""
+        shapes = [child.check_shape() for child in self.children()]
+        try:
+            return np.broadcast_shapes(*shapes)
+        except ValueError as e:
+            raise ValueError(f"Max shapes not broadcastable: {shapes}") from e
+
+    def __repr__(self):
+        inner = ", ".join(repr(op) for op in self.operands)
+        return f"max({inner})"
 
 
 # Penalty function building blocks

@@ -24,6 +24,7 @@ from openscvx.symbolic.expr import (
     Inequality,
     Log,
     MatMul,
+    Max,
     Mul,
     Neg,
     NodalConstraint,
@@ -276,6 +277,20 @@ class JaxLowerer:
     def visit_sqrt(self, node: Sqrt):
         f = self.lower(node.operand)
         return lambda x, u, node, params: jnp.sqrt(f(x, u, node, params))
+
+    @visitor(Max)
+    def visit_max(self, node: Max):
+        fs = [self.lower(op) for op in node.operands]
+
+        def fn(x, u, node, params):
+            values = [f(x, u, node, params) for f in fs]
+            # jnp.maximum can take multiple arguments
+            result = values[0]
+            for val in values[1:]:
+                result = jnp.maximum(result, val)
+            return result
+
+        return fn
 
     @visitor(Transpose)
     def visit_transpose(self, node: Transpose):

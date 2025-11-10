@@ -17,6 +17,7 @@ from openscvx.symbolic.expr import (
     Inequality,
     Log,
     MatMul,
+    Max,
     Mul,
     Neg,
     Norm,
@@ -265,6 +266,19 @@ class CvxpyLowerer:
     def visit_sqrt(self, node: Sqrt) -> cp.Expression:
         operand = self.lower(node.operand)
         return cp.sqrt(operand)
+
+    @visitor(Max)
+    def visit_max(self, node: Max) -> cp.Expression:
+        operands = [self.lower(op) for op in node.operands]
+        # CVXPy's maximum can take multiple arguments
+        if len(operands) == 2:
+            return cp.maximum(operands[0], operands[1])
+        else:
+            # For more than 2 operands, chain maximum calls
+            result = cp.maximum(operands[0], operands[1])
+            for op in operands[2:]:
+                result = cp.maximum(result, op)
+            return result
 
     @visitor(Transpose)
     def visit_transpose(self, node: Transpose) -> cp.Expression:
