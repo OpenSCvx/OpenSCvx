@@ -213,7 +213,7 @@ class TrajOptProblem:
         dynamics_concat = dynamics_concat.canonicalize()
         constraints = [expr.canonicalize() for expr in constraints]
 
-        # Collect parameter values from all constraints before any processing
+        # Collect parameter values from all constraints and dynamics before any processing
         from openscvx.symbolic.expr import Parameter, traverse
 
         parameters = {}
@@ -223,6 +223,10 @@ class TrajOptProblem:
                 if expr.name not in parameters:
                     parameters[expr.name] = expr.value
 
+        # Collect from dynamics
+        traverse(dynamics_concat, collect_param_values)
+
+        # Collect from constraints
         for constraint in constraints:
             traverse(constraint, collect_param_values)
 
