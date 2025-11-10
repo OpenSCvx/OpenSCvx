@@ -51,6 +51,9 @@ def sort_ctcs_constraints(
                         f"but now you gave it interval={key}"
                     )
             else:
+                # When idx is explicitly provided, always create a separate group
+                # even if nodes are the same - this allows multiple constraint groups
+                # with the same node interval but different idx values
                 idx_to_nodes[c.idx] = key
         else:
             # No identifier: see if this interval already has one
