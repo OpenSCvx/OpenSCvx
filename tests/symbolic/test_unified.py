@@ -1,6 +1,7 @@
 import numpy as np
 
 from openscvx.symbolic.expr import Control, State
+from openscvx.symbolic.preprocessing import collect_and_assign_slices
 from openscvx.symbolic.unified import unify_controls, unify_states
 
 
@@ -200,3 +201,190 @@ def test_state_with_guess_arrays():
     # Check initial conditions ordering: true states first, then augmented
     expected_initial = np.array([1.0, 2.0, 5.0])
     np.testing.assert_array_equal(unified.initial, expected_initial)
+
+
+# Test metadata slice capabilities
+def test_unified_state_time_slice():
+    """Test that time_slice is correctly identified in unified states."""
+    pos = State("pos", (3,))
+    pos.min = np.array([0.0, 0.0, 0.0])
+
+    time = State("time", (1,))
+    time.min = np.array([0.0])
+
+    vel = State("vel", (3,))
+    vel.min = np.array([-10.0, -10.0, -10.0])
+
+    # Assign slices first
+    states, _ = collect_and_assign_slices([pos, time, vel], [])
+
+    # Pass in mixed order
+    unified = unify_states(states)
+
+    # time_slice should point to the time state
+    assert unified.time_slice is not None
+    assert unified.time_slice.start == 3  # After pos (3 dims)
+    assert unified.time_slice.stop == 4
+    assert unified.min[unified.time_slice][0] == 0.0
+
+
+def test_unified_state_time_slice_none():
+    """Test that time_slice is None when no time state exists."""
+    pos = State("pos", (3,))
+    vel = State("vel", (3,))
+
+    # Assign slices first
+    states, _ = collect_and_assign_slices([pos, vel], [])
+    unified = unify_states(states)
+
+    assert unified.time_slice is None
+
+
+def test_unified_state_ctcs_slice():
+    """Test that ctcs_slice is correctly identified for CTCS augmented states."""
+    pos = State("pos", (2,))
+    pos.min = np.array([0.0, 0.0])
+
+    ctcs1 = State("_ctcs_aug_0", (1,))
+    ctcs1.min = np.array([0.0])
+
+    ctcs2 = State("_ctcs_aug_1", (1,))
+    ctcs2.min = np.array([0.0])
+
+    slack = State("_slack", (1,))
+    slack.min = np.array([0.0])
+
+    # Assign slices first
+    states, _ = collect_and_assign_slices([pos, ctcs1, ctcs2, slack], [])
+
+    # CTCS states should be grouped together
+    unified = unify_states(states)
+
+    # ctcs_slice should span both CTCS augmented states
+    assert unified.ctcs_slice is not None
+    assert unified.ctcs_slice.start == 2  # After pos (2 dims)
+    assert unified.ctcs_slice.stop == 4  # Covers both ctcs states
+    assert unified.min[unified.ctcs_slice][0] == 0.0
+    assert unified.min[unified.ctcs_slice][1] == 0.0
+
+
+def test_unified_state_ctcs_slice_none():
+    """Test that ctcs_slice is None when no CTCS states exist."""
+    pos = State("pos", (2,))
+    slack = State("_slack", (1,))
+
+    # Assign slices first
+    states, _ = collect_and_assign_slices([pos, slack], [])
+    unified = unify_states(states)
+
+    assert unified.ctcs_slice is None
+
+
+def test_unified_state_multiple_metadata_slices():
+    """Test that both time and CTCS slices coexist properly."""
+    pos = State("pos", (2,))
+    pos.min = np.array([0.0, 0.0])
+
+    time = State("time", (1,))
+    time.min = np.array([0.0])
+
+    ctcs1 = State("_ctcs_aug_0", (1,))
+    ctcs1.min = np.array([0.0])
+
+    ctcs2 = State("_ctcs_aug_1", (1,))
+    ctcs2.min = np.array([0.0])
+
+    # Assign slices first
+    states, _ = collect_and_assign_slices([pos, time, ctcs1, ctcs2], [])
+    unified = unify_states(states)
+
+    # Both slices should be present and non-overlapping
+    assert unified.time_slice is not None
+    assert unified.ctcs_slice is not None
+
+    # time comes before ctcs in true states
+    assert unified.time_slice.start == 2  # After pos
+    assert unified.time_slice.stop == 3
+
+    # ctcs are augmented states
+    assert unified.ctcs_slice.start == 3  # After true states
+    assert unified.ctcs_slice.stop == 5  # Both ctcs states
+
+
+def test_unified_control_time_dilation_slice():
+    """Test that time_dilation_slice is correctly identified in unified controls."""
+    thrust = Control("thrust", (2,))
+    thrust.min = np.array([0.0, 0.0])
+
+    time_dilation = Control("_time_dilation", (1,))
+    time_dilation.min = np.array([0.5])
+    time_dilation.max = np.array([2.0])
+
+    torque = Control("torque", (1,))
+    torque.min = np.array([-5.0])
+
+    # Assign slices in the canonical sorted order (true first, then augmented)
+    # This is the order that unify_controls will use
+    _, controls = collect_and_assign_slices([], [thrust, torque, time_dilation])
+
+    unified = unify_controls(controls)
+
+    # time_dilation_slice should point to the time dilation control
+    assert unified.time_dilation_slice is not None
+    # time_dilation is augmented, so comes after true controls
+    assert unified.time_dilation_slice.start == 3  # After thrust (2) + torque (1)
+    assert unified.time_dilation_slice.stop == 4
+    assert unified.min[unified.time_dilation_slice][0] == 0.5
+    assert unified.max[unified.time_dilation_slice][0] == 2.0
+
+
+def test_unified_control_time_dilation_slice_none():
+    """Test that time_dilation_slice is None when no time dilation control exists."""
+    thrust = Control("thrust", (2,))
+    torque = Control("torque", (1,))
+
+    # Assign slices first
+    _, controls = collect_and_assign_slices([], [thrust, torque])
+    unified = unify_controls(controls)
+
+    assert unified.time_dilation_slice is None
+
+
+def test_metadata_slices_indexing():
+    """Test that metadata slices can be used to index into arrays correctly."""
+    pos = State("pos", (2,))
+    pos.initial = np.array([1.0, 2.0])
+
+    time = State("time", (1,))
+    time.initial = np.array([5.0])
+
+    ctcs = State("_ctcs_aug_0", (1,))
+    ctcs.initial = np.array([0.0])
+
+    # Assign slices first
+    states, _ = collect_and_assign_slices([pos, time, ctcs], [])
+    unified = unify_states(states)
+
+    # Use time_slice to extract time value
+    time_value = unified.initial[unified.time_slice]
+    assert time_value.shape == (1,)
+    assert time_value[0] == 5.0
+
+    # Use ctcs_slice to extract CTCS values
+    ctcs_value = unified.initial[unified.ctcs_slice]
+    assert ctcs_value.shape == (1,)
+    assert ctcs_value[0] == 0.0
+
+    # Create a trajectory array
+    traj = np.ones((10, unified.shape[0]))
+    traj[:, unified.time_slice] = np.linspace(0, 1, 10).reshape(-1, 1)
+    traj[:, unified.ctcs_slice] = np.zeros((10, 1))
+
+    # Verify slicing works on 2D arrays
+    time_traj = traj[:, unified.time_slice]
+    assert time_traj.shape == (10, 1)
+    np.testing.assert_array_almost_equal(time_traj.flatten(), np.linspace(0, 1, 10))
+
+    ctcs_traj = traj[:, unified.ctcs_slice]
+    assert ctcs_traj.shape == (10, 1)
+    np.testing.assert_array_equal(ctcs_traj, np.zeros((10, 1)))
