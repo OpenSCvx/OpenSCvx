@@ -223,7 +223,10 @@ class JaxLowerer:
             # Check if constraint is active at this node
             if node.nodes is not None:
                 start_node, end_node = node.nodes
-                is_active = (start_node <= current_node) & (current_node < end_node)
+                # Ensure current_node is a scalar for jax.lax.cond
+                # current_node may be an array with shape (1,) or scalar
+                node_scalar = jnp.atleast_1d(current_node)[0] if jnp.ndim(current_node) == 0 else current_node[0]
+                is_active = (start_node <= node_scalar) & (node_scalar < end_node)
 
                 # Use jax.lax.cond for conditional evaluation
                 return cond(
