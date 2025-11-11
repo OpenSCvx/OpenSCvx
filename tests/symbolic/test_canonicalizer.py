@@ -313,7 +313,7 @@ def test_mul_preserves_vector_structure_with_parameter():
 
 
 def test_mul_vector_constant_folding():
-    """Test that multiplying multiple vector constants correctly performs element-wise multiplication."""
+    """Test that multiplying multiple vector constants correctly performs element-wise mult."""
     # Create vector constants
     vec1 = Constant(np.array([2.0, 3.0, 4.0]))
     vec2 = Constant(np.array([5.0, 6.0, 7.0]))

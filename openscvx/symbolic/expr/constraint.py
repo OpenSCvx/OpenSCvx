@@ -111,7 +111,13 @@ class CTCS(Expr):
     def canonicalize(self) -> "Expr":
         """Canonicalize the inner constraint but preserve CTCS parameters."""
         canon_constraint = self.constraint.canonicalize()
-        return CTCS(canon_constraint, penalty=self.penalty, nodes=self.nodes, idx=self.idx, check_nodally=self.check_nodally)
+        return CTCS(
+            canon_constraint,
+            penalty=self.penalty,
+            nodes=self.nodes,
+            idx=self.idx,
+            check_nodally=self.check_nodally,
+        )
 
     def check_shape(self) -> Tuple[int, ...]:
         """

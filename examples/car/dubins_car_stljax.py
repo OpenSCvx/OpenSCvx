@@ -99,6 +99,7 @@ problem.settings.scp.w_tr = 1e0
 problem.settings.scp.lam_cost = 1e-1
 problem.settings.scp.lam_vc = 6e2
 problem.settings.scp.uniform_time_grid = True
+plotting_dict = dict()
 
 if __name__ == "__main__":
     problem.initialize()

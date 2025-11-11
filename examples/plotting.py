@@ -1886,7 +1886,6 @@ def plot_scp_animation(result: dict, params=None, path=""):
     i2 = i1 + n_x * n_x
     i3 = i2 + n_x * n_u
     i4 = i3 + n_x * n_u
-    i5 = i4 + n_x
 
     # Plot the attitudes of the SCP Trajs
     frames = []
@@ -3362,7 +3361,6 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
     i2 = i1 + n_x * n_x
     i3 = i2 + n_x * n_u
     i4 = i3 + n_x * n_u
-    i5 = i4 + n_x
 
     # Auto-calculate vehicle axes length based on trajectory size
     axes_length = max(pos_range) * 0.1  # 10% of trajectory range
