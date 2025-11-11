@@ -499,8 +499,12 @@ def test_augment_penalty_expression_structure():
     assert isinstance(xdot_aug, Concat)
     assert len(xdot_aug.exprs) == 2
 
-    # The second expression should be the penalty
-    penalty_expr = xdot_aug.exprs[1]
+    # The second expression should be the CTCS constraint (not unwrapped)
+    ctcs_expr = xdot_aug.exprs[1]
+    assert isinstance(ctcs_expr, CTCS)
+
+    # Check the penalty expression inside the CTCS wrapper
+    penalty_expr = ctcs_expr.penalty_expr()
     assert isinstance(penalty_expr, Sum)
     assert isinstance(penalty_expr.operand, Square)
     assert isinstance(penalty_expr.operand.x, PositivePart)
@@ -532,7 +536,10 @@ def test_augment_single_penalty_no_add():
     )
 
     # Single penalty should not be wrapped in Add
-    penalty_expr = xdot_aug.exprs[1]
+    # But it should be wrapped in CTCS
+    ctcs_expr = xdot_aug.exprs[1]
+    assert isinstance(ctcs_expr, CTCS)  # CTCS wrapper preserved
+    penalty_expr = ctcs_expr.penalty_expr()
     assert isinstance(penalty_expr, Sum)  # Direct penalty, not Add
 
 
@@ -1107,11 +1114,17 @@ def test_ctcs_multiple_augmented_states():
     assert isinstance(xdot_aug, Concat)
     assert len(xdot_aug.exprs) == 3  # original + 2 penalty groups
 
-    # First penalty should be Add (c1 + c2), second should be Sum (c3 only)
+    # Each penalty group should be wrapped in Add to sum multiple CTCS nodes
     penalty1 = xdot_aug.exprs[1]  # idx 0 group
     penalty2 = xdot_aug.exprs[2]  # idx 1 group
+
+    # penalty1 should be Add wrapping two CTCS constraints (c1 + c2)
     assert isinstance(penalty1, Add)  # Multiple penalties summed
-    assert isinstance(penalty2, Sum)  # Single penalty
+    assert len(penalty1.terms) == 2
+    assert all(isinstance(term, CTCS) for term in penalty1.terms)
+
+    # penalty2 should be a single CTCS constraint (c3 only), not wrapped in Add
+    assert isinstance(penalty2, CTCS)  # Single penalty
 
 
 # Tests for vector constraint decomposition
