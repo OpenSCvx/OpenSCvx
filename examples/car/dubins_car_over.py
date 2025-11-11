@@ -16,7 +16,7 @@ from openscvx import TrajOptProblem
 # You can install it via pip:
 #     pip install stljax
 n = 8
-total_time = 4.0  # Total simulation time
+total_time = 8.0  # Total simulation time
 
 # Define state components
 position = ox.State("position", shape=(2,))  # 2D position [x, y]
