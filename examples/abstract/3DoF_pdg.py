@@ -61,7 +61,7 @@ controls = [thrust]
 g_e = 9.807  # Gravitational acceleration on Earth in m/s^2
 
 # Create parameters for the problem
-I_sp = ox.Parameter("I_sp", value=225.)
+I_sp = ox.Parameter("I_sp", value=225.0)
 g = ox.Parameter("g", value=3.7114)
 theta = ox.Parameter("theta", value=27 * np.pi / 180)
 

@@ -59,7 +59,7 @@ controls = [thrust]
 
 # Define Parameters for physical constants
 g_e = 9.807  # Gravitational acceleration on Earth in m/s^2
-I_sp = 225.  # Specific impulse
+I_sp = 225.0  # Specific impulse
 g = 3.7114  # Gravitational acceleration
 theta_val = 27 * np.pi / 180  # Cant angle value
 
@@ -173,4 +173,3 @@ if __name__ == "__main__":
 
     # If installed with extras, you can use the following to plot with pyqtgraph
     # plot_animation_pyqtgraph(results, problem.settings)
-
