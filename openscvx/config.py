@@ -312,7 +312,6 @@ class SimConfig:
         self.inv_S_u = np.diag(1 / np.diag(self.S_u))
 
     # Properties for accessing slices from unified objects
-    # These replace the manually-computed idx_* fields
     @property
     def time_slice(self):
         """Slice for accessing time in the state vector."""
@@ -322,6 +321,11 @@ class SimConfig:
     def ctcs_slice(self):
         """Slice for accessing CTCS augmented states."""
         return self.x.ctcs_slice
+
+    @property
+    def ctcs_slice_prop(self):
+        """Slice for accessing CTCS augmented states in propagation."""
+        return self.x_prop.ctcs_slice
 
     @property
     def time_dilation_slice(self):
@@ -334,45 +338,14 @@ class SimConfig:
         return self.x._true_slice
 
     @property
-    def true_control_slice(self):
-        """Slice for accessing true (non-augmented) controls."""
-        return self.u._true_slice
-
-    # Backward compatibility: keep old idx_* names but delegate to new properties
-    @property
-    def idx_t(self):
-        """Deprecated: Use time_slice instead."""
-        return self.time_slice
-
-    @property
-    def idx_y(self):
-        """Deprecated: Use ctcs_slice instead."""
-        return self.ctcs_slice
-
-    @property
-    def idx_y_prop(self):
-        """Deprecated: Use x_prop.ctcs_slice instead."""
-        return self.x_prop.ctcs_slice
-
-    @property
-    def idx_s(self):
-        """Deprecated: Use time_dilation_slice instead."""
-        return self.time_dilation_slice
-
-    @property
-    def idx_x_true(self):
-        """Deprecated: Use true_state_slice instead."""
-        return self.true_state_slice
-
-    @property
-    def idx_x_true_prop(self):
-        """Deprecated: Use x_prop._true_slice instead."""
+    def true_state_slice_prop(self):
+        """Slice for accessing true (non-augmented) propagation states."""
         return self.x_prop._true_slice
 
     @property
-    def idx_u_true(self):
-        """Deprecated: Use true_control_slice instead."""
-        return self.true_control_slice
+    def true_control_slice(self):
+        """Slice for accessing true (non-augmented) controls."""
+        return self.u._true_slice
 
 
 @dataclass

@@ -684,7 +684,7 @@ def plot_dubins_car_disjoint(results: OptimizationResults, params: Config):
 def full_subject_traj_time(results: OptimizationResults, params: Config):
     x_full = results.x_full
     x_nodes = results.x.guess
-    t_nodes = x_nodes[:, params.sim.idx_t]
+    t_nodes = x_nodes[:, params.sim.time_slice]
     t_full = results.t_full
     subs_traj = []
     subs_traj_node = []

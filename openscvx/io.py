@@ -70,7 +70,7 @@ def print_problem_summary(settings):
         n_nodal_convex += 1
     n_nodal_nonconvex = sum(1 for c in settings.sim.constraints_nodal)
     n_ctcs = len(settings.sim.constraints_ctcs)
-    n_augmented = settings.sim.n_states - settings.sim.idx_x_true.stop
+    n_augmented = settings.sim.n_states - settings.sim.true_state_slice.stop
 
     # Count CVXPy variables, parameters, and constraints
     from openscvx.ocp import OptimalControlProblem

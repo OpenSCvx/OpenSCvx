@@ -62,7 +62,7 @@ def format_result(problem, converged: bool) -> OptimizationResults:
 
     return OptimizationResults(
         converged=converged,
-        t_final=problem.settings.sim.x.guess[:, problem.settings.sim.idx_t][-1],
+        t_final=problem.settings.sim.x.guess[:, problem.settings.sim.time_slice][-1],
         u=problem.settings.sim.u,
         x=problem.settings.sim.x,
         nodes=nodes_dict,
@@ -242,7 +242,7 @@ def PTR_main(
 
     result = OptimizationResults(
         converged=scp_k <= settings.scp.k_max,
-        t_final=x.guess[:, settings.sim.idx_t][-1],
+        t_final=x.guess[:, settings.sim.time_slice][-1],
         u=u,
         x=x,
         x_history=scp_trajs,

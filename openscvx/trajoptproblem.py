@@ -524,7 +524,7 @@ class TrajOptProblem:
 
         # Setup propagation solver parameters
         dtau = 1.0 / (self.settings.scp.n - 1)
-        dt_max = self.settings.sim.u.max[self.settings.sim.idx_s][0] * dtau
+        dt_max = self.settings.sim.u.max[self.settings.sim.time_dilation_slice][0] * dtau
         self.settings.prp.max_tau_len = int(dt_max / self.settings.prp.dt) + 2
 
         # Compile the propagation solver

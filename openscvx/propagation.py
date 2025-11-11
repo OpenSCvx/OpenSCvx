@@ -106,7 +106,7 @@ def s_to_t(x, u, params: Config):
     Returns:
         list: List of real time points.
     """
-    t = [x.guess[:, params.sim.idx_t][0]]
+    t = [x.guess[:, params.sim.time_slice][0]]
     tau = np.linspace(0, 1, params.scp.n)
     for k in range(1, params.scp.n):
         s_kp = u.guess[k - 1, -1]
@@ -220,7 +220,7 @@ def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_sol
             controls_next,
             np.array([[tau[k]]]),
             np.array([[k]]),
-            settings.sim.idx_s.stop,
+            settings.sim.time_dilation_slice.stop,
             tau_cur_padded,
             mask_padded,
             params,
