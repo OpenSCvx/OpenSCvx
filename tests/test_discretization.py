@@ -90,7 +90,7 @@ def test_jit_dVdt_compiles(settings):
     # prepare trivial inputs
     n_x, n_u = settings.sim.n_states, settings.sim.n_controls
     N = settings.scp.n
-    aug_dim = n_x + n_x * n_x + 2 * n_x * n_u + n_x
+    aug_dim = n_x + n_x * n_x + 2 * n_x * n_u
 
     tau = jnp.array(0.3)
     V_flat = jnp.ones((N - 1) * aug_dim)

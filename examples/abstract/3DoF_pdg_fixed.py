@@ -59,15 +59,13 @@ controls = [thrust]
 
 # Define Parameters for physical constants
 g_e = 9.807  # Gravitational acceleration on Earth in m/s^2
-
-# Create parameters for the problem
-I_sp = ox.Parameter("I_sp", value=225.0)
-g = ox.Parameter("g", value=3.7114)
-theta = ox.Parameter("theta", value=27 * np.pi / 180)
+I_sp = 225.0  # Specific impulse
+g = 3.7114  # Gravitational acceleration
+theta_val = 27 * np.pi / 180  # Cant angle value
 
 # These will be computed symbolically in constraints
-rho_min = n_eng * T1 * np.cos(theta.value)  # Minimum thrust-to-weight ratio
-rho_max = n_eng * T2 * np.cos(theta.value)  # Maximum thrust-to-weight ratio
+rho_min = n_eng * T1 * np.cos(theta_val)  # Minimum thrust-to-weight ratio
+rho_max = n_eng * T2 * np.cos(theta_val)  # Maximum thrust-to-weight ratio
 
 # Generate box constraints for all states
 constraints = []
@@ -104,7 +102,7 @@ g_vec = np.array([0, 0, 1], dtype=np.float64) * g  # Gravitational acceleration 
 dynamics = {
     "position": velocity,
     "velocity": thrust / mass[0] - g_vec,
-    "mass": -ox.linalg.Norm(thrust) / (I_sp * g_e * ox.Cos(theta)),
+    "mass": -ox.linalg.Norm(thrust) / (I_sp * g_e * np.cos(theta_val)),
 }
 
 # Build the problem
@@ -149,7 +147,7 @@ problem.settings.scp.lam_vc = 1.2e0
 # problem.settings.scp.ep_tr = 5e-3
 # problem.settings.scp.ep_vc = 1e-10
 
-problem.settings.dis.solver = "Dopri8"
+# problem.settings.dis.solver = "Dopri8"
 
 problem.settings.cvx.solver = "CLARABEL"
 problem.settings.cvx.solver_args = {"enforce_dpp": True}

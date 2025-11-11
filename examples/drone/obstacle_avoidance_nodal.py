@@ -85,18 +85,18 @@ A_obs = []
 radius = []
 axes = []
 
-# Define obstacle centers as parameters for runtime updates
-obstacle_centers = [
-    ox.Parameter("obstacle_center_1", shape=(3,)),
-    ox.Parameter("obstacle_center_2", shape=(3,)),
-    ox.Parameter("obstacle_center_3", shape=(3,)),
-]
-
 # Default values for the obstacle centers
 obstacle_center_positions = [
     np.array([-5.1, 0.1, 2]),
     np.array([0.1, 0.1, 2]),
     np.array([5.1, 0.1, 2]),
+]
+
+# Define obstacle centers as parameters for runtime updates
+obstacle_centers = [
+    ox.Parameter("obstacle_center_1", shape=(3,), value=obstacle_center_positions[0]),
+    ox.Parameter("obstacle_center_2", shape=(3,), value=obstacle_center_positions[1]),
+    ox.Parameter("obstacle_center_3", shape=(3,), value=obstacle_center_positions[2]),
 ]
 
 np.random.seed(0)
@@ -127,13 +127,6 @@ velocity.guess = np.linspace(velocity.initial, [0, 0, 0], n)
 attitude.guess = np.tile([1.0, 0.0, 0.0, 0.0], (n, 1))
 angular_velocity.guess = np.zeros((n, 3))
 
-# Set parameter values for obstacle centers
-params = {
-    "obstacle_center_1": obstacle_center_positions[0],
-    "obstacle_center_2": obstacle_center_positions[1],
-    "obstacle_center_3": obstacle_center_positions[2],
-}
-
 problem = TrajOptProblem(
     dynamics=dynamics,
     states=states,
@@ -145,7 +138,6 @@ problem = TrajOptProblem(
     time_max=total_time,
     constraints=constraints,
     N=n,
-    params=params,
 )
 
 problem.settings.prp.dt = 0.01

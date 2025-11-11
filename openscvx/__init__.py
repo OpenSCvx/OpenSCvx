@@ -24,6 +24,7 @@ from openscvx.symbolic.expr import (
     Leaf,
     Log,
     MatMul,
+    Max,
     Mul,
     Neg,
     NodalConstraint,
@@ -68,6 +69,7 @@ __all__ = [
     "Sqrt",
     "Exp",
     "Log",
+    "Max",
     # Constraints
     "Constraint",
     "Equality",

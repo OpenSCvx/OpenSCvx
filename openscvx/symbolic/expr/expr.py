@@ -340,9 +340,20 @@ class Mul(Expr):
                 factors.append(c)
 
         if const_vals:
-            prod = np.prod(const_vals)
+            # Multiply constants element-wise (broadcasting), not reducing with prod
+            prod = const_vals[0]
+            for val in const_vals[1:]:
+                prod = prod * val
+
             # If prod != 1, keep it
-            if not (isinstance(prod, np.ndarray) and np.all(prod == 1)):
+            # Check both scalar and array cases
+            is_identity = False
+            if isinstance(prod, np.ndarray):
+                is_identity = np.all(prod == 1)
+            else:
+                is_identity = prod == 1
+
+            if not is_identity:
                 factors.append(Constant(prod))
 
         if not factors:

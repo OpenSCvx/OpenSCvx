@@ -1886,7 +1886,6 @@ def plot_scp_animation(result: dict, params=None, path=""):
     i2 = i1 + n_x * n_x
     i3 = i2 + n_x * n_u
     i4 = i3 + n_x * n_u
-    i5 = i4 + n_x
 
     # Plot the attitudes of the SCP Trajs
     frames = []
@@ -1901,7 +1900,7 @@ def plot_scp_animation(result: dict, params=None, path=""):
         pos_traj = []
         if traj_iter < len(scp_multi_shoot):
             for i_multi in range(scp_multi_shoot[traj_iter].shape[1]):
-                pos_traj.append(scp_multi_shoot[traj_iter][:, i_multi].reshape(-1, i5)[:, 0:3])
+                pos_traj.append(scp_multi_shoot[traj_iter][:, i_multi].reshape(-1, i4)[:, 0:3])
             pos_traj = np.array(pos_traj)
 
             for j in range(pos_traj.shape[1]):
@@ -1963,11 +1962,12 @@ def plot_scp_animation(result: dict, params=None, path=""):
     fig.frames = frames
 
     i = 1
-    # Add obstacles using helper function (extract .value from centers)
+    # Add obstacles using helper function (extract .value from centers if needed)
     if "obstacles_centers" in result:
+        centers = [c.value if hasattr(c, "value") else c for c in result["obstacles_centers"]]
         add_obstacles(
             fig,
-            [c.value for c in result["obstacles_centers"]],
+            centers,
             result["obstacles_axes"],
             result["obstacles_radii"],
             opacity=0.5,
@@ -2636,7 +2636,8 @@ def plot_animation_pyqtgraph(result, params, step=2):
             # Scale by 1/radius to match the original plot_animation function
             verts = verts * np.array([1 / radius[0], 1 / radius[1], 1 / radius[2]])
             verts = (axes @ verts.T).T  # rotate
-            verts = verts + center.value  # translate
+            center_val = center.value if hasattr(center, "value") else center
+            verts = verts + center_val  # translate
             sphere_mesh.setVertexes(verts)
             obstacle = gl.GLMeshItem(
                 meshdata=sphere_mesh,
@@ -3310,7 +3311,8 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
             # Scale by 1/radius to match the original plot_animation function
             verts = verts * np.array([1 / radius[0], 1 / radius[1], 1 / radius[2]])
             verts = (axes @ verts.T).T  # rotate
-            verts = verts + center.value  # translate
+            center_val = center.value if hasattr(center, "value") else center
+            verts = verts + center_val  # translate
             sphere_mesh.setVertexes(verts)
             obstacle = gl.GLMeshItem(
                 meshdata=sphere_mesh,
@@ -3359,7 +3361,6 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
     i2 = i1 + n_x * n_x
     i3 = i2 + n_x * n_u
     i4 = i3 + n_x * n_u
-    i5 = i4 + n_x
 
     # Auto-calculate vehicle axes length based on trajectory size
     axes_length = max(pos_range) * 0.1  # 10% of trajectory range
@@ -3401,7 +3402,7 @@ def plot_scp_animation_pyqtgraph(result, params, step=2):
         if traj_iter < len(scp_multi_shoot):
             pos_traj = []
             for i_multi in range(scp_multi_shoot[traj_iter].shape[1]):
-                pos_traj.append(scp_multi_shoot[traj_iter][:, i_multi].reshape(-1, i5)[:, 0:3])
+                pos_traj.append(scp_multi_shoot[traj_iter][:, i_multi].reshape(-1, i4)[:, 0:3])
             pos_traj = np.array(pos_traj)
 
             iteration_multishot_lines = []

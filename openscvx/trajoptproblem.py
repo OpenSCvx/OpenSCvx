@@ -213,7 +213,7 @@ class TrajOptProblem:
         dynamics_concat = dynamics_concat.canonicalize()
         constraints = [expr.canonicalize() for expr in constraints]
 
-        # Collect parameter values from all constraints before any processing
+        # Collect parameter values from all constraints and dynamics before any processing
         from openscvx.symbolic.expr import Parameter, traverse
 
         parameters = {}
@@ -223,6 +223,10 @@ class TrajOptProblem:
                 if expr.name not in parameters:
                     parameters[expr.name] = expr.value
 
+        # Collect from dynamics
+        traverse(dynamics_concat, collect_param_values)
+
+        # Collect from constraints
         for constraint in constraints:
             traverse(constraint, collect_param_values)
 
@@ -293,7 +297,7 @@ class TrajOptProblem:
         # Index tracking
         # TODO: (norrisg) use the `_slice` attribute of the State, Control
         idx_x_true = slice(0, x_unified.true.shape[0])
-        idx_x_true_prop = slice(0, x_prop.shape[0])
+        idx_x_true_prop = slice(0, x_prop.true.shape[0])
         idx_u_true = slice(0, u_unified.true.shape[0])
         idx_constraint_violation = slice(idx_x_true.stop, idx_x_true.stop + num_augmented_states)
         idx_constraint_violation_prop = slice(
