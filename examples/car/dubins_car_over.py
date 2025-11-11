@@ -95,15 +95,17 @@ if __name__ == "__main__":
     problem.initialize()
     results = problem.solve()
     results = problem.post_process(results)
-    
+
     # Extract parameter values from problem.parameters (not Parameter objects)
     plotting_dict = {
         "wp1_center": problem.parameters.get("wp1_center", None),
         "wp1_radius": problem.parameters.get("wp1_radius", None),
     }
-    
+
     # Only add waypoints that are actually defined
     if plotting_dict["wp1_center"] is not None and plotting_dict["wp1_radius"] is not None:
-        results.update({"wp1_center": plotting_dict["wp1_center"], "wp1_radius": plotting_dict["wp1_radius"]})
-    
+        results.update(
+            {"wp1_center": plotting_dict["wp1_center"], "wp1_radius": plotting_dict["wp1_radius"]}
+        )
+
     plot_dubins_car_disjoint(results, problem.settings).show()

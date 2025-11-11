@@ -628,22 +628,22 @@ def plot_dubins_car_disjoint(results: OptimizationResults, params: Config):
     if "wp1_center" in results and "wp1_radius" in results:
         wp1_center = results.plotting_data.get("wp1_center")
         wp1_radius = results.plotting_data.get("wp1_radius")
-        
+
         # Extract values if they are Parameter objects or other non-array types
-        if hasattr(wp1_center, 'value'):
+        if hasattr(wp1_center, "value"):
             wp1_center = np.asarray(wp1_center.value)
         else:
             wp1_center = np.asarray(wp1_center)
-            
-        if hasattr(wp1_radius, 'value'):
+
+        if hasattr(wp1_radius, "value"):
             wp1_radius = np.asarray(wp1_radius.value)
         else:
             wp1_radius = np.asarray(wp1_radius)
-        
+
         # Ensure they are scalars/arrays
         wp1_center = np.asarray(wp1_center).flatten()
         wp1_radius = float(np.asarray(wp1_radius).item())
-        
+
         theta = np.linspace(0, 2 * np.pi, 100)
         circle_x = wp1_center[0] + wp1_radius * np.cos(theta)
         circle_y = wp1_center[1] + wp1_radius * np.sin(theta)
@@ -670,22 +670,22 @@ def plot_dubins_car_disjoint(results: OptimizationResults, params: Config):
     if "wp2_center" in results and "wp2_radius" in results:
         wp2_center = results.plotting_data.get("wp2_center")
         wp2_radius = results.plotting_data.get("wp2_radius")
-        
+
         # Extract values if they are Parameter objects or other non-array types
-        if hasattr(wp2_center, 'value'):
+        if hasattr(wp2_center, "value"):
             wp2_center = np.asarray(wp2_center.value)
         else:
             wp2_center = np.asarray(wp2_center)
-            
-        if hasattr(wp2_radius, 'value'):
+
+        if hasattr(wp2_radius, "value"):
             wp2_radius = np.asarray(wp2_radius.value)
         else:
             wp2_radius = np.asarray(wp2_radius)
-        
+
         # Ensure they are scalars/arrays
         wp2_center = np.asarray(wp2_center).flatten()
         wp2_radius = float(np.asarray(wp2_radius).item())
-        
+
         theta = np.linspace(0, 2 * np.pi, 100)
         circle_x = wp2_center[0] + wp2_radius * np.cos(theta)
         circle_y = wp2_center[1] + wp2_radius * np.sin(theta)
