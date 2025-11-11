@@ -272,16 +272,6 @@ class TrajOptProblem:
         self.x_unified = x_unified
         self.u_unified = u_unified
 
-        # Cache important state/control references for quick property access
-        self._time_state = next((s for s in self.states if s.name == "time"), None)
-        if self._time_state is None:
-            raise ValueError("No state named 'time' found in augmented states")
-
-        self._ctcs_states = [s for s in self.states if s.name.startswith("_ctcs_aug_")]
-        self._time_dilation_control = next(
-            (c for c in self.controls if c.name == "_time_dilation"), None
-        )
-
         # Lower symbolic expressions to JAX
         dyn_fn = lower_to_jax(dynamics_aug)
         constraints_nodal_fns = lower_to_jax(constraints_nodal)
