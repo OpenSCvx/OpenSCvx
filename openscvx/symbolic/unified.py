@@ -52,6 +52,8 @@ class UnifiedState:
     _true_dim: int = 0
     _true_slice: Optional[slice] = None
     _augmented_slice: Optional[slice] = None
+    time_slice: Optional[slice] = None  # Slice for time state
+    ctcs_slice: Optional[slice] = None  # Slice for CTCS augmented states
 
     def __post_init__(self):
         """Initialize slices after dataclass creation."""
@@ -268,6 +270,7 @@ class UnifiedControl:
     _true_dim: int = 0
     _true_slice: Optional[slice] = None
     _augmented_slice: Optional[slice] = None
+    time_dilation_slice: Optional[slice] = None  # Slice for time dilation control
 
     def __post_init__(self):
         """Initialize slices after dataclass creation."""
@@ -466,6 +469,16 @@ def unify_states(states: List[State], name: str = "unified_state") -> UnifiedSta
     # Since we simplified State/Control classes, all user states are "true" dimensions
     true_dim = sum(state.shape[0] for state in true_states)
 
+    # Find time state slice
+    time_state = next((s for s in sorted_states if s.name == "time"), None)
+    time_slice = time_state._slice if time_state else None
+
+    # Find CTCS augmented states slice
+    ctcs_states = [s for s in sorted_states if s.name.startswith("_ctcs_aug_")]
+    ctcs_slice = (
+        slice(ctcs_states[0]._slice.start, ctcs_states[-1]._slice.stop) if ctcs_states else None
+    )
+
     return UnifiedState(
         name=name,
         shape=(total_shape,),
@@ -481,6 +494,8 @@ def unify_states(states: List[State], name: str = "unified_state") -> UnifiedSta
         _true_dim=true_dim,
         _true_slice=slice(0, true_dim),
         _augmented_slice=slice(true_dim, total_shape),
+        time_slice=time_slice,
+        ctcs_slice=ctcs_slice,
     )
 
 
@@ -536,6 +551,10 @@ def unify_controls(controls: List[Control], name: str = "unified_control") -> Un
     # Since we simplified State/Control classes, all user controls are "true" dimensions
     true_dim = sum(control.shape[0] for control in true_controls)
 
+    # Find time dilation control slice
+    time_dilation_control = next((c for c in sorted_controls if c.name == "_time_dilation"), None)
+    time_dilation_slice = time_dilation_control._slice if time_dilation_control else None
+
     return UnifiedControl(
         name=name,
         shape=(total_shape,),
@@ -545,6 +564,7 @@ def unify_controls(controls: List[Control], name: str = "unified_control") -> Un
         _true_dim=true_dim,
         _true_slice=slice(0, true_dim),
         _augmented_slice=slice(true_dim, total_shape),
+        time_dilation_slice=time_dilation_slice,
     )
 
 

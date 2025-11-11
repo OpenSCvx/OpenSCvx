@@ -260,26 +260,35 @@ class TrajOptProblem:
         # Assign slices to augmented states and controls in canonical order
         collect_and_assign_slices(x_aug, u_aug)
 
-        # Store state and control lists for dictionary-based results access
+        # Store state and control lists (includes user-defined + augmented)
         self.states = x_aug
         self.controls = u_aug
 
-        # Find the time state by name and get its slice
-        time_state = next((s for s in x_aug if s.name == "time"), None)
-        if time_state is None:
-            raise ValueError("No state named 'time' found in augmented states")
-        time_slice = time_state._slice
+        # Create unified state/control objects for optimization interface
+        x_unified: UnifiedState = unify_states(x_aug)
+        u_unified: UnifiedControl = unify_controls(u_aug)
 
-        # TODO: (norrisg) allow non-ctcs constraints
+        # Store unified objects for easy access
+        self.x_unified = x_unified
+        self.u_unified = u_unified
+
+        # Cache important state/control references for quick property access
+        self._time_state = next((s for s in self.states if s.name == "time"), None)
+        if self._time_state is None:
+            raise ValueError("No state named 'time' found in augmented states")
+
+        self._ctcs_states = [s for s in self.states if s.name.startswith("_ctcs_aug_")]
+        self._time_dilation_control = next(
+            (c for c in self.controls if c.name == "_time_dilation"), None
+        )
+
+        # Lower symbolic expressions to JAX
         dyn_fn = lower_to_jax(dynamics_aug)
         constraints_nodal_fns = lower_to_jax(constraints_nodal)
 
         # Lower convex constraints to CVXPy
         # Note: CVXPy lowering will happen later in the OCP when CVXPy variables are available
         # For now, we just store the symbolic constraints
-
-        x_unified: UnifiedState = unify_states(x_aug)
-        u_unified: UnifiedControl = unify_controls(u_aug)
 
         # Store parameters in two forms:
         # 1. _param_values: plain dict for JAX functions
@@ -294,19 +303,8 @@ class TrajOptProblem:
         if x_prop is None:
             x_prop = deepcopy(x_unified)
 
-        # Index tracking
-        # TODO: (norrisg) use the `_slice` attribute of the State, Control
-        idx_x_true = slice(0, x_unified.true.shape[0])
-        idx_x_true_prop = slice(0, x_prop.true.shape[0])
-        idx_u_true = slice(0, u_unified.true.shape[0])
-        idx_constraint_violation = slice(idx_x_true.stop, idx_x_true.stop + num_augmented_states)
-        idx_constraint_violation_prop = slice(
-            idx_x_true_prop.stop, idx_x_true_prop.stop + num_augmented_states
-        )
-
-        # Time dilation index for reference
-        idx_time_dilation = slice(idx_u_true.stop, idx_u_true.stop + 1)
-
+        # All indices are now stored in the unified objects themselves!
+        # SimConfig will access them via properties
         if dis is None:
             dis = DiscretizationConfig()
 
@@ -315,16 +313,9 @@ class TrajOptProblem:
                 x=x_unified,
                 x_prop=x_prop,
                 u=u_unified,
-                total_time=x_unified.initial[time_slice][0],
+                total_time=x_unified.initial[x_unified.time_slice][0],
                 n_states=x_unified.initial.shape[0],
                 n_states_prop=x_prop.initial.shape[0],
-                idx_x_true=idx_x_true,
-                idx_x_true_prop=idx_x_true_prop,
-                idx_u_true=idx_u_true,
-                idx_t=time_slice,
-                idx_y=idx_constraint_violation,
-                idx_y_prop=idx_constraint_violation_prop,
-                idx_s=idx_time_dilation,
                 ctcs_node_intervals=node_intervals,
             )
 
