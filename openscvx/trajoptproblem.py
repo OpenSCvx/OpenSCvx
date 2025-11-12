@@ -147,7 +147,7 @@ class TrajOptProblem:
                in dynamics dict, don't provide Time object
         """
 
-        # ==================== STEP 1: Symbolic Preprocessing & Augmentation ====================
+        # Step 1: Symbolic Preprocessing & Augmentation
         (
             dynamics_aug,
             x_aug,
@@ -157,7 +157,6 @@ class TrajOptProblem:
             constraints_nodal_convex,
             parameters,
             node_intervals,
-            num_augmented_states,
         ) = preprocess_symbolic_problem(
             dynamics=dynamics,
             constraints=constraints,
@@ -171,7 +170,7 @@ class TrajOptProblem:
             time_dilation_factor_max=time_dilation_factor_max,
         )
 
-        # ==================== STEP 2: Lower to JAX ====================
+        # Step 2: Lower to JAX
         # TODO: Move CVXPy lowering here after SCP weights become CVXPy Parameters
         # Currently CVXPy lowering happens in initialize() because some weights
         # (lam_vc, lam_vb) are baked into OCP cost at creation time, and users
@@ -193,7 +192,7 @@ class TrajOptProblem:
             parameters=parameters,
         )
 
-        # ==================== STEP 3: Store Processed Components ====================
+        # Step 3: Store Processed Components
 
         # Store state and control lists (includes user-defined + augmented)
         self.states = x_aug

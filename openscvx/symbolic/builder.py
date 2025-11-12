@@ -76,7 +76,6 @@ def preprocess_symbolic_problem(
             - constraints_nodal_convex: Convex nodal constraints (will be lowered to CVXPy)
             - parameters: Dictionary of parameter values from symbolic expressions
             - node_intervals: CTCS node intervals metadata
-            - num_augmented_states: Number of augmented states created for CTCS
 
     Example:
         >>> result = preprocess_symbolic_problem(
@@ -169,7 +168,7 @@ def preprocess_symbolic_problem(
     constraints_nodal = decompose_vector_nodal_constraints(constraints_nodal)
 
     # Sort CTCS constraints by their idx to get node_intervals
-    constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(constraints_ctcs)
+    constraints_ctcs, node_intervals, _ = sort_ctcs_constraints(constraints_ctcs)
 
     # Augment dynamics, states, and controls with CTCS constraints, time dilation
     dynamics_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
@@ -198,5 +197,4 @@ def preprocess_symbolic_problem(
         constraints_nodal_convex,
         parameters,
         node_intervals,
-        num_augmented_states,
     )
