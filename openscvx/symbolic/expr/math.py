@@ -245,3 +245,83 @@ class SmoothReLU(Expr):
 
     def __repr__(self):
         return f"smooth_relu({self.x!r}, c={self.c})"
+
+
+class Linterp(Expr):
+    """Linear interpolation node supporting 1D and 2D interpolation.
+
+    1D interpolation: Linterp(xp, fp, x)
+        - xp: x-coordinates of data points (constant array)
+        - fp: y-coordinates of data points (constant array)
+        - x: query point(s) (can be symbolic expression)
+
+    2D interpolation: Linterp(xp, yp, fp, x, y)
+        - xp: x-coordinates of data points (constant 1D array)
+        - yp: y-coordinates of data points (constant 1D array)
+        - fp: values at grid points (constant 2D array)
+        - x: x query point(s) (can be symbolic expression)
+        - y: y query point(s) (can be symbolic expression)
+    """
+
+    def __init__(self, *args):
+        if len(args) == 3:
+            # 1D interpolation: Linterp(xp, fp, x)
+            self.xp = to_expr(args[0])
+            self.fp = to_expr(args[1])
+            self.x = to_expr(args[2])
+            self.yp = None
+            self.y = None
+            self.ndim = 1
+        elif len(args) == 5:
+            # 2D interpolation: Linterp(xp, yp, fp, x, y)
+            self.xp = to_expr(args[0])
+            self.yp = to_expr(args[1])
+            self.fp = to_expr(args[2])
+            self.x = to_expr(args[3])
+            self.y = to_expr(args[4])
+            self.ndim = 2
+        else:
+            raise ValueError(
+                f"Linterp requires either 3 arguments (1D) or 5 arguments (2D), got {len(args)}"
+            )
+
+    def children(self):
+        if self.ndim == 1:
+            return [self.xp, self.fp, self.x]
+        else:
+            return [self.xp, self.yp, self.fp, self.x, self.y]
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize the operands."""
+        if self.ndim == 1:
+            xp = self.xp.canonicalize()
+            fp = self.fp.canonicalize()
+            x = self.x.canonicalize()
+            return Linterp(xp, fp, x)
+        else:
+            xp = self.xp.canonicalize()
+            yp = self.yp.canonicalize()
+            fp = self.fp.canonicalize()
+            x = self.x.canonicalize()
+            y = self.y.canonicalize()
+            return Linterp(xp, yp, fp, x, y)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Output has the same shape as the query point(s)."""
+        if self.ndim == 1:
+            return self.x.check_shape()
+        else:
+            x_shape = self.x.check_shape()
+            y_shape = self.y.check_shape()
+            try:
+                return np.broadcast_shapes(x_shape, y_shape)
+            except ValueError as e:
+                raise ValueError(
+                    f"Linterp query shapes not broadcastable: {x_shape} vs {y_shape}"
+                ) from e
+
+    def __repr__(self):
+        if self.ndim == 1:
+            return f"linterp({self.xp!r}, {self.fp!r}, {self.x!r})"
+        else:
+            return f"linterp({self.xp!r}, {self.yp!r}, {self.fp!r}, {self.x!r}, {self.y!r})"
