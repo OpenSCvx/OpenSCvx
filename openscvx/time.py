@@ -78,4 +78,3 @@ class Time:
         self.max = max
         # Time derivative is always 1.0 internally
         self.derivative = 1.0
-

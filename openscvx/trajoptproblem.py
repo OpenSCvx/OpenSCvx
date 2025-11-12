@@ -29,7 +29,11 @@ from openscvx.config import (
 from openscvx.constraints.lowered import LoweredNodalConstraint
 from openscvx.discretization import get_discretization_solver
 from openscvx.dynamics import Dynamics
-from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables, lower_convex_constraints
+from openscvx.ocp import (
+    OptimalControlProblem,
+    create_cvxpy_variables,
+    lower_convex_constraints,
+)
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
 from openscvx.ptr import PTR_init, PTR_step, format_result
@@ -57,7 +61,12 @@ from openscvx.symbolic.preprocessing import (
     validate_time_parameters,
     validate_variable_names,
 )
-from openscvx.symbolic.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
+from openscvx.symbolic.unified import (
+    UnifiedControl,
+    UnifiedState,
+    unify_controls,
+    unify_states,
+)
 from openscvx.time import Time
 
 if TYPE_CHECKING:
@@ -164,11 +173,14 @@ class TrajOptProblem:
         """
 
         # Validate time handling approach and get processed parameters
-        has_time_state, time_initial, time_final, time_derivative, time_min, time_max = (
-            validate_time_parameters(
-                states, time
-            )
-        )
+        (
+            has_time_state,
+            time_initial,
+            time_final,
+            time_derivative,
+            time_min,
+            time_max,
+        ) = validate_time_parameters(states, time)
 
         # Augment states with time state if needed (auto-create approach)
         if not has_time_state:
@@ -220,9 +232,11 @@ class TrajOptProblem:
             traverse(constraint, collect_param_values)
 
         # Sort and separate constraints first
-        constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
-            constraints, N
-        )
+        (
+            constraints_ctcs,
+            constraints_nodal,
+            constraints_nodal_convex,
+        ) = separate_constraints(constraints, N)
 
         # Decompose vector-valued nodal constraints into scalar constraints
         # This is necessary for nonconvex nodal constraints that get lowered to JAX
@@ -288,7 +302,9 @@ class TrajOptProblem:
         idx_x_true = slice(0, x_unified.true.shape[0])
         idx_x_true_prop = slice(0, x_prop.true.shape[0])
         idx_u_true = slice(0, u_unified.true.shape[0])
-        idx_constraint_violation = slice(idx_x_true.stop, idx_x_true.stop + num_augmented_states)
+        idx_constraint_violation = slice(
+            idx_x_true.stop, idx_x_true.stop + num_augmented_states
+        )
         idx_constraint_violation_prop = slice(
             idx_x_true_prop.stop, idx_x_true_prop.stop + num_augmented_states
         )
@@ -323,7 +339,9 @@ class TrajOptProblem:
                 w_tr_max_scaling_factor=1e2,  # Maximum Trust Region Weight
             )
         else:
-            assert self.settings.scp.n == N, "Number of segments must be the same as in the config"
+            assert (
+                self.settings.scp.n == N
+            ), "Number of segments must be the same as in the config"
 
         if dev is None:
             dev = DevConfig()
@@ -454,9 +472,15 @@ class TrajOptProblem:
         self.settings.sim.__post_init__()
 
         # Compile dynamics and jacobians
-        self.dynamics_augmented.f = jax.vmap(self.dynamics_augmented.f, in_axes=(0, 0, 0, None))
-        self.dynamics_augmented.A = jax.vmap(self.dynamics_augmented.A, in_axes=(0, 0, 0, None))
-        self.dynamics_augmented.B = jax.vmap(self.dynamics_augmented.B, in_axes=(0, 0, 0, None))
+        self.dynamics_augmented.f = jax.vmap(
+            self.dynamics_augmented.f, in_axes=(0, 0, 0, None)
+        )
+        self.dynamics_augmented.A = jax.vmap(
+            self.dynamics_augmented.A, in_axes=(0, 0, 0, None)
+        )
+        self.dynamics_augmented.B = jax.vmap(
+            self.dynamics_augmented.B, in_axes=(0, 0, 0, None)
+        )
 
         self.dynamics_augmented_prop.f = jax.vmap(
             self.dynamics_augmented_prop.f, in_axes=(0, 0, 0, None)
@@ -560,7 +584,9 @@ class TrajOptProblem:
         print("Total Initialization Time: ", self.timing_init)
 
         # Prime the propagation solver
-        prime_propagation_solver(self.propagation_solver, self._parameters, self.settings)
+        prime_propagation_solver(
+            self.propagation_solver, self._parameters, self.settings
+        )
 
         if self.settings.dev.profiling:
             pr.disable()
@@ -612,7 +638,9 @@ class TrajOptProblem:
         self.settings.sim.__post_init__()
 
         if self.optimal_control_problem is None or self.discretization_solver is None:
-            raise ValueError("Problem has not been initialized. Call initialize() before solve()")
+            raise ValueError(
+                "Problem has not been initialized. Call initialize() before solve()"
+            )
 
         # Enable the profiler
         if self.settings.dev.profiling:
@@ -666,7 +694,9 @@ class TrajOptProblem:
         self.timing_post = t_f_post - t_0_post
 
         # Print results summary
-        io.print_results_summary(result, self.timing_post, self.timing_init, self.timing_solve)
+        io.print_results_summary(
+            result, self.timing_post, self.timing_init, self.timing_solve
+        )
 
         # Disable the profiler
         if self.settings.dev.profiling:
