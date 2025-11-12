@@ -22,6 +22,7 @@ from openscvx.symbolic.expr import (
     Huber,
     Index,
     Inequality,
+    Linterp,
     Log,
     MatMul,
     Max,
@@ -394,3 +395,67 @@ class JaxLowerer:
             return stl_or(x)
 
         return or_fn
+
+    @visitor(Linterp)
+    def visit_linterp(self, node: Linterp):
+        if node.ndim == 1:
+            # 1D interpolation using jnp.interp
+            f_xp = self.lower(node.xp)
+            f_fp = self.lower(node.fp)
+            f_x = self.lower(node.x)
+
+            def interp1d_fn(x, u, node, params):
+                xp_val = f_xp(x, u, node, params)
+                fp_val = f_fp(x, u, node, params)
+                x_val = f_x(x, u, node, params)
+                return jnp.interp(x_val, xp_val, fp_val)
+
+            return interp1d_fn
+        else:
+            # 2D bilinear interpolation
+            f_xp = self.lower(node.xp)
+            f_yp = self.lower(node.yp)
+            f_fp = self.lower(node.fp)
+            f_x = self.lower(node.x)
+            f_y = self.lower(node.y)
+
+            def interp2d_fn(x, u, node, params):
+                xp_val = f_xp(x, u, node, params)
+                yp_val = f_yp(x, u, node, params)
+                fp_val = f_fp(x, u, node, params)
+                x_val = f_x(x, u, node, params)
+                y_val = f_y(x, u, node, params)
+
+                # Bilinear interpolation
+                # Find indices for x and y
+                i = jnp.searchsorted(xp_val, x_val) - 1
+                j = jnp.searchsorted(yp_val, y_val) - 1
+
+                # Clamp indices to valid range
+                i = jnp.clip(i, 0, len(xp_val) - 2)
+                j = jnp.clip(j, 0, len(yp_val) - 2)
+
+                # Get surrounding points
+                x0, x1 = xp_val[i], xp_val[i + 1]
+                y0, y1 = yp_val[j], yp_val[j + 1]
+
+                # Get function values at corners (note: fp is indexed as [j, i] for meshgrid convention)
+                f00 = fp_val[j, i]
+                f10 = fp_val[j, i + 1]
+                f01 = fp_val[j + 1, i]
+                f11 = fp_val[j + 1, i + 1]
+
+                # Compute interpolation weights
+                wx = (x_val - x0) / (x1 - x0)
+                wy = (y_val - y0) / (y1 - y0)
+
+                # Bilinear interpolation formula
+                result = (
+                    f00 * (1 - wx) * (1 - wy)
+                    + f10 * wx * (1 - wy)
+                    + f01 * (1 - wx) * wy
+                    + f11 * wx * wy
+                )
+                return result
+
+            return interp2d_fn
