@@ -141,9 +141,9 @@ class TrajOptProblem:
                 Each key should be a state name, and each value should be an Expr
                 representing the derivative of that state.
             constraints (List[Union[CTCSConstraint, NodalConstraint]]):
-                List of constraints decorated with @ctcs or @nodal. To reference time in constraints,
-                use `ox.time` (e.g., `ox.time[0]`). The time state is automatically created from
-                the Time object, so you don't need to include it in the states list.
+                List of constraints decorated with @ctcs or @nodal. To reference time in
+                constraints, use `ox.time` (e.g., `ox.time[0]`). The time state is automatically
+                created from the Time object, so you don't need to include it in the states list.
             x (List[State]): List of State objects representing the state variables.
                 **Must not include a state named "time"** - the time state is automatically
                 created from the Time object.
@@ -214,8 +214,8 @@ class TrajOptProblem:
         # Find the time state and update ox.time to use the same slice
         time_state = next((s for s in states if s.name == "time"), None)
         if time_state is not None:
-            from openscvx.symbolic.expr import State, traverse
             import openscvx
+            from openscvx.symbolic.expr import State, traverse
             
             # Update the global ox.time to use the same slice as the auto-created time state
             if hasattr(openscvx, '_time_state_ref'):
