@@ -15,6 +15,7 @@ from openscvx.symbolic.expr import (
     Huber,
     Index,
     Inequality,
+    Linterp,
     Log,
     MatMul,
     Max,
@@ -296,6 +297,15 @@ class CvxpyLowerer:
         rows = [self.lower(row) for row in node.rows]
         # Stack rows vertically
         return cp.vstack(rows)
+
+    @visitor(Linterp)
+    def visit_linterp(self, node: Linterp) -> cp.Expression:
+        raise NotImplementedError(
+            "Linear interpolation (Linterp) is not DCP-compliant in CVXPy. "
+            "Interpolation should be handled in the dynamics (JAX) layer. "
+            "If you need interpolated values in constraints, consider linearizing "
+            "around the current trajectory in the SCP iteration."
+        )
 
 
 def lower_to_cvxpy(expr: Expr, variable_map: Dict[str, cp.Expression] = None) -> cp.Expression:
