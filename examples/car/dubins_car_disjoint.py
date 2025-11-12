@@ -97,7 +97,6 @@ problem = TrajOptProblem(
     time_max=20,
     constraints=constraints,
     N=n,
-    licq_max=1e-8,
 )
 # Set solver parameters
 problem.settings.prp.dt = 0.01

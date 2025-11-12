@@ -50,7 +50,7 @@ controls = [speed, angular_rate]
 # Define Parameters for wp radius and center
 wp1_center = ox.Parameter("wp1_center", shape=(2,), value=np.array([-2.1, 0.0]))
 wp1_radius = ox.Parameter("wp1_radius", shape=(), value=0.5)
-wp2_center = ox.Parameter("wp2_center", shape=(2,), value=np.array([2.1, 0.0]))
+wp2_center = ox.Parameter("wp2_center", shape=(2,), value=np.array([2.09999, 0.0]))
 wp2_radius = ox.Parameter("wp2_radius", shape=(), value=0.5)
 
 
@@ -90,8 +90,6 @@ problem = TrajOptProblem(
     time_max=10,
     constraints=constraints,
     N=n,
-    licq_max=1e-8,
-)
 # Set solver parameters
 problem.settings.prp.dt = 0.01
 problem.settings.scp.w_tr_adapt = 1.1
@@ -99,8 +97,15 @@ problem.settings.scp.w_tr = 1e0
 problem.settings.scp.lam_cost = 1e-1
 problem.settings.scp.lam_vc = 6e2
 problem.settings.scp.uniform_time_grid = True
-plotting_dict = dict()
+# Extract parameter values from problem.parameters (not Parameter objects)
+plotting_dict = {
+    "wp1_center": problem.parameters.get("wp1_center", None),
+    "wp1_radius": problem.parameters.get("wp1_radius", None),
+    "wp2_center": problem.parameters.get("wp2_center", None),
+    "wp2_radius": problem.parameters.get("wp2_radius", None),
+}
 
+# Only add waypoints that are actually defined
 if __name__ == "__main__":
     problem.initialize()
     results = problem.solve()

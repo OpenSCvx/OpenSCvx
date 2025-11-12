@@ -624,10 +624,11 @@ def plot_dubins_car_disjoint(results: OptimizationResults, params: Config):
     )
 
     # Plot waypoints wp1 and wp2 as circles and their centers
+    # Handle 0, 1, or 2 waypoints
     # Handle wp1 (optional)
     if "wp1_center" in results and "wp1_radius" in results:
-        wp1_center = results.plotting_data.get("wp1_center")
-        wp1_radius = results.plotting_data.get("wp1_radius")
+        wp1_center = results.get("wp1_center")
+        wp1_radius = results.get("wp1_radius")
 
         # Extract values if they are Parameter objects or other non-array types
         if hasattr(wp1_center, "value"):
@@ -668,8 +669,8 @@ def plot_dubins_car_disjoint(results: OptimizationResults, params: Config):
 
     # Handle wp2 (optional)
     if "wp2_center" in results and "wp2_radius" in results:
-        wp2_center = results.plotting_data.get("wp2_center")
-        wp2_radius = results.plotting_data.get("wp2_radius")
+        wp2_center = results.get("wp2_center")
+        wp2_radius = results.get("wp2_radius")
 
         # Extract values if they are Parameter objects or other non-array types
         if hasattr(wp2_center, "value"):
