@@ -603,7 +603,12 @@ def plot_dubins_car_disjoint(results: OptimizationResults, params: Config):
     x = position[:, 0]
     y = position[:, 1]
     # Use the forward velocity from the control input
-    velocity = results.trajectory.get("velocity", np.zeros_like(x))
+    velocity = results.trajectory.get("speed")
+    if velocity is not None:
+        # Flatten to 1D array for Plotly color mapping
+        velocity = np.asarray(velocity).flatten()
+    else:
+        velocity = np.zeros_like(x)
 
     # Plot the trajectory colored by velocity
     fig.add_trace(

@@ -90,6 +90,7 @@ problem = TrajOptProblem(
     time_max=10,
     constraints=constraints,
     N=n,
+)
 # Set solver parameters
 problem.settings.prp.dt = 0.01
 problem.settings.scp.w_tr_adapt = 1.1
