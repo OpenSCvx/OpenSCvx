@@ -172,6 +172,11 @@ class TrajOptProblem:
         )
 
         # ==================== STEP 2: Lower to JAX ====================
+        # TODO: Move CVXPy lowering here after SCP weights become CVXPy Parameters
+        # Currently CVXPy lowering happens in initialize() because some weights
+        # (lam_vc, lam_vb) are baked into OCP cost at creation time, and users
+        # currently modify these between __init__ and initialize(). Once all weights
+        # are CVXPy Parameters, CVXPy lowering can happen here alongside JAX lowering.
         (
             dyn_fn,
             dynamics_augmented,
@@ -370,6 +375,13 @@ class TrajOptProblem:
         self.propagation_solver = get_propagation_solver(
             self.dynamics_augmented_prop.f, self.settings, self.parameters
         )
+
+        # TODO: Move this CVXPy lowering section to lower_symbolic_expressions()
+        # This should happen in __init__ alongside JAX lowering for architectural consistency.
+        # Blocked until all SCP weights become CVXPy Parameters (currently lam_vc and lam_vb
+        # are baked into OCP at creation time). See docs/trajoptproblem_preprocessing_analysis.md
+        # "CVXPy Lowering: Current Approach vs. Alternatives" section for details.
+
         # Phase 1: Create CVXPy variables
         ocp_vars = create_cvxpy_variables(self.settings)
 

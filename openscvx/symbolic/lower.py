@@ -117,8 +117,13 @@ def lower_symbolic_expressions(
 
     # ==================== KEEP CONVEX CONSTRAINTS SYMBOLIC ====================
 
+    # TODO: Add CVXPy lowering here once SCP weights become CVXPy Parameters
     # Convex constraints remain symbolic and will be lowered to CVXPy
-    # later in initialize() when CVXPy variables are available
+    # later in initialize() when CVXPy variables are available.
+    # Once all SCP weights (lam_vc, lam_vb) are CVXPy Parameters instead of
+    # being baked into the OCP cost, this function should handle CVXPy lowering
+    # alongside JAX lowering for architectural consistency.
+    # See docs/trajoptproblem_preprocessing_analysis.md for full analysis.
 
     # ==================== RETURN LOWERED OUTPUTS ====================
 
