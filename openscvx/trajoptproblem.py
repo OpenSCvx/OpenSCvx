@@ -26,7 +26,6 @@ from openscvx.config import (
     ScpConfig,
     SimConfig,
 )
-from openscvx.constraints.lowered import LoweredNodalConstraint
 from openscvx.discretization import get_discretization_solver
 from openscvx.dynamics import Dynamics
 from openscvx.ocp import (
@@ -38,35 +37,11 @@ from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
 from openscvx.ptr import PTR_init, PTR_step, format_result
 from openscvx.results import OptimizationResults
-from openscvx.symbolic.augmentation import (
-    augment_dynamics_with_ctcs,
-    augment_with_time_state,
-    decompose_vector_nodal_constraints,
-    separate_constraints,
-    sort_ctcs_constraints,
-)
+from openscvx.symbolic.builder import preprocess_symbolic_problem
 from openscvx.symbolic.expr import CTCS, Constraint
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
-from openscvx.symbolic.lower import lower_to_jax
-from openscvx.symbolic.preprocessing import (
-    collect_and_assign_slices,
-    convert_dynamics_dict_to_expr,
-    validate_and_normalize_constraint_nodes,
-    validate_constraints_at_root,
-    validate_dynamics_dict,
-    validate_dynamics_dict_dimensions,
-    validate_dynamics_dimension,
-    validate_shapes,
-    validate_time_parameters,
-    validate_variable_names,
-)
-from openscvx.symbolic.unified import (
-    UnifiedControl,
-    UnifiedState,
-    unify_controls,
-    unify_states,
-)
+from openscvx.symbolic.lower import lower_symbolic_expressions
 from openscvx.time import Time
 
 if TYPE_CHECKING:
@@ -172,123 +147,75 @@ class TrajOptProblem:
                in dynamics dict, don't provide Time object
         """
 
-        # Validate time handling approach and get processed parameters
+        # ==================== STEP 1: Symbolic Preprocessing & Augmentation ====================
         (
-            has_time_state,
-            time_initial,
-            time_final,
-            time_derivative,
-            time_min,
-            time_max,
-        ) = validate_time_parameters(states, time)
-
-        # Augment states with time state if needed (auto-create approach)
-        if not has_time_state:
-            states, constraints = augment_with_time_state(
-                states, constraints, time_initial, time_final, time_min, time_max, N
-            )
-
-        # Add time derivative to dynamics dict (if not already present)
-        # Time derivative is always 1.0 when using Time object
-        dynamics = dict(dynamics)  # Make a copy to avoid mutating the input
-        if "time" not in dynamics:
-            dynamics["time"] = 1.0
-
-        # Validate dynamics dict matches state names and dimensions
-        validate_dynamics_dict(dynamics, states)
-        validate_dynamics_dict_dimensions(dynamics, states)
-
-        # Convert dynamics dict to concatenated expression
-        dynamics, dynamics_concat = convert_dynamics_dict_to_expr(dynamics, states)
-
-        # Validate expressions
-        all_exprs = [dynamics_concat] + constraints
-        validate_variable_names(all_exprs)
-        collect_and_assign_slices(states, controls)
-        validate_shapes(all_exprs)
-        validate_constraints_at_root(constraints)
-        validate_and_normalize_constraint_nodes(constraints, N)
-        validate_dynamics_dimension(dynamics_concat, states)
-
-        # Canonicalize all expressions after validation
-        dynamics_concat = dynamics_concat.canonicalize()
-        constraints = [expr.canonicalize() for expr in constraints]
-
-        # Collect parameter values from all constraints and dynamics before any processing
-        from openscvx.symbolic.expr import Parameter, traverse
-
-        parameters = {}
-
-        def collect_param_values(expr):
-            if isinstance(expr, Parameter):
-                if expr.name not in parameters:
-                    parameters[expr.name] = expr.value
-
-        # Collect from dynamics
-        traverse(dynamics_concat, collect_param_values)
-
-        # Collect from constraints
-        for constraint in constraints:
-            traverse(constraint, collect_param_values)
-
-        # Sort and separate constraints first
-        (
+            dynamics_aug,
+            x_aug,
+            u_aug,
             constraints_ctcs,
             constraints_nodal,
             constraints_nodal_convex,
-        ) = separate_constraints(constraints, N)
-
-        # Decompose vector-valued nodal constraints into scalar constraints
-        # This is necessary for nonconvex nodal constraints that get lowered to JAX
-        constraints_nodal = decompose_vector_nodal_constraints(constraints_nodal)
-
-        # Sort CTCS constraints by their idx to get node_intervals
-        constraints_ctcs, node_intervals, num_augmented_states = sort_ctcs_constraints(
-            constraints_ctcs
-        )
-
-        # Augment dynamics, states, and controls with CTCS constraints, time dilation
-        dynamics_aug, x_aug, u_aug = augment_dynamics_with_ctcs(
-            dynamics_concat,
-            states,
-            controls,
-            constraints_ctcs,
-            N,
+            parameters,
+            node_intervals,
+            num_augmented_states,
+        ) = preprocess_symbolic_problem(
+            dynamics=dynamics,
+            constraints=constraints,
+            states=states,
+            controls=controls,
+            N=N,
+            time=time,
             licq_min=licq_min,
             licq_max=licq_max,
             time_dilation_factor_min=time_dilation_factor_min,
             time_dilation_factor_max=time_dilation_factor_max,
         )
 
-        # Assign slices to augmented states and controls in canonical order
-        collect_and_assign_slices(x_aug, u_aug)
+        # ==================== STEP 2: Lower to JAX ====================
+        (
+            dyn_fn,
+            dynamics_augmented,
+            lowered_constraints_nodal,
+            constraints_nodal_convex,
+            x_unified,
+            u_unified,
+        ) = lower_symbolic_expressions(
+            dynamics_aug=dynamics_aug,
+            states_aug=x_aug,
+            controls_aug=u_aug,
+            constraints_nodal=constraints_nodal,
+            constraints_nodal_convex=constraints_nodal_convex,
+            parameters=parameters,
+        )
+
+        # ==================== STEP 3: Store Processed Components ====================
 
         # Store state and control lists (includes user-defined + augmented)
         self.states = x_aug
         self.controls = u_aug
 
-        # Create unified state/control objects for optimization interface
-        x_unified: UnifiedState = unify_states(x_aug)
-        u_unified: UnifiedControl = unify_controls(u_aug)
-
         # Store unified objects for easy access
         self.x_unified = x_unified
         self.u_unified = u_unified
 
-        # Lower symbolic expressions to JAX
-        dyn_fn = lower_to_jax(dynamics_aug)
-        constraints_nodal_fns = lower_to_jax(constraints_nodal)
-
-        # Lower convex constraints to CVXPy
-        # Note: CVXPy lowering will happen later in the OCP when CVXPy variables are available
-        # For now, we just store the symbolic constraints
-
         # Store parameters in two forms:
-        # 1. _param_values: plain dict for JAX functions
-        # 2. _parameters: wrapper dict for user access that auto-syncs
+        # 1. _parameters: plain dict for JAX functions
+        # 2. _parameter_wrapper: wrapper dict for user access that auto-syncs
         self._parameters = parameters  # Plain dict for JAX
         self._parameter_wrapper = _ParameterDict(self, self._parameters, parameters)
         self.cvxpy_params = None  # Will be set during initialize()
+
+        # Store dynamics objects
+        self.dynamics_augmented = dynamics_augmented
+        # For propagation, use the same augmented dynamics function
+        # (since CTCS augmentation applies to both discretization and propagation)
+        self.dynamics_augmented_prop = Dynamics(
+            f=dyn_fn,
+            A=jacfwd(dyn_fn, argnums=0),
+            B=jacfwd(dyn_fn, argnums=1),
+        )
+
+        # ==================== STEP 4: Setup SCP Configuration ====================
 
         if dynamics_prop is None:
             dynamics_prop = Dynamics(dyn_fn)
@@ -318,7 +245,7 @@ class TrajOptProblem:
                 w_tr_max_scaling_factor=1e2,  # Maximum Trust Region Weight
             )
         else:
-            assert self.settings.scp.n == N, "Number of segments must be the same as in the config"
+            assert scp.n == N, "Number of segments must be the same as in the config"
 
         if dev is None:
             dev = DevConfig()
@@ -327,37 +254,10 @@ class TrajOptProblem:
         if prp is None:
             prp = PropagationConfig()
 
-        # Create LoweredConstraint objects with Jacobians computed automatically
-        lowered_constraints_nodal = []
-        for i, fn in enumerate(constraints_nodal_fns):
-            # Apply vectorization to handle (N, n_x) and (N, n_u) inputs
-            # The lowered functions have signature (x, u, node, **kwargs), so we need to handle node
-            # parameter, node is broadcast (same for all),
-            constraint = LoweredNodalConstraint(
-                func=jax.vmap(fn, in_axes=(0, 0, None, None)),
-                grad_g_x=jax.vmap(jacfwd(fn, argnums=0), in_axes=(0, 0, None, None)),
-                grad_g_u=jax.vmap(jacfwd(fn, argnums=1), in_axes=(0, 0, None, None)),
-                nodes=constraints_nodal[i].nodes,
-            )
-            lowered_constraints_nodal.append(constraint)
-
+        # Store constraints in SimConfig
         sim.constraints_ctcs = []
         sim.constraints_nodal = lowered_constraints_nodal
         sim.constraints_nodal_convex = constraints_nodal_convex
-
-        # Create dynamics objects from the symbolic augmented dynamics
-        self.dynamics_augmented = Dynamics(
-            f=dyn_fn,
-            A=jacfwd(dyn_fn, argnums=0),
-            B=jacfwd(dyn_fn, argnums=1),
-        )
-        # For propagation, use the same augmented dynamics function
-        # (since CTCS augmentation applies to both discretization and propagation)
-        self.dynamics_augmented_prop = Dynamics(
-            f=dyn_fn,
-            A=jacfwd(dyn_fn, argnums=0),
-            B=jacfwd(dyn_fn, argnums=1),
-        )
 
         self.settings = Config(
             sim=sim,
