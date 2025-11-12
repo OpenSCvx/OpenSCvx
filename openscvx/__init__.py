@@ -49,11 +49,11 @@ _time_state_ref = State("time", shape=(1,))
 
 def get_time_state():
     """Get the global time state reference for use in constraints.
-    
+
     This State("time") object can be used in constraint expressions.
     It will automatically reference the time state that is created
     from the Time object passed to TrajOptProblem.
-    
+
     Example:
         ```python
         import openscvx as ox

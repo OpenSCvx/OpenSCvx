@@ -76,60 +76,62 @@ class Time:
         self.max = max
         # Time derivative is always 1.0 internally
         self.derivative = 1.0
-    
+
     def _get_time_expr(self):
         """Get the symbolic time expression (ox.time[0])."""
         import openscvx
+
         return openscvx.time[0]
-    
+
     def __getitem__(self, index):
         """Allow Time objects to be used as symbolic expressions.
-        
+
         When you use time[0] where time is a Time object, it returns
         ox.time[0] which is the symbolic time state reference.
         """
         import openscvx
+
         return openscvx.time[index]
-    
+
     # Delegate arithmetic operations to ox.time[0]
     def __add__(self, other):
         return self._get_time_expr() + other
-    
+
     def __radd__(self, other):
         return other + self._get_time_expr()
-    
+
     def __sub__(self, other):
         return self._get_time_expr() - other
-    
+
     def __rsub__(self, other):
         return other - self._get_time_expr()
-    
+
     def __mul__(self, other):
         return self._get_time_expr() * other
-    
+
     def __rmul__(self, other):
         return other * self._get_time_expr()
-    
+
     def __truediv__(self, other):
         return self._get_time_expr() / other
-    
+
     def __rtruediv__(self, other):
         return other / self._get_time_expr()
-    
+
     def __neg__(self):
         return -self._get_time_expr()
-    
+
     def __pow__(self, other):
         return self._get_time_expr() ** other
-    
+
     def __rpow__(self, other):
         return other ** self._get_time_expr()
-    
+
     def __le__(self, other):
         return self._get_time_expr() <= other
-    
+
     def __ge__(self, other):
         return self._get_time_expr() >= other
-    
+
     def __eq__(self, other):
         return self._get_time_expr() == other

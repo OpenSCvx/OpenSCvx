@@ -209,22 +209,23 @@ class TrajOptProblem:
         all_exprs = [dynamics_concat] + constraints
         validate_variable_names(all_exprs, allow_duplicates={"time"})
         collect_and_assign_slices(states, controls)
-        
+
         # Link the global ox.time State object to the auto-created time state
         # Find the time state and update ox.time to use the same slice
         time_state = next((s for s in states if s.name == "time"), None)
         if time_state is not None:
             import openscvx
             from openscvx.symbolic.expr import State, traverse
-            
+
             # Update the global ox.time to use the same slice as the auto-created time state
-            if hasattr(openscvx, '_time_state_ref'):
+            if hasattr(openscvx, "_time_state_ref"):
                 openscvx._time_state_ref._slice = time_state._slice
-            
+
             # Also update any State("time") objects in constraints to use the same slice
             def update_time_slices(expr):
                 if isinstance(expr, State) and expr.name == "time" and expr is not time_state:
                     expr._slice = time_state._slice
+
             for constraint in constraints:
                 traverse(constraint, update_time_slices)
         validate_shapes(all_exprs)
