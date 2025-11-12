@@ -189,7 +189,7 @@ class SimConfig:
         x_prop: UnifiedState,
         u: UnifiedControl,
         total_time: float,
-        save_compiled: bool = True,
+        save_compiled: bool = False,
         ctcs_node_intervals: Optional[list] = None,
         constraints_ctcs: Optional[list[Callable]] = None,
         constraints_nodal: Optional[list[Callable]] = None,
@@ -225,7 +225,7 @@ class SimConfig:
                 indices.
             idx_s (slice): Slice for time dilation index.
             save_compiled (bool): If True, save and reuse compiled solver
-                functions. Defaults to True.
+                functions. Defaults to False.
             ctcs_node_intervals (list, optional): Node intervals for CTCS
                 constraints.
             constraints_ctcs (list, optional): List of CTCS constraints.
