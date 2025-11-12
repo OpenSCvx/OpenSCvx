@@ -79,15 +79,18 @@ for state in states:
 constraints.append(ox.ctcs(-visit_wp_or_expr <= 0.0).over((3, 5)))
 
 # Build the problem
+time = ox.Time(
+    initial=0.0,
+    final=("minimize", total_time),
+    min=0.0,
+    max=10,
+)
+
 problem = TrajOptProblem(
     dynamics=dynamics,
     states=states,
     controls=controls,
-    time_initial=0.0,
-    time_final=("minimize", total_time),
-    time_derivative=1.0,  # Real time
-    time_min=0.0,
-    time_max=10,
+    time=time,
     constraints=constraints,
     N=n,
 )

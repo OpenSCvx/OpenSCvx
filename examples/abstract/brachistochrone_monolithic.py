@@ -46,15 +46,18 @@ constraint_exprs = [
     ox.ctcs(x.min <= x),
 ]
 
+time = ox.Time(
+    initial=0.0,
+    final=("minimize", total_time),
+    min=0.0,
+    max=total_time,
+)
+
 problem = TrajOptProblem(
     dynamics={"x": dyn_expr},  # Dictionary mapping state name to dynamics
     states=[x],  # Wrapped in list for new API
     controls=[u],  # Wrapped in list for new API
-    time_initial=0.0,
-    time_final=("minimize", total_time),
-    time_derivative=1.0,  # Real time
-    time_min=0.0,
-    time_max=total_time,
+    time=time,
     constraints=constraint_exprs,
     N=n,
     licq_max=1e-8,

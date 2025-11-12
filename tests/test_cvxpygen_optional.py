@@ -5,7 +5,7 @@ Test that cvxpygen is properly handled as an optional dependency.
 import numpy as np
 import pytest
 
-from openscvx import ctcs
+from openscvx import Time, ctcs
 from openscvx.symbolic.expr import Concat, Constant, Control, State
 from openscvx.trajoptproblem import TrajOptProblem
 
@@ -56,13 +56,13 @@ def test_cvxpygen_disabled_by_default():
     # Define constraints using symbolic expressions
     constraints = [ctcs(x <= x.max), ctcs(x.min <= x)]
 
+    time = Time(initial=0.0, final=("minimize", 1.0), min=0.0, max=10.0)
+
     problem = TrajOptProblem(
         dynamics=dynamics,
         states=[x],
         controls=[u],
-        time_initial=0.0,
-        time_final=("minimize", 1.0),
-        time_derivative=1.0,
+        time=time,
         constraints=constraints,
         N=n,
     )
@@ -99,13 +99,13 @@ def test_cvxpygen_enabled_raises_error_without_install():
     # Define constraints using symbolic expressions
     constraints = [ctcs(x <= x.max), ctcs(x.min <= x)]
 
+    time = Time(initial=0.0, final=("minimize", 1.0), min=0.0, max=10.0)
+
     problem = TrajOptProblem(
         dynamics=dynamics,
         states=[x],
         controls=[u],
-        time_initial=0.0,
-        time_final=("minimize", 1.0),
-        time_derivative=1.0,
+        time=time,
         constraints=constraints,
         N=n,
     )
