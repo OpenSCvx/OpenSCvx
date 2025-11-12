@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Set, Tuple, Union
 
 if TYPE_CHECKING:
     from openscvx.time import Time

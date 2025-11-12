@@ -41,7 +41,7 @@ from openscvx.symbolic.augmentation import (
     separate_constraints,
     sort_ctcs_constraints,
 )
-from openscvx.symbolic.expr import CTCS, Constraint, Expr
+from openscvx.symbolic.expr import CTCS, Constraint
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.lower import lower_to_jax

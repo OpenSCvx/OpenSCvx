@@ -9,9 +9,11 @@ class Time:
 
     Attributes:
         initial (float or tuple): Initial time boundary condition.
-            Can be a float (fixed) or tuple like ("free", value), ("minimize", value), or ("maximize", value).
+            Can be a float (fixed) or tuple like ("free", value), ("minimize", value),
+            or ("maximize", value).
         final (float or tuple): Final time boundary condition.
-            Can be a float (fixed) or tuple like ("free", value), ("minimize", value), or ("maximize", value).
+            Can be a float (fixed) or tuple like ("free", value), ("minimize", value),
+            or ("maximize", value).
         min (float): Minimum bound for time variable (required).
         max (float): Maximum bound for time variable (required).
 
@@ -61,12 +63,13 @@ class Time:
                 bc_type, bc_value = value
                 if bc_type not in ["free", "minimize", "maximize"]:
                     raise ValueError(
-                        f"{name} boundary condition type must be 'free', 'minimize', or 'maximize', "
-                        f"got '{bc_type}'"
+                        f"{name} boundary condition type must be 'free', "
+                        f"'minimize', or 'maximize', got '{bc_type}'"
                     )
                 if not isinstance(bc_value, (int, float)):
                     raise ValueError(
-                        f"{name} boundary condition value must be a number, got {type(bc_value).__name__}"
+                        f"{name} boundary condition value must be a number, "
+                        f"got {type(bc_value).__name__}"
                     )
 
         self.initial = initial
