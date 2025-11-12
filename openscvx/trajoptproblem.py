@@ -29,7 +29,11 @@ from openscvx.config import (
 from openscvx.constraints.lowered import LoweredNodalConstraint
 from openscvx.discretization import get_discretization_solver
 from openscvx.dynamics import Dynamics
-from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables, lower_convex_constraints
+from openscvx.ocp import (
+    OptimalControlProblem,
+    create_cvxpy_variables,
+    lower_convex_constraints,
+)
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
 from openscvx.ptr import PTR_init, PTR_step, format_result
@@ -41,7 +45,7 @@ from openscvx.symbolic.augmentation import (
     separate_constraints,
     sort_ctcs_constraints,
 )
-from openscvx.symbolic.expr import CTCS, Constraint, Expr
+from openscvx.symbolic.expr import CTCS, Constraint
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.lower import lower_to_jax
@@ -57,7 +61,13 @@ from openscvx.symbolic.preprocessing import (
     validate_time_parameters,
     validate_variable_names,
 )
-from openscvx.symbolic.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
+from openscvx.symbolic.unified import (
+    UnifiedControl,
+    UnifiedState,
+    unify_controls,
+    unify_states,
+)
+from openscvx.time import Time
 
 if TYPE_CHECKING:
     import cvxpy as cp
@@ -109,11 +119,7 @@ class TrajOptProblem:
         states: List[State],
         controls: List[Control],
         N: int,
-        time_initial: Union[float, tuple] = None,
-        time_final: Union[float, tuple] = None,
-        time_derivative: Union[float, Expr] = None,
-        time_min: float = None,
-        time_max: float = None,
+        time: Time,
         dynamics_prop: Optional[callable] = None,
         x_prop: State = None,
         scp: Optional[ScpConfig] = None,
@@ -137,21 +143,12 @@ class TrajOptProblem:
             constraints (List[Union[CTCSConstraint, NodalConstraint]]):
                 List of constraints decorated with @ctcs or @nodal
             x (List[State]): List of State objects representing the state variables.
-                May optionally include a State named "time" (see time parameters below).
+                May optionally include a State named "time" (see time parameter below).
             u (List[Control]): List of Control objects representing the control variables
             N (int): Number of segments in the trajectory
-            time_initial (float or tuple): Initial time boundary condition. Only provide if
-                NOT including a "time" state in x. Can be a float (fixed) or tuple like
-                ("free", value) or ("minimize", value). Default: None (required if no time state).
-            time_final (float or tuple): Final time boundary condition. Only provide if
-                NOT including a "time" state in x. Can be a float (fixed) or tuple like
-                ("free", value) or ("minimize", value). Default: None (required if no time state).
-            time_derivative (float or Expr): Derivative of time (default 1.0 for real time).
-                Only used if NOT including a "time" state in x. Default: None (uses 1.0).
-            time_min (float): Minimum bound for time variable. Only used if NOT including
-                a "time" state in x. Default: None (uses 0.0).
-            time_max (float): Maximum bound for time variable. Only used if NOT including
-                a "time" state in x. Default: None (uses sensible default based on time_final).
+            time (Time): Time configuration object with initial, final, min, max.
+                Required. If including a "time" state in x, the Time object will be ignored
+                and time properties should be set on the time State object instead.
             dynamics_prop: Propagation dynamics function (optional)
             x_prop: Propagation state (optional)
             scp: SCP configuration object
@@ -170,17 +167,20 @@ class TrajOptProblem:
 
         Note:
             There are two approaches for handling time:
-            1. Auto-create (simple): Don't include "time" in x, provide time_initial/time_final
+            1. Auto-create (simple): Don't include "time" in x, provide Time object
             2. User-provided (for time-dependent constraints): Include "time" State in x and
-               in dynamics dict, don't provide time_initial/time_final parameters
+               in dynamics dict, don't provide Time object
         """
 
         # Validate time handling approach and get processed parameters
-        has_time_state, time_initial, time_final, time_derivative, time_min, time_max = (
-            validate_time_parameters(
-                states, time_initial, time_final, time_derivative, time_min, time_max
-            )
-        )
+        (
+            has_time_state,
+            time_initial,
+            time_final,
+            time_derivative,
+            time_min,
+            time_max,
+        ) = validate_time_parameters(states, time)
 
         # Augment states with time state if needed (auto-create approach)
         if not has_time_state:
@@ -189,9 +189,10 @@ class TrajOptProblem:
             )
 
         # Add time derivative to dynamics dict (if not already present)
+        # Time derivative is always 1.0 when using Time object
         dynamics = dict(dynamics)  # Make a copy to avoid mutating the input
         if "time" not in dynamics:
-            dynamics["time"] = time_derivative
+            dynamics["time"] = 1.0
 
         # Validate dynamics dict matches state names and dimensions
         validate_dynamics_dict(dynamics, states)
@@ -231,9 +232,11 @@ class TrajOptProblem:
             traverse(constraint, collect_param_values)
 
         # Sort and separate constraints first
-        constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
-            constraints, N
-        )
+        (
+            constraints_ctcs,
+            constraints_nodal,
+            constraints_nodal_convex,
+        ) = separate_constraints(constraints, N)
 
         # Decompose vector-valued nodal constraints into scalar constraints
         # This is necessary for nonconvex nodal constraints that get lowered to JAX

@@ -38,11 +38,14 @@ from openscvx.symbolic.expr import (
     Variable,
     ctcs,
 )
+from openscvx.time import Time
 from openscvx.trajoptproblem import TrajOptProblem
 
 __all__ = [
     # Main Trajectory Optimization Entrypoint
     "TrajOptProblem",
+    # Time configuration
+    "Time",
     # Core base classes
     "Expr",
     "Leaf",

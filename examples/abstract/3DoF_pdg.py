@@ -108,15 +108,18 @@ dynamics = {
 }
 
 # Build the problem
+time = ox.Time(
+    initial=0.0,
+    final=("free", total_time),
+    min=0.0,
+    max=1e2,
+)
+
 problem = TrajOptProblem(
     dynamics=dynamics,
     states=states,
     controls=controls,
-    time_initial=0.0,
-    time_final=("free", total_time),
-    time_derivative=1.0,  # Real time
-    time_min=0.0,
-    time_max=1e2,
+    time=time,
     constraints=constraints,
     N=n,
 )

@@ -603,7 +603,12 @@ def plot_dubins_car_disjoint(results: OptimizationResults, params: Config):
     x = position[:, 0]
     y = position[:, 1]
     # Use the forward velocity from the control input
-    velocity = results.trajectory.get("velocity", np.zeros_like(x))
+    velocity = results.trajectory.get("speed")
+    if velocity is not None:
+        # Flatten to 1D array for Plotly color mapping
+        velocity = np.asarray(velocity).flatten()
+    else:
+        velocity = np.zeros_like(x)
 
     # Plot the trajectory colored by velocity
     fig.add_trace(
@@ -624,9 +629,27 @@ def plot_dubins_car_disjoint(results: OptimizationResults, params: Config):
     )
 
     # Plot waypoints wp1 and wp2 as circles and their centers
+    # Handle 0, 1, or 2 waypoints
+    # Handle wp1 (optional)
     if "wp1_center" in results and "wp1_radius" in results:
-        wp1_center = results.plotting_data["wp1_center"]
-        wp1_radius = results.plotting_data["wp1_radius"]
+        wp1_center = results.get("wp1_center")
+        wp1_radius = results.get("wp1_radius")
+
+        # Extract values if they are Parameter objects or other non-array types
+        if hasattr(wp1_center, "value"):
+            wp1_center = np.asarray(wp1_center.value)
+        else:
+            wp1_center = np.asarray(wp1_center)
+
+        if hasattr(wp1_radius, "value"):
+            wp1_radius = np.asarray(wp1_radius.value)
+        else:
+            wp1_radius = np.asarray(wp1_radius)
+
+        # Ensure they are scalars/arrays
+        wp1_center = np.asarray(wp1_center).flatten()
+        wp1_radius = float(np.asarray(wp1_radius).item())
+
         theta = np.linspace(0, 2 * np.pi, 100)
         circle_x = wp1_center[0] + wp1_radius * np.cos(theta)
         circle_y = wp1_center[1] + wp1_radius * np.sin(theta)
@@ -649,9 +672,26 @@ def plot_dubins_car_disjoint(results: OptimizationResults, params: Config):
             )
         )
 
+    # Handle wp2 (optional)
     if "wp2_center" in results and "wp2_radius" in results:
-        wp2_center = results.plotting_data["wp2_center"]
-        wp2_radius = results.plotting_data["wp2_radius"]
+        wp2_center = results.get("wp2_center")
+        wp2_radius = results.get("wp2_radius")
+
+        # Extract values if they are Parameter objects or other non-array types
+        if hasattr(wp2_center, "value"):
+            wp2_center = np.asarray(wp2_center.value)
+        else:
+            wp2_center = np.asarray(wp2_center)
+
+        if hasattr(wp2_radius, "value"):
+            wp2_radius = np.asarray(wp2_radius.value)
+        else:
+            wp2_radius = np.asarray(wp2_radius)
+
+        # Ensure they are scalars/arrays
+        wp2_center = np.asarray(wp2_center).flatten()
+        wp2_radius = float(np.asarray(wp2_radius).item())
+
         theta = np.linspace(0, 2 * np.pi, 100)
         circle_x = wp2_center[0] + wp2_radius * np.cos(theta)
         circle_y = wp2_center[1] + wp2_radius * np.sin(theta)

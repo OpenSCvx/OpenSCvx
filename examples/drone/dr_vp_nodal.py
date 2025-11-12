@@ -211,15 +211,18 @@ velocity.guess = velocity_bar
 attitude.guess = attitude_bar
 angular_velocity.guess = angular_velocity_bar
 
+time = ox.Time(
+    initial=0.0,
+    final=("minimize", total_time),
+    min=0.0,
+    max=total_time,
+)
+
 problem = TrajOptProblem(
     dynamics=dynamics,
     states=states,
     controls=controls,
-    time_initial=0.0,
-    time_final=("minimize", total_time),
-    time_derivative=1.0,  # Real time
-    time_min=0.0,
-    time_max=total_time,
+    time=time,
     constraints=constraints,
     N=n,
 )

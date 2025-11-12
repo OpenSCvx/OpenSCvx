@@ -214,6 +214,10 @@ class JaxLowerer:
         fR = self.lower(node.rhs)
         return lambda x, u, node, params: fL(x, u, node, params) - fR(x, u, node, params)
 
+    # TODO: (norrisg) CTCS is playing 2 roles here: both as a constraint wrapper and as the penalty
+    # expression w/ conditional logic. Consider adding conditional logic as separate AST nodes.
+    # Then, CTCS remains a wrapper and we just wrap the penalty expression with the conditional
+    # logic when we lower it.
     @visitor(CTCS)
     def visit_ctcs(self, node: CTCS):
         # Lower the penalty expression (which includes the constraint residual)
@@ -223,7 +227,10 @@ class JaxLowerer:
             # Check if constraint is active at this node
             if node.nodes is not None:
                 start_node, end_node = node.nodes
-                is_active = (start_node <= current_node) & (current_node < end_node)
+                # Extract scalar value from current_node (which may be array or scalar)
+                # Keep as JAX array for tracing compatibility
+                node_scalar = jnp.atleast_1d(current_node)[0]
+                is_active = (start_node <= node_scalar) & (node_scalar < end_node)
 
                 # Use jax.lax.cond for conditional evaluation
                 return cond(

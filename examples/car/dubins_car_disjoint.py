@@ -86,18 +86,20 @@ constraints.append(ox.ctcs(visit_wp_expr <= 0.0).over((3, 5)))
 # constraints
 
 # Build the problem
+time = ox.Time(
+    initial=0.0,
+    final=("minimize", total_time),
+    min=0.0,
+    max=20,
+)
+
 problem = TrajOptProblem(
     dynamics=dynamics,
     states=states,
     controls=controls,
-    time_initial=0.0,
-    time_final=("minimize", total_time),
-    time_derivative=1.0,  # Real time
-    time_min=0.0,
-    time_max=20,
+    time=time,
     constraints=constraints,
     N=n,
-    licq_max=1e-8,
 )
 # Set solver parameters
 problem.settings.prp.dt = 0.01

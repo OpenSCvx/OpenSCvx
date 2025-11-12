@@ -58,15 +58,18 @@ constraint_exprs = []
 for state in states:
     constraint_exprs.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
 
+time = ox.Time(
+    initial=0.0,
+    final=("minimize", total_time),
+    min=0.0,
+    max=total_time,
+)
+
 problem = TrajOptProblem(
     dynamics=dynamics,
     states=states,
     controls=controls,
-    time_initial=0.0,
-    time_final=("minimize", total_time),
-    time_derivative=1.0,  # Real time
-    time_min=0.0,
-    time_max=total_time,
+    time=time,
     constraints=constraint_exprs,
     N=n,
     licq_max=1e-8,

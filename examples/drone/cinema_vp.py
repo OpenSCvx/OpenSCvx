@@ -215,10 +215,18 @@ attitude.guess = attitude_bar
 angular_velocity.guess = angular_velocity_bar
 fuel.guess = fuel_bar
 
+time_config = ox.Time(
+    initial=0.0,
+    final=total_time,
+    min=0.0,
+    max=total_time,
+)
+
 problem = TrajOptProblem(
     dynamics=dynamics,
     states=states,
     controls=controls,
+    time=time_config,
     constraints=constraints,
     N=n,
     licq_max=1e-8,
