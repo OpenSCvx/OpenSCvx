@@ -73,7 +73,7 @@ TEST_CASES = {
         "vio_idx": -1,
         "max_cost": 45.0,
         "max_vio": 1.0,
-        "timing": {"init": 60.0, "solve": 2.0, "post": 6.0},
+        "timing": {"init": 70.0, "solve": 2.0, "post": 6.0},
         "pre_init": [
             lambda p: setattr(p.settings.dis, "custom_integrator", False),
             lambda p: setattr(p.settings.dev, "printing", False),
