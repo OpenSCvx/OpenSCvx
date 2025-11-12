@@ -85,7 +85,6 @@ class _ParameterDict(dict):
             self[key] = value
 
 
-# TODO: (norrisg) Decide whether to have constraints`, `cost`, alongside `dynamics`, ` etc.
 class TrajOptProblem:
     def __init__(
         self,
