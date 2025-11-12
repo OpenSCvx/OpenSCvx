@@ -327,16 +327,16 @@ def augment_dynamics_with_ctcs(
         penalty_groups: Dict[int, List[Expr]] = {}
 
         for ctcs in constraints_ctcs:
-            # Get the penalty expression for this CTCS constraint
-            penalty_expr = ctcs.penalty_expr()
+            # Keep the CTCS wrapper intact to preserve node interval information
+            # The JAX lowerer's visit_ctcs() method will handle the conditional logic
 
             # TODO: In the future, apply scaling here if ctcs has a scaling attribute
             # if hasattr(ctcs, 'scaling') and ctcs.scaling != 1.0:
-            #     penalty_expr = Mul(Constant(np.array(ctcs.scaling)), penalty_expr)
+            #     ctcs = scale_ctcs(ctcs, scaling_factor)
 
             if ctcs.idx not in penalty_groups:
                 penalty_groups[ctcs.idx] = []
-            penalty_groups[ctcs.idx].append(penalty_expr)
+            penalty_groups[ctcs.idx].append(ctcs)
 
         # Create augmented state expressions for each group
         augmented_state_exprs = []
