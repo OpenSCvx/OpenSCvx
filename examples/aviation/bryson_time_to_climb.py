@@ -11,7 +11,6 @@ Aircraft," Journal of Aircraft, Vol. 6, No. 6, November-December,
 import os
 import sys
 
-import jax.numpy as jnp
 import numpy as np
 
 current_dir = os.path.dirname(os.path.abspath(__file__))

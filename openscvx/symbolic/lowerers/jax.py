@@ -439,7 +439,8 @@ class JaxLowerer:
                 x0, x1 = xp_val[i], xp_val[i + 1]
                 y0, y1 = yp_val[j], yp_val[j + 1]
 
-                # Get function values at corners (note: fp is indexed as [j, i] for meshgrid convention)
+                # Get function values at corners
+                # (note: fp is indexed as [j, i] for meshgrid convention)
                 f00 = fp_val[j, i]
                 f10 = fp_val[j, i + 1]
                 f01 = fp_val[j + 1, i]
