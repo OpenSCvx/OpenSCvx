@@ -57,9 +57,7 @@ class Time:
         for name, value in [("initial", initial), ("final", final)]:
             if isinstance(value, tuple):
                 if len(value) != 2:
-                    raise ValueError(
-                        f"{name} tuple must have exactly 2 elements: (type, value)"
-                    )
+                    raise ValueError(f"{name} tuple must have exactly 2 elements: (type, value)")
                 bc_type, bc_value = value
                 if bc_type not in ["free", "minimize", "maximize"]:
                     raise ValueError(

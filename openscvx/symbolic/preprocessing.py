@@ -143,9 +143,7 @@ def collect_and_assign_slices(
     return states, controls
 
 
-def _traverse_with_depth(
-    expr: Expr, visit: Callable[[Expr, int], None], depth: int = 0
-):
+def _traverse_with_depth(expr: Expr, visit: Callable[[Expr, int], None], depth: int = 0):
     visit(expr, depth)
     for child in expr.children():
         _traverse_with_depth(child, visit, depth + 1)
@@ -195,9 +193,7 @@ def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
         visit(expr, 0)
 
 
-def validate_and_normalize_constraint_nodes(
-    exprs: Union[Expr, list[Expr]], n_nodes: int
-):
+def validate_and_normalize_constraint_nodes(exprs: Union[Expr, list[Expr]], n_nodes: int):
     """
     Validate and normalize constraint nodes specifications.
 
@@ -236,9 +232,7 @@ def validate_and_normalize_constraint_nodes(
             # Just need to check they're within trajectory range
             for node in expr.nodes:
                 if node < 0 or node >= n_nodes:
-                    raise ValueError(
-                        f"NodalConstraint node {node} is out of range [0, {n_nodes})"
-                    )
+                    raise ValueError(f"NodalConstraint node {node} is out of range [0, {n_nodes})")
 
 
 def validate_dynamics_dimension(
@@ -256,9 +250,7 @@ def validate_dynamics_dimension(
         ValueError: If dimensions don't match or if any dynamics is not a vector
     """
     # Normalize inputs to lists
-    dynamics_list = (
-        dynamics_expr if isinstance(dynamics_expr, (list, tuple)) else [dynamics_expr]
-    )
+    dynamics_list = dynamics_expr if isinstance(dynamics_expr, (list, tuple)) else [dynamics_expr]
     states_list = states if isinstance(states, (list, tuple)) else [states]
 
     # Calculate total state dimension
@@ -273,11 +265,7 @@ def validate_dynamics_dimension(
 
         # Dynamics should be a 1D vector
         if len(dynamics_shape) != 1:
-            prefix = (
-                f"Dynamics expression {i}"
-                if len(dynamics_list) > 1
-                else "Dynamics expression"
-            )
+            prefix = f"Dynamics expression {i}" if len(dynamics_list) > 1 else "Dynamics expression"
             raise ValueError(
                 f"{prefix} must be 1-dimensional (vector), but got shape {dynamics_shape}"
             )
@@ -327,9 +315,7 @@ def validate_dynamics_dict(dynamics: Dict[str, Expr], states: List[State]) -> No
         raise ValueError(error_msg)
 
 
-def validate_dynamics_dict_dimensions(
-    dynamics: Dict[str, Expr], states: List[State]
-) -> None:
+def validate_dynamics_dict_dimensions(dynamics: Dict[str, Expr], states: List[State]) -> None:
     """
     Validate that each dynamics expression dimension matches the corresponding state shape.
 
