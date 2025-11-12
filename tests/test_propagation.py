@@ -16,7 +16,15 @@ def decay(x, u, node, params):
 
 
 class Dummy:
-    pass
+    @property
+    def time_slice(self):
+        """Mock property to return idx_t for backward compatibility."""
+        return self.idx_t if hasattr(self, "idx_t") else None
+
+    @property
+    def time_dilation_slice(self):
+        """Mock property to return idx_s for backward compatibility."""
+        return self.idx_s if hasattr(self, "idx_s") else None
 
 
 @pytest.mark.parametrize("dis_type,beta_expected", [("ZOH", 0.0), ("FOH", 1.0)])

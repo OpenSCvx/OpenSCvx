@@ -186,7 +186,7 @@ def prime_propagation_solver(
         controls_next = np.ones((1, settings.sim.u.shape[0]), dtype=settings.sim.u.guess.dtype)
         tau_init = np.array([[0.0]], dtype=np.float64)
         node = np.array([[0]], dtype=np.int64)
-        idx_s_stop = settings.sim.idx_s.stop
+        idx_s_stop = settings.sim.time_dilation_slice.stop
         save_time = np.ones((settings.prp.max_tau_len,), dtype=np.float64)
         mask_padded = np.ones((settings.prp.max_tau_len,), dtype=bool)
         # Create dummy params dict with same structure

@@ -67,7 +67,7 @@ def propagate_trajectory_results(
         i += 1
 
     # Calculate CTCS constraint violation
-    ctcs_violation = x_full[-1, settings.sim.idx_y_prop]
+    ctcs_violation = x_full[-1, settings.sim.ctcs_slice_prop]
 
     # Build trajectory dictionary with all states and controls
     trajectory_dict = {}

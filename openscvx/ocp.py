@@ -298,7 +298,7 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     if settings.sim.constraints_nodal_convex:
         constr += settings.sim.constraints_nodal_convex
 
-    for i in range(settings.sim.idx_x_true.start, settings.sim.idx_x_true.stop):
+    for i in range(settings.sim.true_state_slice.start, settings.sim.true_state_slice.stop):
         if settings.sim.x.initial_type[i] == "Fix":
             constr += [x_nonscaled[0][i] == x_init[i]]  # Initial Boundary Conditions
         if settings.sim.x.final_type[i] == "Fix":
@@ -314,7 +314,8 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
 
     if settings.scp.uniform_time_grid:
         constr += [
-            u_nonscaled[i][settings.sim.idx_s] == u_nonscaled[i - 1][settings.sim.idx_s]
+            u_nonscaled[i][settings.sim.time_dilation_slice]
+            == u_nonscaled[i - 1][settings.sim.time_dilation_slice]
             for i in range(1, settings.scp.n)
         ]
 
@@ -367,7 +368,7 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
             idx_ncvx += 1
 
     for idx, nodes in zip(
-        np.arange(settings.sim.idx_y.start, settings.sim.idx_y.stop),
+        np.arange(settings.sim.ctcs_slice.start, settings.sim.ctcs_slice.stop),
         settings.sim.ctcs_node_intervals,
     ):
         start_idx = 1 if nodes[0] == 0 else nodes[0]

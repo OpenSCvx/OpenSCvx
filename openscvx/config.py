@@ -189,13 +189,6 @@ class SimConfig:
         x_prop: UnifiedState,
         u: UnifiedControl,
         total_time: float,
-        idx_x_true: slice,
-        idx_x_true_prop: slice,
-        idx_u_true: slice,
-        idx_t: slice,
-        idx_y: slice,
-        idx_y_prop: slice,
-        idx_s: slice,
         save_compiled: bool = False,
         ctcs_node_intervals: Optional[list] = None,
         constraints_ctcs: Optional[list[Callable]] = None,
@@ -256,18 +249,11 @@ class SimConfig:
             scaling_x_overrides and scaling_u_overrides. Any indices not covered
             by overrides will use the default min/max bounds.
         """
-        # Assign all arguments to self
+        # Assign core arguments to self
         self.x = x
         self.x_prop = x_prop
         self.u = u
         self.total_time = total_time
-        self.idx_x_true = idx_x_true
-        self.idx_x_true_prop = idx_x_true_prop
-        self.idx_u_true = idx_u_true
-        self.idx_t = idx_t
-        self.idx_y = idx_y
-        self.idx_y_prop = idx_y_prop
-        self.idx_s = idx_s
         self.save_compiled = save_compiled
         self.ctcs_node_intervals = ctcs_node_intervals
         self.constraints_ctcs = constraints_ctcs if constraints_ctcs is not None else []
@@ -281,7 +267,7 @@ class SimConfig:
         self.scaling_x_overrides = scaling_x_overrides
         self.scaling_u_overrides = scaling_u_overrides
 
-        # Then call post init logic
+        # Call post init logic
         self.__post_init__()
 
     def __post_init__(self):
@@ -324,6 +310,42 @@ class SimConfig:
         self.S_u = S_u
         self.c_u = c_u
         self.inv_S_u = np.diag(1 / np.diag(self.S_u))
+
+    # Properties for accessing slices from unified objects
+    @property
+    def time_slice(self):
+        """Slice for accessing time in the state vector."""
+        return self.x.time_slice
+
+    @property
+    def ctcs_slice(self):
+        """Slice for accessing CTCS augmented states."""
+        return self.x.ctcs_slice
+
+    @property
+    def ctcs_slice_prop(self):
+        """Slice for accessing CTCS augmented states in propagation."""
+        return self.x_prop.ctcs_slice
+
+    @property
+    def time_dilation_slice(self):
+        """Slice for accessing time dilation in the control vector."""
+        return self.u.time_dilation_slice
+
+    @property
+    def true_state_slice(self):
+        """Slice for accessing true (non-augmented) states."""
+        return self.x._true_slice
+
+    @property
+    def true_state_slice_prop(self):
+        """Slice for accessing true (non-augmented) propagation states."""
+        return self.x_prop._true_slice
+
+    @property
+    def true_control_slice(self):
+        """Slice for accessing true (non-augmented) controls."""
+        return self.u._true_slice
 
 
 @dataclass
