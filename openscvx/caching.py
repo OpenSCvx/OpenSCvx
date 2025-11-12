@@ -62,7 +62,7 @@ def load_or_compile_discretization_solver(
     n_discretization_nodes: int,
     n_states: int,
     n_controls: int,
-    save_compiled: bool = True,
+    save_compiled: bool = False,
     debug: bool = False,
 ) -> callable:
     """Load discretization solver from cache or compile and cache it.
@@ -118,7 +118,7 @@ def load_or_compile_propagation_solver(
     n_states_prop: int,
     n_controls: int,
     max_tau_len: int,
-    save_compiled: bool = True,
+    save_compiled: bool = False,
 ) -> callable:
     """Load propagation solver from cache or compile and cache it.
 
