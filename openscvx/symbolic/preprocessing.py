@@ -38,16 +38,19 @@ def validate_variable_names(
     *,
     reserved_prefix: str = "_",
     reserved_names: Set[str] = None,
+    allow_duplicates: Set[str] = None,
 ) -> None:
     """
     1) Ensure all State/Control names are unique *across distinct variables*.
     2) Ensure no user‐supplied name starts with `reserved_prefix`.
     3) Ensure no name collides with `reserved_names` if given.
+    4) Allow specified names to be duplicated (e.g., "time" for ox.time).
     Raises ValueError on any violation.
     """
     seen_names = set()
     seen_ids = set()
     reserved = set(reserved_names or ())
+    allowed_duplicates = set(allow_duplicates or ())
 
     def visitor(node):
         if not isinstance(node, (State, Control)):
@@ -60,8 +63,8 @@ def validate_variable_names(
 
         name = node.name
 
-        # 1) uniqueness across *different* variables
-        if name in seen_names:
+        # 1) uniqueness across *different* variables (unless allowed to duplicate)
+        if name in seen_names and name not in allowed_duplicates:
             raise ValueError(f"Duplicate variable name: {name!r}")
 
         # 2) no leading underscore

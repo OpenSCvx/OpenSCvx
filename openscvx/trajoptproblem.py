@@ -141,14 +141,17 @@ class TrajOptProblem:
                 Each key should be a state name, and each value should be an Expr
                 representing the derivative of that state.
             constraints (List[Union[CTCSConstraint, NodalConstraint]]):
-                List of constraints decorated with @ctcs or @nodal
+                List of constraints decorated with @ctcs or @nodal. To reference time in constraints,
+                use `ox.time` (e.g., `ox.time[0]`). The time state is automatically created from
+                the Time object, so you don't need to include it in the states list.
             x (List[State]): List of State objects representing the state variables.
-                May optionally include a State named "time" (see time parameter below).
+                **Must not include a state named "time"** - the time state is automatically
+                created from the Time object.
             u (List[Control]): List of Control objects representing the control variables
             N (int): Number of segments in the trajectory
             time (Time): Time configuration object with initial, final, min, max.
-                Required. If including a "time" state in x, the Time object will be ignored
-                and time properties should be set on the time State object instead.
+                **Required.** The time state is automatically created and added to the states list
+                with boundary conditions and bounds from the Time object.
             dynamics_prop: Propagation dynamics function (optional)
             x_prop: Propagation state (optional)
             scp: SCP configuration object
@@ -202,9 +205,28 @@ class TrajOptProblem:
         dynamics, dynamics_concat = convert_dynamics_dict_to_expr(dynamics, states)
 
         # Validate expressions
+        # Allow "time" to be duplicated since ox.time may be used in constraints
         all_exprs = [dynamics_concat] + constraints
-        validate_variable_names(all_exprs)
+        validate_variable_names(all_exprs, allow_duplicates={"time"})
         collect_and_assign_slices(states, controls)
+        
+        # Link the global ox.time State object to the auto-created time state
+        # Find the time state and update ox.time to use the same slice
+        time_state = next((s for s in states if s.name == "time"), None)
+        if time_state is not None:
+            from openscvx.symbolic.expr import State, traverse
+            import openscvx
+            
+            # Update the global ox.time to use the same slice as the auto-created time state
+            if hasattr(openscvx, '_time_state_ref'):
+                openscvx._time_state_ref._slice = time_state._slice
+            
+            # Also update any State("time") objects in constraints to use the same slice
+            def update_time_slices(expr):
+                if isinstance(expr, State) and expr.name == "time" and expr is not time_state:
+                    expr._slice = time_state._slice
+            for constraint in constraints:
+                traverse(constraint, update_time_slices)
         validate_shapes(all_exprs)
         validate_constraints_at_root(constraints)
         validate_and_normalize_constraint_nodes(constraints, N)

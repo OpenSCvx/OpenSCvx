@@ -48,14 +48,6 @@ fuel.min = np.array([0])
 fuel.initial = np.array([0])
 fuel.final = [("minimize", 0)]
 
-# Define time state (needed for time-dependent constraints)
-time = ox.State("time", shape=(1,))
-time.max = np.array([total_time])
-time.min = np.array([0.0])
-time.initial = np.array([0.0])
-time.final = np.array([total_time])
-time.guess = np.linspace(0.0, total_time, n).reshape(-1, 1)
-
 # Define control components
 thrust_force = ox.Control("thrust_force", shape=(3,))  # Thrust forces [fx, fy, fz]
 thrust_force.max = np.array([0, 0, 4.179446268 * 9.81])
@@ -88,7 +80,8 @@ R_sb = jnp.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]])
 
 
 # Define list of all states (needed for TrajOptProblem and constraints)
-states = [position, velocity, attitude, angular_velocity, fuel, time]
+# Note: time state is NOT included - it will be auto-created from Time object
+states = [position, velocity, attitude, angular_velocity, fuel]
 controls = [thrust_force, torque]
 
 
@@ -154,8 +147,16 @@ constraints = []
 for state in states:
     constraints.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
 
+time = ox.Time(
+    initial=0.0,
+    final=total_time,
+    min=0.0,
+    max=total_time,
+)
+
 # Get the symbolic keypoint pose based on time
-kp_pose_symbolic = get_kp_pose_symbolic(time[0], init_pose)
+# time can be used directly as a symbolic expression (automatically references ox.time[0])
+kp_pose_symbolic = get_kp_pose_symbolic(time, init_pose)
 
 # View planning constraint using symbolic keypoint pose
 p_s_s = R_sb @ ox.spatial.QDCM(attitude).T @ (kp_pose_symbolic - position)
@@ -215,18 +216,11 @@ attitude.guess = attitude_bar
 angular_velocity.guess = angular_velocity_bar
 fuel.guess = fuel_bar
 
-time_config = ox.Time(
-    initial=0.0,
-    final=total_time,
-    min=0.0,
-    max=total_time,
-)
-
 problem = TrajOptProblem(
     dynamics=dynamics,
     states=states,
     controls=controls,
-    time=time_config,
+    time=time,
     constraints=constraints,
     N=n,
     licq_max=1e-8,
