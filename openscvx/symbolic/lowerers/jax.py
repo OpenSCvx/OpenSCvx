@@ -214,6 +214,10 @@ class JaxLowerer:
         fR = self.lower(node.rhs)
         return lambda x, u, node, params: fL(x, u, node, params) - fR(x, u, node, params)
 
+    # TODO: (norrisg) CTCS is playing 2 roles here: both as a constraint wrapper and as the penalty
+    # expression w/ conditional logic. Consider adding conditional logic as separate AST nodes.
+    # Then, CTCS remains a wrapper and we just wrap the penalty expression with the conditional
+    # logic when we lower it.
     @visitor(CTCS)
     def visit_ctcs(self, node: CTCS):
         # Lower the penalty expression (which includes the constraint residual)
