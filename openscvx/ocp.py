@@ -25,9 +25,7 @@ def create_cvxpy_variables(settings: Config) -> Dict:
     # Parameters
     w_tr = cp.Parameter(nonneg=True, name="w_tr")
     lam_cost = cp.Parameter(nonneg=True, name="lam_cost")
-    lam_vc = cp.Parameter(
-        (settings.scp.n - 1, settings.sim.n_states), nonneg=True, name="lam_vc"
-    )
+    lam_vc = cp.Parameter((settings.scp.n - 1, settings.sim.n_states), nonneg=True, name="lam_vc")
 
     # State
     x = cp.Variable((settings.scp.n, settings.sim.n_states), name="x")  # Current State
