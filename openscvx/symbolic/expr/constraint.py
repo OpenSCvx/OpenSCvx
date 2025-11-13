@@ -1,3 +1,45 @@
+"""Specialized constraint types for trajectory optimization.
+
+This module provides advanced constraint specification mechanisms that extend the
+basic Equality and Inequality constraints. These specialized constraint types enable
+precise control over when and how constraints are enforced in discretized trajectory
+optimization problems.
+
+Key constraint types:
+
+    NodalConstraint:
+        Enforces constraints only at specific discrete time points (nodes) along the
+        trajectory. Useful for waypoint constraints, boundary conditions, and reducing
+        computational cost by selective enforcement.
+
+    CTCS (Continuous-Time Constraint Satisfaction):
+        Guarantees strict constraint satisfaction throughout the entire continuous
+        trajectory, not just at discrete nodes. Works by augmenting the state vector
+        with additional states whose dynamics integrate constraint violation penalties.
+        Essential for safety-critical applications where inter-node violations could
+        be catastrophic.
+
+Example:
+    Nodal constraints for waypoints::
+
+        import openscvx as ox
+
+        x = ox.State("x", shape=(3,))
+        target = [10, 5, 0]
+
+        # Enforce position constraint only at specific nodes
+        waypoint_constraint = (x == target).at([0, 10, 20])
+
+    Continuous-time constraint for obstacle avoidance::
+
+        obstacle_center = ox.Parameter("obs", shape=(2,), value=[5, 5])
+        obstacle_radius = 2.0
+
+        # Distance from obstacle must be > radius for ALL time
+        distance = ox.Norm(x[:2] - obstacle_center)
+        safety_constraint = (distance >= obstacle_radius).over((0, 100))
+"""
+
 from typing import Optional, Tuple
 
 import numpy as np

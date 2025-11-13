@@ -1,3 +1,45 @@
+"""Mathematical functions for symbolic expressions.
+
+This module provides common mathematical operations used in optimization problems,
+including trigonometric functions, exponential functions, and smooth approximations
+of non-differentiable operations. All functions are element-wise and preserve the
+shape of their inputs.
+
+Function Categories:
+
+    Trigonometric:
+        `Sin`, `Cos` - Standard trigonometric functions
+
+    Exponential and Roots:
+        `Exp`, `Log`, `Sqrt`, `Square` - Exponential, logarithm, square root, and
+        squaring operations
+
+    Smooth Approximations:
+        `PositivePart`, `Huber`, `SmoothReLU` - Smooth, differentiable approximations
+        of non-smooth functions like max(0, x) and absolute value
+
+    Reductions:
+        `Max` - Maximum over elements
+
+Example:
+    Using trigonometric functions in dynamics::
+
+        import openscvx as ox
+
+        # Pendulum dynamics: theta_ddot = -g/L * sin(theta)
+        theta = ox.State("theta", shape=(1,))
+        theta_dot = ox.State("theta_dot", shape=(1,))
+        g, L = 9.81, 1.0
+
+        theta_ddot = -(g / L) * ox.Sin(theta)
+
+    Smooth penalty functions for constraints::
+
+        # Soft constraint using smooth ReLU
+        x = ox.Variable("x", shape=(3,))
+        penalty = ox.SmoothReLU(ox.Norm(x) - 1.0)  # Penalize norm > 1
+"""
+
 from typing import Tuple
 
 import numpy as np

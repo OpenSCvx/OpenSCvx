@@ -1,3 +1,47 @@
+"""Linear algebra operations for symbolic expressions.
+
+This module provides essential linear algebra operations for matrix and vector
+manipulation in optimization problems. Operations follow NumPy/JAX conventions
+for shapes and broadcasting behavior.
+
+Key Operations:
+
+    Matrix Operations:
+        `Transpose` - Matrix/tensor transposition (swaps last two dimensions)
+        `Diag` - Construct diagonal matrix from vector
+
+    Stacking and Concatenation:
+        `Stack` - Stack expressions along a new dimension
+        `Hstack` - Horizontally stack matrices/vectors
+        `Vstack` - Vertically stack matrices/vectors
+
+    Norms:
+        `Norm` - Euclidean (L2) norm of vectors/matrices
+
+Example:
+    Building rotation matrices and transformations::
+
+        import openscvx as ox
+        import numpy as np
+
+        # Create a rotation matrix from angle
+        theta = ox.Variable("theta", shape=(1,))
+        R = ox.Stack(
+            ox.Hstack(ox.Cos(theta), -ox.Sin(theta)),
+            ox.Hstack(ox.Sin(theta), ox.Cos(theta))
+        )
+
+        # Transform a point
+        point = ox.Variable("p", shape=(2,))
+        rotated = R @ point
+
+    Computing kinetic energy::
+
+        v = ox.State("v", shape=(3,))  # Velocity vector
+        m = 10.0  # Mass
+        kinetic_energy = 0.5 * m * ox.Norm(v)**2
+"""
+
 from typing import Tuple
 
 from .expr import Expr, to_expr
