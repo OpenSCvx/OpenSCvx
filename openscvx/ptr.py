@@ -6,6 +6,7 @@ import cvxpy as cp
 import numpy as np
 import numpy.linalg as la
 
+from openscvx.autotuning import update_scp_weights
 from openscvx.config import Config
 from openscvx.results import OptimizationResults
 
@@ -151,9 +152,7 @@ def PTR_step(
     scp_J_vc = np.sum(np.array(J_vc_vec))
 
     # Update weights
-    settings.scp.w_tr = min(settings.scp.w_tr * settings.scp.w_tr_adapt, settings.scp.w_tr_max)
-    if scp_k > settings.scp.cost_drop:
-        settings.scp.lam_cost = settings.scp.lam_cost * settings.scp.cost_relax
+    update_scp_weights(settings, scp_k)
 
     # Emit data
     emitter_function(
@@ -289,8 +288,16 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
 
     # Convex constraints are already lowered and handled in the OCP, no action needed here
 
+    # Initialize lam_vc as matrix if it's still a scalar in settings
+    if isinstance(settings.scp.lam_vc, (int, float)):
+        # Convert scalar to matrix: (N-1, n_states)
+        lam_vc_matrix = np.ones((settings.scp.n - 1, settings.sim.n_states)) * settings.scp.lam_vc
+        settings.scp.lam_vc = lam_vc_matrix
+
+    # Update CVXPy parameter
     prob.param_dict["w_tr"].value = settings.scp.w_tr
     prob.param_dict["lam_cost"].value = settings.scp.lam_cost
+    prob.param_dict["lam_vc"].value = settings.scp.lam_vc
 
     if settings.cvx.cvxpygen:
         t0 = time.time()

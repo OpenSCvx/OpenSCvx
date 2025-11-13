@@ -420,9 +420,21 @@ class ScpConfig:
 
     def __post_init__(self):
         keys_to_scale = ["w_tr", "lam_vc", "lam_cost", "lam_vb"]
-        scale = max(getattr(self, key) for key in keys_to_scale)
+        # Handle lam_vc which might be scalar or array
+        scale_values = []
         for key in keys_to_scale:
-            setattr(self, key, getattr(self, key) / scale)
+            val = getattr(self, key)
+            if isinstance(val, np.ndarray):
+                scale_values.append(np.max(val))
+            else:
+                scale_values.append(val)
+        scale = max(scale_values)
+        for key in keys_to_scale:
+            val = getattr(self, key)
+            if isinstance(val, np.ndarray):
+                setattr(self, key, val / scale)
+            else:
+                setattr(self, key, val / scale)
 
         if self.w_tr_max_scaling_factor is not None and self.w_tr_max is None:
             self.w_tr_max = self.w_tr_max_scaling_factor * self.w_tr
