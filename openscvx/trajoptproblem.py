@@ -37,11 +37,15 @@ from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
 from openscvx.ptr import PTR_init, PTR_step, format_result
 from openscvx.results import OptimizationResults
-from openscvx.symbolic.builder import preprocess_symbolic_problem
+from openscvx.symbolic.builder import (
+    preprocess_propagation_dynamics,
+    preprocess_symbolic_problem,
+)
 from openscvx.symbolic.expr import CTCS, Constraint
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.lower import lower_symbolic_expressions
+from openscvx.symbolic.preprocessing import validate_propagation_compatibility
 from openscvx.time import Time
 
 if TYPE_CHECKING:
@@ -94,8 +98,8 @@ class TrajOptProblem:
         controls: List[Control],
         N: int,
         time: Time,
-        dynamics_prop: Optional[callable] = None,
-        x_prop: State = None,
+        dynamics_prop: Optional[dict] = None,
+        states_prop: Optional[List[State]] = None,
         scp: Optional[ScpConfig] = None,
         dis: Optional[DiscretizationConfig] = None,
         prp: Optional[PropagationConfig] = None,
@@ -116,15 +120,19 @@ class TrajOptProblem:
                 representing the derivative of that state.
             constraints (List[Union[CTCSConstraint, NodalConstraint]]):
                 List of constraints decorated with @ctcs or @nodal
-            x (List[State]): List of State objects representing the state variables.
+            states (List[State]): List of State objects representing the state variables.
                 May optionally include a State named "time" (see time parameter below).
-            u (List[Control]): List of Control objects representing the control variables
+            controls (List[Control]): List of Control objects representing the control variables
             N (int): Number of segments in the trajectory
             time (Time): Time configuration object with initial, final, min, max.
-                Required. If including a "time" state in x, the Time object will be ignored
+                Required. If including a "time" state in states, the Time object will be ignored
                 and time properties should be set on the time State object instead.
-            dynamics_prop: Propagation dynamics function (optional)
-            x_prop: Propagation state (optional)
+            dynamics_prop (dict, optional): Dictionary mapping state names to propagation
+                dynamics expressions. Used for post-solution trajectory propagation with
+                additional states not needed for optimization. Must include all optimization
+                states plus any additional propagation-only states.
+            states_prop (List[State], optional): List of State objects for propagation.
+                Must be a superset of optimization states. Used with dynamics_prop.
             scp: SCP configuration object
             dis: Discretization configuration object
             prp: Propagation configuration object
@@ -141,8 +149,8 @@ class TrajOptProblem:
 
         Note:
             There are two approaches for handling time:
-            1. Auto-create (simple): Don't include "time" in x, provide Time object
-            2. User-provided (for time-dependent constraints): Include "time" State in x and
+            1. Auto-create (simple): Don't include "time" in states, provide Time object
+            2. User-provided (for time-dependent constraints): Include "time" State in states and
                in dynamics dict, don't provide Time object
         """
 
@@ -169,6 +177,56 @@ class TrajOptProblem:
             time_dilation_factor_max=time_dilation_factor_max,
         )
 
+        # Step 1b: Propagation Dynamics Preprocessing (Optional)
+        if dynamics_prop is not None and states_prop is not None:
+            # Get the time state from the augmented states (before CTCS augmentation)
+            time_state = None
+            for state in x_aug:
+                if state.name == "time":
+                    time_state = state
+                    break
+
+            if time_state is None:
+                raise ValueError("Time state not found in augmented states")
+
+            # Preprocess propagation dynamics with CTCS augmentation
+            (
+                dynamics_prop_expr,
+                states_prop_aug,
+                controls_prop_aug,
+                parameters,
+            ) = preprocess_propagation_dynamics(
+                dynamics_prop=dynamics_prop,
+                states_prop=states_prop,
+                states_opt=states,  # Original optimization states (for comparison)
+                controls=controls,  # Use original controls (not augmented with time dilation)
+                time_state=time_state,
+                constraints_ctcs=constraints_ctcs,  # Apply same CTCS augmentation
+                parameters=parameters,
+                N=N,
+                licq_min=licq_min,
+                licq_max=licq_max,
+                time_dilation_factor_min=time_dilation_factor_min,
+                time_dilation_factor_max=time_dilation_factor_max,
+            )
+
+            # Validate compatibility between optimization and propagation
+            # Compare the non-augmented states only
+            validate_propagation_compatibility(
+                states_opt=states + [time_state],  # Original states + time (before augmentation)
+                states_prop=states_prop
+                + [time_state],  # Original prop states + time (before augmentation)
+                controls_opt=controls,  # Original controls (before time dilation)
+                dynamics_prop_expr=dynamics_prop_expr,
+            )
+
+            has_custom_prop_dynamics = True
+        else:
+            has_custom_prop_dynamics = False
+            dynamics_prop_expr = None
+            states_prop_aug = None
+            controls_prop_aug = None
+
         # Step 2: Lower to JAX
         # TODO: Move CVXPy lowering here after SCP weights become CVXPy Parameters
         # Currently CVXPy lowering happens in initialize() because some weights
@@ -191,6 +249,21 @@ class TrajOptProblem:
             parameters=parameters,
         )
 
+        # Step 2b: Lower Propagation Dynamics to JAX (if provided)
+        if has_custom_prop_dynamics:
+            from openscvx.symbolic.lower import lower_to_jax
+            from openscvx.symbolic.unified import unify_states
+
+            # Lower propagation dynamics to JAX function
+            dyn_fn_prop = lower_to_jax(dynamics_prop_expr)
+
+            # Create unified state object for propagation (with augmented states)
+            x_prop_unified = unify_states(states_prop_aug, name="x_prop")
+        else:
+            # Use optimization dynamics for propagation
+            dyn_fn_prop = dyn_fn
+            x_prop_unified = deepcopy(x_unified)
+
         # Step 3: Store Processed Components
 
         # Store state and control lists (includes user-defined + augmented)
@@ -210,21 +283,14 @@ class TrajOptProblem:
 
         # Store dynamics objects
         self.dynamics_augmented = dynamics_augmented
-        # For propagation, use the same augmented dynamics function
-        # (since CTCS augmentation applies to both discretization and propagation)
+        # For propagation, use custom dynamics if provided, otherwise use optimization dynamics
         self.dynamics_augmented_prop = Dynamics(
-            f=dyn_fn,
-            A=jacfwd(dyn_fn, argnums=0),
-            B=jacfwd(dyn_fn, argnums=1),
+            f=dyn_fn_prop,
+            A=jacfwd(dyn_fn_prop, argnums=0),
+            B=jacfwd(dyn_fn_prop, argnums=1),
         )
 
         # ==================== STEP 4: Setup SCP Configuration ====================
-
-        if dynamics_prop is None:
-            dynamics_prop = Dynamics(dyn_fn)
-
-        if x_prop is None:
-            x_prop = deepcopy(x_unified)
 
         # All indices are now stored in the unified objects themselves!
         # SimConfig will access them via properties
@@ -234,11 +300,11 @@ class TrajOptProblem:
         if sim is None:
             sim = SimConfig(
                 x=x_unified,
-                x_prop=x_prop,
+                x_prop=x_prop_unified,
                 u=u_unified,
                 total_time=x_unified.initial[x_unified.time_slice][0],
                 n_states=x_unified.initial.shape[0],
-                n_states_prop=x_prop.initial.shape[0],
+                n_states_prop=x_prop_unified.initial.shape[0],
                 ctcs_node_intervals=node_intervals,
             )
 

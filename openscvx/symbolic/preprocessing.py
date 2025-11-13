@@ -434,3 +434,59 @@ def convert_dynamics_dict_to_expr(
     dynamics_concat = Concat(*dynamics_exprs)
 
     return dynamics_converted, dynamics_concat
+
+
+def validate_propagation_compatibility(
+    states_opt: List[State],
+    states_prop: List[State],
+    controls_opt: List[Control],
+    dynamics_prop_expr: Expr,
+) -> None:
+    """
+    Validate that propagation dynamics are compatible with optimization dynamics.
+
+    Rules:
+    1. Propagation states must be a superset of optimization states (can have additional states)
+    2. Propagation dynamics must NOT introduce new controls (same controls as optimization)
+    3. All optimization state names must appear in propagation states
+
+    Args:
+        states_opt: List of State objects from optimization (includes time, excludes CTCS aug states)
+        states_prop: List of State objects for propagation
+        controls_opt: List of Control objects from optimization (excludes time dilation)
+        dynamics_prop_expr: Propagation dynamics expression to check for controls
+
+    Raises:
+        ValueError: If validation fails
+    """
+    # Get state names (excluding CTCS augmented states and time dilation control)
+    opt_state_names = {s.name for s in states_opt if not s.name.startswith("_ctcs_aug_")}
+    prop_state_names = {s.name for s in states_prop}
+
+    # Check that all optimization states are in propagation states
+    missing_states = opt_state_names - prop_state_names
+    if missing_states:
+        raise ValueError(
+            f"Propagation states must include all optimization states. Missing: {missing_states}"
+        )
+
+    # Collect all controls used in propagation dynamics
+    controls_in_prop = set()
+
+    def collect_controls(node):
+        if isinstance(node, Control):
+            controls_in_prop.add(node.name)
+
+    traverse(dynamics_prop_expr, collect_controls)
+
+    # Get optimization control names (excluding time dilation which is auto-added)
+    opt_control_names = {c.name for c in controls_opt if c.name != "_time_dilation"}
+
+    # Check that propagation doesn't use any new controls
+    new_controls = controls_in_prop - opt_control_names
+    if new_controls:
+        raise ValueError(
+            f"Propagation dynamics cannot introduce new controls. "
+            f"New controls found: {new_controls}. "
+            f"Allowed controls: {opt_control_names}"
+        )
