@@ -6,14 +6,31 @@ from .expr import Expr, to_expr
 
 
 class Sin(Expr):
+    """Element-wise sine function for symbolic expressions.
+
+    Computes the sine of each element in the operand. Preserves the shape
+    of the input expression.
+
+    Attributes:
+        operand: Expression to apply sine function to
+
+    Example:
+        >>> theta = Variable("theta", shape=(3,))
+        >>> sin_theta = Sin(theta)
+    """
+
     def __init__(self, operand):
+        """Initialize a sine operation.
+
+        Args:
+            operand: Expression to apply sine function to
+        """
         self.operand = operand
 
     def children(self):
         return [self.operand]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize the operand."""
         operand = self.operand.canonicalize()
         return Sin(operand)
 
@@ -26,14 +43,31 @@ class Sin(Expr):
 
 
 class Cos(Expr):
+    """Element-wise cosine function for symbolic expressions.
+
+    Computes the cosine of each element in the operand. Preserves the shape
+    of the input expression.
+
+    Attributes:
+        operand: Expression to apply cosine function to
+
+    Example:
+        >>> theta = Variable("theta", shape=(3,))
+        >>> cos_theta = Cos(theta)
+    """
+
     def __init__(self, operand):
+        """Initialize a cosine operation.
+
+        Args:
+            operand: Expression to apply cosine function to
+        """
         self.operand = operand
 
     def children(self):
         return [self.operand]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize the operand."""
         operand = self.operand.canonicalize()
         return Cos(operand)
 
@@ -46,16 +80,32 @@ class Cos(Expr):
 
 
 class Square(Expr):
-    """x^2"""
+    """Element-wise square function for symbolic expressions.
+
+    Computes the square (x^2) of each element in the operand. Preserves the
+    shape of the input expression. This is more efficient than using Power(x, 2)
+    for some optimization backends.
+
+    Attributes:
+        x: Expression to square
+
+    Example:
+        >>> v = Variable("v", shape=(3,))
+        >>> v_squared = Square(v)  # Equivalent to v ** 2
+    """
 
     def __init__(self, x):
+        """Initialize a square operation.
+
+        Args:
+            x: Expression to square
+        """
         self.x = to_expr(x)
 
     def children(self):
         return [self.x]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize the operand."""
         x = self.x.canonicalize()
         return Square(x)
 
@@ -68,14 +118,31 @@ class Square(Expr):
 
 
 class Sqrt(Expr):
+    """Element-wise square root function for symbolic expressions.
+
+    Computes the square root of each element in the operand. Preserves the
+    shape of the input expression.
+
+    Attributes:
+        operand: Expression to apply square root to
+
+    Example:
+        >>> x = Variable("x", shape=(3,))
+        >>> sqrt_x = Sqrt(x)
+    """
+
     def __init__(self, operand):
+        """Initialize a square root operation.
+
+        Args:
+            operand: Expression to apply square root to
+        """
         self.operand = to_expr(operand)
 
     def children(self):
         return [self.operand]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize the operand."""
         operand = self.operand.canonicalize()
         return Sqrt(operand)
 
@@ -88,14 +155,31 @@ class Sqrt(Expr):
 
 
 class Exp(Expr):
+    """Element-wise exponential function for symbolic expressions.
+
+    Computes e^x for each element in the operand, where e is Euler's number.
+    Preserves the shape of the input expression.
+
+    Attributes:
+        operand: Expression to apply exponential function to
+
+    Example:
+        >>> x = Variable("x", shape=(3,))
+        >>> exp_x = Exp(x)
+    """
+
     def __init__(self, operand):
+        """Initialize an exponential operation.
+
+        Args:
+            operand: Expression to apply exponential function to
+        """
         self.operand = to_expr(operand)
 
     def children(self):
         return [self.operand]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize the operand."""
         operand = self.operand.canonicalize()
         return Exp(operand)
 
@@ -108,14 +192,31 @@ class Exp(Expr):
 
 
 class Log(Expr):
+    """Element-wise natural logarithm function for symbolic expressions.
+
+    Computes the natural logarithm (base e) of each element in the operand.
+    Preserves the shape of the input expression.
+
+    Attributes:
+        operand: Expression to apply logarithm to
+
+    Example:
+        >>> x = Variable("x", shape=(3,))
+        >>> log_x = Log(x)
+    """
+
     def __init__(self, operand):
+        """Initialize a natural logarithm operation.
+
+        Args:
+            operand: Expression to apply logarithm to
+        """
         self.operand = to_expr(operand)
 
     def children(self):
         return [self.operand]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize the operand."""
         operand = self.operand.canonicalize()
         return Log(operand)
 
@@ -128,9 +229,30 @@ class Log(Expr):
 
 
 class Max(Expr):
-    """Maximum of two or more operands: max(a, b, c, ...)"""
+    """Element-wise maximum function for symbolic expressions.
+
+    Computes the element-wise maximum across two or more operands. Supports
+    broadcasting following NumPy rules. During canonicalization, nested Max
+    operations are flattened and constants are folded.
+
+    Attributes:
+        operands: List of expressions to compute maximum over
+
+    Example:
+        >>> x = Variable("x", shape=(3,))
+        >>> y = Variable("y", shape=(3,))
+        >>> max_xy = Max(x, y, 0)  # Element-wise max(x, y, 0)
+    """
 
     def __init__(self, *args):
+        """Initialize a maximum operation.
+
+        Args:
+            *args: Two or more expressions to compute maximum over
+
+        Raises:
+            ValueError: If fewer than two operands are provided
+        """
         if len(args) < 2:
             raise ValueError("Max requires two or more operands")
         self.operands = [to_expr(a) for a in args]
@@ -180,16 +302,33 @@ class Max(Expr):
 
 # Penalty function building blocks
 class PositivePart(Expr):
-    """pos(x) = max(x, 0)"""
+    """Positive part function for symbolic expressions.
+
+    Computes max(x, 0) element-wise, effectively zeroing out negative values
+    while preserving positive values. This is also known as the ReLU (Rectified
+    Linear Unit) function and is commonly used as a penalty function building
+    block in optimization.
+
+    Attributes:
+        x: Expression to apply positive part function to
+
+    Example:
+        >>> constraint_violation = x - 10
+        >>> penalty = PositivePart(constraint_violation)  # Penalizes x > 10
+    """
 
     def __init__(self, x):
+        """Initialize a positive part operation.
+
+        Args:
+            x: Expression to apply positive part function to
+        """
         self.x = to_expr(x)
 
     def children(self):
         return [self.x]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize the operand."""
         x = self.x.canonicalize()
         return PositivePart(x)
 
@@ -202,9 +341,33 @@ class PositivePart(Expr):
 
 
 class Huber(Expr):
-    """Huber penalty function"""
+    """Huber penalty function for symbolic expressions.
+
+    The Huber penalty is a smooth approximation to the absolute value function
+    that is quadratic for small values (|x| < delta) and linear for large values
+    (|x| >= delta). This makes it more robust to outliers than squared penalties
+    while maintaining smoothness.
+
+    The Huber function is defined as:
+    - (x^2) / (2*delta)           for |x| <= delta
+    - |x| - delta/2               for |x| > delta
+
+    Attributes:
+        x: Expression to apply Huber penalty to
+        delta: Threshold parameter controlling the transition point (default: 0.25)
+
+    Example:
+        >>> residual = y_measured - y_predicted
+        >>> penalty = Huber(residual, delta=0.5)
+    """
 
     def __init__(self, x, delta: float = 0.25):
+        """Initialize a Huber penalty operation.
+
+        Args:
+            x: Expression to apply Huber penalty to
+            delta: Threshold parameter for quadratic-to-linear transition (default: 0.25)
+        """
         self.x = to_expr(x)
         self.delta = float(delta)
 
@@ -225,9 +388,34 @@ class Huber(Expr):
 
 
 class SmoothReLU(Expr):
-    """sqrt(max(x, 0)^2 + c^2) - c"""
+    """Smooth approximation to the ReLU (positive part) function.
+
+    Computes a smooth, differentiable approximation to max(x, 0) using the formula:
+    sqrt(max(x, 0)^2 + c^2) - c
+
+    The parameter c controls the smoothness: smaller values give a sharper
+    transition, while larger values produce a smoother approximation. As c
+    approaches 0, this converges to the standard ReLU function.
+
+    This is particularly useful in optimization contexts where smooth gradients
+    are required, such as in penalty methods for constraint handling (CTCS).
+
+    Attributes:
+        x: Expression to apply smooth ReLU to
+        c: Smoothing parameter (default: 1e-8)
+
+    Example:
+        >>> constraint_violation = x - 10
+        >>> penalty = SmoothReLU(constraint_violation, c=1e-6)
+    """
 
     def __init__(self, x, c: float = 1e-8):
+        """Initialize a smooth ReLU operation.
+
+        Args:
+            x: Expression to apply smooth ReLU to
+            c: Smoothing parameter controlling transition sharpness (default: 1e-8)
+        """
         self.x = to_expr(x)
         self.c = float(c)
 
