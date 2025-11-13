@@ -6,14 +6,50 @@ from .expr import Constraint, Expr, Sum
 
 
 class NodalConstraint(Expr):
-    """
-    Wrapper for constraints that should only be enforced at specific discrete nodes.
+    """Wrapper for constraints enforced only at specific discrete trajectory nodes.
 
-    This separates nodal constraint logic from the base Constraint class,
-    providing clean separation of concerns.
+    NodalConstraint allows selective enforcement of constraints at specific time points
+    (nodes) in a discretized trajectory, rather than enforcing them at every node.
+    This is useful for:
+
+    - Specifying waypoint constraints (e.g., pass through point X at node 10)
+    - Boundary conditions at non-standard locations
+    - Reducing computational cost by checking constraints less frequently
+    - Enforcing periodic constraints (e.g., every 5th node)
+
+    The wrapper maintains clean separation between the constraint's mathematical
+    definition and the specification of where it should be applied during optimization.
+
+    Attributes:
+        constraint: The wrapped Constraint (Equality or Inequality) to enforce
+        nodes: List of integer node indices where the constraint is enforced
+
+    Example:
+        >>> # Enforce position constraint only at nodes 0, 10, and 20
+        >>> x = State("x", shape=(3,))
+        >>> target = [10, 5, 0]
+        >>> constraint = (x == target).at([0, 10, 20])
+        >>>
+        >>> # Equivalent using NodalConstraint directly
+        >>> constraint = NodalConstraint(x == target, nodes=[0, 10, 20])
+        >>>
+        >>> # Periodic constraint enforcement (every 10th node)
+        >>> velocity_limit = (vel <= 100).at(list(range(0, 100, 10)))
     """
 
     def __init__(self, constraint: Constraint, nodes: list[int]):
+        """Initialize a NodalConstraint.
+
+        Args:
+            constraint: The Constraint (Equality or Inequality) to enforce at specified nodes
+            nodes: List of integer node indices where the constraint should be enforced.
+                Automatically converts numpy integers to Python integers.
+
+        Raises:
+            TypeError: If constraint is not a Constraint instance
+            TypeError: If nodes is not a list
+            TypeError: If any node index is not an integer
+        """
         if not isinstance(constraint, Constraint):
             raise TypeError("NodalConstraint must wrap a Constraint")
         if not isinstance(nodes, list):
@@ -33,17 +69,31 @@ class NodalConstraint(Expr):
         self.nodes = converted_nodes
 
     def children(self):
+        """Return the wrapped constraint as the only child.
+
+        Returns:
+            list: Single-element list containing the wrapped constraint
+        """
         return [self.constraint]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize the wrapped constraint and preserve the node specification."""
+        """Canonicalize the wrapped constraint while preserving node specification.
+
+        Returns:
+            NodalConstraint: A new NodalConstraint with canonicalized inner constraint
+        """
         canon_constraint = self.constraint.canonicalize()
         return NodalConstraint(canon_constraint, self.nodes)
 
     def check_shape(self) -> Tuple[int, ...]:
-        """
-        NodalConstraint wraps a constraint but doesn't change its computational meaning,
-        just specifies where it should be applied. Always produces a scalar.
+        """Validate the wrapped constraint's shape.
+
+        NodalConstraint wraps a constraint without changing its computational meaning,
+        only specifying where it should be applied. Like all constraints, it produces
+        a scalar result.
+
+        Returns:
+            tuple: Empty tuple () representing scalar shape
         """
         # Validate the wrapped constraint's shape
         self.constraint.check_shape()
@@ -56,11 +106,19 @@ class NodalConstraint(Expr):
 
         Returns:
             Self with underlying constraint's convex flag set to True (enables method chaining)
+
+        Example:
+            >>> constraint = (x <= 10).at([0, 5, 10]).convex()
         """
         self.constraint.convex()
         return self
 
     def __repr__(self):
+        """String representation of the NodalConstraint.
+
+        Returns:
+            str: String showing the wrapped constraint and node indices
+        """
         return f"NodalConstraint({self.constraint!r}, nodes={self.nodes})"
 
 
@@ -68,11 +126,50 @@ class NodalConstraint(Expr):
 
 
 class CTCS(Expr):
-    """
-    Marks a constraint for continuous-time constraint satisfaction.
+    """Continuous-Time Constraint Satisfaction using penalty-based augmentation.
 
-    The constraint's left-hand side will be wrapped in a penalty function
-    during lowering/compilation.
+    CTCS transforms hard inequality constraints into soft penalty terms added to the
+    objective function, enabling continuous-time constraint enforcement in discretized
+    trajectory optimization. This is particularly useful for:
+
+    - Path constraints that must hold throughout the entire trajectory (not just at nodes)
+    - Obstacle avoidance where constraint violation between nodes could be catastrophic
+    - State limits that should be respected continuously (e.g., altitude > 0 for aircraft)
+    - Smoothing constraint violations for better convergence
+
+    The constraint's left-hand side (assuming canonical form: lhs <= 0) is wrapped in
+    a penalty function that penalizes violations. Common penalty functions include:
+
+    - **squared_relu**: Square(PositivePart(lhs)) - smooth, strongly penalizes large violations
+    - **huber**: Huber(PositivePart(lhs)) - less sensitive to outliers than squared
+    - **smooth_relu**: SmoothReLU(lhs) - differentiable approximation of ReLU
+
+    The penalty is integrated over the trajectory using an augmented state that evolves
+    according to the penalty function, enabling continuous enforcement between discrete nodes.
+
+    Attributes:
+        constraint: The wrapped Constraint (typically Inequality) to enforce continuously
+        penalty: Penalty function type ('squared_relu', 'huber', or 'smooth_relu')
+        nodes: Optional (start, end) tuple specifying the interval for enforcement,
+            or None to enforce over the entire trajectory
+        idx: Optional grouping index for managing multiple augmented states
+        check_nodally: Whether to also enforce the constraint at discrete nodes for
+            numerical stability (dual enforcement)
+
+    Example:
+        >>> # Altitude constraint: must stay above ground continuously
+        >>> altitude = State("alt", shape=(1,))
+        >>> ground_clearance = (altitude >= 10).over((0, 100))
+        >>>
+        >>> # Equivalent using CTCS directly
+        >>> from openscvx.symbolic.expr.constraint import CTCS
+        >>> clearance = CTCS(altitude >= 10, penalty="squared_relu", nodes=(0, 100))
+        >>>
+        >>> # Obstacle avoidance with Huber penalty (robust to outliers)
+        >>> distance_to_obs = Norm(pos - obs_center)
+        >>> avoid = (distance_to_obs >= safe_radius).over(
+        ...     (0, 50), penalty="huber", check_nodally=True
+        ... )
     """
 
     def __init__(
@@ -83,6 +180,27 @@ class CTCS(Expr):
         idx: Optional[int] = None,
         check_nodally: bool = False,
     ):
+        """Initialize a CTCS constraint.
+
+        Args:
+            constraint: The Constraint to enforce continuously (typically an Inequality)
+            penalty: Penalty function type. Options:
+                - 'squared_relu': Square(PositivePart(lhs)) - default, smooth and strongly penalizing
+                - 'huber': Huber(PositivePart(lhs)) - robust to outliers
+                - 'smooth_relu': SmoothReLU(lhs) - smooth ReLU approximation
+            nodes: Optional (start, end) tuple of node indices defining the enforcement interval.
+                None means enforce over the entire trajectory. Must satisfy start < end.
+            idx: Optional grouping index for multiple augmented states. Allows organizing
+                multiple CTCS constraints with separate augmented state variables.
+            check_nodally: If True, also enforce the constraint at discrete nodes for
+                numerical stability (creates both continuous and nodal constraints).
+                Defaults to False.
+
+        Raises:
+            TypeError: If constraint is not a Constraint instance
+            ValueError: If nodes is not None or a 2-tuple of integers
+            ValueError: If nodes[0] >= nodes[1] (invalid interval)
+        """
         if not isinstance(constraint, Constraint):
             raise TypeError("CTCS must wrap a Constraint")
 
@@ -106,10 +224,19 @@ class CTCS(Expr):
         self.check_nodally = check_nodally
 
     def children(self):
+        """Return the wrapped constraint as the only child.
+
+        Returns:
+            list: Single-element list containing the wrapped constraint
+        """
         return [self.constraint]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize the inner constraint but preserve CTCS parameters."""
+        """Canonicalize the inner constraint while preserving CTCS parameters.
+
+        Returns:
+            CTCS: A new CTCS with canonicalized inner constraint and same parameters
+        """
         canon_constraint = self.constraint.canonicalize()
         return CTCS(
             canon_constraint,
@@ -120,9 +247,17 @@ class CTCS(Expr):
         )
 
     def check_shape(self) -> Tuple[int, ...]:
-        """
-        CTCS wraps a constraint and transforms it into a penalty expression.
-        The penalty expression is always summed, so CTCS always produces a scalar.
+        """Validate the constraint and penalty expression shapes.
+
+        CTCS transforms the wrapped constraint into a penalty expression that is
+        summed (integrated) over the trajectory, always producing a scalar result.
+
+        Returns:
+            tuple: Empty tuple () representing scalar shape
+
+        Raises:
+            ValueError: If the wrapped constraint has invalid shape
+            ValueError: If the generated penalty expression is not scalar
         """
         # First validate the wrapped constraint's shape
         self.constraint.check_shape()
@@ -145,13 +280,18 @@ class CTCS(Expr):
         return ()
 
     def over(self, interval: tuple[int, int]) -> "CTCS":
-        """Set the continuous interval for this CTCS constraint.
+        """Set or update the continuous interval for this CTCS constraint.
 
         Args:
-            interval: Tuple of (start, end) node indices for the continuous interval
+            interval: Tuple of (start, end) node indices defining the enforcement interval
 
         Returns:
-            New CTCS constraint with the specified interval
+            CTCS: New CTCS constraint with the specified interval
+
+        Example:
+            >>> constraint = (altitude >= 10).over((0, 50))
+            >>> # Update interval to cover different range
+            >>> constraint_updated = constraint.over((50, 100))
         """
         return CTCS(
             self.constraint,
@@ -162,6 +302,11 @@ class CTCS(Expr):
         )
 
     def __repr__(self):
+        """String representation of the CTCS constraint.
+
+        Returns:
+            str: String showing constraint, penalty type, and optional parameters
+        """
         parts = [f"{self.constraint!r}", f"penalty={self.penalty!r}"]
         if self.nodes is not None:
             parts.append(f"nodes={self.nodes}")
@@ -172,9 +317,21 @@ class CTCS(Expr):
         return f"CTCS({', '.join(parts)})"
 
     def penalty_expr(self) -> Expr:
-        """
-        Build the penalty expression for this CTCS constraint.
-        This transforms the constraint's LHS into a penalized expression.
+        """Build the penalty expression for this CTCS constraint.
+
+        Transforms the constraint's left-hand side (in canonical form: lhs <= 0)
+        into a penalty expression using the specified penalty function. The penalty
+        is zero when the constraint is satisfied and positive when violated.
+
+        Returns:
+            Expr: Sum of the penalty function applied to the constraint violation
+
+        Raises:
+            ValueError: If an unknown penalty type is specified
+
+        Note:
+            The penalty expression is used internally during problem compilation
+            to create an augmented state that integrates the constraint violation.
         """
         lhs = self.constraint.lhs
 
@@ -203,5 +360,38 @@ def ctcs(
     idx: Optional[int] = None,
     check_nodally: bool = False,
 ) -> CTCS:
-    """Helper function to create CTCS constraints."""
+    """Helper function to create CTCS (Continuous-Time Constraint Satisfaction) constraints.
+
+    This is a convenience function that creates a CTCS constraint with the same
+    parameters as the CTCS constructor. Useful for functional-style constraint building.
+
+    Args:
+        constraint: The Constraint to enforce continuously
+        penalty: Penalty function type ('squared_relu', 'huber', or 'smooth_relu').
+            Defaults to 'squared_relu'.
+        nodes: Optional (start, end) tuple of node indices for enforcement interval.
+            None enforces over entire trajectory.
+        idx: Optional grouping index for multiple augmented states
+        check_nodally: Whether to also enforce constraint at discrete nodes.
+            Defaults to False.
+
+    Returns:
+        CTCS: A CTCS constraint wrapping the input constraint
+
+    Example:
+        >>> # Using the helper function
+        >>> from openscvx.symbolic.expr.constraint import ctcs
+        >>> altitude_constraint = ctcs(
+        ...     altitude >= 10,
+        ...     penalty="huber",
+        ...     nodes=(0, 100),
+        ...     check_nodally=True
+        ... )
+        >>>
+        >>> # Equivalent to using CTCS constructor
+        >>> altitude_constraint = CTCS(altitude >= 10, penalty="huber", nodes=(0, 100))
+        >>>
+        >>> # Also equivalent to using .over() method on constraint
+        >>> altitude_constraint = (altitude >= 10).over((0, 100), penalty="huber")
+    """
     return CTCS(constraint, penalty, nodes, idx, check_nodally)
