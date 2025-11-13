@@ -15,6 +15,12 @@ class Variable(Leaf):
     Variables are optimized by the solver. In trajectory optimization, Variables typically
     represent discretized state or control trajectories.
 
+    Note:
+        Variable is typically not instantiated directly. Instead, use the specialized
+        subclasses State (for state variables with boundary conditions) or Control
+        (for control inputs). These provide additional functionality specific to
+        trajectory optimization.
+
     Attributes:
         name: Name identifier for the variable
         _shape: Shape of the variable as a tuple (typically 1D)
@@ -24,11 +30,9 @@ class Variable(Leaf):
         _guess: Initial guess for the variable trajectory (n_points, n_vars)
 
     Example:
-        >>> # Create a 3D position variable with bounds
-        >>> pos = Variable("pos", shape=(3,))
-        >>> pos.min = [-10, -10, 0]      # Lower bounds
-        >>> pos.max = [10, 10, 100]      # Upper bounds
-        >>> pos.guess = np.zeros((50, 3)) # Initial trajectory guess (50 time points)
+        >>> # Typically, use State or Control instead of Variable directly:
+        >>> pos = openscvx.State("pos", shape=(3,))
+        >>> u = openscvx.Control("u", shape=(2,))
     """
 
     def __init__(self, name, shape):
