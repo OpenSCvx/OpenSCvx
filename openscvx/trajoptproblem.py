@@ -2,11 +2,9 @@ import os
 import queue
 import threading
 import time
-from copy import deepcopy
 from typing import TYPE_CHECKING, List, Optional, Union
 
 import jax
-from jax import jacfwd
 
 os.environ["EQX_ON_ERROR"] = "nan"
 
@@ -27,7 +25,6 @@ from openscvx.config import (
     SimConfig,
 )
 from openscvx.discretization import get_discretization_solver
-from openscvx.dynamics import Dynamics
 from openscvx.ocp import (
     OptimalControlProblem,
     create_cvxpy_variables,
@@ -37,15 +34,11 @@ from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
 from openscvx.ptr import PTR_init, PTR_step, format_result
 from openscvx.results import OptimizationResults
-from openscvx.symbolic.builder import (
-    preprocess_propagation_dynamics,
-    preprocess_symbolic_problem,
-)
+from openscvx.symbolic.builder import preprocess_symbolic_problem
 from openscvx.symbolic.expr import CTCS, Constraint
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.lower import lower_symbolic_expressions
-from openscvx.symbolic.preprocessing import validate_propagation_compatibility
 from openscvx.time import Time
 
 if TYPE_CHECKING:
@@ -127,12 +120,12 @@ class TrajOptProblem:
             time (Time): Time configuration object with initial, final, min, max.
                 Required. If including a "time" state in states, the Time object will be ignored
                 and time properties should be set on the time State object instead.
-            dynamics_prop (dict, optional): Dictionary mapping state names to propagation
-                dynamics expressions. Used for post-solution trajectory propagation with
-                additional states not needed for optimization. Must include all optimization
-                states plus any additional propagation-only states.
-            states_prop (List[State], optional): List of State objects for propagation.
-                Must be a superset of optimization states. Used with dynamics_prop.
+            dynamics_prop (dict, optional): Dictionary mapping EXTRA state names to their
+                dynamics expressions for propagation. Only specify additional states beyond
+                optimization states (e.g., {"distance": speed}). Do NOT duplicate optimization
+                state dynamics here.
+            states_prop (List[State], optional): List of EXTRA State objects for propagation only.
+                Only specify additional states beyond optimization states. Used with dynamics_prop.
             scp: SCP configuration object
             dis: Discretization configuration object
             prp: Propagation configuration object
@@ -164,6 +157,9 @@ class TrajOptProblem:
             constraints_nodal_convex,
             parameters,
             node_intervals,
+            dynamics_prop_aug,
+            x_prop_aug,
+            u_prop_aug,
         ) = preprocess_symbolic_problem(
             dynamics=dynamics,
             constraints=constraints,
@@ -175,57 +171,9 @@ class TrajOptProblem:
             licq_max=licq_max,
             time_dilation_factor_min=time_dilation_factor_min,
             time_dilation_factor_max=time_dilation_factor_max,
+            dynamics_prop_extra=dynamics_prop,
+            states_prop_extra=states_prop,
         )
-
-        # Step 1b: Propagation Dynamics Preprocessing (Optional)
-        if dynamics_prop is not None and states_prop is not None:
-            # Get the time state from the augmented states (before CTCS augmentation)
-            time_state = None
-            for state in x_aug:
-                if state.name == "time":
-                    time_state = state
-                    break
-
-            if time_state is None:
-                raise ValueError("Time state not found in augmented states")
-
-            # Preprocess propagation dynamics with CTCS augmentation
-            (
-                dynamics_prop_expr,
-                states_prop_aug,
-                controls_prop_aug,
-                parameters,
-            ) = preprocess_propagation_dynamics(
-                dynamics_prop=dynamics_prop,
-                states_prop=states_prop,
-                states_opt=states,  # Original optimization states (for comparison)
-                controls=controls,  # Use original controls (not augmented with time dilation)
-                time_state=time_state,
-                constraints_ctcs=constraints_ctcs,  # Apply same CTCS augmentation
-                parameters=parameters,
-                N=N,
-                licq_min=licq_min,
-                licq_max=licq_max,
-                time_dilation_factor_min=time_dilation_factor_min,
-                time_dilation_factor_max=time_dilation_factor_max,
-            )
-
-            # Validate compatibility between optimization and propagation
-            # Compare the non-augmented states only
-            validate_propagation_compatibility(
-                states_opt=states + [time_state],  # Original states + time (before augmentation)
-                states_prop=states_prop
-                + [time_state],  # Original prop states + time (before augmentation)
-                controls_opt=controls,  # Original controls (before time dilation)
-                dynamics_prop_expr=dynamics_prop_expr,
-            )
-
-            has_custom_prop_dynamics = True
-        else:
-            has_custom_prop_dynamics = False
-            dynamics_prop_expr = None
-            states_prop_aug = None
-            controls_prop_aug = None
 
         # Step 2: Lower to JAX
         # TODO: Move CVXPy lowering here after SCP weights become CVXPy Parameters
@@ -234,12 +182,13 @@ class TrajOptProblem:
         # currently modify these between __init__ and initialize(). Once all weights
         # are CVXPy Parameters, CVXPy lowering can happen here alongside JAX lowering.
         (
-            dyn_fn,
             dynamics_augmented,
             lowered_constraints_nodal,
             constraints_nodal_convex,
             x_unified,
             u_unified,
+            dynamics_augmented_prop,
+            x_prop_unified,
         ) = lower_symbolic_expressions(
             dynamics_aug=dynamics_aug,
             states_aug=x_aug,
@@ -247,22 +196,10 @@ class TrajOptProblem:
             constraints_nodal=constraints_nodal,
             constraints_nodal_convex=constraints_nodal_convex,
             parameters=parameters,
+            dynamics_prop=dynamics_prop_aug,
+            states_prop=x_prop_aug,
+            controls_prop=u_prop_aug,
         )
-
-        # Step 2b: Lower Propagation Dynamics to JAX (if provided)
-        if has_custom_prop_dynamics:
-            from openscvx.symbolic.lower import lower_to_jax
-            from openscvx.symbolic.unified import unify_states
-
-            # Lower propagation dynamics to JAX function
-            dyn_fn_prop = lower_to_jax(dynamics_prop_expr)
-
-            # Create unified state object for propagation (with augmented states)
-            x_prop_unified = unify_states(states_prop_aug, name="x_prop")
-        else:
-            # Use optimization dynamics for propagation
-            dyn_fn_prop = dyn_fn
-            x_prop_unified = deepcopy(x_unified)
 
         # Step 3: Store Processed Components
 
@@ -283,12 +220,7 @@ class TrajOptProblem:
 
         # Store dynamics objects
         self.dynamics_augmented = dynamics_augmented
-        # For propagation, use custom dynamics if provided, otherwise use optimization dynamics
-        self.dynamics_augmented_prop = Dynamics(
-            f=dyn_fn_prop,
-            A=jacfwd(dyn_fn_prop, argnums=0),
-            B=jacfwd(dyn_fn_prop, argnums=1),
-        )
+        self.dynamics_augmented_prop = dynamics_augmented_prop
 
         # ==================== STEP 4: Setup SCP Configuration ====================
 

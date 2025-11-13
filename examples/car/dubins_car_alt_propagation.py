@@ -52,8 +52,8 @@ distance.min = np.array([0.0])
 distance.max = np.array([100.0])
 distance.guess = np.zeros((n, 1))
 
-# Propagation states include all optimization states plus distance
-states_prop = states + [distance]
+# Extra propagation states: only the NEW states, not optimization states
+states_prop_extra = [distance]
 
 # Define Parameters with initial values for obstacle radius and center
 obs_center = ox.Parameter("obs_center", shape=(2,), value=np.array([-2.01, 0.0]))
@@ -77,15 +77,10 @@ dynamics = {
     "theta": angular_rate[0],
 }
 
-# Define propagation dynamics (includes distance tracking)
-# Distance derivative is the speed (total distance traveled)
-dynamics_prop = {
-    "position": ox.Concat(
-        speed[0] * ox.Sin(theta[0]),  # x_dot
-        speed[0] * ox.Cos(theta[0]),  # y_dot
-    ),
-    "theta": angular_rate[0],
-    "distance": speed[0],  # distance_dot = speed
+# Define EXTRA propagation dynamics (only for new states)
+# Only specify dynamics for additional states, not optimization states
+dynamics_prop_extra = {
+    "distance": speed[0],  # distance_dot = speed (total distance traveled)
 }
 
 
@@ -106,8 +101,8 @@ problem = TrajOptProblem(
     N=n,
     licq_max=1e-8,
     time_dilation_factor_min=0.02,
-    dynamics_prop=dynamics_prop,
-    states_prop=states_prop,
+    dynamics_prop=dynamics_prop_extra,  # Only extra states
+    states_prop=states_prop_extra,  # Only extra states
 )
 
 # Set solver parameters

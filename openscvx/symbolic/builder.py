@@ -44,6 +44,8 @@ def preprocess_symbolic_problem(
     licq_max: float = 1e-4,
     time_dilation_factor_min: float = 0.3,
     time_dilation_factor_max: float = 3.0,
+    dynamics_prop_extra: dict = None,
+    states_prop_extra: List[State] = None,
 ) -> Tuple:
     """Preprocess and augment symbolic problem specification.
 
@@ -187,6 +189,32 @@ def preprocess_symbolic_problem(
     # Assign slices to augmented states and controls in canonical order
     collect_and_assign_slices(states_aug, controls_aug)
 
+    # ==================== PHASE 5: Create Propagation Dynamics ====================
+
+    # By default, propagation dynamics are the same as optimization dynamics
+    # Use deepcopy to avoid reference issues when lowering
+    from copy import deepcopy
+
+    dynamics_prop = deepcopy(dynamics_aug)
+    states_prop = list(states_aug)  # Shallow copy of list is fine for states
+    controls_prop = list(controls_aug)
+
+    # If user provided extra propagation states, extend propagation dynamics
+    if dynamics_prop_extra is not None and states_prop_extra is not None:
+        (
+            dynamics_prop,
+            states_prop,
+            controls_prop,
+            parameters,
+        ) = add_propagation_states(
+            dynamics_extra=dynamics_prop_extra,
+            states_extra=states_prop_extra,
+            dynamics_opt=dynamics_prop,
+            states_opt=states_prop,
+            controls_opt=controls_prop,
+            parameters=parameters,
+        )
+
     # ==================== Return Symbolic Outputs ====================
 
     return (
@@ -198,201 +226,134 @@ def preprocess_symbolic_problem(
         constraints_nodal_convex,
         parameters,
         node_intervals,
+        dynamics_prop,
+        states_prop,
+        controls_prop,
     )
 
 
-def preprocess_propagation_dynamics(
-    dynamics_prop: dict,
-    states_prop: List[State],
+def add_propagation_states(
+    dynamics_extra: dict,
+    states_extra: List[State],
+    dynamics_opt: any,
     states_opt: List[State],
-    controls: List[Control],
-    time_state: State,
-    constraints_ctcs: List[CTCS],
+    controls_opt: List[Control],
     parameters: Dict[str, any],
-    N: int,
-    licq_min: float = 0.0,
-    licq_max: float = 1e-4,
-    time_dilation_factor_min: float = 0.3,
-    time_dilation_factor_max: float = 3.0,
 ) -> Tuple:
-    """Preprocess propagation dynamics with CTCS augmentation.
+    """Add extra propagation-only states to optimization dynamics.
 
-    Propagation dynamics are used for post-solution trajectory propagation.
-    They allow tracking additional states beyond optimization states while
-    maintaining the same augmentation structure (CTCS states) for consistency.
+    This function extends optimization dynamics with additional states that are only
+    needed for post-solution trajectory propagation (e.g., distance traveled, energy used).
 
-    State ordering in propagation:
-    1. True states (optimization states + extra propagation states)
-    2. Time state (if not already included)
-    3. CTCS augmented states (same as optimization)
-    4. Time dilation control (same as optimization)
+    The user only specifies the ADDITIONAL states and their dynamics. These are appended
+    after the optimization states (including augmented CTCS states).
+
+    Final state ordering:
+    [opt_states, time, ctcs_aug_states, extra_prop_states]
 
     Args:
-        dynamics_prop: Dictionary mapping state names to their dynamics expressions
-        states_prop: List of State objects for propagation (superset of optimization states)
-        controls: List of Control objects (same as optimization controls)
-        time_state: The time State object from the optimization problem
-        constraints_ctcs: List of CTCS constraints from optimization (for augmentation)
+        dynamics_extra: Dictionary mapping extra state names to their dynamics expressions
+            (only the new states, not the optimization states)
+        states_extra: List of extra State objects for propagation only
+        dynamics_opt: Augmented optimization dynamics expression
+        states_opt: Augmented optimization states (includes time + CTCS aug states)
+        controls_opt: Augmented optimization controls (includes time dilation)
         parameters: Dictionary of parameter values (from optimization preprocessing)
-        N: Number of segments in the trajectory
-        licq_min: Minimum LICQ constraint value
-        licq_max: Maximum LICQ constraint value
-        time_dilation_factor_min: Minimum time dilation factor
-        time_dilation_factor_max: Maximum time dilation factor
 
     Returns:
         Tuple containing:
-            - dynamics_prop_aug: Augmented propagation dynamics expression
-            - states_prop_aug: Augmented propagation states (true + time + ctcs aug)
-            - controls_aug: Augmented controls (includes time dilation)
+            - dynamics_prop: Extended propagation dynamics expression
+            - states_prop: Extended propagation states
+            - controls_prop: Propagation controls (same as optimization)
             - parameters_updated: Updated parameters dict
 
     Raises:
         ValueError: If validation fails
 
     Example:
-        >>> dyn_prop, states_prop_aug, controls_aug, params = preprocess_propagation_dynamics(
-        ...     dynamics_prop={"x": u, "v": a, "distance": speed},
-        ...     states_prop=[x_state, v_state, distance_state],
-        ...     controls=[a_control, speed_control],
-        ...     time_state=time_state,
-        ...     constraints_ctcs=constraints_ctcs,
-        ...     parameters=parameters,
-        ...     N=50
+        >>> # User only specifies extra states
+        >>> dynamics_extra = {"distance": speed[0]}
+        >>> states_extra = [distance_state]
+        >>> dyn_prop, states_prop, controls_prop, params = add_propagation_states(
+        ...     dynamics_extra=dynamics_extra,
+        ...     states_extra=states_extra,
+        ...     dynamics_opt=dynamics_aug,
+        ...     states_opt=states_aug,
+        ...     controls_opt=controls_aug,
+        ...     parameters=parameters
         ... )
     """
 
-    # ==================== PHASE 1: State Reordering & Validation ====================
-
     # Make copies to avoid mutating inputs
-    states_prop_input = list(states_prop)
-    dynamics_prop = dict(dynamics_prop)
+    states_extra = list(states_extra)
+    dynamics_extra = dict(dynamics_extra)
     parameters = dict(parameters)
 
-    # Separate optimization states from extra propagation states
-    # Extra propagation states will be added AFTER augmentation
-    opt_state_names = {
-        s.name for s in states_opt if s.name != "time"
-    }  # Original opt states without time
-    opt_state_names.add("time")  # Add time to optimization states
+    # ==================== PHASE 1: Validate Extra States ====================
 
-    # Partition states: optimization states vs extra propagation-only states
-    states_opt_overlap = []
-    states_prop_extra = []
-    for state in states_prop_input:
-        if state.name in opt_state_names:
-            states_opt_overlap.append(state)
-        else:
-            states_prop_extra.append(state)
+    # Validate that extra states don't conflict with optimization state names
+    opt_state_names = {s.name for s in states_opt}
+    extra_state_names = {s.name for s in states_extra}
+    conflicts = opt_state_names & extra_state_names
+    if conflicts:
+        raise ValueError(
+            f"Extra propagation states conflict with optimization states: {conflicts}. "
+            f"Only specify additional states, not optimization states."
+        )
 
-    # Ensure time state is included
-    has_time = any(state.name == "time" for state in states_opt_overlap)
-    if not has_time:
-        states_opt_overlap.append(time_state)
+    # Validate dynamics dict for extra states
+    validate_dynamics_dict(dynamics_extra, states_extra)
+    validate_dynamics_dict_dimensions(dynamics_extra, states_extra)
 
-    # Build dynamics for optimization states only (extra prop states added after augmentation)
-    dynamics_opt_overlap = {}
-    for s in states_opt_overlap:
-        if s.name in dynamics_prop:
-            dynamics_opt_overlap[s.name] = dynamics_prop[s.name]
+    # ==================== PHASE 2: Process Extra Dynamics ====================
 
-    # Add time derivative if not present
-    if "time" not in dynamics_opt_overlap:
-        dynamics_opt_overlap["time"] = 1.0
+    # Convert extra dynamics to expression
+    _, dynamics_extra_concat = convert_dynamics_dict_to_expr(dynamics_extra, states_extra)
 
-    # Validate dynamics dict (for optimization overlap part)
-    validate_dynamics_dict(dynamics_opt_overlap, states_opt_overlap)
-    validate_dynamics_dict_dimensions(dynamics_opt_overlap, states_opt_overlap)
+    # Validate and canonicalize
+    validate_variable_names([dynamics_extra_concat])
 
-    # Convert dynamics dict to concatenated expression (optimization overlap only)
-    dynamics_opt_overlap, dynamics_opt_concat = convert_dynamics_dict_to_expr(
-        dynamics_opt_overlap, states_opt_overlap
-    )
+    # Temporarily assign slices for validation (will be recalculated below)
+    collect_and_assign_slices(states_extra, controls_opt)
+    validate_shapes([dynamics_extra_concat])
+    validate_dynamics_dimension(dynamics_extra_concat, states_extra)
+    dynamics_extra_concat = dynamics_extra_concat.canonicalize()
 
-    # ==================== PHASE 2: Expression Validation (Optimization Overlap) ====================
-
-    # Validate variable names and shapes for optimization overlap
-    validate_variable_names([dynamics_opt_concat])
-    collect_and_assign_slices(states_opt_overlap, controls)
-    validate_shapes([dynamics_opt_concat])
-    validate_dynamics_dimension(dynamics_opt_concat, states_opt_overlap)
-
-    # ==================== PHASE 3: Canonicalization & Parameter Collection ====================
-
-    # Canonicalize dynamics expression
-    dynamics_opt_concat = dynamics_opt_concat.canonicalize()
-
-    # Collect any new parameter values from propagation dynamics
+    # Collect any new parameter values from extra dynamics
     def collect_param_values(expr):
         if isinstance(expr, Parameter):
             if expr.name not in parameters:
                 parameters[expr.name] = expr.value
 
-    traverse(dynamics_opt_concat, collect_param_values)
+    traverse(dynamics_extra_concat, collect_param_values)
 
-    # ==================== PHASE 4: CTCS Augmentation ====================
+    # ==================== PHASE 3: Concatenate with Optimization Dynamics ====================
 
-    # Apply CTCS augmentation to optimization overlap states
-    # Ordering after this: {opt states, time, ctcs aug states}
-    dynamics_opt_aug, states_opt_aug, controls_prop_aug = augment_dynamics_with_ctcs(
-        dynamics_opt_concat,
-        states_opt_overlap,
-        controls,
-        constraints_ctcs,
-        N,
-        licq_min=licq_min,
-        licq_max=licq_max,
-        time_dilation_factor_min=time_dilation_factor_min,
-        time_dilation_factor_max=time_dilation_factor_max,
-    )
+    # Concatenate: {opt dynamics, extra dynamics}
+    from openscvx.symbolic.expr import Concat
 
-    # ==================== PHASE 5: Add Extra Propagation States ====================
+    dynamics_prop = Concat(dynamics_opt, dynamics_extra_concat)
 
-    # Now add extra propagation-only states AFTER augmentation
-    # Final ordering: {opt states, time, ctcs aug states, extra prop states}
-    if states_prop_extra:
-        # Process extra propagation state dynamics
-        dynamics_extra = {s.name: dynamics_prop[s.name] for s in states_prop_extra}
-        validate_dynamics_dict(dynamics_extra, states_prop_extra)
-        validate_dynamics_dict_dimensions(dynamics_extra, states_prop_extra)
+    # Manually assign slices to extra states ONLY (don't modify optimization state slices)
+    # Extra states are appended after all optimization states
+    n_opt_states = states_opt[-1]._slice.stop if states_opt else 0
+    start_idx = n_opt_states
+    for state in states_extra:
+        end_idx = start_idx + state.shape[0]
+        state._slice = slice(start_idx, end_idx)
+        start_idx = end_idx
 
-        # Convert extra dynamics to expression
-        _, dynamics_extra_concat = convert_dynamics_dict_to_expr(dynamics_extra, states_prop_extra)
+    # Append extra states to optimization states
+    states_prop = states_opt + states_extra
 
-        # Validate and canonicalize
-        validate_variable_names([dynamics_extra_concat])
-        collect_and_assign_slices(states_prop_extra, controls)
-        validate_shapes([dynamics_extra_concat])
-        validate_dynamics_dimension(dynamics_extra_concat, states_prop_extra)
-        dynamics_extra_concat = dynamics_extra_concat.canonicalize()
-
-        # Collect parameters from extra dynamics
-        traverse(dynamics_extra_concat, collect_param_values)
-
-        # Concatenate: {aug dynamics, extra dynamics}
-        from openscvx.symbolic.expr import Concat
-
-        dynamics_prop_aug = Concat(dynamics_opt_aug, dynamics_extra_concat)
-
-        # Clear slices from extra states before appending (they were assigned earlier)
-        for state in states_prop_extra:
-            state._slice = None
-
-        # Append extra states to augmented states
-        states_prop_aug = states_opt_aug + states_prop_extra
-    else:
-        # No extra states, just use augmented optimization states
-        dynamics_prop_aug = dynamics_opt_aug
-        states_prop_aug = states_opt_aug
-
-    # Assign slices to final propagation states and controls
-    collect_and_assign_slices(states_prop_aug, controls_prop_aug)
+    # Propagation uses same controls as optimization
+    controls_prop = controls_opt
 
     # ==================== Return Symbolic Outputs ====================
 
     return (
-        dynamics_prop_aug,
-        states_prop_aug,
-        controls_prop_aug,
+        dynamics_prop,
+        states_prop,
+        controls_prop,
         parameters,
     )
