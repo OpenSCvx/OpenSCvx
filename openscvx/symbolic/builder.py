@@ -5,7 +5,7 @@ before lowering to executable code (JAX/CVXPy). The key function is `preprocess_
 which performs all symbolic manipulation without any code generation.
 """
 
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 from openscvx.symbolic.augmentation import (
     augment_dynamics_with_ctcs,
@@ -43,6 +43,8 @@ def preprocess_symbolic_problem(
     licq_max: float = 1e-4,
     time_dilation_factor_min: float = 0.3,
     time_dilation_factor_max: float = 3.0,
+    dynamics_prop_extra: dict = None,
+    states_prop_extra: List[State] = None,
 ) -> Tuple:
     """Preprocess and augment symbolic problem specification.
 
@@ -186,6 +188,32 @@ def preprocess_symbolic_problem(
     # Assign slices to augmented states and controls in canonical order
     collect_and_assign_slices(states_aug, controls_aug)
 
+    # ==================== PHASE 5: Create Propagation Dynamics ====================
+
+    # By default, propagation dynamics are the same as optimization dynamics
+    # Use deepcopy to avoid reference issues when lowering
+    from copy import deepcopy
+
+    dynamics_prop = deepcopy(dynamics_aug)
+    states_prop = list(states_aug)  # Shallow copy of list is fine for states
+    controls_prop = list(controls_aug)
+
+    # If user provided extra propagation states, extend propagation dynamics
+    if dynamics_prop_extra is not None and states_prop_extra is not None:
+        (
+            dynamics_prop,
+            states_prop,
+            controls_prop,
+            parameters,
+        ) = add_propagation_states(
+            dynamics_extra=dynamics_prop_extra,
+            states_extra=states_prop_extra,
+            dynamics_opt=dynamics_prop,
+            states_opt=states_prop,
+            controls_opt=controls_prop,
+            parameters=parameters,
+        )
+
     # ==================== Return Symbolic Outputs ====================
 
     return (
@@ -197,4 +225,134 @@ def preprocess_symbolic_problem(
         constraints_nodal_convex,
         parameters,
         node_intervals,
+        dynamics_prop,
+        states_prop,
+        controls_prop,
+    )
+
+
+def add_propagation_states(
+    dynamics_extra: dict,
+    states_extra: List[State],
+    dynamics_opt: any,
+    states_opt: List[State],
+    controls_opt: List[Control],
+    parameters: Dict[str, any],
+) -> Tuple:
+    """Add extra propagation-only states to optimization dynamics.
+
+    This function extends optimization dynamics with additional states that are only
+    needed for post-solution trajectory propagation (e.g., distance traveled, energy used).
+
+    The user only specifies the ADDITIONAL states and their dynamics. These are appended
+    after the optimization states (including augmented CTCS states).
+
+    Final state ordering:
+    [opt_states, time, ctcs_aug_states, extra_prop_states]
+
+    Args:
+        dynamics_extra: Dictionary mapping extra state names to their dynamics expressions
+            (only the new states, not the optimization states)
+        states_extra: List of extra State objects for propagation only
+        dynamics_opt: Augmented optimization dynamics expression
+        states_opt: Augmented optimization states (includes time + CTCS aug states)
+        controls_opt: Augmented optimization controls (includes time dilation)
+        parameters: Dictionary of parameter values (from optimization preprocessing)
+
+    Returns:
+        Tuple containing:
+            - dynamics_prop: Extended propagation dynamics expression
+            - states_prop: Extended propagation states
+            - controls_prop: Propagation controls (same as optimization)
+            - parameters_updated: Updated parameters dict
+
+    Raises:
+        ValueError: If validation fails
+
+    Example:
+        >>> # User only specifies extra states
+        >>> dynamics_extra = {"distance": speed[0]}
+        >>> states_extra = [distance_state]
+        >>> dyn_prop, states_prop, controls_prop, params = add_propagation_states(
+        ...     dynamics_extra=dynamics_extra,
+        ...     states_extra=states_extra,
+        ...     dynamics_opt=dynamics_aug,
+        ...     states_opt=states_aug,
+        ...     controls_opt=controls_aug,
+        ...     parameters=parameters
+        ... )
+    """
+
+    # Make copies to avoid mutating inputs
+    states_extra = list(states_extra)
+    dynamics_extra = dict(dynamics_extra)
+    parameters = dict(parameters)
+
+    # ==================== PHASE 1: Validate Extra States ====================
+
+    # Validate that extra states don't conflict with optimization state names
+    opt_state_names = {s.name for s in states_opt}
+    extra_state_names = {s.name for s in states_extra}
+    conflicts = opt_state_names & extra_state_names
+    if conflicts:
+        raise ValueError(
+            f"Extra propagation states conflict with optimization states: {conflicts}. "
+            f"Only specify additional states, not optimization states."
+        )
+
+    # Validate dynamics dict for extra states
+    validate_dynamics_dict(dynamics_extra, states_extra)
+    validate_dynamics_dict_dimensions(dynamics_extra, states_extra)
+
+    # ==================== PHASE 2: Process Extra Dynamics ====================
+
+    # Convert extra dynamics to expression
+    _, dynamics_extra_concat = convert_dynamics_dict_to_expr(dynamics_extra, states_extra)
+
+    # Validate and canonicalize
+    validate_variable_names([dynamics_extra_concat])
+
+    # Temporarily assign slices for validation (will be recalculated below)
+    collect_and_assign_slices(states_extra, controls_opt)
+    validate_shapes([dynamics_extra_concat])
+    validate_dynamics_dimension(dynamics_extra_concat, states_extra)
+    dynamics_extra_concat = dynamics_extra_concat.canonicalize()
+
+    # Collect any new parameter values from extra dynamics
+    def collect_param_values(expr):
+        if isinstance(expr, Parameter):
+            if expr.name not in parameters:
+                parameters[expr.name] = expr.value
+
+    traverse(dynamics_extra_concat, collect_param_values)
+
+    # ==================== PHASE 3: Concatenate with Optimization Dynamics ====================
+
+    # Concatenate: {opt dynamics, extra dynamics}
+    from openscvx.symbolic.expr import Concat
+
+    dynamics_prop = Concat(dynamics_opt, dynamics_extra_concat)
+
+    # Manually assign slices to extra states ONLY (don't modify optimization state slices)
+    # Extra states are appended after all optimization states
+    n_opt_states = states_opt[-1]._slice.stop if states_opt else 0
+    start_idx = n_opt_states
+    for state in states_extra:
+        end_idx = start_idx + state.shape[0]
+        state._slice = slice(start_idx, end_idx)
+        start_idx = end_idx
+
+    # Append extra states to optimization states
+    states_prop = states_opt + states_extra
+
+    # Propagation uses same controls as optimization
+    controls_prop = controls_opt
+
+    # ==================== Return Symbolic Outputs ====================
+
+    return (
+        dynamics_prop,
+        states_prop,
+        controls_prop,
+        parameters,
     )

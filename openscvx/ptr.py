@@ -68,7 +68,7 @@ def format_result(problem, converged: bool) -> OptimizationResults:
         x=problem.settings.sim.x,
         nodes=nodes_dict,
         trajectory={},  # Populated by post_process
-        _states=problem.states,
+        _states=problem.states_prop,  # Use propagation states for trajectory dict
         _controls=problem.controls,
         x_history=problem.scp_trajs,
         u_history=problem.scp_controls,
