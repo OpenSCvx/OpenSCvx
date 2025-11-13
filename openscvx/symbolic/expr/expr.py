@@ -354,7 +354,11 @@ class Add(Expr):
         return list(self.terms)
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize addition: flatten, fold constants, eliminate zeros."""
+        """Canonicalize addition: flatten, fold constants, and eliminate zeros.
+
+        Returns:
+            Expr: Canonical form of the addition expression
+        """
         terms = []
         const_vals = []
 
@@ -380,7 +384,14 @@ class Add(Expr):
         return Add(*terms)
 
     def check_shape(self) -> Tuple[int, ...]:
-        """Addition broadcasts shapes like NumPy."""
+        """Check shape compatibility and compute broadcasted result shape like NumPy.
+
+        Returns:
+            tuple: The broadcasted shape of all operands
+
+        Raises:
+            ValueError: If operand shapes are not broadcastable
+        """
         shapes = [child.check_shape() for child in self.children()]
         try:
             return np.broadcast_shapes(*shapes)
@@ -422,7 +433,11 @@ class Sub(Expr):
         return [self.left, self.right]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize subtraction: fold constants if both sides are constants."""
+        """Canonicalize subtraction: fold constants if both sides are constants.
+
+        Returns:
+            Expr: Canonical form of the subtraction expression
+        """
         left = self.left.canonicalize()
         right = self.right.canonicalize()
         if isinstance(left, Constant) and isinstance(right, Constant):
@@ -430,7 +445,14 @@ class Sub(Expr):
         return Sub(left, right)
 
     def check_shape(self) -> Tuple[int, ...]:
-        """Subtraction broadcasts shapes like NumPy."""
+        """Check shape compatibility and compute broadcasted result shape like NumPy.
+
+        Returns:
+            tuple: The broadcasted shape of all operands
+
+        Raises:
+            ValueError: If operand shapes are not broadcastable
+        """
         shapes = [child.check_shape() for child in self.children()]
         try:
             return np.broadcast_shapes(*shapes)
@@ -474,7 +496,11 @@ class Mul(Expr):
         return list(self.factors)
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize multiplication: flatten, fold constants, eliminate ones."""
+        """Canonicalize multiplication: flatten, fold constants, and eliminating ones.
+
+        Returns:
+            Expr: Canonical form of the multiplication expression
+        """
         factors = []
         const_vals = []
 
@@ -511,7 +537,15 @@ class Mul(Expr):
         return Mul(*factors)
 
     def check_shape(self) -> Tuple[int, ...]:
-        """Multiplication broadcasts shapes like NumPy."""
+        """Check shape compatibility and compute broadcasted result shape like NumPy.
+        
+
+        Returns:
+            tuple: The broadcasted shape of all operands
+
+        Raises:
+            ValueError: If operand shapes are not broadcastable
+        """
         shapes = [child.check_shape() for child in self.children()]
         try:
             return np.broadcast_shapes(*shapes)
@@ -553,7 +587,11 @@ class Div(Expr):
         return [self.left, self.right]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize division: fold constants if both sides are constants."""
+        """Canonicalize division: fold constants if both sides are constants.
+
+        Returns:
+            Expr: Canonical form of the division expression
+        """
         lhs = self.left.canonicalize()
         rhs = self.right.canonicalize()
         if isinstance(lhs, Constant) and isinstance(rhs, Constant):
@@ -561,7 +599,14 @@ class Div(Expr):
         return Div(lhs, rhs)
 
     def check_shape(self) -> Tuple[int, ...]:
-        """Division broadcasts shapes like NumPy."""
+        """Check shape compatibility and compute broadcasted result shape like NumPy.
+
+        Returns:
+            tuple: The broadcasted shape of both operands
+
+        Raises:
+            ValueError: If operand shapes are not broadcastable
+        """
         shapes = [child.check_shape() for child in self.children()]
         try:
             return np.broadcast_shapes(*shapes)
@@ -674,7 +719,11 @@ class Neg(Expr):
         return [self.operand]
 
     def canonicalize(self) -> "Expr":
-        """Fold constant negations."""
+        """Canonicalize negation: fold constant negations.
+
+        Returns:
+            Expr: Canonical form of the negation expression
+        """
         o = self.operand.canonicalize()
         if isinstance(o, Constant):
             return Constant(-o.value)
@@ -714,6 +763,11 @@ class Sum(Expr):
         return [self.operand]
 
     def canonicalize(self) -> "Expr":
+        """Canonicalize sum: canonicalize the operand.
+
+        Returns:
+            Expr: Canonical form of the sum expression
+        """
         operand = self.operand.canonicalize()
         return Sum(operand)
 
@@ -758,6 +812,11 @@ class Index(Expr):
         return [self.base]
 
     def canonicalize(self) -> "Expr":
+        """Canonicalize index by canonicalizing the base expression.
+
+        Returns:
+            Expr: Canonical form of the indexing expression
+        """
         base = self.base.canonicalize()
         return Index(base, self.index)
 
@@ -803,6 +862,11 @@ class Concat(Expr):
         return list(self.exprs)
 
     def canonicalize(self) -> "Expr":
+        """Canonicalize concatenation by canonicalizing all operands.
+
+        Returns:
+            Expr: Canonical form of the concatenation expression
+        """
         exprs = [e.canonicalize() for e in self.exprs]
         return Concat(*exprs)
 
@@ -851,12 +915,16 @@ class Power(Expr):
         return [self.base, self.exponent]
 
     def canonicalize(self) -> "Expr":
+        """Canonicalize power by canonicalizing base and exponent.
+
+        Returns:
+            Expr: Canonical form of the power expression
+        """
         base = self.base.canonicalize()
         exponent = self.exponent.canonicalize()
         return Power(base, exponent)
 
     def check_shape(self) -> Tuple[int, ...]:
-        """Power preserves the broadcasted shape of base and exponent."""
         shapes = [child.check_shape() for child in self.children()]
         try:
             return np.broadcast_shapes(*shapes)
