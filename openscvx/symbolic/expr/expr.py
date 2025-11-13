@@ -1,3 +1,68 @@
+"""Core symbolic expression system for trajectory optimization.
+
+This module provides the foundation for openscvx's symbolic expression framework,
+implementing an Abstract Syntax Tree (AST) representation for mathematical expressions
+used in optimization problems. The expression system enables:
+
+    - Declarative problem specification: Write optimization problems using familiar
+      mathematical notation with operator overloading (+, -, *, /, @, **, etc.)
+    - Automatic differentiation: Expressions are automatically differentiated during
+      compilation to solver-specific formats
+    - Shape checking: Static validation of tensor dimensions before optimization
+    - Canonicalization: Algebraic simplification for more efficient compilation
+    - Multiple backends: Expressions can be compiled to CVXPy, JAX, or custom solvers
+
+Architecture:
+    The expression system is built around an AST where each node is an `Expr` subclass:
+
+        - Leaf nodes: `Parameter`, `Variable`, `State`, `Control` - symbolic values
+        - Arithmetic operations: `Add`, `Sub`, `Mul`, `Div`, `MatMul`, `Power`, `Neg`
+        - Reductions: `Sum`, `Norm`, etc.
+        - Constraints: `Equality`, `Inequality`
+        - Functions: `Sin`, `Cos`, `Exp`, `Log`, `Sqrt`, etc.
+        - Indexing: `Index`, `Concat`, `Stack`
+
+    Each expression node implements:
+
+        - `children()`: Returns child expressions in the AST
+        - `canonicalize()`: Returns a simplified/normalized version
+        - `check_shape()`: Validates and returns the output shape
+
+Example:
+    Creating symbolic variables and expressions::
+
+        import openscvx as ox
+
+        # Define symbolic variables
+        x = ox.Variable("x", shape=(3,))
+        A = ox.Parameter("A", shape=(3, 3), value=np.eye(3))
+
+        # Build expressions using natural syntax
+        expr = A @ x + 5
+        constraint = ox.Norm(x) <= 1.0
+
+        # Expressions form an AST
+        print(expr.pretty())  # Visualize the tree structure
+
+    Shape checking with automatic validation::
+
+        x = ox.Variable("x", shape=(3,))
+        y = ox.Variable("y", shape=(4,))
+
+        # This will raise ValueError during shape checking
+        try:
+            expr = x + y  # Shapes (3,) and (4,) not broadcastable
+            expr.check_shape()
+        except ValueError as e:
+            print(f"Shape error: {e}")
+
+    Algebraic canonicalization::
+
+        x = ox.Variable("x", shape=(3,))
+        expr = x + 0 + (1 * x)
+        canonical = expr.canonicalize()  # Simplifies to: x + x
+"""
+
 from typing import Callable, Optional, Tuple, Union
 
 import numpy as np
