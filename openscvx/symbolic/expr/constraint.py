@@ -225,8 +225,12 @@ class CTCS(Expr):
                 - 'smooth_relu': SmoothReLU(lhs) - smooth ReLU approximation
             nodes: Optional (start, end) tuple of node indices defining the enforcement interval.
                 None means enforce over the entire trajectory. Must satisfy start < end.
+                CTCS constraints with the same nodes are automatically grouped together.
             idx: Optional grouping index for multiple augmented states. Allows organizing
                 multiple CTCS constraints with separate augmented state variables.
+                If None, constraints are auto-grouped by their node intervals.
+                Explicitly setting idx allows manual control over which constraints
+                share an augmented state.
             check_nodally: If True, also enforce the constraint at discrete nodes for
                 numerical stability (creates both continuous and nodal constraints).
                 Defaults to False.
@@ -358,10 +362,11 @@ class CTCS(Expr):
         into a penalty expression using the specified penalty function. The penalty
         is zero when the constraint is satisfied and positive when violated.
 
-        This penalty expression becomes the dynamics of an augmented state:
-        dx_aug/dt = penalty(lhs). By constraining x_aug(t) = 0 for all t, we ensure
-        the integral of the penalty is zero, which strictly enforces the constraint
-        continuously.
+        This penalty expression becomes part of the dynamics of an augmented state.
+        Multiple CTCS constraints in the same group (same idx) have their penalties
+        summed: ds_aug_i/dt = sum(penalty_j) for all j in group i. By constraining
+        s_aug_i(t) = 0 for all t, we ensure all penalties in the group are zero,
+        which strictly enforces all constraints in the group continuously.
 
         Returns:
             Expr: Sum of the penalty function applied to the constraint violation
@@ -371,8 +376,8 @@ class CTCS(Expr):
 
         Note:
             This method is used internally during problem compilation to create
-            augmented state dynamics. The returned expression is added to the
-            dynamics vector via Concat.
+            augmented state dynamics. Multiple penalty expressions with the same
+            idx are summed together before being added to the dynamics vector via Concat.
         """
         lhs = self.constraint.lhs
 
