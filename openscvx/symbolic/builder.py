@@ -25,7 +25,6 @@ from openscvx.symbolic.preprocessing import (
     validate_dynamics_dict,
     validate_dynamics_dict_dimensions,
     validate_dynamics_dimension,
-    validate_propagation_compatibility,
     validate_shapes,
     validate_time_parameters,
     validate_variable_names,
