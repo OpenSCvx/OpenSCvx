@@ -207,6 +207,9 @@ class TrajOptProblem:
         self.states = x_aug
         self.controls = u_aug
 
+        # Store propagation states (includes extra propagation-only states)
+        self.states_prop = x_prop_aug
+
         # Store unified objects for easy access
         self.x_unified = x_unified
         self.u_unified = u_unified
