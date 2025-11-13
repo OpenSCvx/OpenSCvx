@@ -538,7 +538,7 @@ class Mul(Expr):
 
     def check_shape(self) -> Tuple[int, ...]:
         """Check shape compatibility and compute broadcasted result shape like NumPy.
-        
+
 
         Returns:
             tuple: The broadcasted shape of all operands
