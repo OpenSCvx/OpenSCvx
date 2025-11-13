@@ -606,7 +606,6 @@ class MatMul(Expr):
         return [self.left, self.right]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize matrix multiplication."""
         left = self.left.canonicalize()
         right = self.right.canonicalize()
         return MatMul(left, right)
@@ -675,7 +674,7 @@ class Neg(Expr):
         return [self.operand]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize negation: fold if operand is a constant."""
+        """Fold constant negations."""
         o = self.operand.canonicalize()
         if isinstance(o, Constant):
             return Constant(-o.value)
@@ -715,7 +714,6 @@ class Sum(Expr):
         return [self.operand]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize sum operation."""
         operand = self.operand.canonicalize()
         return Sum(operand)
 
@@ -760,7 +758,6 @@ class Index(Expr):
         return [self.base]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize indexing operation."""
         base = self.base.canonicalize()
         return Index(base, self.index)
 
@@ -806,7 +803,6 @@ class Concat(Expr):
         return list(self.exprs)
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize concatenation operation."""
         exprs = [e.canonicalize() for e in self.exprs]
         return Concat(*exprs)
 
@@ -855,7 +851,6 @@ class Power(Expr):
         return [self.base, self.exponent]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize power operation."""
         base = self.base.canonicalize()
         exponent = self.exponent.canonicalize()
         return Power(base, exponent)
