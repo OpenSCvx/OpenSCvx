@@ -20,6 +20,10 @@ class NodalConstraint(Expr):
     The wrapper maintains clean separation between the constraint's mathematical
     definition and the specification of where it should be applied during optimization.
 
+    Note:
+        Bare Constraint objects (without .at() or .over()) are automatically converted
+        to NodalConstraints applied at all nodes during preprocessing.
+
     Attributes:
         constraint: The wrapped Constraint (Equality or Inequality) to enforce
         nodes: List of integer node indices where the constraint is enforced
@@ -35,6 +39,11 @@ class NodalConstraint(Expr):
         >>>
         >>> # Periodic constraint enforcement (every 10th node)
         >>> velocity_limit = (vel <= 100).at(list(range(0, 100, 10)))
+        >>>
+        >>> # Bare constraints are automatically applied at all nodes
+        >>> # These are equivalent:
+        >>> constraint1 = vel <= 100  # Auto-converted to all nodes
+        >>> constraint2 = (vel <= 100).at(list(range(n_nodes)))
     """
 
     def __init__(self, constraint: Constraint, nodes: list[int]):
@@ -126,50 +135,76 @@ class NodalConstraint(Expr):
 
 
 class CTCS(Expr):
-    """Continuous-Time Constraint Satisfaction using penalty-based augmentation.
+    """Continuous-Time Constraint Satisfaction using augmented state dynamics.
 
-    CTCS transforms hard inequality constraints into soft penalty terms added to the
-    objective function, enabling continuous-time constraint enforcement in discretized
-    trajectory optimization. This is particularly useful for:
+    CTCS enables strict continuous-time constraint enforcement in discretized trajectory
+    optimization by augmenting the state vector with additional states whose dynamics
+    are the constraint violation penalties. By constraining these augmented states to remain
+    at zero throughout the trajectory, the original constraints are guaranteed to be satisfied
+    continuously, not just at discrete nodes.
+
+    **How it works:**
+
+    1. Each constraint (in canonical form: lhs <= 0) is wrapped in a penalty function
+    2. Augmented states s_aug_i are added with dynamics: ds_aug_i/dt = sum(penalty_j(lhs_j))
+       for all CTCS constraints j in group i
+    3. Each augmented state is constrained: s_aug_i(t) = 0 for all t (strictly enforced)
+    4. Since s_aug_i integrates the penalties, s_aug_i = 0 implies all penalties in the
+       group are zero, which means all constraints in the group are satisfied continuously
+
+    **Grouping and augmented states:**
+
+    - CTCS constraints with the **same node interval** are grouped into a single augmented
+      state by default (their penalties are summed)
+    - CTCS constraints with **different node intervals** create separate augmented states
+    - Using the `idx` parameter explicitly assigns constraints to specific augmented states,
+      allowing manual control over grouping
+    - Each unique group creates one augmented state named `_ctcs_aug_0`, `_ctcs_aug_1`, etc.
+
+    This is particularly useful for:
 
     - Path constraints that must hold throughout the entire trajectory (not just at nodes)
     - Obstacle avoidance where constraint violation between nodes could be catastrophic
     - State limits that should be respected continuously (e.g., altitude > 0 for aircraft)
-    - Smoothing constraint violations for better convergence
+    - Ensuring smooth, feasible trajectories between discretization points
 
-    The constraint's left-hand side (assuming canonical form: lhs <= 0) is wrapped in
-    a penalty function that penalizes violations. Common penalty functions include:
+    **Penalty functions** (applied to constraint violations):
 
-    - **squared_relu**: Square(PositivePart(lhs)) - smooth, strongly penalizes large violations
+    - **squared_relu**: Square(PositivePart(lhs)) - smooth, differentiable (default)
     - **huber**: Huber(PositivePart(lhs)) - less sensitive to outliers than squared
-    - **smooth_relu**: SmoothReLU(lhs) - differentiable approximation of ReLU
-
-    The penalty is integrated over the trajectory using an augmented state that evolves
-    according to the penalty function, enabling continuous enforcement between discrete nodes.
+    - **smooth_relu**: SmoothReLU(lhs) - smooth approximation of ReLU
 
     Attributes:
         constraint: The wrapped Constraint (typically Inequality) to enforce continuously
         penalty: Penalty function type ('squared_relu', 'huber', or 'smooth_relu')
         nodes: Optional (start, end) tuple specifying the interval for enforcement,
             or None to enforce over the entire trajectory
-        idx: Optional grouping index for managing multiple augmented states
+        idx: Optional grouping index for managing multiple augmented states.
+            CTCS constraints with the same idx and nodes are grouped together, sharing
+            an augmented state. If None, auto-assigned based on node intervals.
         check_nodally: Whether to also enforce the constraint at discrete nodes for
-            numerical stability (dual enforcement)
+            additional numerical robustness (creates both continuous and nodal constraints)
 
     Example:
-        >>> # Altitude constraint: must stay above ground continuously
+        >>> # Single augmented state (default behavior - same node interval)
         >>> altitude = State("alt", shape=(1,))
-        >>> ground_clearance = (altitude >= 10).over((0, 100))
+        >>> constraints = [
+        ...     (altitude >= 10).over((0, 10)),  # Both constraints share
+        ...     (altitude <= 1000).over((0, 10))  # one augmented state
+        ... ]
         >>>
-        >>> # Equivalent using CTCS directly
-        >>> from openscvx.symbolic.expr.constraint import CTCS
-        >>> clearance = CTCS(altitude >= 10, penalty="squared_relu", nodes=(0, 100))
+        >>> # Multiple augmented states (different node intervals)
+        >>> constraints = [
+        ...     (altitude >= 10).over((0, 5)),  # Creates _ctcs_aug_0
+        ...     (altitude >= 20).over((5, 10))  # Creates _ctcs_aug_1
+        ... ]
         >>>
-        >>> # Obstacle avoidance with Huber penalty (robust to outliers)
-        >>> distance_to_obs = Norm(pos - obs_center)
-        >>> avoid = (distance_to_obs >= safe_radius).over(
-        ...     (0, 50), penalty="huber", check_nodally=True
-        ... )
+        >>> # Manual grouping with idx parameter
+        >>> constraints = [
+        ...     (altitude >= 10).over((0, 10), idx=0),    # Group 0
+        ...     (velocity <= 100).over((0, 10), idx=1),   # Group 1 (separate state)
+        ...     (altitude <= 1000).over((0, 10), idx=0)   # Also group 0
+        ... ]
     """
 
     def __init__(
@@ -185,7 +220,7 @@ class CTCS(Expr):
         Args:
             constraint: The Constraint to enforce continuously (typically an Inequality)
             penalty: Penalty function type. Options:
-                - 'squared_relu': Square(PositivePart(lhs)) - default, smooth and strongly penalizing
+                - 'squared_relu': Square(PositivePart(lhs)) - default, smooth, differentiable
                 - 'huber': Huber(PositivePart(lhs)) - robust to outliers
                 - 'smooth_relu': SmoothReLU(lhs) - smooth ReLU approximation
             nodes: Optional (start, end) tuple of node indices defining the enforcement interval.
@@ -323,6 +358,11 @@ class CTCS(Expr):
         into a penalty expression using the specified penalty function. The penalty
         is zero when the constraint is satisfied and positive when violated.
 
+        This penalty expression becomes the dynamics of an augmented state:
+        dx_aug/dt = penalty(lhs). By constraining x_aug(t) = 0 for all t, we ensure
+        the integral of the penalty is zero, which strictly enforces the constraint
+        continuously.
+
         Returns:
             Expr: Sum of the penalty function applied to the constraint violation
 
@@ -330,8 +370,9 @@ class CTCS(Expr):
             ValueError: If an unknown penalty type is specified
 
         Note:
-            The penalty expression is used internally during problem compilation
-            to create an augmented state that integrates the constraint violation.
+            This method is used internally during problem compilation to create
+            augmented state dynamics. The returned expression is added to the
+            dynamics vector via Concat.
         """
         lhs = self.constraint.lhs
 
