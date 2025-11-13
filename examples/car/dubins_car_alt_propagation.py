@@ -145,5 +145,6 @@ if __name__ == "__main__":
 
     results = problem.solve()
     results = problem.post_process(results)
+    print(f"Total distance travelled: {results.trajectory['distance'][-1]}")
     results.update(plotting_dict)
     plot_dubins_car(results, problem.settings).show()
