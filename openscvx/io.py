@@ -5,6 +5,7 @@ import warnings
 from importlib.metadata import PackageNotFoundError, version
 
 import jax
+import numpy as np
 from termcolor import colored
 
 from openscvx.results import OptimizationResults
@@ -92,10 +93,14 @@ def print_problem_summary(settings):
     jax_version = jax.__version__
 
     # Build weights string conditionally
+    if isinstance(settings.scp.lam_vc, np.ndarray):
+        lam_vc_str = f"λ_vc=matrix({settings.scp.lam_vc.shape})"
+    else:
+        lam_vc_str = f"λ_vc={settings.scp.lam_vc:4.1f}"
     weights_parts = [
         f"λ_cost={settings.scp.lam_cost:4.1f}",
         f"λ_tr={settings.scp.w_tr:4.1f}",
-        f"λ_vc={settings.scp.lam_vc:4.1f}",
+        lam_vc_str,
     ]
 
     # Add λ_vb only if there are nodal nonconvex constraints

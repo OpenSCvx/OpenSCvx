@@ -25,6 +25,9 @@ def create_cvxpy_variables(settings: Config) -> Dict:
     # Parameters
     w_tr = cp.Parameter(nonneg=True, name="w_tr")
     lam_cost = cp.Parameter(nonneg=True, name="lam_cost")
+    lam_vc = cp.Parameter(
+        (settings.scp.n - 1, settings.sim.n_states), nonneg=True, name="lam_vc"
+    )
 
     # State
     x = cp.Variable((settings.scp.n, settings.sim.n_states), name="x")  # Current State
@@ -101,6 +104,7 @@ def create_cvxpy_variables(settings: Config) -> Dict:
     return {
         "w_tr": w_tr,
         "lam_cost": lam_cost,
+        "lam_vc": lam_vc,
         "x": x,
         "dx": dx,
         "x_bar": x_bar,
@@ -244,6 +248,7 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     # Extract variables from the dict for easier access
     w_tr = ocp_vars["w_tr"]
     lam_cost = ocp_vars["lam_cost"]
+    lam_vc = ocp_vars["lam_vc"]
     x = ocp_vars["x"]
     dx = ocp_vars["dx"]
     x_bar = ocp_vars["x_bar"]
@@ -357,7 +362,7 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
         w_tr * cp.sum_squares(cp.hstack((dx[i], du[i]))) for i in range(settings.scp.n)
     )  # Trust Region Cost
     cost += sum(
-        settings.scp.lam_vc * cp.sum(cp.abs(nu[i - 1])) for i in range(1, settings.scp.n)
+        cp.sum(lam_vc[i - 1] * cp.abs(nu[i - 1])) for i in range(1, settings.scp.n)
     )  # Virtual Control Slack
 
     idx_ncvx = 0
