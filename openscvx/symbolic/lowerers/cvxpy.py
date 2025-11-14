@@ -144,7 +144,7 @@ def visitor(expr_cls: Type[Expr]):
 
     Example:
         >>> @visitor(Add)
-        ... def visit_add(self, node: Add):
+        ... def _visit_add(self, node: Add):
         ...     # Lower addition to CVXPy
         ...     ...
 
@@ -153,7 +153,7 @@ def visitor(expr_cls: Type[Expr]):
 
             @visitor(Equality)
             @visitor(Inequality)
-            def visit_constraint(self, node: Constraint):
+            def _visit_constraint(self, node: Constraint):
                 # Handle both equality and inequality
                 ...
     """
@@ -285,7 +285,7 @@ class CvxpyLowerer:
         self.variable_map[name] = cvx_expr
 
     @visitor(Constant)
-    def visit_constant(self, node: Constant) -> cp.Expression:
+    def _visit_constant(self, node: Constant) -> cp.Expression:
         """Lower a constant value to a CVXPy constant.
 
         Wraps the constant's numpy array value in a CVXPy Constant expression.
@@ -299,7 +299,7 @@ class CvxpyLowerer:
         return cp.Constant(node.value)
 
     @visitor(State)
-    def visit_state(self, node: State) -> cp.Expression:
+    def _visit_state(self, node: State) -> cp.Expression:
         """Lower a state variable to a CVXPy expression.
 
         Extracts the appropriate slice from the unified state vector "x" using
@@ -326,7 +326,7 @@ class CvxpyLowerer:
         return cvx_var
 
     @visitor(Control)
-    def visit_control(self, node: Control) -> cp.Expression:
+    def _visit_control(self, node: Control) -> cp.Expression:
         """Lower a control variable to a CVXPy expression.
 
         Extracts the appropriate slice from the unified control vector "u" using
@@ -353,7 +353,7 @@ class CvxpyLowerer:
         return cvx_var
 
     @visitor(Parameter)
-    def visit_parameter(self, node: Parameter) -> cp.Expression:
+    def _visit_parameter(self, node: Parameter) -> cp.Expression:
         """Lower a parameter to a CVXPy expression.
 
         Parameters are looked up by name in the variable_map. They can be mapped
@@ -382,7 +382,7 @@ class CvxpyLowerer:
             )
 
     @visitor(Add)
-    def visit_add(self, node: Add) -> cp.Expression:
+    def _visit_add(self, node: Add) -> cp.Expression:
         """Lower addition to CVXPy expression.
 
         Recursively lowers all terms and composes them with element-wise addition.
@@ -401,7 +401,7 @@ class CvxpyLowerer:
         return result
 
     @visitor(Sub)
-    def visit_sub(self, node: Sub) -> cp.Expression:
+    def _visit_sub(self, node: Sub) -> cp.Expression:
         """Lower subtraction to CVXPy expression (element-wise left - right).
 
         Subtraction is affine and always DCP-compliant.
@@ -417,7 +417,7 @@ class CvxpyLowerer:
         return left - right
 
     @visitor(Mul)
-    def visit_mul(self, node: Mul) -> cp.Expression:
+    def _visit_mul(self, node: Mul) -> cp.Expression:
         """Lower element-wise multiplication to CVXPy expression.
 
         Element-wise multiplication is DCP-compliant when at least one operand
@@ -440,7 +440,7 @@ class CvxpyLowerer:
         return result
 
     @visitor(Div)
-    def visit_div(self, node: Div) -> cp.Expression:
+    def _visit_div(self, node: Div) -> cp.Expression:
         """Lower element-wise division to CVXPy expression.
 
         Division is DCP-compliant when the denominator is constant or when
@@ -460,7 +460,7 @@ class CvxpyLowerer:
         return left / right
 
     @visitor(MatMul)
-    def visit_matmul(self, node: MatMul) -> cp.Expression:
+    def _visit_matmul(self, node: MatMul) -> cp.Expression:
         """Lower matrix multiplication to CVXPy expression using @ operator.
 
         Matrix multiplication is DCP-compliant when at least one operand is
@@ -477,7 +477,7 @@ class CvxpyLowerer:
         return left @ right
 
     @visitor(Neg)
-    def visit_neg(self, node: Neg) -> cp.Expression:
+    def _visit_neg(self, node: Neg) -> cp.Expression:
         """Lower negation (unary minus) to CVXPy expression.
 
         Negation preserves DCP properties (negating convex gives concave).
@@ -492,7 +492,7 @@ class CvxpyLowerer:
         return -operand
 
     @visitor(Sum)
-    def visit_sum(self, node: Sum) -> cp.Expression:
+    def _visit_sum(self, node: Sum) -> cp.Expression:
         """Lower sum reduction to CVXPy expression (sums all elements).
 
         Sum preserves DCP properties (sum of convex is convex).
@@ -507,7 +507,7 @@ class CvxpyLowerer:
         return cp.sum(operand)
 
     @visitor(Norm)
-    def visit_norm(self, node: Norm) -> cp.Expression:
+    def _visit_norm(self, node: Norm) -> cp.Expression:
         """Lower norm operation to CVXPy expression.
 
         Norms are convex functions and commonly used in convex optimization.
@@ -526,7 +526,7 @@ class CvxpyLowerer:
         return cp.norm(operand, node.ord)
 
     @visitor(Index)
-    def visit_index(self, node: Index) -> cp.Expression:
+    def _visit_index(self, node: Index) -> cp.Expression:
         """Lower indexing/slicing operation to CVXPy expression.
 
         Indexing preserves DCP properties (indexing into convex is convex).
@@ -541,7 +541,7 @@ class CvxpyLowerer:
         return base[node.index]
 
     @visitor(Concat)
-    def visit_concat(self, node: Concat) -> cp.Expression:
+    def _visit_concat(self, node: Concat) -> cp.Expression:
         """Lower concatenation to CVXPy expression.
 
         Concatenates expressions horizontally along axis 0. Scalars are
@@ -567,7 +567,7 @@ class CvxpyLowerer:
         return cp.hstack(exprs_1d)
 
     @visitor(Sin)
-    def visit_sin(self, node: Sin) -> cp.Expression:
+    def _visit_sin(self, node: Sin) -> cp.Expression:
         """Raise NotImplementedError for sine function.
 
         Sine is not DCP-compliant in CVXPy as it is neither convex nor concave.
@@ -590,7 +590,7 @@ class CvxpyLowerer:
         )
 
     @visitor(Cos)
-    def visit_cos(self, node: Cos) -> cp.Expression:
+    def _visit_cos(self, node: Cos) -> cp.Expression:
         """Raise NotImplementedError for cosine function.
 
         Cosine is not DCP-compliant in CVXPy as it is neither convex nor concave.
@@ -613,7 +613,7 @@ class CvxpyLowerer:
         )
 
     @visitor(Exp)
-    def visit_exp(self, node: Exp) -> cp.Expression:
+    def _visit_exp(self, node: Exp) -> cp.Expression:
         """Lower exponential function to CVXPy expression.
 
         Exponential is a convex function and DCP-compliant when used in
@@ -635,7 +635,7 @@ class CvxpyLowerer:
         return cp.exp(operand)
 
     @visitor(Log)
-    def visit_log(self, node: Log) -> cp.Expression:
+    def _visit_log(self, node: Log) -> cp.Expression:
         """Lower natural logarithm to CVXPy expression.
 
         Logarithm is a concave function and DCP-compliant when used in
@@ -657,7 +657,7 @@ class CvxpyLowerer:
         return cp.log(operand)
 
     @visitor(Equality)
-    def visit_equality(self, node: Equality) -> cp.Constraint:
+    def _visit_equality(self, node: Equality) -> cp.Constraint:
         """Lower equality constraint to CVXPy constraint (lhs == rhs).
 
         Equality constraints require affine expressions on both sides for
@@ -678,7 +678,7 @@ class CvxpyLowerer:
         return left == right
 
     @visitor(Inequality)
-    def visit_inequality(self, node: Inequality) -> cp.Constraint:
+    def _visit_inequality(self, node: Inequality) -> cp.Constraint:
         """Lower inequality constraint to CVXPy constraint (lhs <= rhs).
 
         Inequality constraints must satisfy DCP rules: convex <= concave.
@@ -698,7 +698,7 @@ class CvxpyLowerer:
         return left <= right
 
     @visitor(CTCS)
-    def visit_ctcs(self, node: CTCS) -> cp.Expression:
+    def _visit_ctcs(self, node: CTCS) -> cp.Expression:
         """Raise NotImplementedError for CTCS constraints.
 
         CTCS (Continuous-Time Constraint Satisfaction) constraints are handled
@@ -724,7 +724,7 @@ class CvxpyLowerer:
         )
 
     @visitor(PositivePart)
-    def visit_pos(self, node: PositivePart) -> cp.Expression:
+    def _visit_pos(self, node: PositivePart) -> cp.Expression:
         """Lower positive part function to CVXPy.
 
         Computes max(x, 0), which is convex. Used in penalty methods for
@@ -744,7 +744,7 @@ class CvxpyLowerer:
         return cp.maximum(operand, 0.0)
 
     @visitor(Square)
-    def visit_square(self, node: Square) -> cp.Expression:
+    def _visit_square(self, node: Square) -> cp.Expression:
         """Lower square function to CVXPy.
 
         Computes x^2, which is convex. Used in quadratic penalty methods
@@ -764,7 +764,7 @@ class CvxpyLowerer:
         return cp.square(operand)
 
     @visitor(Huber)
-    def visit_huber(self, node: Huber) -> cp.Expression:
+    def _visit_huber(self, node: Huber) -> cp.Expression:
         """Lower Huber penalty function to CVXPy.
 
         Huber penalty is quadratic for small values and linear for large values,
@@ -788,7 +788,7 @@ class CvxpyLowerer:
         return cp.huber(operand, M=node.delta)
 
     @visitor(SmoothReLU)
-    def visit_srelu(self, node: SmoothReLU) -> cp.Expression:
+    def _visit_srelu(self, node: SmoothReLU) -> cp.Expression:
         """Lower smooth ReLU penalty function to CVXPy.
 
         Smooth approximation to ReLU: sqrt(max(x, 0)^2 + c^2) - c
@@ -813,7 +813,7 @@ class CvxpyLowerer:
         return cp.sqrt(cp.sum_squares(pos_part) + c**2) - c
 
     @visitor(Sqrt)
-    def visit_sqrt(self, node: Sqrt) -> cp.Expression:
+    def _visit_sqrt(self, node: Sqrt) -> cp.Expression:
         """Lower square root to CVXPy expression.
 
         Square root is concave and DCP-compliant when used appropriately
@@ -834,7 +834,7 @@ class CvxpyLowerer:
         return cp.sqrt(operand)
 
     @visitor(Max)
-    def visit_max(self, node: Max) -> cp.Expression:
+    def _visit_max(self, node: Max) -> cp.Expression:
         """Lower element-wise maximum to CVXPy expression.
 
         Maximum is convex (pointwise max of convex functions is convex).
@@ -861,7 +861,7 @@ class CvxpyLowerer:
             return result
 
     @visitor(Transpose)
-    def visit_transpose(self, node: Transpose) -> cp.Expression:
+    def _visit_transpose(self, node: Transpose) -> cp.Expression:
         """Lower matrix transpose to CVXPy expression.
 
         Transpose preserves DCP properties (transpose of convex is convex).
@@ -876,7 +876,7 @@ class CvxpyLowerer:
         return operand.T
 
     @visitor(Power)
-    def visit_power(self, node: Power) -> cp.Expression:
+    def _visit_power(self, node: Power) -> cp.Expression:
         """Lower element-wise power (base**exponent) to CVXPy expression.
 
         Power is DCP-compliant for specific exponent values:
@@ -898,7 +898,7 @@ class CvxpyLowerer:
         return cp.power(base, exponent)
 
     @visitor(Stack)
-    def visit_stack(self, node: Stack) -> cp.Expression:
+    def _visit_stack(self, node: Stack) -> cp.Expression:
         """Lower vertical stacking to CVXPy expression.
 
         Stacks expressions vertically using cp.vstack. Preserves DCP properties.

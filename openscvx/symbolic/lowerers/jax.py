@@ -135,7 +135,7 @@ def visitor(expr_cls: Type[Expr]):
 
     Example:
         >>> @visitor(Add)
-        ... def visit_add(self, node: Add):
+        ... def _visit_add(self, node: Add):
         ...     # Lower addition to JAX
         ...     ...
 
@@ -144,7 +144,7 @@ def visitor(expr_cls: Type[Expr]):
 
             @visitor(Equality)
             @visitor(Inequality)
-            def visit_constraint(self, node: Constraint):
+            def _visit_constraint(self, node: Constraint):
                 # Handle both equality and inequality
                 ...
     """
@@ -237,7 +237,7 @@ class JaxLowerer:
         return dispatch(self, expr)
 
     @visitor(Constant)
-    def visit_constant(self, node: Constant):
+    def _visit_constant(self, node: Constant):
         """Lower a constant value to a JAX function.
 
         Captures the constant value and returns a function that always returns it.
@@ -258,7 +258,7 @@ class JaxLowerer:
         return lambda x, u, node, params: value
 
     @visitor(State)
-    def visit_state(self, node: State):
+    def _visit_state(self, node: State):
         """Lower a state variable to a JAX function.
 
         Extracts the appropriate slice from the unified state vector x using
@@ -279,7 +279,7 @@ class JaxLowerer:
         return lambda x, u, node, params: x[sl]
 
     @visitor(Control)
-    def visit_control(self, node: Control):
+    def _visit_control(self, node: Control):
         """Lower a control variable to a JAX function.
 
         Extracts the appropriate slice from the unified control vector u using
@@ -300,7 +300,7 @@ class JaxLowerer:
         return lambda x, u, node, params: u[sl]
 
     @visitor(Parameter)
-    def visit_parameter(self, node: Parameter):
+    def _visit_parameter(self, node: Parameter):
         """Lower a parameter to a JAX function.
 
         Parameters are looked up by name in the params dictionary at evaluation time,
@@ -316,7 +316,7 @@ class JaxLowerer:
         return lambda x, u, node, params: jnp.array(params[param_name])
 
     @visitor(Add)
-    def visit_add(self, node: Add):
+    def _visit_add(self, node: Add):
         """Lower addition to JAX function.
 
         Recursively lowers all terms and composes them with element-wise addition.
@@ -339,14 +339,14 @@ class JaxLowerer:
         return fn
 
     @visitor(Sub)
-    def visit_sub(self, node: Sub):
+    def _visit_sub(self, node: Sub):
         """Lower subtraction to JAX function (element-wise left - right)."""
         fL = self.lower(node.left)
         fR = self.lower(node.right)
         return lambda x, u, node, params: fL(x, u, node, params) - fR(x, u, node, params)
 
     @visitor(Mul)
-    def visit_mul(self, node: Mul):
+    def _visit_mul(self, node: Mul):
         """Lower element-wise multiplication to JAX function (Hadamard product)."""
         fs = [self.lower(factor) for factor in node.factors]
 
@@ -359,33 +359,33 @@ class JaxLowerer:
         return fn
 
     @visitor(Div)
-    def visit_div(self, node: Div):
+    def _visit_div(self, node: Div):
         """Lower element-wise division to JAX function."""
         fL = self.lower(node.left)
         fR = self.lower(node.right)
         return lambda x, u, node, params: fL(x, u, node, params) / fR(x, u, node, params)
 
     @visitor(MatMul)
-    def visit_matmul(self, node: MatMul):
+    def _visit_matmul(self, node: MatMul):
         """Lower matrix multiplication to JAX function using jnp.matmul."""
         fL = self.lower(node.left)
         fR = self.lower(node.right)
         return lambda x, u, node, params: jnp.matmul(fL(x, u, node, params), fR(x, u, node, params))
 
     @visitor(Neg)
-    def visit_neg(self, node: Neg):
+    def _visit_neg(self, node: Neg):
         """Lower negation (unary minus) to JAX function."""
         fO = self.lower(node.operand)
         return lambda x, u, node, params: -fO(x, u, node, params)
 
     @visitor(Sum)
-    def visit_sum(self, node: Sum):
+    def _visit_sum(self, node: Sum):
         """Lower sum reduction to JAX function (sums all elements)."""
         f = self.lower(node.operand)
         return lambda x, u, node, params: jnp.sum(f(x, u, node, params))
 
     @visitor(Norm)
-    def visit_norm(self, node: Norm):
+    def _visit_norm(self, node: Norm):
         """Lower norm operation to JAX function.
 
         Converts symbolic norm to jnp.linalg.norm with appropriate ord parameter.
@@ -412,7 +412,7 @@ class JaxLowerer:
         return lambda x, u, node, params: jnp.linalg.norm(f(x, u, node, params), ord=ord_val)
 
     @visitor(Index)
-    def visit_index(self, node: Index):
+    def _visit_index(self, node: Index):
         """Lower indexing/slicing operation to JAX function."""
         # lower the "base" expr into a fn(x,u,node), then index it
         f_base = self.lower(node.base)
@@ -420,7 +420,7 @@ class JaxLowerer:
         return lambda x, u, node, params: jnp.atleast_1d(f_base(x, u, node, params))[idx]
 
     @visitor(Concat)
-    def visit_concat(self, node: Concat):
+    def _visit_concat(self, node: Concat):
         """Lower concatenation to JAX function (concatenates along axis 0)."""
         # lower each child
         fn_list = [self.lower(child) for child in node.exprs]
@@ -433,32 +433,32 @@ class JaxLowerer:
         return concat_fn
 
     @visitor(Sin)
-    def visit_sin(self, node: Sin):
+    def _visit_sin(self, node: Sin):
         """Lower sine function to JAX function."""
         fO = self.lower(node.operand)
         return lambda x, u, node, params: jnp.sin(fO(x, u, node, params))
 
     @visitor(Cos)
-    def visit_cos(self, node: Cos):
+    def _visit_cos(self, node: Cos):
         """Lower cosine function to JAX function."""
         fO = self.lower(node.operand)
         return lambda x, u, node, params: jnp.cos(fO(x, u, node, params))
 
     @visitor(Exp)
-    def visit_exp(self, node: Exp):
+    def _visit_exp(self, node: Exp):
         """Lower exponential function to JAX function."""
         fO = self.lower(node.operand)
         return lambda x, u, node, params: jnp.exp(fO(x, u, node, params))
 
     @visitor(Log)
-    def visit_log(self, node: Log):
+    def _visit_log(self, node: Log):
         """Lower natural logarithm to JAX function."""
         fO = self.lower(node.operand)
         return lambda x, u, node, params: jnp.log(fO(x, u, node, params))
 
     @visitor(Equality)
     @visitor(Inequality)
-    def visit_constraint(self, node: Constraint):
+    def _visit_constraint(self, node: Constraint):
         """Lower constraint to residual function.
 
         Both equality (lhs == rhs) and inequality (lhs <= rhs) constraints are
@@ -485,7 +485,7 @@ class JaxLowerer:
     # Then, CTCS remains a wrapper and we just wrap the penalty expression with the conditional
     # logic when we lower it.
     @visitor(CTCS)
-    def visit_ctcs(self, node: CTCS):
+    def _visit_ctcs(self, node: CTCS):
         """Lower CTCS (Continuous-Time Constraint Satisfaction) to JAX function.
 
         CTCS constraints use penalty methods to enforce constraints over continuous
@@ -533,7 +533,7 @@ class JaxLowerer:
         return ctcs_fn
 
     @visitor(PositivePart)
-    def visit_pos(self, node):
+    def _visit_pos(self, node):
         """Lower positive part function to JAX.
 
         Computes max(x, 0), used in penalty methods for inequality constraints.
@@ -548,7 +548,7 @@ class JaxLowerer:
         return lambda x, u, node, params: jnp.maximum(f(x, u, node, params), 0.0)
 
     @visitor(Square)
-    def visit_square(self, node):
+    def _visit_square(self, node):
         """Lower square function to JAX.
 
         Computes x^2 element-wise. Used in quadratic penalty methods.
@@ -563,7 +563,7 @@ class JaxLowerer:
         return lambda x, u, node, params: f(x, u, node, params) * f(x, u, node, params)
 
     @visitor(Huber)
-    def visit_huber(self, node):
+    def _visit_huber(self, node):
         """Lower Huber penalty function to JAX.
 
         Huber penalty is quadratic for small values and linear for large values:
@@ -585,7 +585,7 @@ class JaxLowerer:
         )
 
     @visitor(SmoothReLU)
-    def visit_srelu(self, node):
+    def _visit_srelu(self, node):
         """Lower smooth ReLU penalty function to JAX.
 
         Smooth approximation to ReLU: sqrt(max(x, 0)^2 + c^2) - c
@@ -606,7 +606,7 @@ class JaxLowerer:
         )
 
     @visitor(NodalConstraint)
-    def visit_nodal_constraint(self, node: NodalConstraint):
+    def _visit_nodal_constraint(self, node: NodalConstraint):
         """Lower a NodalConstraint by lowering its underlying constraint.
 
         NodalConstraint is a wrapper that specifies which nodes a constraint
@@ -621,13 +621,13 @@ class JaxLowerer:
         return self.lower(node.constraint)
 
     @visitor(Sqrt)
-    def visit_sqrt(self, node: Sqrt):
+    def _visit_sqrt(self, node: Sqrt):
         """Lower square root to JAX function."""
         f = self.lower(node.operand)
         return lambda x, u, node, params: jnp.sqrt(f(x, u, node, params))
 
     @visitor(Max)
-    def visit_max(self, node: Max):
+    def _visit_max(self, node: Max):
         """Lower element-wise maximum to JAX function."""
         fs = [self.lower(op) for op in node.operands]
 
@@ -642,20 +642,20 @@ class JaxLowerer:
         return fn
 
     @visitor(Transpose)
-    def visit_transpose(self, node: Transpose):
+    def _visit_transpose(self, node: Transpose):
         """Lower matrix transpose to JAX function."""
         f = self.lower(node.operand)
         return lambda x, u, node, params: jnp.transpose(f(x, u, node, params))
 
     @visitor(Power)
-    def visit_power(self, node: Power):
+    def _visit_power(self, node: Power):
         """Lower element-wise power (base**exponent) to JAX function."""
         fB = self.lower(node.base)
         fE = self.lower(node.exponent)
         return lambda x, u, node, params: jnp.power(fB(x, u, node, params), fE(x, u, node, params))
 
     @visitor(Stack)
-    def visit_stack(self, node: Stack):
+    def _visit_stack(self, node: Stack):
         """Lower vertical stacking to JAX function (stack along axis 0)."""
         row_fns = [self.lower(row) for row in node.rows]
 
@@ -666,7 +666,7 @@ class JaxLowerer:
         return stack_fn
 
     @visitor(Hstack)
-    def visit_hstack(self, node: Hstack):
+    def _visit_hstack(self, node: Hstack):
         """Lower horizontal stacking to JAX function."""
         array_fns = [self.lower(arr) for arr in node.arrays]
 
@@ -677,7 +677,7 @@ class JaxLowerer:
         return hstack_fn
 
     @visitor(Vstack)
-    def visit_vstack(self, node: Vstack):
+    def _visit_vstack(self, node: Vstack):
         """Lower vertical stacking to JAX function."""
         array_fns = [self.lower(arr) for arr in node.arrays]
 
@@ -688,7 +688,7 @@ class JaxLowerer:
         return vstack_fn
 
     @visitor(QDCM)
-    def visit_qdcm(self, node: QDCM):
+    def _visit_qdcm(self, node: QDCM):
         """Lower quaternion to direction cosine matrix (DCM) conversion.
 
         Converts a unit quaternion [q0, q1, q2, q3] to a 3x3 rotation matrix.
@@ -710,7 +710,7 @@ class JaxLowerer:
         return lambda x, u, node, params: qdcm(f(x, u, node, params))
 
     @visitor(SSMP)
-    def visit_ssmp(self, node: SSMP):
+    def _visit_ssmp(self, node: SSMP):
         """Lower skew-symmetric matrix for quaternion dynamics (4x4).
 
         Creates a 4x4 skew-symmetric matrix from angular velocity vector for
@@ -732,7 +732,7 @@ class JaxLowerer:
         return lambda x, u, node, params: SSMP(f(x, u, node, params))
 
     @visitor(SSM)
-    def visit_ssm(self, node: SSM):
+    def _visit_ssm(self, node: SSM):
         """Lower skew-symmetric matrix for cross product (3x3).
 
         Creates a 3x3 skew-symmetric matrix from a vector such that
@@ -754,13 +754,13 @@ class JaxLowerer:
         return lambda x, u, node, params: SSM(f(x, u, node, params))
 
     @visitor(Diag)
-    def visit_diag(self, node: Diag):
+    def _visit_diag(self, node: Diag):
         """Lower diagonal matrix construction to JAX function."""
         f = self.lower(node.operand)
         return lambda x, u, node, params: jnp.diag(f(x, u, node, params))
 
     @visitor(Or)
-    def visit_or(self, node: Or):
+    def _visit_or(self, node: Or):
         """Lower STL disjunction (Or) to JAX using STLJax library.
 
         Converts a symbolic Or constraint to an STLJax Or formula for handling
