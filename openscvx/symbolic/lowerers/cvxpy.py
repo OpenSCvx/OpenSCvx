@@ -80,6 +80,45 @@ Example:
         # Add to problem
         prob = cp.Problem(cp.Minimize(cost), constraints=[cvx_constraint])
 
+For Contributors:
+    **Adding Support for New Expression Types**
+
+    To add support for a new symbolic expression type to CVXPy lowering:
+
+    1. **Define the visitor method** in CvxpyLowerer with the @visitor decorator::
+
+        @visitor(MyNewExpr)
+        def _visit_my_new_expr(self, node: MyNewExpr) -> cp.Expression:
+            # Lower child expressions recursively
+            operand = self.lower(node.operand)
+
+            # Return CVXPy expression
+            return cp.my_operation(operand)
+
+    2. **Key requirements**:
+        - Use the @visitor(ExprType) decorator to register the handler
+        - Method name should be _visit_<expr_name> (private, lowercase, snake_case)
+        - Recursively lower all child expressions using self.lower()
+        - Return a cp.Expression or cp.Constraint object
+        - Use cp.* operations for CVXPy atoms
+
+    3. **DCP considerations**:
+        - This module only translates; CVXPy validates DCP rules
+        - Document the mathematical properties in the docstring (convex, concave, affine)
+        - For non-DCP operations, raise NotImplementedError with helpful message
+        - See _visit_sin, _visit_cos, _visit_ctcs for examples
+
+    4. **Example patterns**:
+        - Unary operation: ``return cp.my_func(self.lower(node.operand))``
+        - Binary operation: ``return self.lower(node.left) + self.lower(node.right)``
+        - Constraints: ``return self.lower(node.lhs) <= self.lower(node.rhs)``
+        - Not supported: Raise NotImplementedError with guidance
+
+    5. **Testing**: Ensure your visitor works with:
+        - Simple expressions: Direct lowering to cp.Expression
+        - Constraint validation: CVXPy accepts the result
+        - DCP checking: CVXPy's problem.solve() validates correctly
+
 See Also:
     - lower_to_cvxpy(): Convenience wrapper for single expression lowering
     - JaxLowerer: Alternative backend for non-convex constraints and dynamics

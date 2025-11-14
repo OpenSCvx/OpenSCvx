@@ -62,6 +62,42 @@ Example:
         df_dx = jacfwd(f, argnums=0)
         gradient = df_dx(x_val, u_val, node=0, params={})
 
+For Contributors:
+    **Adding Support for New Expression Types**
+
+    To add support for a new symbolic expression type to JAX lowering:
+
+    1. **Define the visitor method** in JaxLowerer with the @visitor decorator::
+
+        @visitor(MyNewExpr)
+        def _visit_my_new_expr(self, node: MyNewExpr):
+            # Lower child expressions recursively
+            operand_fn = self.lower(node.operand)
+
+            # Return a closure with signature (x, u, node, params) -> result
+            return lambda x, u, node, params: jnp.my_operation(
+                operand_fn(x, u, node, params)
+            )
+
+    2. **Key requirements**:
+        - Use the @visitor(ExprType) decorator to register the handler
+        - Method name should be _visit_<expr_name> (private, lowercase, snake_case)
+        - Recursively lower all child expressions using self.lower()
+        - Return a closure with signature (x, u, node, params) -> jax_array
+        - Use jnp.* operations (not np.*) for JAX traceability
+        - Ensure the result is JAX-differentiable (avoid Python control flow)
+
+    3. **Example patterns**:
+        - Unary operation: Lower operand, apply jnp function
+        - Binary operation: Lower both operands, combine with jnp operation
+        - N-ary operation: Lower all operands, reduce or combine them
+        - Conditional logic: Use jax.lax.cond for branching (see _visit_ctcs)
+
+    4. **Testing**: Ensure your visitor works with:
+        - JAX JIT compilation: jax.jit(lowered_fn)
+        - Automatic differentiation: jax.jacfwd(lowered_fn, argnums=0)
+        - Vectorization: jax.vmap(lowered_fn)
+
 See Also:
     - lower_to_jax(): Convenience wrapper in symbolic/lower.py
     - CVXPyLowerer: Alternative backend for convex constraints
