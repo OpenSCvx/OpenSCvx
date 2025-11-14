@@ -1,8 +1,86 @@
-"""Symbolic problem preprocessing and augmentation.
+"""Symbolic problem preprocessing and augmentation pipeline.
 
-This module contains functions for processing and augmenting symbolic problem specifications
-before lowering to executable code (JAX/CVXPy). The key function is `preprocess_symbolic_problem`,
-which performs all symbolic manipulation without any code generation.
+This module provides the main preprocessing pipeline for trajectory optimization problems,
+transforming user-specified symbolic dynamics and constraints into an augmented form
+ready for compilation to executable code (JAX/CVXPy).
+
+The preprocessing pipeline is purely symbolic - no code generation occurs here. Instead,
+it performs validation, canonicalization, and augmentation to prepare the problem for
+efficient numerical solution.
+
+Key functionality:
+
+    - Problem validation: Check shapes, variable names, constraint placement
+    - Time handling: Auto-create time state or validate user-provided time
+    - Canonicalization: Simplify expressions algebraically
+    - Parameter collection: Extract parameter values from expressions
+    - Constraint separation: Categorize constraints by type (CTCS, nodal, convex)
+    - CTCS augmentation: Add augmented states and time dilation for path constraints
+    - Propagation dynamics: Optionally extend dynamics for post-solution propagation
+
+Pipeline stages:
+    1. Time handling & validation: Process time configuration
+    2. Expression validation: Check shapes, names, constraint structure
+    3. Canonicalization & parameter collection: Simplify and extract parameters
+    4. Constraint separation & augmentation: Sort constraints and add CTCS states
+    5. Propagation dynamics creation: Optionally add extra states for simulation
+
+Architecture:
+    The main function `preprocess_symbolic_problem` orchestrates the pipeline:
+
+    Input:
+        - User dynamics: Dict[str, Expr] mapping state names to dynamics
+        - User constraints: List of symbolic constraints
+        - User states & controls: Variable definitions
+        - Time configuration: Time object specifying time bounds
+
+    Output:
+        - Augmented dynamics: Original + time + CTCS augmented state dynamics
+        - Augmented states: Original + time + CTCS augmented states
+        - Augmented controls: Original + time dilation control
+        - Separated constraints: CTCS, nodal, and convex nodal lists
+        - Parameters: Extracted parameter values
+        - Metadata: Node intervals for CTCS constraints
+
+Example:
+    Basic problem preprocessing::
+
+        import openscvx as ox
+        import numpy as np
+
+        # Define problem
+        x = ox.State("x", shape=(2,))
+        v = ox.State("v", shape=(2,))
+        u = ox.Control("u", shape=(2,))
+
+        # Dynamics
+        dynamics = {
+            "x": v,
+            "v": u
+        }
+
+        # Constraints
+        constraints = [
+            (ox.Norm(x) <= 5.0).over((0, 50)),  # Path constraint via CTCS
+            (ox.Norm(u) <= 1.0).at([0, 10, 20, 30, 40, 50])  # Nodal constraint
+        ]
+
+        # Preprocess
+        from openscvx.symbolic.builder import preprocess_symbolic_problem
+
+        result = preprocess_symbolic_problem(
+            dynamics=dynamics,
+            constraints=constraints,
+            states=[x, v],
+            controls=[u],
+            N=50,
+            time=ox.Time(initial=0.0, final=10.0)
+        )
+
+        dynamics_aug, states_aug, controls_aug, *_ = result
+        # Augmented dynamics: x_dot, v_dot, time_dot, ctcs_aug_dot
+        # states_aug: [x, v, time, _ctcs_aug_0]
+        # controls_aug: [u, _time_dilation]
 """
 
 from typing import Dict, List, Tuple, Union
@@ -46,51 +124,106 @@ def preprocess_symbolic_problem(
     dynamics_prop_extra: dict = None,
     states_prop_extra: List[State] = None,
 ) -> Tuple:
-    """Preprocess and augment symbolic problem specification.
+    """Preprocess and augment symbolic trajectory optimization problem.
 
-    This function performs all symbolic preprocessing and augmentation steps:
-    1. Time handling & validation
-    2. Expression validation
-    3. Canonicalization & parameter collection
-    4. Constraint separation & CTCS augmentation
+    This is the main preprocessing pipeline that transforms a user-specified symbolic
+    problem into an augmented form ready for compilation. It performs validation,
+    canonicalization, constraint separation, and CTCS augmentation in a series of
+    well-defined phases.
 
-    The output is purely symbolic - no code generation occurs here.
+    The function is purely symbolic - no code generation or compilation occurs. The
+    output is an augmented symbolic problem specification that can be lowered to
+    JAX or CVXPy by downstream compilation functions.
+
+    Pipeline phases:
+        1. Time handling & validation: Auto-create or validate time state
+        2. Expression validation: Validate shapes, names, constraints
+        3. Canonicalization & parameter collection: Simplify and extract parameters
+        4. Constraint separation & augmentation: Sort constraints and add CTCS states
+        5. Propagation dynamics creation: Optionally add extra states for simulation
 
     Args:
-        dynamics: Dictionary mapping state names to their dynamics expressions
-        constraints: List of constraints (CTCS or nodal)
-        states: List of State objects
-        controls: List of Control objects
-        N: Number of segments in the trajectory
-        time: Time configuration object
-        licq_min: Minimum LICQ constraint value
-        licq_max: Maximum LICQ constraint value
-        time_dilation_factor_min: Minimum time dilation factor
-        time_dilation_factor_max: Maximum time dilation factor
+        dynamics: Dictionary mapping state names to dynamics expressions.
+            Example: {"x": v, "v": u}
+        constraints: List of constraints (Constraint, NodalConstraint, or CTCS)
+        states: List of user-defined State objects (should NOT include time or CTCS states)
+        controls: List of user-defined Control objects (should NOT include time dilation)
+        N: Number of discretization nodes in the trajectory
+        time: Time configuration object specifying time bounds and constraints
+        licq_min: Minimum bound for CTCS augmented states (default: 0.0)
+        licq_max: Maximum bound for CTCS augmented states (default: 1e-4)
+        time_dilation_factor_min: Minimum factor for time dilation control (default: 0.3)
+        time_dilation_factor_max: Maximum factor for time dilation control (default: 3.0)
+        dynamics_prop_extra: Optional dictionary of additional dynamics for propagation-only
+            states (default: None)
+        states_prop_extra: Optional list of additional State objects for propagation only
+            (default: None)
 
     Returns:
-        Tuple containing:
-            - dynamics_aug: Augmented dynamics expression (includes CTCS penalties)
-            - states_aug: Augmented states list (user + time + CTCS augmented states)
-            - controls_aug: Augmented controls list (user + time dilation)
-            - constraints_ctcs: CTCS constraints (remain symbolic)
-            - constraints_nodal: Non-convex nodal constraints (will be lowered to JAX)
-            - constraints_nodal_convex: Convex nodal constraints (will be lowered to CVXPy)
-            - parameters: Dictionary of parameter values from symbolic expressions
-            - node_intervals: CTCS node intervals metadata
+        Tuple containing 11 elements:
+            0. dynamics_aug (Expr): Augmented dynamics = user dynamics + time + CTCS penalties
+            1. states_aug (List[State]): User states + time + CTCS augmented states
+            2. controls_aug (List[Control]): User controls + time dilation
+            3. constraints_ctcs (List[CTCS]): CTCS constraints (remain symbolic)
+            4. constraints_nodal (List[NodalConstraint]): Non-convex nodal constraints
+            5. constraints_nodal_convex (List[NodalConstraint]): Convex nodal constraints
+            6. parameters (Dict[str, np.ndarray]): Parameter values extracted from expressions
+            7. node_intervals (List[Tuple[int, int]]): Time intervals for CTCS constraints
+            8. dynamics_prop (Expr): Propagation dynamics (includes extra states if provided)
+            9. states_prop (List[State]): Propagation states (includes extra states if provided)
+            10. controls_prop (List[Control]): Propagation controls (same as controls_aug)
+
+    Raises:
+        ValueError: If validation fails at any stage
 
     Example:
-        >>> result = preprocess_symbolic_problem(
-        ...     dynamics={"x": u, "v": a},
-        ...     constraints=[constraint1, constraint2],
-        ...     states=[x_state, v_state],
-        ...     controls=[a_control],
-        ...     N=50,
-        ...     time=Time(t_initial=0.0, t_final=10.0)
-        ... )
-        >>> dynamics_aug, states_aug, controls_aug, *_ = result
-        >>> # Inspect augmented states
-        >>> print(states_aug)  # [x, v, time, ctcs_aug_0, ...]
+        Basic usage with CTCS constraint::
+
+            >>> import openscvx as ox
+            >>> x = ox.State("x", shape=(2,))
+            >>> v = ox.State("v", shape=(2,))
+            >>> u = ox.Control("u", shape=(2,))
+            >>>
+            >>> dynamics = {"x": v, "v": u}
+            >>> constraints = [(ox.Norm(x) <= 5.0).over((0, 50))]
+            >>>
+            >>> result = preprocess_symbolic_problem(
+            ...     dynamics=dynamics,
+            ...     constraints=constraints,
+            ...     states=[x, v],
+            ...     controls=[u],
+            ...     N=50,
+            ...     time=ox.Time(initial=0.0, final=10.0)
+            ... )
+            >>>
+            >>> (dynamics_aug, states_aug, controls_aug,
+            ...  ctcs, nodal, nodal_convex, params, intervals,
+            ...  dyn_prop, states_prop, controls_prop) = result
+            >>>
+            >>> # Augmented dynamics components: [x_dot, v_dot, time_dot, ctcs_aug_dot]
+            >>> # Augmented states: [x, v, time, _ctcs_aug_0]
+            >>> # Augmented controls: [u, _time_dilation]
+            >>> print([s.name for s in states_aug])
+            ['x', 'v', 'time', '_ctcs_aug_0']
+
+        With propagation-only states::
+
+            >>> distance = ox.State("distance", shape=(1,))
+            >>> dynamics_extra = {"distance": ox.Norm(v)}
+            >>>
+            >>> result = preprocess_symbolic_problem(
+            ...     dynamics=dynamics,
+            ...     constraints=constraints,
+            ...     states=[x, v],
+            ...     controls=[u],
+            ...     N=50,
+            ...     time=ox.Time(initial=0.0, final=10.0),
+            ...     dynamics_prop_extra=dynamics_extra,
+            ...     states_prop_extra=[distance]
+            ... )
+            >>>
+            >>> # Propagation states include distance for post-solve simulation
+            >>> _, _, _, _, _, _, _, _, dyn_prop, states_prop, _ = result
     """
 
     # ==================== PHASE 1: Time Handling & Validation ====================
@@ -239,48 +372,79 @@ def add_propagation_states(
     controls_opt: List[Control],
     parameters: Dict[str, any],
 ) -> Tuple:
-    """Add extra propagation-only states to optimization dynamics.
+    """Extend optimization dynamics with additional propagation-only states.
 
-    This function extends optimization dynamics with additional states that are only
-    needed for post-solution trajectory propagation (e.g., distance traveled, energy used).
+    This function augments the optimization dynamics with extra states that are only
+    needed for post-solution trajectory propagation and simulation. These states
+    don't affect the optimization but are useful for computing derived quantities
+    like distance traveled, energy consumed, or accumulated cost.
 
-    The user only specifies the ADDITIONAL states and their dynamics. These are appended
-    after the optimization states (including augmented CTCS states).
+    Propagation-only states are NOT part of the optimization problem - they are
+    integrated forward after solving using the optimized state and control trajectories.
+    This is more efficient than including them as optimization variables.
 
-    Final state ordering:
-    [opt_states, time, ctcs_aug_states, extra_prop_states]
+    The user specifies only the ADDITIONAL states and their dynamics. These are
+    appended after all optimization states (user states + time + CTCS augmented states).
+
+    State ordering in propagation dynamics:
+        [user_states, time, ctcs_aug_states, extra_prop_states]
 
     Args:
-        dynamics_extra: Dictionary mapping extra state names to their dynamics expressions
-            (only the new states, not the optimization states)
+        dynamics_extra: Dictionary mapping extra state names to dynamics expressions.
+            Only specify NEW states, not optimization states. Example: {"distance": speed}
         states_extra: List of extra State objects for propagation only
-        dynamics_opt: Augmented optimization dynamics expression
-        states_opt: Augmented optimization states (includes time + CTCS aug states)
-        controls_opt: Augmented optimization controls (includes time dilation)
-        parameters: Dictionary of parameter values (from optimization preprocessing)
+        dynamics_opt: Augmented optimization dynamics expression (from preprocessing)
+        states_opt: Augmented optimization states (user + time + CTCS augmented)
+        controls_opt: Augmented optimization controls (user + time dilation)
+        parameters: Dictionary of parameter values from optimization preprocessing
 
     Returns:
         Tuple containing:
-            - dynamics_prop: Extended propagation dynamics expression
-            - states_prop: Extended propagation states
-            - controls_prop: Propagation controls (same as optimization)
-            - parameters_updated: Updated parameters dict
+            - dynamics_prop (Expr): Extended dynamics (optimization + extra)
+            - states_prop (List[State]): Extended states (optimization + extra)
+            - controls_prop (List[Control]): Same as controls_opt
+            - parameters_updated (Dict): Updated parameters including any from extra dynamics
 
     Raises:
-        ValueError: If validation fails
+        ValueError: If extra states conflict with optimization state names or if
+                   validation fails
 
     Example:
-        >>> # User only specifies extra states
-        >>> dynamics_extra = {"distance": speed[0]}
-        >>> states_extra = [distance_state]
-        >>> dyn_prop, states_prop, controls_prop, params = add_propagation_states(
-        ...     dynamics_extra=dynamics_extra,
-        ...     states_extra=states_extra,
-        ...     dynamics_opt=dynamics_aug,
-        ...     states_opt=states_aug,
-        ...     controls_opt=controls_aug,
-        ...     parameters=parameters
-        ... )
+        Adding distance and energy tracking for propagation::
+
+            >>> # After preprocessing, add propagation states
+            >>> import openscvx as ox
+            >>> import numpy as np
+            >>>
+            >>> # Define extra states for tracking
+            >>> distance = ox.State("distance", shape=(1,))
+            >>> distance.initial = np.array([0.0])
+            >>>
+            >>> energy = ox.State("energy", shape=(1,))
+            >>> energy.initial = np.array([0.0])
+            >>>
+            >>> # Define their dynamics (using optimization states/controls)
+            >>> # Assume v and u are optimization states/controls
+            >>> dynamics_extra = {
+            ...     "distance": ox.Norm(v),  # Integrate velocity magnitude
+            ...     "energy": ox.Norm(u)**2  # Integrate squared control
+            ... }
+            >>>
+            >>> dyn_prop, states_prop, controls_prop, params = add_propagation_states(
+            ...     dynamics_extra=dynamics_extra,
+            ...     states_extra=[distance, energy],
+            ...     dynamics_opt=dynamics_aug,
+            ...     states_opt=states_aug,
+            ...     controls_opt=controls_aug,
+            ...     parameters=parameters
+            ... )
+            >>>
+            >>> # Now states_prop includes all states for forward simulation
+            >>> # distance and energy will be integrated during propagation
+
+    Note:
+        The extra states should have initial conditions set, as they will be
+        integrated from these initial values during propagation.
     """
 
     # Make copies to avoid mutating inputs

@@ -1,3 +1,58 @@
+"""State and dynamics augmentation for continuous-time constraint satisfaction.
+
+This module provides utilities for augmenting trajectory optimization problems with
+additional states and dynamics to handle continuous-time constraint satisfaction (CTCS).
+The CTCS method enforces path constraints continuously along the trajectory rather than
+just at discretization nodes.
+
+Key functionality:
+
+    - CTCS constraint grouping: Sort and group CTCS constraints by time intervals
+    - Constraint separation: Separate CTCS, nodal, and convex constraints
+    - Vector decomposition: Decompose vector constraints into scalar components
+    - Time augmentation: Add time state with appropriate dynamics and constraints
+    - CTCS dynamics augmentation: Add augmented states and time dilation control
+
+The augmentation process transforms the original dynamics x_dot = f(x, u) into an
+augmented system with additional states for constraint satisfaction and time dilation.
+
+Architecture:
+    The CTCS method works by:
+    1. Grouping constraints by time interval and assigning index (idx)
+    2. Creating augmented states (one per constraint group)
+    3. Adding penalty dynamics: aug_dot = penalty(constraint_violation)
+    4. Adding time dilation control to slow down near constraint boundaries
+
+Example:
+    Augmenting dynamics with CTCS constraints::
+
+        import openscvx as ox
+
+        # Define problem
+        x = ox.State("x", shape=(3,))
+        u = ox.Control("u", shape=(2,))
+
+        # Create dynamics
+        xdot = u @ A  # Some dynamics expression
+
+        # Define path constraint
+        path_constraint = (ox.Norm(x) <= 1.0).over((0, 50))  # CTCS constraint
+
+        # Augment dynamics with CTCS
+        from openscvx.symbolic.augmentation import augment_dynamics_with_ctcs
+
+        xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
+            xdot=xdot,
+            states=[x],
+            controls=[u],
+            constraints_ctcs=[path_constraint],
+            N=50
+        )
+        # xdot_aug now includes augmented state dynamics
+        # states_aug includes original states + augmented states
+        # controls_aug includes original controls + time dilation
+"""
+
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -18,23 +73,40 @@ from openscvx.symbolic.expr.state import State
 def sort_ctcs_constraints(
     constraints_ctcs: List[CTCS],
 ) -> Tuple[List[CTCS], List[Tuple[int, int]], int]:
-    """
-    Sort and group CTCS constraints by their idx, ensuring proper grouping rules.
+    """Sort and group CTCS constraints by time interval and assign indices.
+
+    Groups CTCS constraints by their time intervals (nodes) and assigns a unique
+    index (idx) to each group. Constraints with the same time interval can share
+    an augmented state (same idx), while constraints with different intervals must
+    have different augmented states.
+
+    Grouping rules:
+        - Constraints with the same node interval can share an idx
+        - Constraints with different node intervals must have different idx values
+        - idx values must form a contiguous block starting from 0
+        - Unspecified idx values are automatically assigned
+        - User-specified idx values are validated for consistency
 
     Args:
         constraints_ctcs: List of CTCS constraints to sort and group
 
     Returns:
         Tuple of:
-        - List of CTCS constraints with idx assigned
-        - List of node intervals in ascending idx order
-        - Number of augmented states (number of unique idx values)
+            - List of CTCS constraints with idx assigned to each
+            - List of node intervals (start, end) in ascending idx order
+            - Number of augmented states needed (number of unique idx values)
 
-    Rules:
-        - All CTCS constraints with the same nodes can go into the same idx
-        - CTCS constraints with different node intervals cannot go into the same idx
-        - idx values must form a contiguous block starting from 0
-        - Unspecified idx values are auto-assigned
+    Raises:
+        ValueError: If user-specified idx values are inconsistent or non-contiguous
+
+    Example:
+        >>> constraint1 = (x <= 5).over((0, 50))  # Auto-assigned idx
+        >>> constraint2 = (y <= 10).over((0, 50))  # Same interval, same idx
+        >>> constraint3 = (z <= 15).over((20, 80))  # Different interval, different idx
+        >>> sorted_ctcs, intervals, n_aug = sort_ctcs_constraints([c1, c2, c3])
+        >>> # constraint1.idx = 0, constraint2.idx = 0, constraint3.idx = 1
+        >>> # intervals = [(0, 50), (20, 80)]
+        >>> # n_aug = 2
     """
     idx_to_nodes: Dict[int, Tuple[int, int]] = {}
     next_idx = 0
@@ -88,19 +160,39 @@ def sort_ctcs_constraints(
 def separate_constraints(
     constraints: List[Expr], n_nodes: int
 ) -> Tuple[List[CTCS], List[NodalConstraint], List[NodalConstraint]]:
-    """
-    Separate CTCS constraints from regular constraints, converting bare constraints
-    to NodalConstraints that apply at all nodes. Also separate convex constraints.
+    """Separate and categorize constraints by type and convexity.
+
+    Separates constraints into three categories:
+    1. CTCS (continuous-time) constraints
+    2. Non-convex nodal constraints
+    3. Convex nodal constraints
+
+    Bare Constraint objects are automatically converted to NodalConstraint objects
+    that apply at all nodes. Constraints within CTCS wrappers that have check_nodally=True
+    are also extracted and added to the nodal constraint lists.
 
     Args:
-        constraints: List of constraints (mix of CTCS, NodalConstraint, and bare Constraints)
+        constraints: List of constraints (CTCS, NodalConstraint, or bare Constraint)
         n_nodes: Total number of nodes in the trajectory
 
     Returns:
         Tuple of:
-        - List of CTCS constraints
-        - List of non-convex NodalConstraint objects (including converted bare constraints)
-        - List of convex NodalConstraint objects
+            - List of CTCS constraints (continuous-time constraints)
+            - List of non-convex NodalConstraint objects
+            - List of convex NodalConstraint objects
+
+    Raises:
+        ValueError: If a constraint is not one of the expected types
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> ctcs_constraint = (x <= 5).over((0, 50))
+        >>> nodal_constraint = (x >= 0).at([0, 10, 20])
+        >>> bare_constraint = ox.Norm(x) <= 1  # Will apply at all nodes
+        >>> ctcs, nodal, convex = separate_constraints(
+        ...     [ctcs_constraint, nodal_constraint, bare_constraint],
+        ...     n_nodes=50
+        ... )
     """
     constraints_ctcs: List[CTCS] = []
     constraints_nodal: List[NodalConstraint] = []
@@ -152,20 +244,32 @@ def separate_constraints(
 def decompose_vector_nodal_constraints(
     constraints_nodal: List[NodalConstraint],
 ) -> List[NodalConstraint]:
-    """
-    Decompose vector-valued nodal constraints into multiple scalar constraints.
+    """Decompose vector-valued nodal constraints into scalar constraints.
 
-    This is necessary for nonconvex nodal constraints that get lowered to JAX functions,
-    because the JAX->CVXPY interface expects scalar constraint values per node.
+    Decomposes vector constraints into individual scalar constraints, which is necessary
+    for nonconvex nodal constraints that are lowered to JAX functions. The JAX-to-CVXPY
+    interface expects scalar constraint values at each node.
 
-    CTCS constraints and future convex nodal constraints can handle vector values,
-    so they don't need decomposition.
+    For example, a constraint with shape (3,) is decomposed into 3 separate scalar
+    constraints using indexing. CTCS constraints don't need decomposition since they
+    handle vector values internally.
 
     Args:
-        constraints_nodal: List of NodalConstraint objects (already canonicalized)
+        constraints_nodal: List of NodalConstraint objects (must be canonicalized)
 
     Returns:
-        List of NodalConstraint objects with vector constraints decomposed into scalars
+        List of NodalConstraint objects with vector constraints decomposed into scalars.
+        Scalar constraints are passed through unchanged.
+
+    Note:
+        Constraints are assumed to be in canonical form: residual <= 0 or residual == 0,
+        where residual is the lhs of the constraint.
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> constraint = (x <= 5).at([0, 10, 20])  # Vector constraint, shape (3,)
+        >>> decomposed = decompose_vector_nodal_constraints([constraint])
+        >>> # Returns 3 constraints: x[0] <= 5, x[1] <= 5, x[2] <= 5
     """
     decomposed_constraints = []
 
@@ -201,14 +305,24 @@ def decompose_vector_nodal_constraints(
 
 
 def get_nodal_constraints_from_ctcs(constraints_ctcs: List[CTCS]) -> List[Constraint]:
-    """
-    Extract underlying constraints from CTCS constraints that should also be checked nodally.
+    """Extract constraints from CTCS wrappers that should be checked nodally.
+
+    Some CTCS constraints have the check_nodally flag set, indicating that the
+    underlying constraint should be enforced both continuously (via CTCS) and
+    discretely at the nodes. This function extracts those underlying constraints.
 
     Args:
         constraints_ctcs: List of CTCS constraint wrappers
 
     Returns:
-        List of underlying Constraint objects from CTCS constraints with check_nodally=True
+        List of underlying Constraint objects from CTCS with check_nodally=True
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> # CTCS constraint that should also be checked at nodes
+        >>> constraint = (x <= 5).over((0, 50), check_nodally=True)
+        >>> nodal = get_nodal_constraints_from_ctcs([constraint])
+        >>> # Returns [x <= 5] to be enforced at all nodes
     """
     nodal_ctcs = []
     for ctcs in constraints_ctcs:
@@ -226,22 +340,48 @@ def augment_with_time_state(
     time_max: float,
     N: int,
 ) -> Tuple[List[State], List[Constraint]]:
-    """
-    Augment the states list with a time state and add corresponding CTCS constraints.
+    """Augment problem with a time state variable.
+
+    Creates a time state variable if one doesn't already exist and adds it to the
+    states list. Also adds CTCS constraints to enforce time bounds continuously
+    throughout the trajectory.
+
+    The time state tracks physical time along the trajectory and is used for
+    time-optimal control problems. Boundary conditions can be fixed values or
+    free variables with initial guesses.
 
     Args:
-        states: List of State objects (will not be modified)
-        constraints: List of constraints (will not be modified)
-        time_initial: Initial time boundary condition (float or tuple like ("free", value))
-        time_final: Final time boundary condition (float or tuple like ("free", value))
-        time_min: Minimum bound for time variable
-        time_max: Maximum bound for time variable
-        N: Number of discretization nodes
+        states: List of State objects (will not be modified, copy is returned)
+        constraints: List of constraints (will not be modified, copy is returned)
+        time_initial: Initial time boundary condition:
+            - float: Fixed initial time
+            - tuple: ("free", guess) for free initial time with initial guess
+        time_final: Final time boundary condition (same format as time_initial)
+        time_min: Minimum bound for time variable throughout trajectory
+        time_max: Maximum bound for time variable throughout trajectory
+        N: Number of discretization nodes (for initial guess generation)
 
     Returns:
         Tuple of:
-        - Updated list of states (including time state appended at end)
-        - Updated list of constraints (including time CTCS constraints)
+            - Updated states list (original + time state if created)
+            - Updated constraints list (original + time bound CTCS constraints)
+
+    Note:
+        If a state named "time" already exists, it is not modified and no
+        constraints are added.
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> states_aug, constraints_aug = augment_with_time_state(
+        ...     states=[x],
+        ...     constraints=[],
+        ...     time_initial=0.0,
+        ...     time_final=("free", 10.0),
+        ...     time_min=0.0,
+        ...     time_max=100.0,
+        ...     N=50
+        ... )
+        >>> # states_aug now includes time state with initial=0, final=free
     """
     # Create copies to avoid mutating inputs
     states_aug = list(states)
@@ -298,25 +438,57 @@ def augment_dynamics_with_ctcs(
     time_dilation_factor_min=0.3,
     time_dilation_factor_max=3.0,
 ) -> Tuple[Expr, List[State], List[Control]]:
-    """
-    Augment dynamics with continuous-time constraint satisfaction (CTCS).
+    """Augment dynamics with continuous-time constraint satisfaction states.
+
+    Implements the CTCS method by adding augmented states and time dilation control
+    to the original dynamics. For each group of CTCS constraints, an augmented state
+    is created whose dynamics are the penalty function of constraint violations.
+
+    The CTCS method enforces path constraints continuously by:
+    1. Creating augmented states with dynamics = penalty(constraint_violation)
+    2. Constraining augmented states to stay near zero (LICQ condition)
+    3. Adding time dilation control to slow down near constraint boundaries
+
+    The augmented dynamics become:
+        x_dot = f(x, u)
+        aug_dot = penalty(g(x, u))  # For each constraint group
+        time_dot = time_dilation
 
     Args:
-        xdot: The original dynamics expression
-        states: The list of state variables (must include a state named "time")
-        controls: The list of control variables
-        constraints_ctcs: List of CTCS constraints
+        xdot: Original dynamics expression for states
+        states: List of state variables (must include a state named "time")
+        controls: List of control variables
+        constraints_ctcs: List of CTCS constraints (should be sorted and grouped)
         N: Number of discretization nodes
-        licq_min: Minimum value for LICQ augmented state
-        licq_max: Maximum value for LICQ augmented state
-        time_dilation_factor_min: Minimum time dilation factor
-        time_dilation_factor_max: Maximum time dilation factor
+        licq_min: Minimum bound for augmented states (default: 0.0)
+        licq_max: Maximum bound for augmented states (default: 1e-4)
+        time_dilation_factor_min: Minimum time dilation factor (default: 0.3)
+        time_dilation_factor_max: Maximum time dilation factor (default: 3.0)
 
     Returns:
         Tuple of:
-        - Augmented dynamics expression
-        - Updated list of states (including augmented states)
-        - Updated list of controls (including time dilation)
+            - Augmented dynamics expression (original + augmented state dynamics)
+            - Updated states list (original + augmented states)
+            - Updated controls list (original + time dilation control)
+
+    Raises:
+        ValueError: If no state named "time" is found in the states list
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> u = ox.Control("u", shape=(2,))
+        >>> time = ox.State("time", shape=(1,))
+        >>> xdot = u @ A  # Some dynamics
+        >>> constraint = (ox.Norm(x) <= 1.0).over((0, 50))
+        >>> xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
+        ...     xdot=xdot,
+        ...     states=[x, time],
+        ...     controls=[u],
+        ...     constraints_ctcs=[constraint],
+        ...     N=50
+        ... )
+        >>> # states_aug includes x, time, and _ctcs_aug_0
+        >>> # controls_aug includes u and _time_dilation
     """
     # Copy the original states and controls lists
     states_augmented = list(states)

@@ -1,12 +1,78 @@
+"""Linear algebra operations for symbolic expressions.
+
+This module provides essential linear algebra operations for matrix and vector
+manipulation in optimization problems. Operations follow NumPy/JAX conventions
+for shapes and broadcasting behavior.
+
+Key Operations:
+
+    Matrix Operations:
+        `Transpose` - Matrix/tensor transposition (swaps last two dimensions)
+        `Diag` - Construct diagonal matrix from vector
+
+    Stacking and Concatenation:
+        `Stack` - Stack expressions along a new dimension
+        `Hstack` - Horizontally stack matrices/vectors
+        `Vstack` - Vertically stack matrices/vectors
+
+    Norms:
+        `Norm` - Euclidean (L2) norm of vectors/matrices
+
+Example:
+    Building rotation matrices and transformations::
+
+        import openscvx as ox
+        import numpy as np
+
+        # Create a rotation matrix from angle
+        theta = ox.Variable("theta", shape=(1,))
+        R = ox.Stack(
+            ox.Hstack(ox.Cos(theta), -ox.Sin(theta)),
+            ox.Hstack(ox.Sin(theta), ox.Cos(theta))
+        )
+
+        # Transform a point
+        point = ox.Variable("p", shape=(2,))
+        rotated = R @ point
+
+    Computing kinetic energy::
+
+        v = ox.State("v", shape=(3,))  # Velocity vector
+        m = 10.0  # Mass
+        kinetic_energy = 0.5 * m * ox.Norm(v)**2
+"""
+
 from typing import Tuple
 
 from .expr import Expr, to_expr
 
 
 class Transpose(Expr):
-    """Matrix transpose operation"""
+    """Matrix transpose operation for symbolic expressions.
+
+    Transposes the last two dimensions of an expression. For matrices, this swaps
+    rows and columns. For higher-dimensional arrays, it swaps the last two axes.
+    Scalars and vectors are unchanged by transposition.
+
+    The canonicalization includes an optimization that eliminates double transposes:
+    (A.T).T simplifies to A.
+
+    Attributes:
+        operand: Expression to transpose
+
+    Example:
+        >>> A = Variable("A", shape=(3, 4))
+        >>> A_T = Transpose(A)  # or A.T, result shape (4, 3)
+        >>> v = Variable("v", shape=(5,))
+        >>> v_T = Transpose(v)  # result shape (5,) - vectors unchanged
+    """
 
     def __init__(self, operand):
+        """Initialize a transpose operation.
+
+        Args:
+            operand: Expression to transpose
+        """
         self.operand = to_expr(operand)
 
     def children(self):
@@ -45,16 +111,36 @@ class Transpose(Expr):
 
 
 class Diag(Expr):
-    """Create diagonal matrix from vector or extract diagonal from matrix"""
+    """Diagonal matrix construction from a vector.
+
+    Creates a square diagonal matrix from a 1D vector. The vector elements become
+    the diagonal entries, with all off-diagonal entries set to zero. This is
+    analogous to numpy.diag() or jax.numpy.diag().
+
+    Note:
+        Currently only supports creating diagonal matrices from vectors.
+        Extracting diagonals from matrices is not yet implemented.
+
+    Attributes:
+        operand: 1D vector expression to place on the diagonal
+
+    Example:
+        >>> v = Variable("v", shape=(3,))
+        >>> D = Diag(v)  # Creates a (3, 3) diagonal matrix
+    """
 
     def __init__(self, operand):
+        """Initialize a diagonal matrix operation.
+
+        Args:
+            operand: 1D vector expression to place on the diagonal
+        """
         self.operand = to_expr(operand)
 
     def children(self):
         return [self.operand]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize the operand."""
         operand = self.operand.canonicalize()
         return Diag(operand)
 
@@ -71,9 +157,35 @@ class Diag(Expr):
 
 
 class Norm(Expr):
-    """Norm of an expression (reduction operation)"""
+    """Norm operation for symbolic expressions (reduction to scalar).
+
+    Computes the norm of an expression according to the specified order parameter.
+    This is a reduction operation that always produces a scalar result regardless
+    of the input shape. Supports various norm types following NumPy/SciPy conventions.
+
+    Attributes:
+        operand: Expression to compute norm of
+        ord: Norm order specification (default: "fro" for Frobenius norm)
+            - "fro": Frobenius norm (default)
+            - "inf": Infinity norm
+            - 1: L1 norm (sum of absolute values)
+            - 2: L2 norm (Euclidean norm)
+            - Other values as supported by the backend
+
+    Example:
+        >>> x = Variable("x", shape=(3,))
+        >>> euclidean_norm = Norm(x, ord=2)  # L2 norm, result is scalar
+        >>> A = Variable("A", shape=(3, 4))
+        >>> frobenius_norm = Norm(A)  # Frobenius norm, result is scalar
+    """
 
     def __init__(self, operand, ord="fro"):
+        """Initialize a norm operation.
+
+        Args:
+            operand: Expression to compute norm of
+            ord: Norm order specification (default: "fro")
+        """
         self.operand = to_expr(operand)
         self.ord = ord  # Can be "fro", "inf", 1, 2, etc.
 
@@ -97,9 +209,33 @@ class Norm(Expr):
 
 
 class Stack(Expr):
-    """Stack expressions into a matrix - similar to jnp.array([[row1], [row2], ...])"""
+    """Stack expressions vertically to create a higher-dimensional array.
+
+    Stacks a list of expressions along a new first dimension. All input expressions
+    must have the same shape. The result has shape (num_rows, *row_shape).
+
+    This is similar to numpy.array([row1, row2, ...]) or jax.numpy.stack(rows, axis=0).
+
+    Attributes:
+        rows: List of expressions to stack, each representing a "row"
+
+    Example:
+        >>> x = Variable("x", shape=(3,))
+        >>> y = Variable("y", shape=(3,))
+        >>> z = Variable("z", shape=(3,))
+        >>> stacked = Stack([x, y, z])  # Creates shape (3, 3)
+        >>> # Equivalent to: [[x[0], x[1], x[2]],
+        >>> #                 [y[0], y[1], y[2]],
+        >>> #                 [z[0], z[1], z[2]]]
+    """
 
     def __init__(self, rows):
+        """Initialize a stack operation.
+
+        Args:
+            rows: List of expressions to stack along a new first dimension.
+                  All expressions must have the same shape.
+        """
         # rows should be a list of expressions representing each row
         self.rows = [to_expr(row) for row in rows]
 
@@ -107,7 +243,6 @@ class Stack(Expr):
         return self.rows
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize all rows."""
         rows = [row.canonicalize() for row in self.rows]
         return Stack(rows)
 
@@ -136,16 +271,43 @@ class Stack(Expr):
 
 
 class Hstack(Expr):
-    """Horizontal stack"""
+    """Horizontal stacking operation for symbolic expressions.
+
+    Concatenates expressions horizontally (along columns for 2D arrays).
+    This is analogous to numpy.hstack() or jax.numpy.hstack().
+
+    Behavior depends on input dimensionality:
+    - 1D arrays: Concatenates along axis 0 (making a longer vector)
+    - 2D arrays: Concatenates along axis 1 (columns), rows must match
+    - Higher-D: Concatenates along axis 1, all other dimensions must match
+
+    Attributes:
+        arrays: List of expressions to stack horizontally
+
+    Example:
+        >>> # 1D case: concatenate vectors
+        >>> x = Variable("x", shape=(3,))
+        >>> y = Variable("y", shape=(2,))
+        >>> h = Hstack([x, y])  # Result shape (5,)
+        >>>
+        >>> # 2D case: concatenate matrices horizontally
+        >>> A = Variable("A", shape=(3, 4))
+        >>> B = Variable("B", shape=(3, 2))
+        >>> C = Hstack([A, B])  # Result shape (3, 6)
+    """
 
     def __init__(self, arrays):
+        """Initialize a horizontal stack operation.
+
+        Args:
+            arrays: List of expressions to concatenate horizontally
+        """
         self.arrays = [to_expr(arr) for arr in arrays]
 
     def children(self):
         return self.arrays
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize all arrays."""
         arrays = [arr.canonicalize() for arr in self.arrays]
         return Hstack(arrays)
 
@@ -192,16 +354,43 @@ class Hstack(Expr):
 
 
 class Vstack(Expr):
-    """Vertical stack"""
+    """Vertical stacking operation for symbolic expressions.
+
+    Concatenates expressions vertically (along rows for 2D arrays).
+    This is analogous to numpy.vstack() or jax.numpy.vstack().
+
+    All input expressions must have the same number of dimensions, and all
+    dimensions except the first must match. The result concatenates along
+    axis 0 (rows).
+
+    Attributes:
+        arrays: List of expressions to stack vertically
+
+    Example:
+        >>> # Stack vectors to create a matrix
+        >>> x = Variable("x", shape=(3,))
+        >>> y = Variable("y", shape=(3,))
+        >>> v = Vstack([x, y])  # Result shape (2, 3)
+        >>>
+        >>> # Stack matrices vertically
+        >>> A = Variable("A", shape=(3, 4))
+        >>> B = Variable("B", shape=(2, 4))
+        >>> C = Vstack([A, B])  # Result shape (5, 4)
+    """
 
     def __init__(self, arrays):
+        """Initialize a vertical stack operation.
+
+        Args:
+            arrays: List of expressions to concatenate vertically.
+                    All must have matching dimensions except the first.
+        """
         self.arrays = [to_expr(arr) for arr in arrays]
 
     def children(self):
         return self.arrays
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize all arrays."""
         arrays = [arr.canonicalize() for arr in self.arrays]
         return Vstack(arrays)
 

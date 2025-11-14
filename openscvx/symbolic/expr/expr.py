@@ -1,13 +1,96 @@
+"""Core symbolic expression system for trajectory optimization.
+
+This module provides the foundation for openscvx's symbolic expression framework,
+implementing an Abstract Syntax Tree (AST) representation for mathematical expressions
+used in optimization problems. The expression system enables:
+
+    - Declarative problem specification: Write optimization problems using familiar
+      mathematical notation with operator overloading (+, -, *, /, @, **, etc.)
+    - Automatic differentiation: Expressions are automatically differentiated during
+      compilation to solver-specific formats
+    - Shape checking: Static validation of tensor dimensions before optimization
+    - Canonicalization: Algebraic simplification for more efficient compilation
+    - Multiple backends: Expressions can be compiled to CVXPy, JAX, or custom solvers
+
+Architecture:
+    The expression system is built around an AST where each node is an `Expr` subclass:
+
+        - Leaf nodes: `Parameter`, `Variable`, `State`, `Control` - symbolic values
+        - Arithmetic operations: `Add`, `Sub`, `Mul`, `Div`, `MatMul`, `Power`, `Neg`
+        - Reductions: `Sum`, `Norm`, etc.
+        - Constraints: `Equality`, `Inequality`
+        - Functions: `Sin`, `Cos`, `Exp`, `Log`, `Sqrt`, etc.
+        - Indexing: `Index`, `Concat`, `Stack`
+
+    Each expression node implements:
+
+        - `children()`: Returns child expressions in the AST
+        - `canonicalize()`: Returns a simplified/normalized version
+        - `check_shape()`: Validates and returns the output shape
+
+Example:
+    Creating symbolic variables and expressions::
+
+        import openscvx as ox
+
+        # Define symbolic variables
+        x = ox.State("x", shape=(3,))
+        A = ox.Parameter("A", shape=(3, 3), value=np.eye(3))
+
+        # Build expressions using natural syntax
+        expr = A @ x + 5
+        constraint = ox.Norm(x) <= 1.0
+
+        # Expressions form an AST
+        print(expr.pretty())  # Visualize the tree structure
+
+    Shape checking with automatic validation::
+
+        x = ox.State("x", shape=(3,))
+        y = ox.State("y", shape=(4,))
+
+        # This will raise ValueError during shape checking
+        try:
+            expr = x + y  # Shapes (3,) and (4,) not broadcastable
+            expr.check_shape()
+        except ValueError as e:
+            print(f"Shape error: {e}")
+
+    Algebraic canonicalization::
+
+        x = ox.State("x", shape=(3,))
+        expr = x + 0 + (1 * x)
+        canonical = expr.canonicalize()  # Simplifies to: x + x
+"""
+
 from typing import Callable, Optional, Tuple, Union
 
 import numpy as np
 
 
 class Expr:
-    """
-    Base class for symbolic expressions in optimization problems.
+    """Base class for symbolic expressions in optimization problems.
 
-    Note: This class is currently not being used.
+    Expr is the foundation of the symbolic expression system in openscvx. It represents
+    nodes in an abstract syntax tree (AST) for mathematical expressions. Expressions
+    support:
+
+    - Arithmetic operations: +, -, *, /, @, **
+    - Comparison operations: ==, <=, >=
+    - Indexing and slicing: []
+    - Transposition: .T property
+    - Shape checking and validation
+    - Canonicalization (algebraic simplification)
+
+    All Expr subclasses implement a tree structure where each node can have child
+    expressions accessed via the children() method.
+
+    Attributes:
+        __array_priority__: Priority for operations with numpy arrays (set to 1000)
+
+    Note:
+        When used in operations with numpy arrays, Expr objects take precedence,
+        allowing symbolic expressions to wrap numeric values automatically.
     """
 
     # Give Expr objects higher priority than numpy arrays in operations
@@ -80,11 +163,25 @@ class Expr:
 
     @property
     def T(self):
+        """Transpose property for matrix expressions.
+
+        Returns:
+            Transpose: A Transpose expression wrapping this expression
+
+        Example:
+            >>> A = ox.State("A", shape=(3, 4))
+            >>> A_T = A.T  # Creates Transpose(A), result shape (4, 3)
+        """
         from .linalg import Transpose
 
         return Transpose(self)
 
     def children(self):
+        """Return the child expressions of this node.
+
+        Returns:
+            list: List of child Expr objects. Empty list for leaf nodes.
+        """
         return []
 
     def canonicalize(self) -> "Expr":
@@ -131,6 +228,26 @@ class Expr:
         raise NotImplementedError(f"check_shape() not implemented for {self.__class__.__name__}")
 
     def pretty(self, indent=0):
+        """Generate a pretty-printed string representation of the expression tree.
+
+        Creates an indented, hierarchical view of the expression tree structure,
+        useful for debugging and visualization.
+
+        Args:
+            indent: Current indentation level (default: 0)
+
+        Returns:
+            str: Multi-line string representation of the expression tree
+
+        Example:
+            >>> expr = (x + y) * z
+            >>> print(expr.pretty())
+            Mul
+              Add
+                State
+                State
+              State
+        """
         pad = "  " * indent
         pad = "  " * indent
         lines = [f"{pad}{self.__class__.__name__}"]
@@ -231,17 +348,69 @@ class Parameter(Leaf):
 
 
 def to_expr(x: Union[Expr, float, int, np.ndarray]) -> Expr:
+    """Convert a value to an Expr if it is not already one.
+
+    This is a convenience function that wraps numeric values and arrays as Constant
+    expressions, while leaving Expr instances unchanged. Used internally by operators
+    to ensure operands are proper Expr objects.
+
+    Args:
+        x: Value to convert - can be an Expr, numeric scalar, or numpy array
+
+    Returns:
+        The input if it's already an Expr, otherwise a Constant wrapping the value
+
+    Example:
+        >>> to_expr(5.0)  # Returns Constant(5.0)
+        >>> to_expr(var)  # Returns var unchanged if var is an Expr
+    """
     return x if isinstance(x, Expr) else Constant(np.array(x))
 
 
 def traverse(expr: Expr, visit: Callable[[Expr], None]):
+    """Depth-first traversal of an expression tree.
+
+    Visits each node in the expression tree by applying the visit function to the
+    current node, then recursively visiting all children.
+
+    Args:
+        expr: Root expression node to start traversal from
+        visit: Callback function applied to each node during traversal
+
+    Example:
+        >>> def print_nodes(node):
+        ...     print(node.__class__.__name__)
+        >>> traverse(my_expr, print_nodes)
+    """
     visit(expr)
     for child in expr.children():
         traverse(child, visit)
 
 
 class Add(Expr):
+    """Addition operation for symbolic expressions.
+
+    Represents element-wise addition of two or more expressions. Supports broadcasting
+    following NumPy rules. Can be created using the + operator on Expr objects.
+
+    Attributes:
+        terms: List of expression operands to add together
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = ox.State("y", shape=(3,))
+        >>> z = x + y + 5  # Creates Add(x, y, Constant(5))
+    """
+
     def __init__(self, *args):
+        """Initialize an addition operation.
+
+        Args:
+            *args: Two or more expressions to add together
+
+        Raises:
+            ValueError: If fewer than two operands are provided
+        """
         if len(args) < 2:
             raise ValueError("Add requires two or more operands")
         self.terms = [to_expr(a) for a in args]
@@ -250,7 +419,11 @@ class Add(Expr):
         return list(self.terms)
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize addition: flatten, fold constants, eliminate zeros."""
+        """Canonicalize addition: flatten, fold constants, and eliminate zeros.
+
+        Returns:
+            Expr: Canonical form of the addition expression
+        """
         terms = []
         const_vals = []
 
@@ -276,7 +449,14 @@ class Add(Expr):
         return Add(*terms)
 
     def check_shape(self) -> Tuple[int, ...]:
-        """Addition broadcasts shapes like NumPy."""
+        """Check shape compatibility and compute broadcasted result shape like NumPy.
+
+        Returns:
+            tuple: The broadcasted shape of all operands
+
+        Raises:
+            ValueError: If operand shapes are not broadcastable
+        """
         shapes = [child.check_shape() for child in self.children()]
         try:
             return np.broadcast_shapes(*shapes)
@@ -289,7 +469,28 @@ class Add(Expr):
 
 
 class Sub(Expr):
+    """Subtraction operation for symbolic expressions.
+
+    Represents element-wise subtraction (left - right). Supports broadcasting
+    following NumPy rules. Can be created using the - operator on Expr objects.
+
+    Attributes:
+        left: Left-hand side expression (minuend)
+        right: Right-hand side expression (subtrahend)
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = ox.State("y", shape=(3,))
+        >>> z = x - y  # Creates Sub(x, y)
+    """
+
     def __init__(self, left, right):
+        """Initialize a subtraction operation.
+
+        Args:
+            left: Expression to subtract from (minuend)
+            right: Expression to subtract (subtrahend)
+        """
         self.left = left
         self.right = right
 
@@ -297,7 +498,11 @@ class Sub(Expr):
         return [self.left, self.right]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize subtraction: fold constants if both sides are constants."""
+        """Canonicalize subtraction: fold constants if both sides are constants.
+
+        Returns:
+            Expr: Canonical form of the subtraction expression
+        """
         left = self.left.canonicalize()
         right = self.right.canonicalize()
         if isinstance(left, Constant) and isinstance(right, Constant):
@@ -305,7 +510,14 @@ class Sub(Expr):
         return Sub(left, right)
 
     def check_shape(self) -> Tuple[int, ...]:
-        """Subtraction broadcasts shapes like NumPy."""
+        """Check shape compatibility and compute broadcasted result shape like NumPy.
+
+        Returns:
+            tuple: The broadcasted shape of all operands
+
+        Raises:
+            ValueError: If operand shapes are not broadcastable
+        """
         shapes = [child.check_shape() for child in self.children()]
         try:
             return np.broadcast_shapes(*shapes)
@@ -317,7 +529,30 @@ class Sub(Expr):
 
 
 class Mul(Expr):
+    """Element-wise multiplication operation for symbolic expressions.
+
+    Represents element-wise (Hadamard) multiplication of two or more expressions.
+    Supports broadcasting following NumPy rules. Can be created using the * operator
+    on Expr objects. For matrix multiplication, use MatMul or the @ operator.
+
+    Attributes:
+        factors: List of expression operands to multiply together
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = ox.State("y", shape=(3,))
+        >>> z = x * y * 2  # Creates Mul(x, y, Constant(2))
+    """
+
     def __init__(self, *args):
+        """Initialize an element-wise multiplication operation.
+
+        Args:
+            *args: Two or more expressions to multiply together
+
+        Raises:
+            ValueError: If fewer than two operands are provided
+        """
         if len(args) < 2:
             raise ValueError("Mul requires two or more operands")
         self.factors = [to_expr(a) for a in args]
@@ -326,7 +561,11 @@ class Mul(Expr):
         return list(self.factors)
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize multiplication: flatten, fold constants, eliminate ones."""
+        """Canonicalize multiplication: flatten, fold constants, and eliminating ones.
+
+        Returns:
+            Expr: Canonical form of the multiplication expression
+        """
         factors = []
         const_vals = []
 
@@ -363,7 +602,15 @@ class Mul(Expr):
         return Mul(*factors)
 
     def check_shape(self) -> Tuple[int, ...]:
-        """Multiplication broadcasts shapes like NumPy."""
+        """Check shape compatibility and compute broadcasted result shape like NumPy.
+
+
+        Returns:
+            tuple: The broadcasted shape of all operands
+
+        Raises:
+            ValueError: If operand shapes are not broadcastable
+        """
         shapes = [child.check_shape() for child in self.children()]
         try:
             return np.broadcast_shapes(*shapes)
@@ -376,7 +623,28 @@ class Mul(Expr):
 
 
 class Div(Expr):
+    """Element-wise division operation for symbolic expressions.
+
+    Represents element-wise division (left / right). Supports broadcasting
+    following NumPy rules. Can be created using the / operator on Expr objects.
+
+    Attributes:
+        left: Numerator expression
+        right: Denominator expression
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = ox.State("y", shape=(3,))
+        >>> z = x / y  # Creates Div(x, y)
+    """
+
     def __init__(self, left, right):
+        """Initialize a division operation.
+
+        Args:
+            left: Expression for the numerator
+            right: Expression for the denominator
+        """
         self.left = left
         self.right = right
 
@@ -384,7 +652,11 @@ class Div(Expr):
         return [self.left, self.right]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize division: fold constants if both sides are constants."""
+        """Canonicalize division: fold constants if both sides are constants.
+
+        Returns:
+            Expr: Canonical form of the division expression
+        """
         lhs = self.left.canonicalize()
         rhs = self.right.canonicalize()
         if isinstance(lhs, Constant) and isinstance(rhs, Constant):
@@ -392,7 +664,14 @@ class Div(Expr):
         return Div(lhs, rhs)
 
     def check_shape(self) -> Tuple[int, ...]:
-        """Division broadcasts shapes like NumPy."""
+        """Check shape compatibility and compute broadcasted result shape like NumPy.
+
+        Returns:
+            tuple: The broadcasted shape of both operands
+
+        Raises:
+            ValueError: If operand shapes are not broadcastable
+        """
         shapes = [child.check_shape() for child in self.children()]
         try:
             return np.broadcast_shapes(*shapes)
@@ -404,7 +683,32 @@ class Div(Expr):
 
 
 class MatMul(Expr):
+    """Matrix multiplication operation for symbolic expressions.
+
+    Represents matrix multiplication following standard linear algebra rules.
+    Can be created using the @ operator on Expr objects. Handles:
+    - Matrix @ Matrix: (m,n) @ (n,k) -> (m,k)
+    - Matrix @ Vector: (m,n) @ (n,) -> (m,)
+    - Vector @ Matrix: (m,) @ (m,n) -> (n,)
+    - Vector @ Vector: (m,) @ (m,) -> scalar
+
+    Attributes:
+        left: Left-hand side expression
+        right: Right-hand side expression
+
+    Example:
+        >>> A = ox.State("A", shape=(3, 4))
+        >>> x = ox.State("x", shape=(4,))
+        >>> y = A @ x  # Creates MatMul(A, x), result shape (3,)
+    """
+
     def __init__(self, left, right):
+        """Initialize a matrix multiplication operation.
+
+        Args:
+            left: Left-hand side expression for matrix multiplication
+            right: Right-hand side expression for matrix multiplication
+        """
         self.left = left
         self.right = right
 
@@ -412,7 +716,6 @@ class MatMul(Expr):
         return [self.left, self.right]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize matrix multiplication."""
         left = self.left.canonicalize()
         right = self.right.canonicalize()
         return MatMul(left, right)
@@ -456,14 +759,36 @@ class MatMul(Expr):
 
 
 class Neg(Expr):
+    """Negation operation for symbolic expressions.
+
+    Represents element-wise negation (unary minus). Can be created using the
+    unary - operator on Expr objects.
+
+    Attributes:
+        operand: Expression to negate
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = -x  # Creates Neg(x)
+    """
+
     def __init__(self, operand):
+        """Initialize a negation operation.
+
+        Args:
+            operand: Expression to negate
+        """
         self.operand = operand
 
     def children(self):
         return [self.operand]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize negation: fold if operand is a constant."""
+        """Canonicalize negation: fold constant negations.
+
+        Returns:
+            Expr: Canonical form of the negation expression
+        """
         o = self.operand.canonicalize()
         if isinstance(o, Constant):
             return Constant(-o.value)
@@ -478,16 +803,36 @@ class Neg(Expr):
 
 
 class Sum(Expr):
-    """Sum all elements of an expression (reduction operation)"""
+    """Sum reduction operation for symbolic expressions.
+
+    Sums all elements of an expression, reducing it to a scalar. This is a
+    reduction operation that collapses all dimensions.
+
+    Attributes:
+        operand: Expression whose elements will be summed
+
+    Example:
+        >>> x = ox.State("x", shape=(3, 4))
+        >>> total = Sum(x)  # Creates Sum(x), result shape ()
+    """
 
     def __init__(self, operand):
+        """Initialize a sum reduction operation.
+
+        Args:
+            operand: Expression to sum over all elements
+        """
         self.operand = to_expr(operand)
 
     def children(self):
         return [self.operand]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize sum operation."""
+        """Canonicalize sum: canonicalize the operand.
+
+        Returns:
+            Expr: Canonical form of the sum expression
+        """
         operand = self.operand.canonicalize()
         return Sum(operand)
 
@@ -503,9 +848,28 @@ class Sum(Expr):
 
 
 class Index(Expr):
-    """Expr that means "take this Expr and index/slice it." """
+    """Indexing and slicing operation for symbolic expressions.
+
+    Represents indexing or slicing of an expression using NumPy-style indexing.
+    Can be created using square bracket notation on Expr objects.
+
+    Attributes:
+        base: Expression to index into
+        index: Index specification (int, slice, or tuple of indices/slices)
+
+    Example:
+        >>> x = ox.State("x", shape=(10,))
+        >>> y = x[0:5]  # Creates Index(x, slice(0, 5))
+        >>> z = x[3]    # Creates Index(x, 3)
+    """
 
     def __init__(self, base: Expr, index: Union[int, slice, tuple]):
+        """Initialize an indexing operation.
+
+        Args:
+            base: Expression to index into
+            index: NumPy-style index (int, slice, or tuple of indices/slices)
+        """
         self.base = base
         self.index = index
 
@@ -513,7 +877,11 @@ class Index(Expr):
         return [self.base]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize indexing operation."""
+        """Canonicalize index by canonicalizing the base expression.
+
+        Returns:
+            Expr: Canonical form of the indexing expression
+        """
         base = self.base.canonicalize()
         return Index(base, self.index)
 
@@ -532,11 +900,26 @@ class Index(Expr):
 
 
 class Concat(Expr):
-    """
-    Concatenate a sequence of Exprs into one long vector.
+    """Concatenation operation for symbolic expressions.
+
+    Concatenates a sequence of expressions along their first dimension. All inputs
+    must have the same rank and matching dimensions except for the first dimension.
+
+    Attributes:
+        exprs: Tuple of expressions to concatenate
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = ox.State("y", shape=(4,))
+        >>> z = Concat(x, y)  # Creates Concat(x, y), result shape (7,)
     """
 
     def __init__(self, *exprs: Expr):
+        """Initialize a concatenation operation.
+
+        Args:
+            *exprs: Expressions to concatenate along the first dimension
+        """
         # wrap raw values as Constant if needed
         self.exprs = [to_expr(e) for e in exprs]
 
@@ -544,7 +927,11 @@ class Concat(Expr):
         return list(self.exprs)
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize concatenation operation."""
+        """Canonicalize concatenation by canonicalizing all operands.
+
+        Returns:
+            Expr: Canonical form of the concatenation expression
+        """
         exprs = [e.canonicalize() for e in self.exprs]
         return Concat(*exprs)
 
@@ -565,7 +952,27 @@ class Concat(Expr):
 
 
 class Power(Expr):
+    """Element-wise power operation for symbolic expressions.
+
+    Represents element-wise exponentiation (base ** exponent). Supports broadcasting
+    following NumPy rules. Can be created using the ** operator on Expr objects.
+
+    Attributes:
+        base: Base expression
+        exponent: Exponent expression
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = x ** 2  # Creates Power(x, Constant(2))
+    """
+
     def __init__(self, base, exponent):
+        """Initialize a power operation.
+
+        Args:
+            base: Base expression
+            exponent: Exponent expression
+        """
         self.base = to_expr(base)
         self.exponent = to_expr(exponent)
 
@@ -573,13 +980,16 @@ class Power(Expr):
         return [self.base, self.exponent]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize power operation."""
+        """Canonicalize power by canonicalizing base and exponent.
+
+        Returns:
+            Expr: Canonical form of the power expression
+        """
         base = self.base.canonicalize()
         exponent = self.exponent.canonicalize()
         return Power(base, exponent)
 
     def check_shape(self) -> Tuple[int, ...]:
-        """Power preserves the broadcasted shape of base and exponent."""
         shapes = [child.check_shape() for child in self.children()]
         try:
             return np.broadcast_shapes(*shapes)
@@ -591,7 +1001,27 @@ class Power(Expr):
 
 
 class Constant(Expr):
+    """Constant value expression.
+
+    Represents a constant numeric value in the expression tree. Constants are
+    automatically normalized (squeezed) upon construction to ensure consistency.
+
+    Attributes:
+        value: The numpy array representing the constant value (squeezed)
+
+    Example:
+        >>> c1 = Constant(5.0)        # Scalar constant
+        >>> c2 = Constant([1, 2, 3])  # Vector constant
+        >>> c3 = to_expr(10)          # Also creates a Constant
+    """
+
     def __init__(self, value: np.ndarray):
+        """Initialize a constant expression.
+
+        Args:
+            value: Numeric value or numpy array to wrap as a constant.
+                   Will be converted to numpy array and squeezed.
+        """
         # Normalize immediately upon construction to ensure consistency
         # This ensures Constant(5.0) and Constant([5.0]) create identical objects
         if not isinstance(value, np.ndarray):
@@ -634,11 +1064,28 @@ class Constant(Expr):
 
 
 class Constraint(Expr):
-    """
-    Abstract base for all constraints.
+    """Abstract base class for optimization constraints.
+
+    Constraints represent relationships between expressions that must be satisfied
+    in the optimization problem. This base class provides common functionality for
+    both equality and inequality constraints.
+
+    Attributes:
+        lhs: Left-hand side expression
+        rhs: Right-hand side expression
+        is_convex: Flag indicating if the constraint is known to be convex
+
+    Note:
+        Constraints are canonicalized to standard form: (lhs - rhs) {op} 0
     """
 
     def __init__(self, lhs: Expr, rhs: Expr):
+        """Initialize a constraint.
+
+        Args:
+            lhs: Left-hand side expression
+            rhs: Right-hand side expression
+        """
         self.lhs = lhs
         self.rhs = rhs
         self.is_convex = False
@@ -720,14 +1167,30 @@ class Constraint(Expr):
 
 
 class Equality(Constraint):
-    """Represents lhs == rhs."""
+    """Equality constraint for optimization problems.
+
+    Represents an equality constraint: lhs == rhs. Can be created using the ==
+    operator on Expr objects.
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> constraint = x == 0  # Creates Equality(x, Constant(0))
+    """
 
     def __repr__(self):
         return f"{self.lhs!r} == {self.rhs!r}"
 
 
 class Inequality(Constraint):
-    """Represents lhs <= rhs"""
+    """Inequality constraint for optimization problems.
+
+    Represents an inequality constraint: lhs <= rhs. Can be created using the <=
+    operator on Expr objects.
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> constraint = x <= 10  # Creates Inequality(x, Constant(10))
+    """
 
     def __repr__(self):
         return f"{self.lhs!r} <= {self.rhs!r}"

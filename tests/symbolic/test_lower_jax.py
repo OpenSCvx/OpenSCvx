@@ -64,7 +64,7 @@ def test_top_level_lower_raises_for_unregistered_expr():
 def test_jax_lower_constant():
     const = Constant(np.array([[1.0, 2.0], [3.0, 4.0]]))
     jl = JaxLowerer()
-    f = jl.visit_constant(const)
+    f = jl._visit_constant(const)
     out = f(None, None, None, None)
     assert isinstance(out, jnp.ndarray)
     assert out.shape == (2, 2)
@@ -75,14 +75,14 @@ def test_jax_lower_state_without_slice_raises():
     s = State("s", (3,))
     jl = JaxLowerer()
     with pytest.raises(ValueError):
-        jl.visit_state(s)
+        jl._visit_state(s)
 
 
 def test_jax_lower_control_without_slice_raises():
     c = Control("c", (2,))
     jl = JaxLowerer()
     with pytest.raises(ValueError):
-        jl.visit_control(c)
+        jl._visit_control(c)
 
 
 def test_jax_lower_state_with_slice():
@@ -90,7 +90,7 @@ def test_jax_lower_state_with_slice():
     s = State("s", (4,))
     s._slice = slice(2, 6)
     jl = JaxLowerer()
-    f = jl.visit_state(s)
+    f = jl._visit_state(s)
     out = f(x, None, None, None)
     assert isinstance(out, jnp.ndarray)
     assert out.shape == (4,)
@@ -102,7 +102,7 @@ def test_jax_lower_control_with_slice():
     c = Control("c", (3,))
     c._slice = slice(5, 8)
     jl = JaxLowerer()
-    f = jl.visit_control(c)
+    f = jl._visit_control(c)
     out = f(None, u, None, None)
     assert isinstance(out, jnp.ndarray)
     assert out.shape == (3,)
@@ -113,7 +113,7 @@ def test_jax_lower_parameter_scalar():
     """Test Parameter node with scalar value."""
     param = Parameter("alpha", (), value=5.0)
     jl = JaxLowerer()
-    f = jl.visit_parameter(param)
+    f = jl._visit_parameter(param)
     parameters = dict(alpha=5.0)
 
     # Test with scalar parameter
@@ -133,7 +133,7 @@ def test_jax_lower_parameter_vector():
     """Test Parameter node with vector value."""
     param = Parameter("weights", (3,), value=np.array([1.0, 2.0, 3.0]))
     jl = JaxLowerer()
-    f = jl.visit_parameter(param)
+    f = jl._visit_parameter(param)
 
     # Test with vector parameter
     weights_val = np.array([1.0, 2.0, 3.0])
@@ -152,7 +152,7 @@ def test_jax_lower_parameter_matrix():
     """Test Parameter node with matrix value."""
     param = Parameter("transform", (2, 3), value=np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]))
     jl = JaxLowerer()
-    f = jl.visit_parameter(param)
+    f = jl._visit_parameter(param)
 
     # Test with matrix parameter
     matrix_val = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
@@ -326,9 +326,9 @@ def test_jax_lower_add_and_mul_of_slices():
     expr_mul = Mul(a, b)
 
     jl = JaxLowerer()
-    f_res_add = jl.visit_add(expr_add)
+    f_res_add = jl._visit_add(expr_add)
     res_add = f_res_add(x, None, None, None)
-    f_res_mul = jl.visit_mul(expr_mul)
+    f_res_mul = jl._visit_mul(expr_mul)
     res_mul = f_res_mul(x, None, None, None)
 
     assert jnp.allclose(res_add, x[0:3] + x[3:6])
@@ -347,9 +347,9 @@ def test_jax_lower_sub_and_div_of_slices():
     expr_div = Div(a, c)
 
     jl = JaxLowerer()
-    f_res_sub = jl.visit_sub(expr_sub)
+    f_res_sub = jl._visit_sub(expr_sub)
     res_sub = f_res_sub(x, u, None, None)
-    f_res_div = jl.visit_div(expr_div)
+    f_res_div = jl._visit_div(expr_div)
     res_div = f_res_div(x, u, None, None)
 
     assert jnp.allclose(res_sub, x[0:3] - u[0:3])
@@ -363,7 +363,7 @@ def test_jax_lower_matmul_vector_matrix():
     expr = MatMul(M, v)
 
     jl = JaxLowerer()
-    f = jl.visit_matmul(expr)
+    f = jl._visit_matmul(expr)
     out = f(None, None, None, None)
     assert isinstance(out, jnp.ndarray)
     assert out.shape == (2,)
@@ -382,7 +382,7 @@ def test_jax_lower_neg_and_composite():
     # expr = -((a + b) * c)
     expr = Neg(Mul(Add(a, b), c))
     jl = JaxLowerer()
-    f = jl.visit_neg(expr)
+    f = jl._visit_neg(expr)
     out = f(x, u, None, None)
 
     expected = -((x[0:2] + u[0:2]) * jnp.array([1.0, 1.0]))
@@ -447,7 +447,7 @@ def test_equality_constraint_lowering():
     constraint = Equality(lhs, rhs)
 
     jl = JaxLowerer()
-    fn = jl.visit_constraint(constraint)
+    fn = jl._visit_constraint(constraint)
     residual = fn(x, u, None, None)
 
     # Residual should be lhs - rhs = x - 2*u
@@ -469,7 +469,7 @@ def test_inequality_constraint_lowering():
     constraint = Inequality(lhs, rhs)
 
     jl = JaxLowerer()
-    fn = jl.visit_constraint(constraint)  # Both use the same visitor
+    fn = jl._visit_constraint(constraint)  # Both use the same visitor
     residual = fn(x, None, None, None)
 
     # Residual should be lhs - rhs = x - 2.0
@@ -1169,7 +1169,7 @@ def test_normalized_constants_lower_correctly():
     scalar_squeezed = Constant(np.array([[5.0]]))  # (1,1) -> () after squeeze
     assert scalar_squeezed.value.shape == ()  # Verify normalization happened
 
-    fn_scalar = jl.visit_constant(scalar_squeezed)
+    fn_scalar = jl._visit_constant(scalar_squeezed)
     result_scalar = fn_scalar(None, None, None, None)
 
     assert isinstance(result_scalar, jnp.ndarray)
@@ -1180,7 +1180,7 @@ def test_normalized_constants_lower_correctly():
     vector_squeezed = Constant(np.array([[1.0, 2.0, 3.0]]))  # (1,3) -> (3,) after squeeze
     assert vector_squeezed.value.shape == (3,)  # Verify normalization happened
 
-    fn_vector = jl.visit_constant(vector_squeezed)
+    fn_vector = jl._visit_constant(vector_squeezed)
     result_vector = fn_vector(None, None, None, None)
 
     assert isinstance(result_vector, jnp.ndarray)
@@ -1193,7 +1193,7 @@ def test_normalized_constants_lower_correctly():
     )  # (1,2,1,2) -> (2,2) after squeeze
     assert matrix_squeezed.value.shape == (2, 2)  # Verify normalization happened
 
-    fn_matrix = jl.visit_constant(matrix_squeezed)
+    fn_matrix = jl._visit_constant(matrix_squeezed)
     result_matrix = fn_matrix(None, None, None, None)
 
     assert isinstance(result_matrix, jnp.ndarray)
@@ -1248,8 +1248,8 @@ def test_normalized_constants_preserve_dtype_in_lowering():
     assert float32_const.value.dtype == np.float32
 
     # Test lowering
-    fn_int = jl.visit_constant(int32_const)
-    fn_float = jl.visit_constant(float32_const)
+    fn_int = jl._visit_constant(int32_const)
+    fn_float = jl._visit_constant(float32_const)
 
     result_int = fn_int(None, None, None, None)
     result_float = fn_float(None, None, None, None)

@@ -6,9 +6,22 @@ from .variable import Variable
 
 
 class BoundaryType(str, Enum):
-    """String enum for boundary condition types.
+    """Enumeration of boundary condition types for state variables.
 
-    This allows users to pass plain strings while we maintain type safety internally.
+    This enum allows users to specify boundary conditions using plain strings
+    while maintaining type safety internally. Boundary conditions control how
+    the optimizer handles initial and final state values.
+
+    Attributes:
+        FIXED: State value is fixed to a specific value
+        FREE: State value is free to be optimized within bounds
+        MINIMIZE: Objective term to minimize the state value
+        MAXIMIZE: Objective term to maximize the state value
+
+    Example:
+        >>> # Can use either enum or string
+        >>> BoundaryType.FIXED
+        >>> "fixed"  # Equivalent
     """
 
     FIXED = "fixed"
@@ -18,55 +31,56 @@ class BoundaryType(str, Enum):
 
 
 class State(Variable):
-    """Symbolic state variable for trajectory optimization.
+    """State variable with boundary conditions for trajectory optimization.
 
-    A State represents a named state variable in the symbolic expression tree.
-    It integrates with the AST system and supports boundary conditions for
-    trajectory optimization.
+    State represents a dynamic state variable in a trajectory optimization problem.
+    Unlike control inputs, states evolve according to dynamics constraints and can
+    have boundary conditions specified at the initial and final time points.
+    Like all Variables, States also support min/max bounds and initial trajectory
+    guesses to help guide the optimization solver toward good solutions.
 
-    The State class is designed to be lightweight and focused on symbolic
-    representation, with optimization-specific functionality handled by the
-    unified layer.
+    States support four types of boundary conditions:
+    - **fixed**: State value is constrained to a specific value
+    - **free**: State value is optimized within the specified bounds
+    - **minimize**: Adds a term to the objective function to minimize the state value
+    - **maximize**: Adds a term to the objective function to maximize the state value
 
-    Boundary condition types:
-    - Fixed values (Fix)
-    - Free variables (Free)
-    - Minimization objectives (Minimize)
-    - Maximization objectives (Maximize)
+    Each element of a multi-dimensional state can have different boundary condition
+    types, allowing for fine-grained control over the optimization.
 
     Attributes:
-        name (str): Unique name identifier for this state variable
-        shape (tuple): Shape of the state vector (e.g., (3,) for 3D position)
-        min (np.ndarray): Minimum bounds for state variables
-        max (np.ndarray): Maximum bounds for state variables
-        guess (np.ndarray): Initial trajectory guess
-        initial (np.ndarray): Initial boundary conditions
-        final (np.ndarray): Final boundary conditions
+        name: Unique name identifier for this state variable
+        shape: Shape of the state vector (typically 1D like (3,) for 3D position)
+        min: Minimum bounds for state variables
+        max: Maximum bounds for state variables
+        guess: Initial trajectory guess
+        initial: Initial state values with boundary condition types
+        initial_type: Array of boundary condition types for initial state
+        final: Final state values with boundary condition types
+        final_type: Array of boundary condition types for final state
 
     Example:
-        ```python
-        # Simple scalar state
-        time = State("time", (1,))
-        time.min = np.array([0.0])
-        time.max = np.array([10.0])
-        time.initial = [0.0]  # Defaults to fixed
-        time.final = [("minimize", 5.0)]
-
-        # Vector state
-        position = State("position", (3,))
-        position.min = np.array([0, 0, 10])
-        position.max = np.array([10, 10, 200])
-        position.initial = [0, ("free", 1), 50]  # Mix of fixed and free
-        position.final = [10, ("free", 5), ("maximize", 150)]
-        ```
+        >>> # Scalar time state with free initial time, minimize final time
+        >>> time = State("time", (1,))
+        >>> time.min = [0.0]
+        >>> time.max = [10.0]
+        >>> time.initial = [("free", 0.0)]
+        >>> time.final = [("minimize", 5.0)]
+        >>>
+        >>> # 3D position state with mixed boundary conditions
+        >>> pos = State("pos", (3,))
+        >>> pos.min = [0, 0, 10]
+        >>> pos.max = [10, 10, 200]
+        >>> pos.initial = [0, ("free", 1), 50]  # x fixed, y free, z fixed
+        >>> pos.final = [10, ("free", 5), ("maximize", 150)]  # Maximize final altitude
     """
 
     def __init__(self, name, shape):
         """Initialize a State object.
 
         Args:
-            name (str): Name identifier for the state variable
-            shape (tuple): Shape of the state vector
+            name: Name identifier for the state variable
+            shape: Shape of the state vector (typically 1D tuple)
         """
         super().__init__(name, shape)
         self._initial = None
@@ -79,7 +93,12 @@ class State(Variable):
         """Get the minimum bounds for the state variables.
 
         Returns:
-            np.ndarray: Array of minimum values for each state variable
+            Array of minimum values for each state variable element.
+
+        Example:
+            >>> pos = State("pos", (3,))
+            >>> pos.min = [0, 0, 10]
+            >>> print(pos.min)  # [0. 0. 10.]
         """
         return self._min
 
@@ -87,11 +106,20 @@ class State(Variable):
     def min(self, val):
         """Set the minimum bounds for the state variables.
 
+        Bounds are validated against any fixed initial/final conditions to ensure
+        consistency.
+
         Args:
-            val (np.ndarray): Array of minimum values for each state variable
+            val: Array of minimum values, must match the state shape exactly
 
         Raises:
-            ValueError: If the shape of val doesn't match the state shape
+            ValueError: If the shape doesn't match the state shape, or if fixed
+                boundary conditions violate the bounds
+
+        Example:
+            >>> pos = State("pos", (3,))
+            >>> pos.min = [0, 0, 10]  # Set lower bounds
+            >>> pos.initial = [0, 5, 15]  # Must satisfy: 0>=0, 5>=0, 15>=10
         """
         val = np.asarray(val)
         if val.shape != self.shape:
@@ -104,7 +132,12 @@ class State(Variable):
         """Get the maximum bounds for the state variables.
 
         Returns:
-            np.ndarray: Array of maximum values for each state variable
+            Array of maximum values for each state variable element.
+
+        Example:
+            >>> vel = State("vel", (3,))
+            >>> vel.max = [10, 10, 5]
+            >>> print(vel.max)  # [10. 10. 5.]
         """
         return self._max
 
@@ -112,11 +145,20 @@ class State(Variable):
     def max(self, val):
         """Set the maximum bounds for the state variables.
 
+        Bounds are validated against any fixed initial/final conditions to ensure
+        consistency.
+
         Args:
-            val (np.ndarray): Array of maximum values for each state variable
+            val: Array of maximum values, must match the state shape exactly
 
         Raises:
-            ValueError: If the shape of val doesn't match the state shape
+            ValueError: If the shape doesn't match the state shape, or if fixed
+                boundary conditions violate the bounds
+
+        Example:
+            >>> vel = State("vel", (3,))
+            >>> vel.max = [10, 10, 5]  # Set upper bounds
+            >>> vel.final = [8, 9, 4]  # Must satisfy: 8<=10, 9<=10, 4<=5
         """
         val = np.asarray(val)
         if val.shape != self.shape:
@@ -125,10 +167,13 @@ class State(Variable):
         self._check_bounds_against_initial_final()
 
     def _check_bounds_against_initial_final(self):
-        """Check if initial and final values respect the bounds.
+        """Validate that fixed boundary conditions respect min/max bounds.
+
+        This internal method is automatically called when bounds or boundary
+        conditions are set to ensure consistency.
 
         Raises:
-            ValueError: If any fixed initial or final value violates the bounds
+            ValueError: If any fixed initial or final value violates the min/max bounds
         """
         for field_name, data, types in [
             ("initial", self._initial, self.initial_type),
@@ -154,24 +199,53 @@ class State(Variable):
 
     @property
     def initial(self):
-        """Get the initial state values.
+        """Get the initial state boundary condition values.
 
         Returns:
-            np.ndarray: Array of initial state values
+            Array of initial state values (regardless of boundary condition type),
+            or None if not set.
+
+        Note:
+            Use `initial_type` to see the boundary condition types for each element.
+
+        Example:
+            >>> x = State("x", (2,))
+            >>> x.initial = [0, ("free", 1)]
+            >>> print(x.initial)  # [0. 1.]
+            >>> print(x.initial_type)  # ['Fix' 'Free']
         """
         return self._initial
 
     @initial.setter
     def initial(self, arr):
-        """Set the initial state values and their types.
+        """Set the initial state boundary conditions.
+
+        Each element can be specified as either a simple number (defaults to "fixed")
+        or a tuple of (type, value) where type specifies the boundary condition.
 
         Args:
-            arr: Array of initial values. Can be:
-                - Numbers (default to "fixed")
-                - Tuples of (type, value) where type is "fixed", "free", "minimize", "maximize"
+            arr: Array-like of initial conditions. Each element can be:
+                - A number: Defaults to fixed boundary condition at that value
+                - A tuple (type, value): Where type is one of:
+                    - "fixed": Constrain state to this exact value
+                    - "free": Let optimizer choose within bounds, initialize at value
+                    - "minimize": Add objective term to minimize, initialize at value
+                    - "maximize": Add objective term to maximize, initialize at value
 
         Raises:
-            ValueError: If the shape doesn't match the state shape
+            ValueError: If the shape doesn't match the state shape, if boundary
+                condition type is invalid, or if fixed values violate bounds
+
+        Example:
+            >>> pos = State("pos", (3,))
+            >>> pos.min = [0, 0, 0]
+            >>> pos.max = [10, 10, 10]
+            >>> # x fixed at 0, y free (starts at 5), z fixed at 2
+            >>> pos.initial = [0, ("free", 5), 2]
+            >>>
+            >>> # Can also minimize/maximize boundary values
+            >>> time = State("t", (1,))
+            >>> time.initial = [("minimize", 0)]  # Minimize initial time
         """
         # Convert to list first to handle mixed types properly
         if not isinstance(arr, (list, tuple)):
@@ -216,24 +290,53 @@ class State(Variable):
 
     @property
     def final(self):
-        """Get the final state values.
+        """Get the final state boundary condition values.
 
         Returns:
-            np.ndarray: Array of final state values
+            Array of final state values (regardless of boundary condition type),
+            or None if not set.
+
+        Note:
+            Use `final_type` to see the boundary condition types for each element.
+
+        Example:
+            >>> x = State("x", (2,))
+            >>> x.final = [10, ("minimize", 0)]
+            >>> print(x.final)  # [10. 0.]
+            >>> print(x.final_type)  # ['Fix' 'Minimize']
         """
         return self._final
 
     @final.setter
     def final(self, arr):
-        """Set the final state values and their types.
+        """Set the final state boundary conditions.
+
+        Each element can be specified as either a simple number (defaults to "fixed")
+        or a tuple of (type, value) where type specifies the boundary condition.
 
         Args:
-            arr: Array of final values. Can be:
-                - Numbers (default to "fixed")
-                - Tuples of (type, value) where type is "fixed", "free", "minimize", "maximize"
+            arr: Array-like of final conditions. Each element can be:
+                - A number: Defaults to fixed boundary condition at that value
+                - A tuple (type, value): Where type is one of:
+                    - "fixed": Constrain state to this exact value
+                    - "free": Let optimizer choose within bounds, initialize at value
+                    - "minimize": Add objective term to minimize, initialize at value
+                    - "maximize": Add objective term to maximize, initialize at value
 
         Raises:
-            ValueError: If the shape doesn't match the state shape
+            ValueError: If the shape doesn't match the state shape, if boundary
+                condition type is invalid, or if fixed values violate bounds
+
+        Example:
+            >>> pos = State("pos", (3,))
+            >>> pos.min = [0, 0, 0]
+            >>> pos.max = [10, 10, 10]
+            >>> # x fixed at 10, y free (starts at 5), z maximize altitude
+            >>> pos.final = [10, ("free", 5), ("maximize", 8)]
+            >>>
+            >>> # Minimize final time in time-optimal problem
+            >>> time = State("t", (1,))
+            >>> time.final = [("minimize", 10)]
         """
         # Convert to list first to handle mixed types properly
         if not isinstance(arr, (list, tuple)):
@@ -280,6 +383,10 @@ class State(Variable):
         """String representation of the State object.
 
         Returns:
-            str: A string describing the State object
+            Concise string showing the state name and shape.
+
+        Example:
+            >>> pos = State("pos", (3,))
+            >>> print(pos)  # State('pos', shape=(3,))
         """
         return f"State('{self.name}', shape={self.shape})"
