@@ -3,7 +3,7 @@ name: Documentation
 on:
   push:
     branches:
-      - feature/documentation
+      - main
 
 permissions:
   contents: write
@@ -34,15 +34,13 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y pngquant
       - run: pip install mkdocs-material
       - run: pip install mkdocstrings-python
-      - run: mkdocs build
-      
-      - name: Upload to GitHub Pages
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-    
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+      - run: pip install mike
+      - name: Install package
+        run: pip install -e .
+      - name: Deploy nightly documentation
+        run: |
+          git fetch origin gh-pages --depth=1 || true
+          mike deploy --push --update-aliases nightly
   
       - name: Save build cache
         uses: actions/cache/save@v4
