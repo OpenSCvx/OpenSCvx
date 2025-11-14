@@ -110,56 +110,55 @@ For setting up a local development environment, we recommend using Conda to mana
 
 ## Quick Example
 
-Here's a simple example to get you started with OpenSCvx:
+Here's a simple example to get you started with OpenSCvx. This demonstrates a minimum-time problem where a vehicle moves from the origin to a target position:
 
 ```python
 import numpy as np
-import jax.numpy as jnp
-from openscvx.backend.state import State, Minimize
-from openscvx.backend.control import Control
-from openscvx.dynamics import dynamics
-from openscvx.trajoptproblem import TrajOptProblem
+import openscvx as ox
+from openscvx import TrajOptProblem
 
-# Define state variables (position x, y and time)
-x = State("x", shape=(3,))
+# Define state variables
+position = ox.State("position", shape=(2,))  # 2D position [x, y]
+position.min = np.array([-10.0, -10.0])
+position.max = np.array([10.0, 10.0])
+position.initial = np.array([0.0, 0.0])
+position.final = np.array([5.0, 5.0])
 
-# Define control variables (velocity in x, y directions)
-u = Control("u", shape=(2,))
+# Define control variables
+velocity = ox.Control("velocity", shape=(2,))  # Velocity [vx, vy]
+velocity.min = np.array([-2.0, -2.0])
+velocity.max = np.array([2.0, 2.0])
 
-# Set bounds on state
-x.min = np.array([-10.0, -10.0, 0])
-x.max = np.array([10.0, 10.0, 5.0])
-
-# Set initial and final conditions
-x.initial = np.array([0, 0, 0])
-x.final = np.array([5, 5, Minimize(5.0)])
-
-# Set initial guess for state trajectory
-x.guess = np.linspace([0, 0, 0], [5, 5, 5.0], 20)
-
-# Set bounds on control
-u.min = np.array([-2, -2])
-u.max = np.array([2, 2])
-
-# Set initial control guess
-u.guess = np.repeat(
-    np.expand_dims(np.array([1, 1]), axis=0), 20, axis=0
+# Set initial guesses
+position.guess = np.linspace(position.initial, position.final, 20)
+velocity.guess = np.repeat(
+    np.expand_dims(np.array([1.0, 1.0]), axis=0), 20, axis=0
 )
 
-# Define dynamics (simple integrator)
-@dynamics
-def dynamics_fn(x_, u_):
-    rx_dot = u_[0]  # x velocity
-    ry_dot = u_[1]  # y velocity
-    t_dot = 1       # time derivative
-    return jnp.array([rx_dot, ry_dot, t_dot])
+# Collect states and controls
+states = [position]
+controls = [velocity]
 
-# Create and solve the problem
+# Define dynamics using symbolic expressions
+dynamics = {
+    "position": velocity,  # position derivative is velocity
+}
+
+# Define time (minimize final time)
+time = ox.Time(
+    initial=0.0,
+    final=("minimize", 5.0),  # Minimize final time with initial guess of 5.0
+    min=0.0,
+    max=10.0,
+)
+
+# Create the problem
 problem = TrajOptProblem(
-    dynamics=dynamics_fn,
-    x=x,
-    u=u,
-    idx_time=2,  # Index of time variable in state vector
+    dynamics=dynamics,
+    states=states,
+    controls=controls,
+    time=time,
+    constraints=[],
     N=20,
 )
 
@@ -169,9 +168,10 @@ result = problem.solve()
 result = problem.post_process(result)
 
 # Access results
-print(f"Optimal cost: {result.cost}")
-print(f"Final position: {result.x_full[-1, :2]}")
-print(f"Total time: {result.x_full[-1, 2]}")
+print(f"Converged: {result.converged}")
+print(f"Optimal time: {result.t_final:.3f}")
+print(f"Final position: {result.trajectory['position'][-1]}")
+print(f"Total cost: {result.cost:.3f}")
 ```
 
 !!! note "Note"
