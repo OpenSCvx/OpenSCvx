@@ -2,270 +2,248 @@
 
 ## Using Parameters in Dynamics and Constraints
 
-OpenSCvx allows you to define symbolic parameters that can be used in both dynamics and constraints. This enables flexible, reusable problem definitions. 
+OpenSCvx allows you to define symbolic parameters that can be used in both dynamics and constraints. Parameters enable flexible, reusable problem definitions and can be updated at runtime without recompiling.
 
-!!! Note
-    When using parameters, the argument names in your functions must match the parameter name with an underscore suffix (e.g., `g_` for a parameter named `g`).
-
-
-### Example: 3DoF Rocket Landing Dynamics with Parameters
+### Example: 3DoF Rocket Landing with Parameters
 
 ```python
-from openscvx.backend.parameter import Parameter
-from openscvx.dynamics import dynamics
-import jax.numpy as jnp
+import numpy as np
+import openscvx as ox
 
-I_sp = Parameter("I_sp")
-g = Parameter("g")
-theta = Parameter("theta")
+# Define parameters for physical constants
+g_e = 9.807  # Gravitational acceleration on Earth (m/s^2)
 
-I_sp.value = 225
-g.value = 3.7114
-theta.value = 27 * jnp.pi / 180
+# Create symbolic parameters
+I_sp = ox.Parameter("I_sp", value=225.0)
+g = ox.Parameter("g", value=3.7114)
+theta = ox.Parameter("theta", value=27 * np.pi / 180)
 
-@dynamics
-def rocket_dynamics(x_, u_, I_sp_, g_, theta_):
-    m = x_[6]
-    T = u_
-    r_dot = x_[3:6]
-    g_vec = jnp.array([0, 0, g_])
-    v_dot = T/m - g_vec
-    m_dot = -jnp.linalg.norm(T) / (I_sp_ * 9.807 * jnp.cos(theta_))
-    t_dot = 1
-    return jnp.hstack([r_dot, v_dot, m_dot, t_dot])
+# Define states
+position = ox.State("position", shape=(3,))
+velocity = ox.State("velocity", shape=(3,))
+mass = ox.State("mass", shape=(1,))
+
+# Define control
+thrust = ox.Control("thrust", shape=(3,))
+
+# Use parameters in dynamics
+g_vec = np.array([0, 0, 1], dtype=np.float64) * g
+
+dynamics = {
+    "position": velocity,
+    "velocity": thrust / mass[0] - g_vec,
+    "mass": -ox.linalg.Norm(thrust) / (I_sp * g_e * ox.Cos(theta)),
+}
 ```
 
-When building your problem, collect all parameters with `Parameter.get_all()` and pass them to your problem setup:
+Parameters are automatically detected and handled by the problem - no need to manually collect or pass them.
+
+### Using Parameters in Constraints
+
+Parameters can be used in constraints just like in dynamics:
 
 ```python
-problem = TrajOptProblem(
-    dynamics=rocket_dynamics,
-    x=x,
-    u=u,
-    params=Parameter.get_all(),
-    ...
+# Define obstacle parameters
+obs_center = ox.Parameter("obs_center", shape=(3,), value=np.array([100, 100, 50]))
+obs_radius = ox.Parameter("obs_radius", value=50.0)
+
+# Use in continuous constraint
+diff = position - obs_center
+constraints.append(
+    ox.ctcs(diff.T @ diff >= obs_radius**2)
+)
+
+# Use in discrete constraint
+constraints.append(
+    (ox.linalg.Norm(position - obs_center) >= obs_radius).at([10])
 )
 ```
 
----
+### Updating Parameters at Runtime
 
-## Using Parameters in Constraints
-
-You can also use parameters in both CTCS and nodal constraints. Again, the argument names must match the parameter name with an underscore.
-
-### CTCS Constraint Example with Parameters
+Parameters can be updated between solves without recompiling:
 
 ```python
-from openscvx.backend.parameter import Parameter
-from openscvx.constraints import ctcs
-import jax.numpy as jnp
+# Initial solve
+problem.initialize()
+results = problem.solve()
 
-obs_center = Parameter("obs_center", shape=(2,))
-obs_radius = Parameter("obs_radius", shape=())
-obs_center.value = jnp.array([-2.01, 0.0])
-obs_radius.value = 1.0
+# Update parameter values
+problem.parameters["obs_center"] = np.array([150, 150, 60])
+problem.parameters["obs_radius"] = 60.0
 
-@ctcs
-def obstacle_avoidance(x_, u_, obs_center_, obs_radius_):
-    return obs_radius_ - jnp.linalg.norm(x_[:2] - obs_center_)
+# Resolve with new parameter values (no recompilation needed)
+results = problem.solve()
 ```
-
-### Nodal Constraint Example with Parameters
-
-```python
-from openscvx.backend.parameter import Parameter
-from openscvx.constraints import nodal
-import jax.numpy as jnp
-
-g = Parameter("g")
-g.value = 3.7114
-
-@nodal
-def terminal_velocity_constraint(x_, u_, g_):
-    # Enforce a terminal velocity constraint using the gravity parameter
-    return x_[5] + g_ * x_[7]  # e.g., vz + g * t <= 0 at final node
-```
-
----
 
 ## CTCS Constraints: Advanced Options
 
+CTCS (Continuous-Time Constraint Satisfaction) constraints are enforced over continuous intervals using penalty functions.
+
 ### Penalty Function
 
-You can specify a penalty function for CTCS constraints using the `penalty` flag. Built-in options include:
+You can specify a penalty function using the `penalty` argument. Built-in options include:
 
-- `squared_relu` - $\max(0, g)^2$
+- `squared_relu` (default) - $\max(0, g)^2$
 - `huber` - $\begin{cases} \frac{1}{2} g^2 & \text{if } |g| \leq \delta \\ \delta (|g| - \frac{1}{2}\delta) & \text{otherwise} \end{cases}$
-- `smooth relu` - $\|\max(0, g)+c\|-c$
+- `smooth_relu` - $\|\max(0, g)+c\|-c$
 
 Example:
 
 ```python
-@ctcs(penalty="huber")
-def g(x_, u_):
-    return jnp.linalg.norm(x_[:2]) - 1.0
-```
-
-Or provide a custom penalty function:
-
-```python
-# True Huber function with delta=0.25
-huber = lambda x: jnp.where(
-    jnp.abs(x) <= 0.25, 
-    0.5 * x**2, 
-    0.25 * (jnp.abs(x) - 0.5 * 0.25)
+constraints.append(
+    ox.ctcs(ox.linalg.Norm(position[:2]) <= 10.0, penalty="huber")
 )
-@ctcs(penalty=huber)
-def g(x_, u_):
-    return jnp.linalg.norm(x_[:2]) - 1.0
 ```
 
 ### Node-Specific Regions
 
-To enforce a constraint only over a portion of the trajectory:
+To enforce a constraint only over a portion of the trajectory, use the `.over()` method:
 
 ```python
-@ctcs(nodes=(3, 8))
-def g(x_, u_):
-    return jnp.linalg.norm(x_[:2]) - 1.0
+# Enforce constraint between nodes 3 and 8
+constraint = (ox.linalg.Norm(position[:2]) <= 10.0).over(
+    interval=(3, 8),
+    penalty="squared_relu"
+)
+constraints.append(constraint)
 ```
 
 ### Multiple Augmented States
 
-To associate different constraints with different augmented states:
+To associate different constraints with different augmented states, use the `idx` argument:
 
 ```python
-@ctcs(idx=0)
-def g1(x_, u_):
-    return jnp.linalg.norm(x_[:2]) - 1.0
+# Box constraints use augmented state 0
+constraints.extend([
+    ox.ctcs(position <= position.max, idx=0),
+    ox.ctcs(position.min <= position, idx=0),
+])
 
-@ctcs(idx=1)
-def g2(x_, u_):
-    return x_ - max_state
-```
+# Thrust magnitude constraints use augmented state 1
+constraints.extend([
+    ox.ctcs(rho_min <= ox.linalg.Norm(thrust), idx=1),
+    ox.ctcs(ox.linalg.Norm(thrust) <= rho_max, idx=1),
+])
 
----
-
-## Nodal Constraints: Advanced Options
-
-### Convex and Nonconvex Nodal Constraints
-
-- For convex constraints, set `convex=True` and use cvxpy atoms:
-
-```python
-@nodal(convex=True)
-def g(x_, u_):
-    return cp.norm(x_) <= 1.0
-```
-
-- For nonconvex constraints, use the default (`convex=False`) and express as $g(x,u) \leq 0$:
-
-```python
-@nodal
-def g(x_, u_):
-    return 1 - x_[0]
-```
-
-### Node Ranges
-
-To enforce a constraint at specific nodes:
-
-```python
-@nodal(nodes=[4])
-def g(x_, u_):
-    return x_[0] - x_wp
-```
-
-### Vectorized Nodal Constraints
-
-To enforce a constraint between nodes or to apply a custom vectorized constraint across the trajectory, use `vectorized=True`. This allows you to write constraints that operate on the entire trajectory arrays for `x` and `u`.
-
-Example:
-
-```python
-@nodal(vectorized=True)
-def g(x, u):
-    # x and u are arrays of shape (N, n_x) and (N, n_u)
-    return (x[1:, t_idx] - x[:-1, t_idx]) - t_max
-```
-
-This replaces the deprecated `internodal` argument.
-
-## Constraints Parameters
-
-To allow for a large number of problems to be effectively solved with the same code, we have a number of parameters that can be set to modify the behavior of the constraints.
-
-### Constraint Time Constraints
-
-For an inequality constraint using the definition ($g(\cdot) \leq 0$) that you wish to be enforced in continuous time, the `@ctcs()` decorator can be applied. For example if I have a ball constraint, $\|x-r_c\|_2\leq r_{\min}$, meaning I want my agent to stay at least $r_{\min}$ distance to a point $r_c$ for the entire trajectory, I can do the following:
-
-```python
-
-@ctcs(lambda x, u: jnp.linalg.norm(x - r_c) - r_min)
-
-```
-!!! Note
-    When specifying `ctcs` constraints, all constraints regardless of convexity are treated to the sam reformulation technique and linearized. This is not the case for `nodal` constraints.
-
-#### Penalty Function
-
-In order to enforce this constraint a penalty function is used. THis can be set using the `penalty` flag, which will defualt to `"squared_relu"`, $\max(0, g(x))^2$. However this may not be the best choice depending on the nature of your constraints. We provide a few different options, 
-
-  - `squared_relu` - $\max(0, g)^2$
-  - `huber` - $\begin{cases} \frac{1}{2} g^2 & \text{if } |g| \leq \delta \\ \delta (|g| - \frac{1}{2}\delta) & \text{otherwise} \end{cases}$
-  - `smooth relu` - $\|\max(0, g)+c\|-c$
-
-These can be set using the `penalty` flag. For example, if I want to use the huber penalty function, I can do the following:
-
-```python
-
-@ctcs(lambda x, u: jnp.linalg.norm(x-r_c) - r_min, penalty="huber")
-
-```
-
-If you want to set your own penalty function, then you can provide a lambda function as follows 
-
-```python
-@ctcs(
-    lambda x, u: jnp.linalg.norm(x - r_c) - r_min, 
-    penalty=lambda x: jnp.maximum(0, x)**2
+# Thrust pointing constraint uses augmented state 2
+constraints.append(
+    ox.ctcs(np.cos(theta_max) <= thrust[2] / ox.linalg.Norm(thrust), idx=2)
 )
 ```
 
-#### Node Specific Regions
+This allows different constraints to use separate virtual control and augmented state variables, which can improve convergence.
 
-If you onyl want to enforce the constraint in continuous time but only over a portion of the full trajectory, you can specify a 'nodes' argument as follows,
+## Nodal Constraints: Advanced Options
 
-```python
-@ctcs(lambda x, u: jnp.linalg.norm(x-r_c) - r_min, nodes=(3, 8))
-```
+Nodal constraints are enforced at specific discrete nodes in the trajectory.
 
-This will ensure that the constraint is only enforced between nodes 3 and 8. 
+### Convex and Nonconvex Constraints
 
-!!! tip
-    Specifying this may be useful if, for example, you want the agent to occupy certain regions only at certain times.
-
-By defualt, `ctcs` constraits will be assumed to be enforced over the entire trajectory. 
-
-
-#### Multiple Augmented States
-
-Constraints that are enforced over difference ranges will be associated with diffferent augmentes states, $y$. If you want to have seperate augmented states for each constraint, you can specify an `idx` argument as follows,
+For convex constraints, use the `.convex()` method:
 
 ```python
-@ctcs(lambda x, u: jnp.linalg.norm(x[r_idx]-r_c) - r_min, idx=0)
-@ctcs(lambda x, u: x - max_state, idx = 1)
+# Convex constraint - waypoint at node 10
+target = np.array([100, 100, 50])
+constraints.append(
+    (ox.linalg.Norm(position - target, ord="inf") <= 1.0).convex().at([10])
+)
+
+# Convex constraint - altitude limit at node 15
+constraints.append(
+    (position[2] >= 10.0).convex().at([15])
+)
 ```
-In this case, two augmented states will be used to enforce each constraint. 
 
-
-### Nodal Constraints
-You can additionally express constraints for discrete points along the trajectory. For exmaple if I wish to enforce that at each node, the agents velocity is less than a certain value, $v_{\max}$, I can do so as follows,
+For nonconvex constraints, simply use the constraint without `.convex()`:
 
 ```python
-
-@nodal(lambda x, u: cp.norm(x[v_idx]) <= v_max, convex=True)
+# Nonconvex constraint
+constraints.append(
+    (velocity.T @ velocity <= v_max**2).at([5, 10, 15])
+)
 ```
 
-#### Convexity
-When specifying constraints if the constraint is convex, please set `convex = True` and use [```cvxpy``` atoms](https://www.cvxpy.org/tutorial/functions/index.html) to define the constraint as a boolean expression. By default `
+### Node Specification
+
+Use the `.at()` method to specify which nodes enforce the constraint:
+
+```python
+# Single node
+constraints.append((position[2] >= 0).at([0]))
+
+# Multiple nodes
+constraints.append((ox.linalg.Norm(velocity) <= v_max).at([5, 10, 15, 20]))
+
+# Final node
+constraints.append((velocity == np.array([0, 0, 0])).at([n-1]))
+```
+
+### Combining with CTCS
+
+You can enforce a constraint both continuously and at specific nodes:
+
+```python
+# Enforce continuously with CTCS
+constraint = ox.linalg.Norm(position - target) >= safe_distance
+
+# Also check nodally (optional, for verification)
+constraints.append(
+    constraint.over(interval=(0, n-1), check_nodally=True)
+)
+```
+
+## Solver Settings
+
+OpenSCvx provides extensive configuration options for tuning solver behavior.
+
+### SCP Algorithm Settings
+
+```python
+# Trust region settings
+problem.settings.scp.w_tr = 2e0                  # Trust region weight
+problem.settings.scp.w_tr_adapt = 1.04           # Trust region adaptation factor
+problem.settings.scp.w_tr_max_scaling_factor = 1e2  # Maximum trust region scaling
+
+# Cost and virtual control weights
+problem.settings.scp.lam_cost = 2.5e-1           # Weight on the cost objective
+problem.settings.scp.lam_vc = 1.2e0              # Weight on virtual control
+problem.settings.scp.lam_vb = 1e0                # Virtual buffer weight (for nonconvex nodal constraints)
+
+# Convergence tolerances
+problem.settings.scp.ep_tr = 1e-3                # Trust region tolerance
+problem.settings.scp.ep_vc = 1e-8                # Virtual control tolerance
+
+# Cost relaxation
+problem.settings.scp.cost_drop = 10              # Iteration to start relaxing cost
+problem.settings.scp.cost_relax = 0.8            # Cost relaxation factor
+```
+
+### Convex Solver Settings
+
+```python
+# Choose convex solver
+problem.settings.cvx.solver = "CLARABEL"  # Options: "CLARABEL", "ECOS", "SCS", "MOSEK"
+
+# Solver-specific arguments
+problem.settings.cvx.solver_args = {
+    "enforce_dpp": True,  # Data Parallel Processing for CLARABEL
+}
+```
+
+### Integration Settings
+
+```python
+# Propagation time step
+problem.settings.prp.dt = 0.01
+
+# Integration method
+problem.settings.dis.solver = "Dopri8"  # Options: "Dopri5", "Dopri8", "Tsit5", etc.
+```
+
+### Compilation and Caching
+
+```python
+# Save compiled JAX functions for faster subsequent runs
+problem.settings.sim.save_compiled = True
+```

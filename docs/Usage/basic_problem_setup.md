@@ -1,155 +1,235 @@
 # Basic Problem Setup
 Here we will cover all the necessary elements to setup your problem along with some tips and best practices to get the most out of the package.
 
-## State Specification
-To specify the state, you create a `State` object and configure its properties:
+## Imports
+First, import OpenSCvx:
 
 ```python
-from openscvx.backend.state import State, Free, Fix, Minimize, Maximize
+import numpy as np
+import jax.numpy as jnp
+import openscvx as ox
+from openscvx import TrajOptProblem
+```
 
-# Create state variable
-x = State("x", shape=(n_states,))
+## State Specification
+States are defined as individual symbolic variables. Each state component gets its own `ox.State` object:
+
+```python
+# Create state variables
+position = ox.State("position", shape=(3,))
+velocity = ox.State("velocity", shape=(3,))
+
+# Set bounds for each state
+position.min = np.array([-10, -10, 0])
+position.max = np.array([10, 10, 20])
+
+velocity.min = np.array([-5, -5, -5])
+velocity.max = np.array([5, 5, 5])
+
+# Set initial conditions
+position.initial = np.array([0, 0, 1])
+velocity.initial = np.array([0, 0, 0])
+
+# Set final conditions (can use tuples for free/minimize/maximize)
+position.final = np.array([5, 5, 1])
+velocity.final = [("free", 0), ("free", 0), ("free", 0)]
+
+# Set initial guess for SCP (shape: (n_nodes, state_shape))
+position.guess = np.linspace(position.initial, position.final, n_nodes)
+velocity.guess = np.zeros((n_nodes, 3))
+
+# Collect all states into a list
+states = [position, velocity]
+```
+
+The boundary condition options use tuple syntax:
+
+- Fixed value: `value` or `("fixed", value)`
+- Free variable: `("free", guess)` - Can be optimized within bounds
+- Minimize: `("minimize", guess)` - Variable to be minimized
+- Maximize: `("maximize", guess)` - Variable to be maximized
+
+## Control Specification
+Controls are also defined as individual symbolic variables:
+
+```python
+# Create control variables
+thrust = ox.Control("thrust", shape=(3,))
 
 # Set bounds
-x.min = np.array([min_values_for_each_state])
-x.max = np.array([max_values_for_each_state])
+thrust.min = np.array([0, 0, 0])
+thrust.max = np.array([10, 10, 10])
 
-# Set initial conditions (can be fixed values or boundary condition objects)
-x.initial = np.array([value1, Free(guess2), Fix(value3), Minimize(guess4)])
+# Set initial guess for SCP (shape: (n_nodes, control_shape))
+thrust.guess = np.repeat(
+    np.expand_dims(np.array([0, 0, 5]), axis=0),
+    n_nodes, axis=0
+)
 
-# Set final conditions (can be fixed values or boundary condition objects)
-x.final = np.array([value1, Free(guess2), Maximize(guess3), Minimize(guess4)])
+# Collect all controls into a list
+controls = [thrust]
+```
 
-# Set initial guess for SCP (shape: (n_nodes, n_states))
-x.guess = np.linspace(
-    initial_values, final_values, n_nodes
+## Dynamics
+Dynamics are defined as a dictionary mapping state names to their time derivatives using symbolic expressions:
+
+```python
+# Physical parameters
+m = 1.0  # Mass
+g = -9.81  # Gravity
+
+# Define dynamics using symbolic expressions
+dynamics = {
+    "position": velocity,
+    "velocity": thrust / m + np.array([0, 0, g]),
+}
+```
+
+The symbolic expressions support standard Python operators:
+- Arithmetic: `+`, `-`, `*`, `/`, `**`
+- Matrix multiplication: `@`
+- Comparisons: `<=`, `>=`, `==`
+- Indexing: `[...]`
+- Transpose: `.T`
+
+Common symbolic functions include:
+- `ox.linalg.Norm()`: Vector/matrix norms
+- `ox.linalg.Diag()`: Diagonal matrices
+- `ox.spatial.QDCM()`: Quaternion to DCM
+- `ox.spatial.SSM()`: Skew-symmetric matrix
+- `ox.spatial.SSMP()`: Skew-symmetric matrix product
+
+!!! Note
+    Under the hood, symbolic expressions are compiled using JAX, so use `jax.numpy` for numerical constants and functions when needed.
+
+## Time Definition
+Define a `Time` object:
+
+```python
+# Fixed time horizon
+time = ox.Time(
+    initial=0.0,
+    final=10.0,
+    min=0.0,
+    max=10.0,
+)
+
+# Minimum time problem
+time = ox.Time(
+    initial=0.0,
+    final=("minimize", 10.0),  # Minimize final time with initial guess of 10.0
+    min=0.0,
+    max=20.0,
 )
 ```
 
-The boundary condition options are:
-
-- `Fix(value)` - Fixed value that cannot be optimized
-- `Free(guess)` - Free variable that can be optimized within bounds
-- `Minimize(guess)` - Variable to be minimized
-- `Maximize(guess)` - Variable to be maximized
-
-## Control Specification
-To specify the control, you create a `Control` object and configure its properties:
+## Costs
+You can choose states to minimize or maximize using the tuple syntax in boundary conditions:
 
 ```python
-from openscvx.backend.control import Control
+# Minimize a state component at the final time
+energy = ox.State("energy", shape=())
+energy.final = ("minimize", 0.0)
 
-# Create control variable
-u = Control("u", shape=(n_controls,))
+# Maximize a state component
+reward = ox.State("reward", shape=())
+reward.final = ("maximize", 100.0)
+```
 
-# Set bounds
-u.min = np.array([min_values_for_each_control])
-u.max = np.array([max_values_for_each_control])
+## Constraints
+Constraints are created using symbolic expressions with comparison operators.
 
-# Set initial guess for SCP (shape: (n_nodes, n_controls))
-u.guess = np.repeat(
-    np.expand_dims(initial_control, axis=0), 
+### Continuous Constraints
+Continuous constraints are enforced over time intervals using `ox.ctcs()`:
+
+```python
+# Box constraints on states
+constraints = []
+for state in states:
+    constraints.extend([
+        ox.ctcs(state <= state.max),
+        ox.ctcs(state.min <= state)
+    ])
+
+# Custom path constraints
+max_speed = 10.0
+constraints.append(ox.ctcs(ox.linalg.Norm(velocity) <= max_speed))
+
+# Obstacle avoidance (distance >= safe_distance)
+obstacle_center = ox.Parameter("obs_center", shape=(3,), value=np.array([5, 5, 5]))
+safe_distance = 2.0
+diff = position - obstacle_center
+constraints.append(ox.ctcs(diff.T @ diff >= safe_distance**2))
+```
+
+### Discrete Constraints
+Discrete constraints are enforced at specific nodes using the `.at()` method:
+
+```python
+# Waypoint constraint at node 10
+target = np.array([5, 5, 5])
+constraints.append(
+    (position == target).at([10])
+)
+
+# Constraint at multiple nodes
+constraints.append(
+    (ox.linalg.Norm(velocity) <= 1.0).at([0, 5, 10])
+)
+
+# Convex constraints can be marked for better performance
+constraints.append(
+    (position[2] >= 0).convex().at([15])
+)
+```
+
+## Parameters
+Parameters allow values to be updated at runtime without recompiling:
+
+```python
+# Create parameters
+obs_center = ox.Parameter("obs_center", shape=(3,), value=np.array([1.0, 2.0, 3.0]))
+obs_radius = ox.Parameter("obs_radius", shape=(), value=0.5)
+
+# Use in constraints
+diff = position - obs_center
+constraints.append(
+    ox.ctcs(diff.T @ diff >= obs_radius**2)
+)
+
+# Update parameter values later
+# problem.parameters["obs_center"] = new_center_value
+```
+
+## Initial Guess
+While not strictly necessary for the initial guess to be dynamically feasible or satisfy constraints, a good guess helps the solver converge faster and avoid local minima.
+
+For state trajectories, linear interpolation is a good starting point:
+
+```python
+position.guess = np.linspace(position.initial, position.final, n_nodes)
+velocity.guess = np.zeros((n_nodes, 3))
+```
+
+For control trajectories, use constant values:
+
+```python
+thrust.guess = np.repeat(
+    np.expand_dims(np.array([0, 0, 5]), axis=0),
     n_nodes, axis=0
 )
 ```
 
-## Dynamics
-The dynamics function must take the following form:
+## Problem Instantiation
+Instantiate the problem with all components:
 
 ```python
-from openscvx.dynamics import dynamics
-
-@dynamics
-def dynamics(x_, u_):
-    "Insert your dynamics functions here"
-    return jnp.hstack(["Stack up your dynamics here"]) 
-```
-
-Here `x` is the state and `u` is the control. The function must return a vector of the same size as the state.
-
-!!! Note
-    Under the hood the dynamics and constraint functions will be compiled using JAX so it is necessary to only use `jax` functions and `jax.ndarrays` within the dynamics and nonconvex constraint functions.
-
-## Costs
-You can choose states to either maximize or minimize by using the `Minimize` and `Maximize` boundary condition objects in the state's `initial` or `final` properties. Additional augmented states can be created automatically by the system to capture costs that are not already defined within the states.
-
-## Constraints
-We support both continuous and discrete constraints using the decorators `ctcs` and `nodal`. 
-
-### Continuous Constraints
-To specify continuous constraints, you can use the `ctcs` decorator. This decorator takes a function that returns a scalar. This function must take the following form: `g(x, u, **args) <= 0`. 
-
-```python
-from openscvx.constraints import ctcs
-a = 1
-b = 2.0
-constraints = [
-    ctcs(lambda x_, u_: g1(x_, u_)),
-    ctcs(lambda x_, u_: g2(x_, u_, a, b))
-]
-```
-
-The input state `x` will be an array of shape `(n_x)` and the control `u` will be an array of shape `(n_u)`. The function must return a scalar value.
-
-### Nodal Constraints
-To specify constraints that are evaluated at specific nodes, use the `nodal` decorator:
-
-```python
-from openscvx.constraints import nodal
-
-constraints = [
-    nodal(lambda x_, u_: g(x_, u_), nodes=[0, 5, 10])  # Evaluate at nodes 0, 5, 10
-]
-```
-
-## Parameters
-You can define parameters that can be used in constraints and dynamics:
-
-```python
-from openscvx.backend.parameter import Parameter
-
-# Create parameters
-obs_center = Parameter("obs_center", shape=(2,))
-obs_radius = Parameter("obs_radius", shape=())
-
-# Set parameter values
-obs_center.value = np.array([1.0, 2.0])
-obs_radius.value = 0.5
-
-# Use in constraints
-constraints.append(
-    ctcs(lambda x_, u_, obs_center_, obs_radius_: 
-         obs_radius_ - jnp.linalg.norm(x_[:2] - obs_center_))
-)
-```
-
-## Initial Guess
-This is a very important part of the problem setup. While it is not strictly necessary for the initial guess to be dynamically feasible or satisfy constraints, it is best practice to use an initial guess that is as close to the solution as possible. This will help the solver converge faster and avoid local minima.
-
-For state trajectories, a good starting point is to linearly interpolate between the initial and final states:
-
-```python
-x.guess = np.linspace(x.initial, x.final, n_nodes)
-```
-
-For control trajectories, you can use a constant guess:
-
-```python
-u.guess = np.repeat(np.expand_dims(initial_control, axis=0), n_nodes, axis=0)
-```
-
-## Instantiate the Problem
-The problem can be instantiated as follows:
-
-```python
-from openscvx.trajoptproblem import TrajOptProblem
-
 problem = TrajOptProblem(
     dynamics=dynamics,
+    states=states,
+    controls=controls,
+    time=time,
     constraints=constraints,
-    x=x,
-    u=u,
-    idx_time=time_index,  # Index of time variable in state vector
     N=n_nodes,
 )
 ```
@@ -165,21 +245,29 @@ problem.settings.scp.lam_vc = 1E1    # Weight on the Virtual Control Objective
 
 If you have nonconvex nodal constraints then you will also need to include `problem.settings.scp.lam_vb = 1E0`.
 
-## Running the Simulation
-To run the simulation, follow these steps:
+## Running the Problem
+To solve the trajectory optimization problem:
 
 1. Initialize the problem:
    ```python
    problem.initialize()
    ```
-   
-2. Solve the Problem:
+
+2. Solve the problem:
    ```python
    results = problem.solve()
    ```
 
-3. Postprocess the solution for verification and plotting:
+3. Post-process the solution:
    ```python
    results = problem.post_process(results)
-   results.update(plotting_dict)
+   ```
+
+4. Access the solution:
+   ```python
+   # Extract state and control trajectories
+   position_trajectory = results["position"]
+   velocity_trajectory = results["velocity"]
+   thrust_trajectory = results["thrust"]
+   time_vector = results["time"]
    ```

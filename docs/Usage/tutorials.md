@@ -2,6 +2,15 @@
 
 This section provides step-by-step tutorials for using OpenSCvx to solve trajectory optimization problems. Each tutorial includes a Google Colab notebook for interactive learning.
 
+## Getting Started
+
+If you're new to OpenSCvx, we recommend:
+
+1. Start with the [Basic Problem Setup](basic_problem_setup.md) guide
+2. Work through the 6DoF Obstacle Avoidance tutorial
+3. Progress to the Line-of-Sight Guidance tutorial for advanced concepts
+4. Explore the [Examples](../examples.md) section for additional problems
+
 ## Available Tutorials
 
 ### [6DoF Obstacle Avoidance](tutorial_6dof_obstacle_avoidance.md)
@@ -31,15 +40,6 @@ Solve a complex trajectory optimization problem involving gate navigation and li
 - Mixed continuous and discrete constraints
 - Advanced initial guess generation
 - SCP parameter tuning
-
-## Getting Started
-
-If you're new to OpenSCvx, we recommend:
-
-1. Start with the [Basic Problem Setup](basic_problem_setup.md) guide
-2. Work through the 6DoF Obstacle Avoidance tutorial
-3. Progress to the Line-of-Sight Guidance tutorial for advanced concepts
-4. Explore the [Examples](../examples.md) section for additional problems
 
 ## Interactive Learning
 
