@@ -199,5 +199,6 @@ check_lint.py
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# MkDocs
-/material/templates/
+# MkDocs Material Insiders (installed from GitHub in CI, not committed)
+material/
+src/

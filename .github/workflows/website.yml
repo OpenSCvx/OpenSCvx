@@ -32,7 +32,8 @@ jobs:
           restore-keys: |
             mkdocs-material-
       - run: sudo apt-get update && sudo apt-get install -y pngquant
-      - run: pip install mkdocs-material
+      - name: Install MkDocs Material Insiders
+        run: pip install git+https://${{ secrets.MKDOCS_INSIDERS_TOKEN }}@github.com/squidfunk/mkdocs-material-insiders.git
       - run: pip install mkdocstrings-python
       - run: pip install mike
       - name: Install package
