@@ -1,3 +1,43 @@
+"""Validation and preprocessing utilities for symbolic expressions.
+
+This module provides preprocessing and validation functions for symbolic expressions
+in trajectory optimization problems. These utilities ensure that expressions are
+well-formed and constraints are properly specified before compilation to solvers.
+
+The preprocessing pipeline includes:
+
+    - Shape validation: Ensure all expressions have compatible shapes
+    - Variable name validation: Check for unique, non-reserved variable names
+    - Constraint validation: Verify constraints appear only at root level
+    - Dynamics validation: Check that dynamics match state dimensions
+    - Time parameter validation: Validate time configuration
+    - Slice assignment: Assign contiguous memory slices to variables
+
+These functions are typically called automatically during problem construction,
+but can also be used manually for debugging or custom problem setups.
+
+Example:
+    Validating expressions before problem construction::
+
+        import openscvx as ox
+
+        x = ox.State("x", shape=(3,))
+        u = ox.Control("u", shape=(2,))
+
+        # Build dynamics and constraints
+        dynamics = {
+            "x": u  # Will fail validation - dimension mismatch!
+        }
+
+        # Validate dimensions before creating problem
+        from openscvx.symbolic.preprocessing import validate_dynamics_dict_dimensions
+
+        try:
+            validate_dynamics_dict_dimensions(dynamics, [x])
+        except ValueError as e:
+            print(f"Validation error: {e}")
+"""
+
 from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Set, Tuple, Union
 
 if TYPE_CHECKING:
@@ -39,11 +79,28 @@ def validate_variable_names(
     reserved_prefix: str = "_",
     reserved_names: Set[str] = None,
 ) -> None:
-    """
-    1) Ensure all State/Control names are unique *across distinct variables*.
-    2) Ensure no user‐supplied name starts with `reserved_prefix`.
-    3) Ensure no name collides with `reserved_names` if given.
-    Raises ValueError on any violation.
+    """Validate variable names for uniqueness and reserved name conflicts.
+
+    This function ensures that all State and Control variable names are:
+    1. Unique across distinct variable instances
+    2. Not starting with the reserved prefix (default: "_")
+    3. Not colliding with explicitly reserved names
+
+    Args:
+        exprs: Iterable of expression trees to scan for variables
+        reserved_prefix: Prefix that user variables cannot start with (default: "_")
+        reserved_names: Set of explicitly reserved names that cannot be used (default: None)
+
+    Raises:
+        ValueError: If any variable name violates uniqueness or reserved name rules
+
+    Example:
+        >>> x1 = ox.State("x", shape=(3,))
+        >>> x2 = ox.State("x", shape=(2,))  # Same name, different object
+        >>> validate_variable_names([x1 + x2])  # Raises ValueError: Duplicate name 'x'
+
+        >>> bad = ox.State("_internal", shape=(2,))
+        >>> validate_variable_names([bad])  # Raises ValueError: Reserved prefix '_'
     """
     seen_names = set()
     seen_ids = set()
@@ -84,15 +141,35 @@ def validate_variable_names(
 def collect_and_assign_slices(
     states: List[State], controls: List[Control], *, start_index: int = 0
 ) -> Tuple[list[State], list[Control]]:
-    """Assign slices to states and controls in the provided order.
+    """Assign contiguous memory slices to states and controls.
+
+    This function assigns slice objects to states and controls that determine their
+    positions in the flat decision variable vector. Variables can have either:
+    - Auto-assigned slices: Automatically assigned contiguously based on order
+    - Manual slices: User-specified slices that must be contiguous and non-overlapping
+
+    If any variables have manual slices, they must:
+    - Start at index 0 (or start_index if specified)
+    - Be contiguous and non-overlapping
+    - Match the variable's flattened dimension
 
     Args:
         states: List of State objects in canonical order
         controls: List of Control objects in canonical order
-        start_index: Starting index for slice assignment (default 0)
+        start_index: Starting index for slice assignment (default: 0)
 
     Returns:
-        Tuple of (states, controls) with slices assigned
+        Tuple of (states, controls) with slice attributes assigned
+
+    Raises:
+        ValueError: If manual slices are invalid (wrong size, overlapping, not starting at 0)
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> u = ox.Control("u", shape=(2,))
+        >>> states, controls = collect_and_assign_slices([x], [u])
+        >>> print(x._slice)  # slice(0, 3)
+        >>> print(u._slice)  # slice(0, 2)
     """
 
     def assign(vars_list, start_index):
@@ -144,19 +221,44 @@ def collect_and_assign_slices(
 
 
 def _traverse_with_depth(expr: Expr, visit: Callable[[Expr, int], None], depth: int = 0):
+    """Depth-first traversal of an expression tree with depth tracking.
+
+    Internal helper function that extends the standard traverse function to track
+    the depth of each node in the tree. Used for constraint validation.
+
+    Args:
+        expr: Root expression node to start traversal from
+        visit: Callback function applied to each (node, depth) pair during traversal
+        depth: Current depth level (default: 0)
+    """
     visit(expr, depth)
     for child in expr.children():
         _traverse_with_depth(child, visit, depth + 1)
 
 
 def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
-    """
-    Raise ValueError if any Constraint or constraint wrapper is found at depth>0.
-    Both raw constraints and constraint wrappers (like CTCS, NodalConstraint) must only appear
-    at the root level. However, constraints inside constraint wrappers are allowed
-    (e.g., the constraint inside CTCS(x <= 5) is valid).
+    """Validate that constraints only appear at the root level of expression trees.
 
-    Accepts a single Expr or a list of Exprs.
+    Constraints and constraint wrappers (CTCS, NodalConstraint) must only appear as
+    top-level expressions, not nested within other expressions. However, constraints
+    inside constraint wrappers are allowed (e.g., the constraint inside CTCS(x <= 5)).
+
+    This ensures constraints are properly processed during problem compilation and
+    prevents ambiguous constraint specifications.
+
+    Args:
+        exprs: Single expression or list of expressions to validate
+
+    Raises:
+        ValueError: If any constraint or constraint wrapper is found at depth > 0
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> constraint = x <= 5
+        >>> validate_constraints_at_root([constraint])  # OK - constraint at root
+
+        >>> bad_expr = ox.Sum(x <= 5)  # Constraint nested inside Sum
+        >>> validate_constraints_at_root([bad_expr])  # Raises ValueError
     """
 
     # Define constraint wrappers that must also be at root level
@@ -194,24 +296,35 @@ def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
 
 
 def validate_and_normalize_constraint_nodes(exprs: Union[Expr, list[Expr]], n_nodes: int):
-    """
-    Validate and normalize constraint nodes specifications.
+    """Validate and normalize constraint node specifications.
+
+    This function validates and normalizes node specifications for constraint wrappers:
 
     For NodalConstraint:
-    - nodes should be a list of specific node indices: [2, 4, 6, 8]
-    - Validates all nodes are within range
+        - nodes should be a list of specific node indices: [2, 4, 6, 8]
+        - Validates all nodes are within the valid range [0, n_nodes)
 
-    For CTCS constraints:
-    - nodes should be a tuple of (start, end): (0, 10)
-    - None is replaced with (0, n_nodes)
-    - Validation ensures tuple has exactly 2 elements and start < end
+    For CTCS (Continuous-Time Constraint Satisfaction) constraints:
+        - nodes should be a tuple of (start, end): (0, 10)
+        - None is replaced with (0, n_nodes) to apply over entire trajectory
+        - Validation ensures tuple has exactly 2 elements and start < end
+        - Validates indices are within trajectory bounds
 
     Args:
         exprs: Single expression or list of expressions to validate
         n_nodes: Total number of nodes in the trajectory
 
     Raises:
-        ValueError: If node specifications are invalid
+        ValueError: If node specifications are invalid (out of range, malformed, etc.)
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> constraint = (x <= 5).at([0, 10, 20])  # NodalConstraint
+        >>> validate_and_normalize_constraint_nodes([constraint], n_nodes=50)  # OK
+
+        >>> ctcs_constraint = (x <= 5).over((0, 100))  # CTCS
+        >>> validate_and_normalize_constraint_nodes([ctcs_constraint], n_nodes=50)
+        # Raises ValueError: Range exceeds trajectory length
     """
 
     # Normalize to list
@@ -238,16 +351,30 @@ def validate_and_normalize_constraint_nodes(exprs: Union[Expr, list[Expr]], n_no
 def validate_dynamics_dimension(
     dynamics_expr: Union[Expr, list[Expr]], states: Union[State, list[State]]
 ) -> None:
-    """
-    Validate that dynamics expressions dimension(s) match the total dimension of the given states.
+    """Validate that dynamics expression dimensions match state dimensions.
+
+    Ensures that the total dimension of all dynamics expressions matches the total
+    dimension of all states. Each dynamics expression must be a 1D vector, and their
+    combined dimension must equal the sum of all state dimensions.
+
+    This is essential for ensuring the ODE system x_dot = f(x, u, t) is well-formed.
 
     Args:
         dynamics_expr: Single dynamics expression or list of dynamics expressions.
-                      Combined, they should represent x_dot = f(x, u, t) for all states.
+                      Combined, they represent x_dot = f(x, u, t) for all states.
         states: Single state variable or list of state variables that the dynamics describe.
 
     Raises:
-        ValueError: If dimensions don't match or if any dynamics is not a vector
+        ValueError: If dimensions don't match or if any dynamics is not a 1D vector
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = ox.State("y", shape=(2,))
+        >>> dynamics = ox.Concat(x * 2, y + 1)  # Shape (5,) - matches total state dim
+        >>> validate_dynamics_dimension(dynamics, [x, y])  # OK
+
+        >>> bad_dynamics = x  # Shape (3,) - doesn't match total dim of 5
+        >>> validate_dynamics_dimension(bad_dynamics, [x, y])  # Raises ValueError
     """
     # Normalize inputs to lists
     dynamics_list = dynamics_expr if isinstance(dynamics_expr, (list, tuple)) else [dynamics_expr]
@@ -291,8 +418,11 @@ def validate_dynamics_dimension(
 
 
 def validate_dynamics_dict(dynamics: Dict[str, Expr], states: List[State]) -> None:
-    """
-    Validate that the dynamics dictionary keys match the state names exactly.
+    """Validate that dynamics dictionary keys match state names exactly.
+
+    Ensures that the dynamics dictionary has exactly the same keys as the state names,
+    with no missing states and no extra keys. This is required when using dictionary-based
+    dynamics specification.
 
     Args:
         dynamics: Dictionary mapping state names to their dynamics expressions
@@ -300,6 +430,15 @@ def validate_dynamics_dict(dynamics: Dict[str, Expr], states: List[State]) -> No
 
     Raises:
         ValueError: If there's a mismatch between state names and dynamics keys
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = ox.State("y", shape=(2,))
+        >>> dynamics = {"x": x * 2, "y": y + 1}
+        >>> validate_dynamics_dict(dynamics, [x, y])  # OK
+
+        >>> bad_dynamics = {"x": x * 2}  # Missing "y"
+        >>> validate_dynamics_dict(bad_dynamics, [x, y])  # Raises ValueError
     """
     state_names_set = set(state.name for state in states)
     dynamics_names_set = set(dynamics.keys())
@@ -316,8 +455,13 @@ def validate_dynamics_dict(dynamics: Dict[str, Expr], states: List[State]) -> No
 
 
 def validate_dynamics_dict_dimensions(dynamics: Dict[str, Expr], states: List[State]) -> None:
-    """
-    Validate that each dynamics expression dimension matches the corresponding state shape.
+    """Validate that each dynamics expression matches its corresponding state shape.
+
+    For dictionary-based dynamics specification, ensures that each state's dynamics
+    expression has the same shape as the state itself. This validates that each
+    component of x_dot = f(x, u, t) has the correct dimension.
+
+    Scalars are normalized to shape (1,) for comparison, matching Concat behavior.
 
     Args:
         dynamics: Dictionary mapping state names to their dynamics expressions
@@ -325,6 +469,16 @@ def validate_dynamics_dict_dimensions(dynamics: Dict[str, Expr], states: List[St
 
     Raises:
         ValueError: If any dynamics expression dimension doesn't match its state shape
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = ox.State("y", shape=(2,))
+        >>> u = ox.Control("u", shape=(3,))
+        >>> dynamics = {"x": u, "y": y + 1}
+        >>> validate_dynamics_dict_dimensions(dynamics, [x, y])  # OK
+
+        >>> bad_dynamics = {"x": u, "y": u}  # y dynamics has wrong shape
+        >>> validate_dynamics_dict_dimensions(bad_dynamics, [x, y])  # Raises ValueError
     """
 
     def normalize_scalars(shape: Tuple[int, ...]) -> Tuple[int, ...]:
@@ -361,25 +515,44 @@ def validate_time_parameters(
     Union[float, None],
     Union[float, None],
 ]:
-    """
-    Validate time parameter usage and determine which approach the user is taking.
+    """Validate time parameter usage and configuration.
 
-    There are two valid approaches:
-    1. Auto-create time: Don't include "time" in states, provide Time object
-    2. User-provided time: Include "time" State in states, Time object is ignored
+    There are two valid approaches for handling time in trajectory optimization:
+
+    1. Auto-create time (recommended): Don't include "time" in states, provide Time object.
+       The time state is automatically created and managed.
+
+    2. User-provided time (advanced): Include a "time" State in states. The Time object
+       is ignored and the user has full control over time dynamics.
 
     Args:
         states: List of State objects
         time: Time configuration object (required, but ignored if time state exists)
 
     Returns:
-        Tuple of (has_time_state, time_initial, time_final, time_derivative, time_min, time_max)
-        where has_time_state is True if user provided a time state, and the remaining values
-        are processed parameters (with defaults applied) or None if user-provided.
-        Note: time_derivative is always 1.0 when using Time object.
+        Tuple of (has_time_state, time_initial, time_final, time_derivative, time_min, time_max):
+            - has_time_state: True if user provided a time state
+            - time_initial: Initial time value (None if user-provided time)
+            - time_final: Final time value (None if user-provided time)
+            - time_derivative: Always 1.0 for auto-created time (None if user-provided)
+            - time_min: Minimum time bound (None if user-provided)
+            - time_max: Maximum time bound (None if user-provided)
 
     Raises:
-        ValueError: If validation fails
+        ValueError: If Time object is not provided or has invalid type
+
+    Example:
+        >>> # Approach 1: Auto-create time
+        >>> x = ox.State("x", shape=(3,))
+        >>> time_obj = ox.Time(initial=0.0, final=10.0)
+        >>> validate_time_parameters([x], time_obj)
+        (False, 0.0, 10.0, 1.0, None, None)
+
+        >>> # Approach 2: User-provided time
+        >>> x = ox.State("x", shape=(3,))
+        >>> time_state = ox.State("time", shape=())
+        >>> validate_time_parameters([x, time_state], time_obj)
+        (True, None, None, None, None, None)
     """
     from openscvx.time import Time
 
@@ -408,9 +581,13 @@ def validate_time_parameters(
 def convert_dynamics_dict_to_expr(
     dynamics: Dict[str, Expr], states: List[State]
 ) -> Tuple[Dict[str, Expr], Expr]:
-    """
-    Convert a dynamics dictionary to a concatenated Expr, ordered by the states list.
-    Also converts scalar values to Constant expressions.
+    """Convert dynamics dictionary to concatenated expression in canonical order.
+
+    Converts a dictionary-based dynamics specification to a single concatenated expression
+    that represents the full ODE system x_dot = f(x, u, t). The dynamics are ordered
+    according to the states list to ensure consistent variable ordering.
+
+    This function also normalizes scalar values (int, float) to Constant expressions.
 
     Args:
         dynamics: Dictionary mapping state names to their dynamics expressions
@@ -418,8 +595,18 @@ def convert_dynamics_dict_to_expr(
 
     Returns:
         Tuple of:
-        - Updated dynamics dictionary (with scalars converted to Constant)
-        - Concatenated dynamics expression ordered by states list
+            - Updated dynamics dictionary (with scalars converted to Constant expressions)
+            - Concatenated dynamics expression ordered by states list
+
+    Example:
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = ox.State("y", shape=(2,))
+        >>> dynamics_dict = {"x": x * 2, "y": 1.0}  # Scalar for y
+        >>> converted_dict, concat_expr = convert_dynamics_dict_to_expr(
+        ...     dynamics_dict, [x, y]
+        ... )
+        >>> # converted_dict["y"] is now Constant(1.0)
+        >>> # concat_expr is Concat(x * 2, Constant(1.0))
     """
     # Create a copy to avoid mutating the input
     dynamics_converted = dict(dynamics)
