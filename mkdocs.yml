@@ -99,6 +99,9 @@ hooks:
 # Additional configuration
 extra:
   favicon: assets/favicon.png
+  version:
+    provider: mike
+    default: latest
   social:
     - icon: fontawesome/brands/chrome
       link: https://haynec.github.io/
