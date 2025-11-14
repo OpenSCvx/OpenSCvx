@@ -169,7 +169,7 @@ class Expr:
             Transpose: A Transpose expression wrapping this expression
 
         Example:
-            >>> A = State("A", shape=(3, 4))
+            >>> A = ox.State("A", shape=(3, 4))
             >>> A_T = A.T  # Creates Transpose(A), result shape (4, 3)
         """
         from .linalg import Transpose
@@ -397,8 +397,8 @@ class Add(Expr):
         terms: List of expression operands to add together
 
     Example:
-        >>> x = State("x", shape=(3,))
-        >>> y = State("y", shape=(3,))
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = ox.State("y", shape=(3,))
         >>> z = x + y + 5  # Creates Add(x, y, Constant(5))
     """
 
@@ -479,8 +479,8 @@ class Sub(Expr):
         right: Right-hand side expression (subtrahend)
 
     Example:
-        >>> x = State("x", shape=(3,))
-        >>> y = State("y", shape=(3,))
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = ox.State("y", shape=(3,))
         >>> z = x - y  # Creates Sub(x, y)
     """
 
@@ -539,8 +539,8 @@ class Mul(Expr):
         factors: List of expression operands to multiply together
 
     Example:
-        >>> x = State("x", shape=(3,))
-        >>> y = State("y", shape=(3,))
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = ox.State("y", shape=(3,))
         >>> z = x * y * 2  # Creates Mul(x, y, Constant(2))
     """
 
@@ -633,8 +633,8 @@ class Div(Expr):
         right: Denominator expression
 
     Example:
-        >>> x = State("x", shape=(3,))
-        >>> y = State("y", shape=(3,))
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = ox.State("y", shape=(3,))
         >>> z = x / y  # Creates Div(x, y)
     """
 
@@ -697,8 +697,8 @@ class MatMul(Expr):
         right: Right-hand side expression
 
     Example:
-        >>> A = State("A", shape=(3, 4))
-        >>> x = State("x", shape=(4,))
+        >>> A = ox.State("A", shape=(3, 4))
+        >>> x = ox.State("x", shape=(4,))
         >>> y = A @ x  # Creates MatMul(A, x), result shape (3,)
     """
 
@@ -768,7 +768,7 @@ class Neg(Expr):
         operand: Expression to negate
 
     Example:
-        >>> x = State("x", shape=(3,))
+        >>> x = ox.State("x", shape=(3,))
         >>> y = -x  # Creates Neg(x)
     """
 
@@ -812,7 +812,7 @@ class Sum(Expr):
         operand: Expression whose elements will be summed
 
     Example:
-        >>> x = State("x", shape=(3, 4))
+        >>> x = ox.State("x", shape=(3, 4))
         >>> total = Sum(x)  # Creates Sum(x), result shape ()
     """
 
@@ -858,7 +858,7 @@ class Index(Expr):
         index: Index specification (int, slice, or tuple of indices/slices)
 
     Example:
-        >>> x = State("x", shape=(10,))
+        >>> x = ox.State("x", shape=(10,))
         >>> y = x[0:5]  # Creates Index(x, slice(0, 5))
         >>> z = x[3]    # Creates Index(x, 3)
     """
@@ -909,8 +909,8 @@ class Concat(Expr):
         exprs: Tuple of expressions to concatenate
 
     Example:
-        >>> x = State("x", shape=(3,))
-        >>> y = State("y", shape=(4,))
+        >>> x = ox.State("x", shape=(3,))
+        >>> y = ox.State("y", shape=(4,))
         >>> z = Concat(x, y)  # Creates Concat(x, y), result shape (7,)
     """
 
@@ -962,7 +962,7 @@ class Power(Expr):
         exponent: Exponent expression
 
     Example:
-        >>> x = State("x", shape=(3,))
+        >>> x = ox.State("x", shape=(3,))
         >>> y = x ** 2  # Creates Power(x, Constant(2))
     """
 
@@ -1173,7 +1173,7 @@ class Equality(Constraint):
     operator on Expr objects.
 
     Example:
-        >>> x = State("x", shape=(3,))
+        >>> x = ox.State("x", shape=(3,))
         >>> constraint = x == 0  # Creates Equality(x, Constant(0))
     """
 
@@ -1188,7 +1188,7 @@ class Inequality(Constraint):
     operator on Expr objects.
 
     Example:
-        >>> x = State("x", shape=(3,))
+        >>> x = ox.State("x", shape=(3,))
         >>> constraint = x <= 10  # Creates Inequality(x, Constant(10))
     """
 
