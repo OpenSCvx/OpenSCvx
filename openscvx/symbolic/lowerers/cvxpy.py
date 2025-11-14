@@ -1,3 +1,92 @@
+"""CVXPy backend for lowering symbolic expressions to CVXPy format.
+
+This module implements the CVXPy lowering backend that converts symbolic expression
+AST nodes into CVXPy expressions for convex optimization. The lowering uses a visitor
+pattern where each expression type has a corresponding visitor method.
+
+Architecture:
+    The CVXPy lowerer follows a visitor pattern with centralized registration:
+
+    1. **Visitor Registration**: The @visitor decorator registers handler functions
+       for each expression type in the _CVXPY_VISITORS dictionary
+    2. **Dispatch**: The dispatch() function looks up and calls the appropriate
+       visitor based on the expression's type
+    3. **Recursive Lowering**: Each visitor recursively lowers child expressions
+       and composes CVXPy operations
+    4. **Translation Only**: This module only translates expressions; CVXPy itself
+       validates DCP (Disciplined Convex Programming) rules when the problem is
+       constructed/solved
+
+Key Features:
+    - **Expression Translation**: Converts symbolic AST to CVXPy expression format
+    - **Variable Management**: Maps symbolic States/Controls to CVXPy variables
+      through a variable_map dictionary
+    - **Parameter Support**: Handles both constant parameters and CVXPy Parameters
+      for efficient parameter sweeps
+    - **Constraint Generation**: Produces CVXPy constraint objects from symbolic
+      equality and inequality expressions
+
+Backend Usage:
+    CVXPy lowering is used for convex constraints in the SCP subproblem. Unlike
+    JAX lowering (which happens early during problem construction), CVXPy lowering
+    occurs later during TrajOptProblem.initialize() when CVXPy variables are
+    available. See lower_symbolic_expressions() in symbolic/lower.py for details.
+
+CVXPy Variable Mapping:
+    The lowerer requires a variable_map dictionary that maps symbolic variable names
+    to CVXPy expressions. For trajectory optimization::
+
+        variable_map = {
+            "x": cvxpy.Variable((n_x,)),  # State vector
+            "u": cvxpy.Variable((n_u,)),  # Control vector
+            "param_name": cvxpy.Parameter((3,)),  # Runtime parameters
+        }
+
+    States and Controls use their slices (assigned during unification) to extract
+    the correct portion of the unified x and u vectors.
+
+Example:
+    Basic usage::
+
+        import cvxpy as cp
+        from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+        import openscvx as ox
+
+        # Create symbolic expression
+        x = ox.State("x", shape=(3,))
+        u = ox.Control("u", shape=(2,))
+        expr = ox.Norm(x)**2 + 0.1 * ox.Norm(u)**2
+
+        # Create CVXPy variables
+        cvx_x = cp.Variable(3)
+        cvx_u = cp.Variable(2)
+
+        # Lower to CVXPy
+        lowerer = CvxpyLowerer(variable_map={"x": cvx_x, "u": cvx_u})
+        cvx_expr = lowerer.lower(expr)
+
+        # Use in optimization problem
+        prob = cp.Problem(cp.Minimize(cvx_expr), constraints=[...])
+        prob.solve()
+
+    Constraint lowering::
+
+        # Symbolic constraint
+        constraint = ox.Norm(x) <= 1.0
+
+        # Lower to CVXPy constraint
+        cvx_constraint = lowerer.lower(constraint)
+
+        # Add to problem
+        prob = cp.Problem(cp.Minimize(cost), constraints=[cvx_constraint])
+
+See Also:
+    - lower_to_cvxpy(): Convenience wrapper for single expression lowering
+    - JaxLowerer: Alternative backend for non-convex constraints and dynamics
+    - lower_symbolic_expressions(): Main orchestrator in symbolic/lower.py
+    - CVXPy documentation: https://www.cvxpy.org/
+"""
+
 from typing import Any, Callable, Dict, Type
 
 import cvxpy as cp
@@ -37,9 +126,38 @@ from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
 
 _CVXPY_VISITORS: Dict[Type[Expr], Callable] = {}
+"""Registry mapping expression types to their visitor functions."""
 
 
 def visitor(expr_cls: Type[Expr]):
+    """Decorator to register a visitor function for an expression type.
+
+    This decorator registers a visitor method to handle a specific expression
+    type during CVXPy lowering. The decorated function is stored in _CVXPY_VISITORS
+    and will be called by dispatch() when lowering that expression type.
+
+    Args:
+        expr_cls: The Expr subclass this visitor handles (e.g., Add, Mul, Norm)
+
+    Returns:
+        Decorator function that registers the visitor and returns it unchanged
+
+    Example:
+        >>> @visitor(Add)
+        ... def visit_add(self, node: Add):
+        ...     # Lower addition to CVXPy
+        ...     ...
+
+    Note:
+        Multiple expression types can share a visitor by stacking decorators::
+
+            @visitor(Equality)
+            @visitor(Inequality)
+            def visit_constraint(self, node: Constraint):
+                # Handle both equality and inequality
+                ...
+    """
+
     def register(fn: Callable[[Any, Expr], cp.Expression]):
         _CVXPY_VISITORS[expr_cls] = fn
         return fn
@@ -48,6 +166,26 @@ def visitor(expr_cls: Type[Expr]):
 
 
 def dispatch(lowerer: Any, expr: Expr):
+    """Dispatch an expression to its registered visitor function.
+
+    Looks up the visitor function for the expression's type and calls it.
+    This is the core of the visitor pattern implementation.
+
+    Args:
+        lowerer: The CvxpyLowerer instance (provides context for visitor methods)
+        expr: The expression node to lower
+
+    Returns:
+        The result of calling the visitor function (CVXPy expression or constraint)
+
+    Raises:
+        NotImplementedError: If no visitor is registered for the expression type
+
+    Example:
+        >>> lowerer = CvxpyLowerer(variable_map={...})
+        >>> expr = Add(x, y)
+        >>> cvx_expr = dispatch(lowerer, expr)  # Calls visit_add
+    """
     fn = _CVXPY_VISITORS.get(type(expr))
     if fn is None:
         raise NotImplementedError(
@@ -57,37 +195,126 @@ def dispatch(lowerer: Any, expr: Expr):
 
 
 class CvxpyLowerer:
-    """
-    Lowers symbolic expressions to CVXPy expressions.
+    """CVXPy backend for lowering symbolic expressions to disciplined convex programs.
 
-    CVXPy variables must be created externally and passed in during initialization.
-    The lowerer assumes variables are already properly shaped and indexed.
+    This class implements the visitor pattern for converting symbolic expression
+    AST nodes to CVXPy expressions and constraints. Each expression type has a
+    corresponding visitor method decorated with @visitor that handles the lowering
+    logic.
+
+    The lowering process is recursive: each visitor lowers its child expressions
+    first, then composes them into a CVXPy operation. CVXPy will validate DCP
+    (Disciplined Convex Programming) compliance when the problem is constructed.
+
+    Attributes:
+        variable_map (dict): Dictionary mapping variable names to CVXPy expressions.
+            Must include "x" for states and "u" for controls. May include parameter
+            names mapped to CVXPy Parameter objects or constants.
+
+    Example:
+        >>> import cvxpy as cp
+        >>> lowerer = CvxpyLowerer(variable_map={
+        ...     "x": cp.Variable(3),
+        ...     "u": cp.Variable(2),
+        ... })
+        >>> expr = ox.Norm(x)**2 + 0.1 * ox.Norm(u)**2
+        >>> cvx_expr = lowerer.lower(expr)
+
+    Note:
+        The lowerer is stateful (stores variable_map) unlike JaxLowerer which
+        is stateless. Variables must be registered before lowering expressions
+        that reference them.
     """
 
     def __init__(self, variable_map: Dict[str, cp.Expression] = None):
-        """
-        Initialize the CVXPy lowerer.
+        """Initialize the CVXPy lowerer.
 
         Args:
             variable_map: Dictionary mapping variable names to CVXPy expressions.
-                         For State/Control objects, keys should match their names.
+                For State/Control objects, keys should be "x" and "u" respectively.
+                For Parameter objects, keys should match their names. If None, an
+                empty dictionary is created.
+
+        Example:
+            >>> cvx_x = cp.Variable(3, name="x")
+            >>> cvx_u = cp.Variable(2, name="u")
+            >>> lowerer = CvxpyLowerer({"x": cvx_x, "u": cvx_u})
         """
         self.variable_map = variable_map or {}
 
     def lower(self, expr: Expr) -> cp.Expression:
-        """Lower a symbolic expression to a CVXPy expression."""
+        """Lower a symbolic expression to a CVXPy expression.
+
+        Main entry point for lowering. Delegates to dispatch() which looks up
+        the appropriate visitor method based on the expression type.
+
+        Args:
+            expr: Symbolic expression to lower (any Expr subclass)
+
+        Returns:
+            CVXPy expression or constraint object. For arithmetic expressions,
+            returns cp.Expression. For Equality/Inequality, returns cp.Constraint.
+
+        Raises:
+            NotImplementedError: If no visitor exists for the expression type
+            ValueError: If required variables are not in variable_map
+
+        Example:
+            >>> lowerer = CvxpyLowerer(variable_map={"x": cvx_x, "u": cvx_u})
+            >>> x = ox.State("x", shape=(3,))
+            >>> expr = ox.Norm(x)
+            >>> cvx_expr = lowerer.lower(expr)
+        """
         return dispatch(self, expr)
 
     def register_variable(self, name: str, cvx_expr: cp.Expression):
-        """Register a CVXPy variable/expression for use in lowering."""
+        """Register a CVXPy variable/expression for use in lowering.
+
+        Adds or updates a variable in the variable_map. Useful for dynamically
+        adding variables after the lowerer has been created.
+
+        Args:
+            name: Variable name (e.g., "x", "u", or parameter name)
+            cvx_expr: CVXPy expression to associate with the name
+
+        Example:
+            >>> lowerer = CvxpyLowerer()
+            >>> lowerer.register_variable("x", cp.Variable(3))
+            >>> lowerer.register_variable("obs_center", cp.Parameter(3))
+        """
         self.variable_map[name] = cvx_expr
 
     @visitor(Constant)
     def visit_constant(self, node: Constant) -> cp.Expression:
+        """Lower a constant value to a CVXPy constant.
+
+        Wraps the constant's numpy array value in a CVXPy Constant expression.
+
+        Args:
+            node: Constant expression node
+
+        Returns:
+            CVXPy constant expression wrapping the value
+        """
         return cp.Constant(node.value)
 
     @visitor(State)
     def visit_state(self, node: State) -> cp.Expression:
+        """Lower a state variable to a CVXPy expression.
+
+        Extracts the appropriate slice from the unified state vector "x" using
+        the slice assigned during unification. The "x" variable must exist in
+        the variable_map.
+
+        Args:
+            node: State expression node
+
+        Returns:
+            CVXPy expression representing the state slice: x[slice]
+
+        Raises:
+            ValueError: If "x" is not found in variable_map
+        """
         if "x" not in self.variable_map:
             raise ValueError("State vector 'x' not found in variable_map.")
 
@@ -100,6 +327,21 @@ class CvxpyLowerer:
 
     @visitor(Control)
     def visit_control(self, node: Control) -> cp.Expression:
+        """Lower a control variable to a CVXPy expression.
+
+        Extracts the appropriate slice from the unified control vector "u" using
+        the slice assigned during unification. The "u" variable must exist in
+        the variable_map.
+
+        Args:
+            node: Control expression node
+
+        Returns:
+            CVXPy expression representing the control slice: u[slice]
+
+        Raises:
+            ValueError: If "u" is not found in variable_map
+        """
         if "u" not in self.variable_map:
             raise ValueError("Control vector 'u' not found in variable_map.")
 
@@ -112,6 +354,24 @@ class CvxpyLowerer:
 
     @visitor(Parameter)
     def visit_parameter(self, node: Parameter) -> cp.Expression:
+        """Lower a parameter to a CVXPy expression.
+
+        Parameters are looked up by name in the variable_map. They can be mapped
+        to CVXPy Parameter objects (for efficient parameter sweeps) or constants.
+
+        Args:
+            node: Parameter expression node
+
+        Returns:
+            CVXPy expression from variable_map (Parameter or constant)
+
+        Raises:
+            ValueError: If parameter name is not found in variable_map
+
+        Note:
+            For parameter sweeps without recompilation, map to cp.Parameter.
+            For fixed values, map to cp.Constant or numpy arrays.
+        """
         param_name = node.name
         if param_name in self.variable_map:
             return self.variable_map[param_name]
@@ -123,6 +383,17 @@ class CvxpyLowerer:
 
     @visitor(Add)
     def visit_add(self, node: Add) -> cp.Expression:
+        """Lower addition to CVXPy expression.
+
+        Recursively lowers all terms and composes them with element-wise addition.
+        Addition is affine and always DCP-compliant.
+
+        Args:
+            node: Add expression node with multiple terms
+
+        Returns:
+            CVXPy expression representing the sum of all terms
+        """
         terms = [self.lower(term) for term in node.terms]
         result = terms[0]
         for term in terms[1:]:
@@ -131,12 +402,37 @@ class CvxpyLowerer:
 
     @visitor(Sub)
     def visit_sub(self, node: Sub) -> cp.Expression:
+        """Lower subtraction to CVXPy expression (element-wise left - right).
+
+        Subtraction is affine and always DCP-compliant.
+
+        Args:
+            node: Sub expression node
+
+        Returns:
+            CVXPy expression representing left - right
+        """
         left = self.lower(node.left)
         right = self.lower(node.right)
         return left - right
 
     @visitor(Mul)
     def visit_mul(self, node: Mul) -> cp.Expression:
+        """Lower element-wise multiplication to CVXPy expression.
+
+        Element-wise multiplication is DCP-compliant when at least one operand
+        is constant. For quadratic forms, use MatMul instead.
+
+        Args:
+            node: Mul expression node with multiple factors
+
+        Returns:
+            CVXPy expression representing element-wise product
+
+        Note:
+            For convex optimization, typically one factor should be constant.
+            CVXPy will raise a DCP error if the composition violates DCP rules.
+        """
         factors = [self.lower(factor) for factor in node.factors]
         result = factors[0]
         for factor in factors[1:]:
@@ -145,38 +441,121 @@ class CvxpyLowerer:
 
     @visitor(Div)
     def visit_div(self, node: Div) -> cp.Expression:
+        """Lower element-wise division to CVXPy expression.
+
+        Division is DCP-compliant when the denominator is constant or when
+        the numerator is constant and the denominator is concave.
+
+        Args:
+            node: Div expression node
+
+        Returns:
+            CVXPy expression representing left / right
+
+        Note:
+            CVXPy will raise a DCP error if the division violates DCP rules.
+        """
         left = self.lower(node.left)
         right = self.lower(node.right)
         return left / right
 
     @visitor(MatMul)
     def visit_matmul(self, node: MatMul) -> cp.Expression:
+        """Lower matrix multiplication to CVXPy expression using @ operator.
+
+        Matrix multiplication is DCP-compliant when at least one operand is
+        constant. Used for quadratic forms like x.T @ Q @ x.
+
+        Args:
+            node: MatMul expression node
+
+        Returns:
+            CVXPy expression representing left @ right
+        """
         left = self.lower(node.left)
         right = self.lower(node.right)
         return left @ right
 
     @visitor(Neg)
     def visit_neg(self, node: Neg) -> cp.Expression:
+        """Lower negation (unary minus) to CVXPy expression.
+
+        Negation preserves DCP properties (negating convex gives concave).
+
+        Args:
+            node: Neg expression node
+
+        Returns:
+            CVXPy expression representing -operand
+        """
         operand = self.lower(node.operand)
         return -operand
 
     @visitor(Sum)
     def visit_sum(self, node: Sum) -> cp.Expression:
+        """Lower sum reduction to CVXPy expression (sums all elements).
+
+        Sum preserves DCP properties (sum of convex is convex).
+
+        Args:
+            node: Sum expression node
+
+        Returns:
+            CVXPy scalar expression representing the sum of all elements
+        """
         operand = self.lower(node.operand)
         return cp.sum(operand)
 
     @visitor(Norm)
     def visit_norm(self, node: Norm) -> cp.Expression:
+        """Lower norm operation to CVXPy expression.
+
+        Norms are convex functions and commonly used in convex optimization.
+        Supports all CVXPy norm types (1, 2, inf, "fro", etc.).
+
+        Args:
+            node: Norm expression node with ord attribute
+
+        Returns:
+            CVXPy expression representing the norm of the operand
+
+        Note:
+            Common norms: ord=2 (Euclidean), ord=1 (Manhattan), ord="inf"
+        """
         operand = self.lower(node.operand)
         return cp.norm(operand, node.ord)
 
     @visitor(Index)
     def visit_index(self, node: Index) -> cp.Expression:
+        """Lower indexing/slicing operation to CVXPy expression.
+
+        Indexing preserves DCP properties (indexing into convex is convex).
+
+        Args:
+            node: Index expression node
+
+        Returns:
+            CVXPy expression representing base[index]
+        """
         base = self.lower(node.base)
         return base[node.index]
 
     @visitor(Concat)
     def visit_concat(self, node: Concat) -> cp.Expression:
+        """Lower concatenation to CVXPy expression.
+
+        Concatenates expressions horizontally along axis 0. Scalars are
+        promoted to 1D arrays before concatenation. Preserves DCP properties.
+
+        Args:
+            node: Concat expression node
+
+        Returns:
+            CVXPy expression representing horizontal concatenation
+
+        Note:
+            Uses cp.hstack for concatenation. Scalars are reshaped to (1,).
+        """
         exprs = [self.lower(child) for child in node.exprs]
         # Ensure all expressions are at least 1D for concatenation
         exprs_1d = []
@@ -189,7 +568,21 @@ class CvxpyLowerer:
 
     @visitor(Sin)
     def visit_sin(self, node: Sin) -> cp.Expression:
-        # CVXPy doesn't support trigonometric functions in DCP form
+        """Raise NotImplementedError for sine function.
+
+        Sine is not DCP-compliant in CVXPy as it is neither convex nor concave.
+
+        Args:
+            node: Sin expression node
+
+        Raises:
+            NotImplementedError: Always raised since sine is not DCP-compliant
+
+        Note:
+            For constraints involving trigonometric functions:
+            - Use piecewise-linear approximations, or
+            - Handle in the JAX dynamics/constraint layer instead of CVXPy
+        """
         raise NotImplementedError(
             "Trigonometric functions like Sin are not DCP-compliant in CVXPy. "
             "Consider using piecewise-linear approximations or handle these constraints "
@@ -198,7 +591,21 @@ class CvxpyLowerer:
 
     @visitor(Cos)
     def visit_cos(self, node: Cos) -> cp.Expression:
-        # CVXPy doesn't support trigonometric functions in DCP form
+        """Raise NotImplementedError for cosine function.
+
+        Cosine is not DCP-compliant in CVXPy as it is neither convex nor concave.
+
+        Args:
+            node: Cos expression node
+
+        Raises:
+            NotImplementedError: Always raised since cosine is not DCP-compliant
+
+        Note:
+            For constraints involving trigonometric functions:
+            - Use piecewise-linear approximations, or
+            - Handle in the JAX dynamics/constraint layer instead of CVXPy
+        """
         raise NotImplementedError(
             "Trigonometric functions like Cos are not DCP-compliant in CVXPy. "
             "Consider using piecewise-linear approximations or handle these constraints "
@@ -207,30 +614,108 @@ class CvxpyLowerer:
 
     @visitor(Exp)
     def visit_exp(self, node: Exp) -> cp.Expression:
+        """Lower exponential function to CVXPy expression.
+
+        Exponential is a convex function and DCP-compliant when used in
+        appropriate contexts (e.g., minimizing exp(x) or constraints like
+        exp(x) <= c).
+
+        Args:
+            node: Exp expression node
+
+        Returns:
+            CVXPy expression representing exp(operand)
+
+        Note:
+            Exponential is convex increasing, so it's valid in:
+            - Objective: minimize exp(x)
+            - Constraints: exp(x) <= c (convex constraint)
+        """
         operand = self.lower(node.operand)
-        # Exponential is convex, so it's DCP-compliant when used appropriately
         return cp.exp(operand)
 
     @visitor(Log)
     def visit_log(self, node: Log) -> cp.Expression:
+        """Lower natural logarithm to CVXPy expression.
+
+        Logarithm is a concave function and DCP-compliant when used in
+        appropriate contexts (e.g., maximizing log(x) or constraints like
+        log(x) >= c).
+
+        Args:
+            node: Log expression node
+
+        Returns:
+            CVXPy expression representing log(operand)
+
+        Note:
+            Logarithm is concave increasing, so it's valid in:
+            - Objective: maximize log(x)
+            - Constraints: log(x) >= c (concave constraint, or equivalently c <= log(x))
+        """
         operand = self.lower(node.operand)
-        # Logarithm is concave, so it's DCP-compliant when used appropriately
         return cp.log(operand)
 
     @visitor(Equality)
     def visit_equality(self, node: Equality) -> cp.Constraint:
+        """Lower equality constraint to CVXPy constraint (lhs == rhs).
+
+        Equality constraints require affine expressions on both sides for
+        DCP compliance.
+
+        Args:
+            node: Equality constraint node
+
+        Returns:
+            CVXPy equality constraint object
+
+        Note:
+            For DCP compliance, both lhs and rhs must be affine. CVXPy will
+            raise a DCP error if either side is non-affine.
+        """
         left = self.lower(node.lhs)
         right = self.lower(node.rhs)
         return left == right
 
     @visitor(Inequality)
     def visit_inequality(self, node: Inequality) -> cp.Constraint:
+        """Lower inequality constraint to CVXPy constraint (lhs <= rhs).
+
+        Inequality constraints must satisfy DCP rules: convex <= concave.
+
+        Args:
+            node: Inequality constraint node
+
+        Returns:
+            CVXPy inequality constraint object
+
+        Note:
+            For DCP compliance: lhs must be convex and rhs must be concave.
+            Common form: convex_expr(x) <= constant
+        """
         left = self.lower(node.lhs)
         right = self.lower(node.rhs)
         return left <= right
 
     @visitor(CTCS)
     def visit_ctcs(self, node: CTCS) -> cp.Expression:
+        """Raise NotImplementedError for CTCS constraints.
+
+        CTCS (Continuous-Time Constraint Satisfaction) constraints are handled
+        through dynamics augmentation using JAX, not CVXPy. They represent
+        non-convex continuous-time constraints.
+
+        Args:
+            node: CTCS constraint node
+
+        Raises:
+            NotImplementedError: Always raised since CTCS uses JAX, not CVXPy
+
+        Note:
+            CTCS constraints are lowered to JAX during dynamics augmentation.
+            They add virtual states and controls to enforce constraints over
+            continuous time intervals. See JaxLowerer.visit_ctcs() instead.
+        """
         raise NotImplementedError(
             "CTCS constraints are for continuous-time constraint satisfaction and "
             "should be handled through dynamics augmentation with JAX lowering, "
@@ -240,21 +725,86 @@ class CvxpyLowerer:
 
     @visitor(PositivePart)
     def visit_pos(self, node: PositivePart) -> cp.Expression:
+        """Lower positive part function to CVXPy.
+
+        Computes max(x, 0), which is convex. Used in penalty methods for
+        inequality constraints.
+
+        Args:
+            node: PositivePart expression node
+
+        Returns:
+            CVXPy expression representing max(operand, 0)
+
+        Note:
+            Positive part is convex and commonly used in hinge loss and
+            penalty methods for inequality constraints.
+        """
         operand = self.lower(node.x)
         return cp.maximum(operand, 0.0)
 
     @visitor(Square)
     def visit_square(self, node: Square) -> cp.Expression:
+        """Lower square function to CVXPy.
+
+        Computes x^2, which is convex. Used in quadratic penalty methods
+        and least-squares objectives.
+
+        Args:
+            node: Square expression node
+
+        Returns:
+            CVXPy expression representing operand^2
+
+        Note:
+            Square is convex increasing for x >= 0 and convex decreasing for
+            x <= 0. It's always convex overall.
+        """
         operand = self.lower(node.x)
         return cp.square(operand)
 
     @visitor(Huber)
     def visit_huber(self, node: Huber) -> cp.Expression:
+        """Lower Huber penalty function to CVXPy.
+
+        Huber penalty is quadratic for small values and linear for large values,
+        providing robustness to outliers. It is convex and DCP-compliant.
+
+        The Huber function is defined as:
+        - |x| <= delta: 0.5 * x^2
+        - |x| > delta: delta * (|x| - 0.5 * delta)
+
+        Args:
+            node: Huber expression node with delta parameter
+
+        Returns:
+            CVXPy expression representing Huber penalty
+
+        Note:
+            Huber loss is convex and combines the benefits of squared error
+            (smooth, differentiable) and absolute error (robust to outliers).
+        """
         operand = self.lower(node.x)
         return cp.huber(operand, M=node.delta)
 
     @visitor(SmoothReLU)
     def visit_srelu(self, node: SmoothReLU) -> cp.Expression:
+        """Lower smooth ReLU penalty function to CVXPy.
+
+        Smooth approximation to ReLU: sqrt(max(x, 0)^2 + c^2) - c
+        Differentiable everywhere, approaches ReLU as c -> 0. Convex.
+
+        Args:
+            node: SmoothReLU expression node with smoothing parameter c
+
+        Returns:
+            CVXPy expression representing smooth ReLU penalty
+
+        Note:
+            This provides a smooth, convex approximation to the ReLU function
+            max(x, 0). The parameter c controls the smoothness: smaller c gives
+            a better approximation but less smoothness.
+        """
         operand = self.lower(node.x)
         c = node.c
         # smooth_relu(x) = sqrt(max(x, 0)^2 + c^2) - c
@@ -264,11 +814,41 @@ class CvxpyLowerer:
 
     @visitor(Sqrt)
     def visit_sqrt(self, node: Sqrt) -> cp.Expression:
+        """Lower square root to CVXPy expression.
+
+        Square root is concave and DCP-compliant when used appropriately
+        (e.g., maximizing sqrt(x) or constraints like sqrt(x) >= c).
+
+        Args:
+            node: Sqrt expression node
+
+        Returns:
+            CVXPy expression representing sqrt(operand)
+
+        Note:
+            Square root is concave increasing for x > 0. Valid in:
+            - Objective: maximize sqrt(x)
+            - Constraints: sqrt(x) >= c (concave constraint)
+        """
         operand = self.lower(node.operand)
         return cp.sqrt(operand)
 
     @visitor(Max)
     def visit_max(self, node: Max) -> cp.Expression:
+        """Lower element-wise maximum to CVXPy expression.
+
+        Maximum is convex (pointwise max of convex functions is convex).
+
+        Args:
+            node: Max expression node with multiple operands
+
+        Returns:
+            CVXPy expression representing element-wise maximum
+
+        Note:
+            For multiple operands, chains binary maximum operations.
+            Maximum preserves convexity.
+        """
         operands = [self.lower(op) for op in node.operands]
         # CVXPy's maximum can take multiple arguments
         if len(operands) == 2:
@@ -282,49 +862,119 @@ class CvxpyLowerer:
 
     @visitor(Transpose)
     def visit_transpose(self, node: Transpose) -> cp.Expression:
+        """Lower matrix transpose to CVXPy expression.
+
+        Transpose preserves DCP properties (transpose of convex is convex).
+
+        Args:
+            node: Transpose expression node
+
+        Returns:
+            CVXPy expression representing operand.T
+        """
         operand = self.lower(node.operand)
         return operand.T
 
     @visitor(Power)
     def visit_power(self, node: Power) -> cp.Expression:
+        """Lower element-wise power (base**exponent) to CVXPy expression.
+
+        Power is DCP-compliant for specific exponent values:
+        - exponent >= 1: convex (when base >= 0)
+        - 0 <= exponent <= 1: concave (when base >= 0)
+
+        Args:
+            node: Power expression node
+
+        Returns:
+            CVXPy expression representing base**exponent
+
+        Note:
+            CVXPy will verify DCP compliance at problem construction time.
+            Common convex cases: x^2, x^3, x^4 (even powers)
+        """
         base = self.lower(node.base)
         exponent = self.lower(node.exponent)
         return cp.power(base, exponent)
 
     @visitor(Stack)
     def visit_stack(self, node: Stack) -> cp.Expression:
+        """Lower vertical stacking to CVXPy expression.
+
+        Stacks expressions vertically using cp.vstack. Preserves DCP properties.
+
+        Args:
+            node: Stack expression node with multiple rows
+
+        Returns:
+            CVXPy expression representing vertical stack of rows
+
+        Note:
+            Each row is stacked along axis 0 to create a 2D array.
+        """
         rows = [self.lower(row) for row in node.rows]
         # Stack rows vertically
         return cp.vstack(rows)
 
 
 def lower_to_cvxpy(expr: Expr, variable_map: Dict[str, cp.Expression] = None) -> cp.Expression:
-    """
-    Convenience function to lower a single expression to CVXPy.
+    """Lower symbolic expression to CVXPy expression or constraint.
+
+    Convenience wrapper that creates a CvxpyLowerer and lowers a single
+    symbolic expression to a CVXPy expression. The result can be used in
+    CVXPy optimization problems.
 
     Args:
-        expr: Expression to lower
-        variable_map: Dictionary mapping variable names to CVXPy expressions
+        expr: Symbolic expression to lower (any Expr subclass)
+        variable_map: Dictionary mapping variable names to CVXPy expressions.
+            Must include "x" for states and "u" for controls. May include
+            parameter names mapped to CVXPy Parameters or constants.
 
     Returns:
-        CVXPy expression or constraint
+        CVXPy expression for arithmetic expressions (Add, Mul, Norm, etc.)
+        or CVXPy constraint for constraint expressions (Equality, Inequality)
+
+    Raises:
+        NotImplementedError: If the expression type is not supported (e.g., Sin, Cos, CTCS)
+        ValueError: If required variables are missing from variable_map
 
     Example:
-        >>> import cvxpy as cp
-        >>> from openscvx.backend.expr import *
-        >>> from openscvx.backend.state import State
-        >>>
-        >>> # Create CVXPy variables
-        >>> x_var = cp.Variable((10, 3), name="x")  # 10 time steps, 3 states
-        >>>
-        >>> # Create symbolic state
-        >>> x = State("x", shape=(3,))
-        >>>
-        >>> # Create expression: x + 1
-        >>> expr = x + 1
-        >>>
-        >>> # Lower to CVXPy
-        >>> cvx_expr = lower_to_cvxpy(expr, {"x": x_var})
+        Basic expression lowering::
+
+            import cvxpy as cp
+            import openscvx as ox
+
+            # Create CVXPy variables
+            cvx_x = cp.Variable(3, name="x")
+            cvx_u = cp.Variable(2, name="u")
+
+            # Create symbolic expression
+            x = ox.State("x", shape=(3,))
+            u = ox.Control("u", shape=(2,))
+            expr = ox.Norm(x)**2 + 0.1 * ox.Norm(u)**2
+
+            # Lower to CVXPy
+            cvx_expr = lower_to_cvxpy(expr, {"x": cvx_x, "u": cvx_u})
+
+            # Use in optimization problem
+            prob = cp.Problem(cp.Minimize(cvx_expr))
+            prob.solve()
+
+        Constraint lowering::
+
+            # Symbolic constraint
+            constraint = ox.Norm(x) <= 1.0
+
+            # Lower to CVXPy constraint
+            cvx_constraint = lower_to_cvxpy(constraint, {"x": cvx_x, "u": cvx_u})
+
+            # Use in problem
+            prob = cp.Problem(cp.Minimize(cost), constraints=[cvx_constraint])
+
+    See Also:
+        - CvxpyLowerer: The underlying lowerer class
+        - lower_to_jax(): Convenience wrapper for JAX lowering
+        - lower_symbolic_expressions(): Main orchestrator in symbolic/lower.py
     """
     lowerer = CvxpyLowerer(variable_map)
     return lowerer.lower(expr)
