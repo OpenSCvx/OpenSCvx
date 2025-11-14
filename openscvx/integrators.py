@@ -220,7 +220,7 @@ def solve_ivp_diffrax_prop(
     """
     Solve an initial-value ODE problem using a Diffrax adaptive solver.
     This function is specifically designed for use in the context of
-    trajectory optimization and handles the nonlinear single-shot propagation 
+    trajectory optimization and handles the nonlinear single-shot propagation
     of state variables in undilated time.
 
     Args:
