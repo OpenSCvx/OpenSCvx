@@ -35,6 +35,8 @@ jobs:
       - run: pip install mkdocs-material
       - run: pip install mkdocstrings-python
       - run: pip install mike
+      - name: Install package
+        run: pip install -e .
       - name: Deploy nightly documentation
         run: |
           git fetch origin gh-pages --depth=1 || true

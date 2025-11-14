@@ -69,6 +69,9 @@ jobs:
           pip install mkdocs-material mkdocstrings-python mike
           sudo apt-get update && sudo apt-get install -y pngquant
 
+      - name: Install package
+        run: pip install -e .
+
       - name: Deploy versioned documentation
         run: |
           git fetch origin gh-pages --depth=1 || true
