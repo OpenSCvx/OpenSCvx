@@ -35,18 +35,30 @@ to install OpenSCVx in your python environment.
 <details>
 <summary>Nightly</summary>
 
-For the latest development version (nightly), clone the repository and install in editable mode:
+To install the latest development version (nightly) without cloning:
+
+```sh
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx
+```
+
+With optional dependencies:
+
+```sh
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx[gui,cvxpygen]
+```
+
+**Note:** The `--extra-index-url https://pypi.org/simple/` flag is required because TestPyPI doesn't host all dependencies (like cvxpy, jax, etc.), so pip will fetch them from the main PyPI.
+
+Alternatively, for local development with the latest source:
 
 ```sh
 # Clone the repo
- git clone https://github.com/haynec/OpenSCvx.git
- cd OpenSCvx
+git clone https://github.com/haynec/OpenSCvx.git
+cd OpenSCvx
 
 # Install in editable/development mode
- pip install -e .
+pip install -e .
 ```
-
-This will install the code as a package and allow you to make local changes.
 
 </details>
 
