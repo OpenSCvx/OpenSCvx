@@ -33,18 +33,18 @@ def settings():
     return p
 
 
-def state_dot(x, u, node):
+def state_dot(x, u, node, params):
     # simple linear: x' = A_true x + B_true u
     return x + u
 
 
-def A(x, u, node):
+def A(x, u, node, params):
     batch = x.shape[0]
     eye = jnp.eye(2)
     return jnp.broadcast_to(eye, (batch, 2, 2))
 
 
-def B(x, u, node):
+def B(x, u, node, params):
     batch = x.shape[0]
     ones = jnp.ones((2, 1))
     return jnp.broadcast_to(ones, (batch, 2, 1))
@@ -74,7 +74,7 @@ def test_discretization_shapes(settings, dynamics):
     x = jnp.ones((settings.scp.n, settings.sim.n_states))
     u = jnp.ones((settings.scp.n, settings.sim.n_controls + 1))  # +1 slack
 
-    A_bar, B_bar, C_bar, z_bar, Vmulti = solver(x, u)
+    A_bar, B_bar, C_bar, z_bar, Vmulti = solver(x, u, {})
 
     # expected shapes
     N = settings.scp.n
@@ -90,7 +90,7 @@ def test_jit_dVdt_compiles(settings):
     # prepare trivial inputs
     n_x, n_u = settings.sim.n_states, settings.sim.n_controls
     N = settings.scp.n
-    aug_dim = n_x + n_x * n_x + 2 * n_x * n_u + n_x
+    aug_dim = n_x + n_x * n_x + 2 * n_x * n_u
 
     tau = jnp.array(0.3)
     V_flat = jnp.ones((N - 1) * aug_dim)
@@ -99,12 +99,14 @@ def test_jit_dVdt_compiles(settings):
 
     # bind out the Python callables & settings
     def wrapped(tau_, V_):
-        return dVdt(tau_, V_, u_cur, u_next, state_dot, A, B, n_x, n_u, N, settings.dis.dis_type)
+        return dVdt(
+            tau_, V_, u_cur, u_next, state_dot, A, B, n_x, n_u, N, settings.dis.dis_type, {}
+        )
 
     # now JIT only over (tau_, V_)
     jitted = jax.jit(wrapped)
     lowered = jitted.lower(tau, V_flat)
-    # compile will fail if there’s a trace issue
+    # compile will fail if there's a trace issue
     lowered.compile()
 
 
@@ -125,4 +127,4 @@ def test_jit_discretization_solver_compiles(settings, dynamics, integrator):
 
     # jit & lower & compile
     jitted = jax.jit(solver)
-    export.export(jitted)(x, u)
+    export.export(jitted)(x, u, {})

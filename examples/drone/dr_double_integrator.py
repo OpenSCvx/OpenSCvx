@@ -1,7 +1,6 @@
 import os
 import sys
 
-import cvxpy as cp
 import jax.numpy as jnp
 import numpy as np
 
@@ -9,38 +8,36 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
+import openscvx as ox
 from examples.plotting import plot_animation_double_integrator
-from openscvx.backend.control import Control
-from openscvx.backend.state import Free, Minimize, State
-from openscvx.constraints import ctcs, nodal
-from openscvx.dynamics import dynamics
-from openscvx.trajoptproblem import TrajOptProblem
+from openscvx import TrajOptProblem
 from openscvx.utils import gen_vertices, rot
 
 n = 22  # Number of Nodes
 total_time = 24.0  # Total time for the simulation
 
-x = State("x", shape=(7,))  # State variable with 14 dimensions
+# Define state components
+position = ox.State("position", shape=(3,))  # 3D position [x, y, z]
+position.max = np.array([200.0, 100, 50])
+position.min = np.array([-200.0, -100, 15])
+position.initial = np.array([10.0, 0, 20])
+position.final = [10.0, 0, 20]
+position.guess = np.linspace(position.initial, position.final, n)
 
-x.max = np.array([200.0, 100, 50, 100, 100, 100, 100])  # Upper Bound on the states
-x.min = np.array([-200.0, -100, 15, -100, -100, -100, 0])  # Lower Bound on the states
+velocity = ox.State("velocity", shape=(3,))  # 3D velocity [vx, vy, vz]
+velocity.max = np.array([100, 100, 100])
+velocity.min = np.array([-100, -100, -100])
+velocity.initial = np.array([0, 0, 0])
+velocity.final = [("free", 0), ("free", 0), ("free", 0)]
+velocity.guess = np.linspace(velocity.initial, [0, 0, 0], n)
 
-x.initial = np.array([10.0, 0, 20, 0, 0, 0, 0])
-x.final = np.array([10.0, 0, 20, Free(0), Free(0), Free(0), Minimize(total_time)])
-x.guess = np.linspace(x.initial, x.final, n)
-
-u = Control("u", shape=(3,))  # Control variable with 6 dimensions
+# Define control
+force = ox.Control("force", shape=(3,))  # Control forces [fx, fy, fz]
 f_max = 4.179446268 * 9.81
-u.max = np.array([f_max, f_max, f_max])
-u.min = np.array([-f_max, -f_max, -f_max])  # Lower Bound on the controls
-initial_control = np.array(
-    [
-        0.0,
-        0,
-        10,
-    ]
-)
-u.guess = np.repeat(initial_control[np.newaxis, :], n, axis=0)
+force.max = np.array([f_max, f_max, f_max])
+force.min = np.array([-f_max, -f_max, -f_max])
+initial_control = np.array([0.0, 0, 10])
+force.guess = np.repeat(initial_control[np.newaxis, :], n, axis=0)
 
 m = 1.0  # Mass of the drone
 g_const = -9.18
@@ -76,61 +73,67 @@ for center in gate_centers:
     vertices.append(gen_vertices(center, radii))
 ### End Gate Parameters ###
 
+# Define list of all states (needed for TrajOptProblem and constraints)
+states = [position, velocity]
+controls = [force]
 
-constraints = [
-    ctcs(lambda x_, u_: (x_ - x.true.max)),
-    ctcs(lambda x_, u_: (x.true.min - x_)),
-]
+# Generate box constraints for all states
+constraint_exprs = []
+for state in states:
+    constraint_exprs.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
+
+# Add gate constraints
 for node, cen in zip(gate_nodes, A_gate_cen):
-    constraints.append(
-        nodal(
-            lambda x_, u_, A=A_gate, c=cen: cp.norm(A @ x_[:3] - c, "inf") <= 1,
-            nodes=[node],
-            convex=True,
-        )
-    )  # use local variables inside the lambda function
+    A_gate_const = A_gate
+    c_const = cen
+    gate_constraint = (
+        (ox.linalg.Norm(A_gate_const @ position - c_const, ord="inf") <= np.array([1.0]))
+        .convex()
+        .at([node])
+    )
+    constraint_exprs.append(gate_constraint)
 
 
-@dynamics
-def dynamics(x_, u_):
-    # Unpack the state and control vectors
-    v = x_[3:6]
-
-    f = u_[:3]
-
-    # Compute the time derivatives of the state variables
-    r_dot = v
-    v_dot = (1 / m) * f + jnp.array([0, 0, g_const])
-    t_dot = 1
-    return jnp.hstack([r_dot, v_dot, t_dot])
+# Define dynamics as dictionary mapping state names to their derivatives
+dynamics = {
+    "position": velocity,
+    "velocity": (1 / m) * force + np.array([0, 0, g_const], dtype=np.float64),
+}
 
 
-x_bar = np.linspace(x.initial, x.final, n)
+position_bar = np.linspace(position.initial, position.final, n)
 
 i = 0
-origins = [x.initial[:3]]
+origins = [position.initial]
 ends = []
 for center in gate_centers:
     origins.append(center)
     ends.append(center)
-ends.append(x.final[:3])
+ends.append(position.final)
 gate_idx = 0
 for _ in range(n_gates + 1):
     for k in range(n // (n_gates + 1)):
-        x_bar[i, :3] = origins[gate_idx] + (k / (n // (n_gates + 1))) * (
+        position_bar[i] = origins[gate_idx] + (k / (n // (n_gates + 1))) * (
             ends[gate_idx] - origins[gate_idx]
         )
         i += 1
     gate_idx += 1
 
-x.guess = x_bar
+position.guess = position_bar
+
+time = ox.Time(
+    initial=0.0,
+    final=("minimize", total_time),
+    min=0.0,
+    max=total_time,
+)
 
 problem = TrajOptProblem(
     dynamics=dynamics,
-    x=x,
-    u=u,
-    constraints=constraints,
-    idx_time=len(x.max) - 1,
+    states=states,
+    controls=controls,
+    time=time,
+    constraints=constraint_exprs,
     N=n,
 )
 

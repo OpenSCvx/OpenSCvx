@@ -2,6 +2,56 @@
 requires = ["setuptools>=61.0", "wheel", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "openscvx"
+dynamic = ["version"]
+description = "A general Python-based successive convexification implementation which uses a JAX backend."
+readme = "README.md"
+license = {text = "Apache Software License"}
+authors = [
+    {name = "Chris Hayner and Griffin Norris", email = "haynec@uw.edu"},
+]
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+]
+dependencies = [
+    "cvxpy",
+    "qoco",
+    "numpy",
+    "jax",
+    "plotly",
+    "termcolor",
+    "diffrax",
+    "absl-py",
+    "flatbuffers",
+]
+
+[project.urls]
+Homepage = "https://haynec.github.io/openscvx/"
+
+[project.optional-dependencies]
+gui = [
+    "pyqtgraph",
+    "PyQt5",
+    "scipy",
+    "PyOpenGL",
+    "PyOpenGL_accelerate",
+]
+cvxpygen = [
+    "cvxpygen",
+    "qocogen",
+]
+stl = [
+    "stljax",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["openscvx*"]
+exclude = ["tests*", "examples*", "figures*"]
+
 [tool.setuptools_scm]
 write_to      = "openscvx/_version.py"
 version_scheme = "guess-next-dev"   # e.g. 1.2.4.dev3

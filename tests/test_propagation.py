@@ -6,18 +6,25 @@ import numpy as np
 import pytest
 from jax import export
 
-from openscvx.backend.control import Control
-from openscvx.backend.state import State
 from openscvx.propagation import get_propagation_solver, prop_aug_dy, s_to_t, t_to_tau
+from openscvx.symbolic.expr import Control, State
 
 
 # simple scalar decay: x' = -x
-def decay(x, u, node):
+def decay(x, u, node, params):
     return -x
 
 
 class Dummy:
-    pass
+    @property
+    def time_slice(self):
+        """Mock property to return idx_t for backward compatibility."""
+        return self.idx_t if hasattr(self, "idx_t") else None
+
+    @property
+    def time_dilation_slice(self):
+        """Mock property to return idx_s for backward compatibility."""
+        return self.idx_s if hasattr(self, "idx_s") else None
 
 
 @pytest.mark.parametrize("dis_type,beta_expected", [("ZOH", 0.0), ("FOH", 1.0)])
@@ -55,9 +62,10 @@ def test_prop_aug_dy_linear(dis_type, beta_expected):
         tau_init,
         node,
         idx_s,
-        lambda x_batch, u_control, node: x_batch + u_control,  # state_dot
+        lambda x_batch, u_control, node, params: x_batch + u_control,  # state_dot
         dis_type,
         N,
+        {},
     )
     np.testing.assert_allclose(out, expected, rtol=1e-6)
 
@@ -165,7 +173,7 @@ def test_propagation_solver_decay(dis_type):
     mask = jnp.array([True])  # Only one point
 
     # Call the solver
-    sol = solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask)
+    sol = solver(V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask, {})
 
     # Extract solution
     y_half = float(sol[0][0])
@@ -209,7 +217,7 @@ def test_jit_propagation_solver_compiles(dis_type):
     # JIT and export the solver
     jitted = jax.jit(
         lambda V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask: solver(
-            V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask
+            V0, tau_grid, u_cur, u_next, tau_init, node, idx_s, save_time, mask, {}
         )
     )
 

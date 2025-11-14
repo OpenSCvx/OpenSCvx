@@ -52,4 +52,4 @@ template: |
 
   ---
 
-  **Full Changelog:** [`$PREVIOUS_TAG...v$NEXT_PATCH_VERSION`](https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$NEXT_PATCH_VERSION)
+  **Full Changelog:** [`$PREVIOUS_TAG...v$RESOLVED_VERSION`](https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION)

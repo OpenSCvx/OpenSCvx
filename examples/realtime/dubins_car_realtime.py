@@ -18,10 +18,8 @@ from PyQt5.QtWidgets import (
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from dubins_car.dubins_car import (
+from car.dubins_car import (
     # --- Import your problem setup ---
-    obs_center,
-    obs_radius,
     plotting_dict,
     problem,
 )
@@ -36,13 +34,13 @@ new_result_event = threading.Event()
 def on_key(event):
     step = 0.1
     if event.key == "up":
-        obs_center.value[1] += step
+        problem.parameters["obs_center"][1] += step
     elif event.key == "down":
-        obs_center.value[1] -= step
+        problem.parameters["obs_center"][1] -= step
     elif event.key == "left":
-        obs_center.value[0] -= step
+        problem.parameters["obs_center"][0] -= step
     elif event.key == "right":
-        obs_center.value[0] += step
+        problem.parameters["obs_center"][0] += step
     elif event.key == "escape":
         running["stop"] = True
 
@@ -88,7 +86,9 @@ def optimization_loop():
                 results["cost"] = 0.0
             # Print iteration info to CLI
             print(
-                f"Iteration {iteration}: J_tr={results['J_tr']:.2e}, J_vb={results['J_vb']:.2e}, J_vc={results['J_vc']:.2e}, Cost={results['cost']:.2e}, Status={results['prob_stat']}"
+                f"Iteration {iteration}: J_tr={results['J_tr']:.2e}, J_vb={results['J_vb']:.2e}, "
+                f"J_vc={results['J_vc']:.2e}, Cost={results['cost']:.2e}, "
+                f"Status={results['prob_stat']}"
             )
             # Optionally skip post_process for speed
             # results = problem.post_process(results)
@@ -118,13 +118,13 @@ class ObstaclePlotWidget(pg.PlotWidget):
     def keyPressEvent(self, event):
         step = 0.1
         if event.key() == Qt.Key_Up:
-            obs_center.value[1] += step
+            problem.parameters["obs_center"][1] += step
         elif event.key() == Qt.Key_Down:
-            obs_center.value[1] -= step
+            problem.parameters["obs_center"][1] -= step
         elif event.key() == Qt.Key_Left:
-            obs_center.value[0] -= step
+            problem.parameters["obs_center"][0] -= step
         elif event.key() == Qt.Key_Right:
-            obs_center.value[0] += step
+            problem.parameters["obs_center"][0] += step
         elif event.key() == Qt.Key_Escape:
             running["stop"] = True
         super().keyPressEvent(event)
@@ -132,9 +132,9 @@ class ObstaclePlotWidget(pg.PlotWidget):
     def mousePressEvent(self, event):
         pos = self.plotItem.vb.mapSceneToView(event.pos())
         mouse_x, mouse_y = pos.x(), pos.y()
-        dx = mouse_x - obs_center.value[0]
-        dy = mouse_y - obs_center.value[1]
-        if dx**2 + dy**2 <= obs_radius.value**2:
+        dx = mouse_x - problem.parameters["obs_center"][0]
+        dy = mouse_y - problem.parameters["obs_center"][1]
+        if dx**2 + dy**2 <= problem.parameters["obs_radius"] ** 2:
             self.dragging = True
             # Do NOT call super() if starting drag (prevents plot pan)
         else:
@@ -143,8 +143,8 @@ class ObstaclePlotWidget(pg.PlotWidget):
     def mouseMoveEvent(self, event):
         if self.dragging:
             pos = self.plotItem.vb.mapSceneToView(event.pos())
-            obs_center.value[0] = pos.x()
-            obs_center.value[1] = pos.y()
+            problem.parameters["obs_center"][0] = pos.x()
+            problem.parameters["obs_center"][1] = pos.y()
             # Do NOT call super() if dragging (prevents plot pan)
         else:
             super().mouseMoveEvent(event)
@@ -314,10 +314,10 @@ def plot_thread_func():
     plot_widget.addItem(traj_scatter)
     # Create circle for obstacle with true radius
     obs_circle = QGraphicsEllipseItem(
-        obs_center.value[0] - obs_radius.value,
-        obs_center.value[1] - obs_radius.value,
-        obs_radius.value * 2,
-        obs_radius.value * 2,
+        problem.parameters["obs_center"][0] - problem.parameters["obs_radius"],
+        problem.parameters["obs_center"][1] - problem.parameters["obs_radius"],
+        problem.parameters["obs_radius"] * 2,
+        problem.parameters["obs_radius"] * 2,
     )
     obs_circle.setPen(pg.mkPen("g", width=2))
     obs_circle.setBrush(pg.mkBrush(0, 255, 0, 60))
@@ -338,11 +338,10 @@ def plot_thread_func():
                 i2 = i1 + n_x * n_x
                 i3 = i2 + n_x * n_u
                 i4 = i3 + n_x * n_u
-                i5 = i4 + n_x
                 all_pos_segments = []
                 for i_node in range(V_multi_shoot.shape[1]):
                     node_data = V_multi_shoot[:, i_node]
-                    segments_for_node = node_data.reshape(-1, i5)
+                    segments_for_node = node_data.reshape(-1, i4)
                     pos_segments = segments_for_node[:, :2]
                     all_pos_segments.append(pos_segments)
                 if all_pos_segments:
@@ -350,10 +349,10 @@ def plot_thread_func():
                     traj_scatter.setData(full_traj[:, 0], full_traj[:, 1])
                 # Update obstacle circle position
                 obs_circle.setRect(
-                    obs_center.value[0] - obs_radius.value,
-                    obs_center.value[1] - obs_radius.value,
-                    obs_radius.value * 2,
-                    obs_radius.value * 2,
+                    problem.parameters["obs_center"][0] - problem.parameters["obs_radius"],
+                    problem.parameters["obs_center"][1] - problem.parameters["obs_radius"],
+                    problem.parameters["obs_radius"] * 2,
+                    problem.parameters["obs_radius"] * 2,
                 )
                 # Update optimization metrics display
                 update_optimization_metrics(latest_results["results"], labels_dict)

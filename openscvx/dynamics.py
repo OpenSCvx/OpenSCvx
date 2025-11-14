@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, Optional, Union
+from typing import Callable, Optional
 
 import jax.numpy as jnp
 
@@ -126,78 +126,3 @@ class Dynamics:
     f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
     A: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
     B: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
-
-
-def dynamics(
-    _func: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
-    *,
-    A: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
-    B: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None,
-) -> Union[Callable, Dynamics]:
-    """
-    Decorator that wraps a function defining the system dynamics as a
-    `Dynamics` object. You may optionally specify the system gradients
-    w.r.t. `x`, `u` if desired, if not specified they will be calculated
-    using `jax.jacfwd`. Note: the dynamics as well as the optional gradients
-    should be composed of `jax` primitives to enable efficient computation.
-
-    This decorator may be used with or without arguments:
-
-    ```
-    @dynamics
-    def f(x, u): ...
-    ```
-
-    or
-
-    ```
-    @dynamics(A=grad_f_x, B=grad_f_u)
-    def f(x, u): ...
-    ```
-
-    or, if a more lambda-function-style is desired, the function can be
-    directly wrapped
-
-    ```
-    dyn = dynamics(f(x,u))
-    dyn_lambda = dynamics(lambda x, u: ...)
-    ```
-
-    Args:
-        _func (callable, optional): The function to wrap. Populated
-            when using @dynamics with no extra args.
-        A (callable, optional): Jacobian of f wrt state x. Computed
-            via jax.jacfwd if not provided.
-        B (callable, optional): Jacobian of f wrt input u. Computed
-            via jax.jacfwd if not provided.
-
-    Returns:
-        Union[Callable, Dynamics]
-            A decorator if called without a function, or a `Dynamics`
-            dataclass bundling system dynamics function and Jacobians
-            when applied to a function.
-
-    Examples:
-        >>> @dynamics
-        ... def f(x, u):
-        ...     return x + u
-        >>> isinstance(f, Dynamics)
-        True
-    """
-
-    def decorator(f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
-        # Had to unwrap to ensure arguments are visible downstream.
-        # Originally wrapped so name, doc, signature stay on f
-        wrapped = f
-        return Dynamics(
-            f=wrapped,
-            A=A,
-            B=B,
-        )
-
-    # if called as @dynamics or @dynamics(...), _func will be None and we return decorator
-    if _func is None:
-        return decorator
-    # if called as dynamics(func), we immediately decorate
-    else:
-        return decorator(_func)

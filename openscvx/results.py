@@ -3,8 +3,8 @@ from typing import Any, Optional
 
 import numpy as np
 
-from openscvx.backend.control import Control
-from openscvx.backend.state import State
+from openscvx.symbolic.expr.control import Control
+from openscvx.symbolic.expr.state import State
 
 
 @dataclass
@@ -22,6 +22,12 @@ class OptimizationResults:
         t_final (float): Final time of the optimized trajectory
         u (Control): Optimized control trajectory at discretization nodes
         x (State): Optimized state trajectory at discretization nodes
+
+        # Dictionary-based Access
+        nodes (dict[str, np.ndarray]): Dictionary mapping state/control names to arrays
+            at optimization nodes. Includes both user-defined and augmented variables.
+        trajectory (dict[str, np.ndarray]): Dictionary mapping state/control names to arrays
+            along the propagated trajectory. Added by post_process().
 
         # SCP Iteration History (for convergence analysis)
         x_history (list[np.ndarray]): State trajectories from each SCP iteration
@@ -47,6 +53,14 @@ class OptimizationResults:
     t_final: float
     u: Control
     x: State
+
+    # Dictionary-based access to states and controls
+    nodes: dict[str, np.ndarray] = field(default_factory=dict)
+    trajectory: dict[str, np.ndarray] = field(default_factory=dict)
+
+    # Internal metadata for dictionary construction
+    _states: list = field(default_factory=list, repr=False)
+    _controls: list = field(default_factory=list, repr=False)
 
     # History of SCP iterations
     x_history: list[np.ndarray] = field(default_factory=list)

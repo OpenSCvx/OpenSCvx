@@ -5,6 +5,7 @@ import warnings
 from importlib.metadata import PackageNotFoundError, version
 
 import jax
+import numpy as np
 from termcolor import colored
 
 from openscvx.results import OptimizationResults
@@ -66,24 +67,11 @@ def print_problem_summary(settings):
         settings: Configuration settings containing problem information
     """
     n_nodal_convex = 0
-    for c in settings.sim.constraints_nodal:
-        if c.convex:
-            try:
-                import cvxpy as cp
-
-                if c.vectorized:
-                    x_dummy = [cp.Variable(settings.sim.n_states) for _ in range(settings.scp.n)]
-                    u_dummy = [cp.Variable(settings.sim.n_controls) for _ in range(settings.scp.n)]
-                else:
-                    x_dummy = cp.Variable(settings.sim.n_states)
-                    u_dummy = cp.Variable(settings.sim.n_controls)
-                constraints = c.get_cvxpy_constraints(x_dummy, u_dummy)
-                n_nodal_convex += len(constraints)
-            except Exception:
-                n_nodal_convex += 1
-    n_nodal_nonconvex = sum(1 for c in settings.sim.constraints_nodal if not c.convex)
+    for c in settings.sim.constraints_nodal_convex:
+        n_nodal_convex += 1
+    n_nodal_nonconvex = sum(1 for c in settings.sim.constraints_nodal)
     n_ctcs = len(settings.sim.constraints_ctcs)
-    n_augmented = settings.sim.n_states - settings.sim.idx_x_true.stop
+    n_augmented = settings.sim.n_states - settings.sim.true_state_slice.stop
 
     # Count CVXPy variables, parameters, and constraints
     from openscvx.ocp import OptimalControlProblem
@@ -105,10 +93,14 @@ def print_problem_summary(settings):
     jax_version = jax.__version__
 
     # Build weights string conditionally
+    if isinstance(settings.scp.lam_vc, np.ndarray):
+        lam_vc_str = f"λ_vc=matrix({settings.scp.lam_vc.shape})"
+    else:
+        lam_vc_str = f"λ_vc={settings.scp.lam_vc:4.1f}"
     weights_parts = [
         f"λ_cost={settings.scp.lam_cost:4.1f}",
         f"λ_tr={settings.scp.w_tr:4.1f}",
-        f"λ_vc={settings.scp.lam_vc:4.1f}",
+        lam_vc_str,
     ]
 
     # Add λ_vb only if there are nodal nonconvex constraints

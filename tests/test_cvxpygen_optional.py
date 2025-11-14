@@ -2,14 +2,11 @@
 Test that cvxpygen is properly handled as an optional dependency.
 """
 
-import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from openscvx.backend.control import Control
-from openscvx.backend.state import State
-from openscvx.constraints import ctcs
-from openscvx.dynamics import dynamics
+from openscvx import Time, ctcs
+from openscvx.symbolic.expr import Concat, Constant, Control, State
 from openscvx.trajoptproblem import TrajOptProblem
 
 # Conditionally import cvxpygen to see if it's installed
@@ -19,14 +16,6 @@ try:
     CVXPYGEN_INSTALLED = True
 except ImportError:
     CVXPYGEN_INSTALLED = False
-
-
-@dynamics
-def simple_dynamics(x_, u_):
-    """Simple dynamics for testing."""
-    x_dot = u_
-    t_dot = 1
-    return jnp.hstack([x_dot, t_dot])
 
 
 def test_cvxpygen_optional_import():
@@ -61,10 +50,21 @@ def test_cvxpygen_disabled_by_default():
     u.max = np.array([2])
     u.guess = np.zeros((n, 1))
 
-    constraints = [ctcs(lambda x_, u_: x_ - x.true.max), ctcs(lambda x_, u_: x.true.min - x_)]
+    # Define dynamics as dictionary - x_dot = [u[0], 0] for 2D state
+    dynamics = {"x": Concat(u[0], Constant(0.0))}
+
+    # Define constraints using symbolic expressions
+    constraints = [ctcs(x <= x.max), ctcs(x.min <= x)]
+
+    time = Time(initial=0.0, final=("minimize", 1.0), min=0.0, max=10.0)
 
     problem = TrajOptProblem(
-        dynamics=simple_dynamics, x=x, u=u, params=[], idx_time=1, constraints=constraints, N=n
+        dynamics=dynamics,
+        states=[x],
+        controls=[u],
+        time=time,
+        constraints=constraints,
+        N=n,
     )
 
     # Check that cvxpygen is disabled by default
@@ -93,10 +93,21 @@ def test_cvxpygen_enabled_raises_error_without_install():
     u.max = np.array([2])
     u.guess = np.zeros((n, 1))
 
-    constraints = [ctcs(lambda x_, u_: x_ - x.true.max), ctcs(lambda x_, u_: x.true.min - x_)]
+    # Define dynamics as dictionary - x_dot = [u[0], 0] for 2D state
+    dynamics = {"x": Concat(u[0], Constant(0.0))}
+
+    # Define constraints using symbolic expressions
+    constraints = [ctcs(x <= x.max), ctcs(x.min <= x)]
+
+    time = Time(initial=0.0, final=("minimize", 1.0), min=0.0, max=10.0)
 
     problem = TrajOptProblem(
-        dynamics=simple_dynamics, x=x, u=u, params=[], idx_time=1, constraints=constraints, N=n
+        dynamics=dynamics,
+        states=[x],
+        controls=[u],
+        time=time,
+        constraints=constraints,
+        N=n,
     )
 
     # Enable cvxpygen

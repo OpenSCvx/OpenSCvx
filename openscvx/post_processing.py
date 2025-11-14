@@ -38,8 +38,22 @@ def propagate_trajectory_results(
     tau_vals, u_full = t_to_tau(u, t_full, t, settings)
 
     # Match free values from initial state to the initial value from the result
-    mask = jnp.array([t == "Free" for t in x.initial_type], dtype=bool)
-    settings.sim.x_prop.initial = jnp.where(mask, x.guess[0, :], settings.sim.x_prop.initial)
+    # Only copy for states that exist in optimization (propagation may have extra states at the end)
+    n_opt_states = x.guess.shape[1]
+    n_prop_states = settings.sim.x_prop.initial.shape[0]
+
+    if n_opt_states == n_prop_states:
+        # Same size - copy all
+        mask = jnp.array([t == "Free" for t in x.initial_type], dtype=bool)
+        settings.sim.x_prop.initial = jnp.where(mask, x.guess[0, :], settings.sim.x_prop.initial)
+    else:
+        # Propagation has extra states - only copy the overlapping portion
+        mask = jnp.array([t == "Free" for t in x.initial_type], dtype=bool)
+        x_prop_initial_updated = settings.sim.x_prop.initial.copy()
+        x_prop_initial_updated[:n_opt_states] = jnp.where(
+            mask, x.guess[0, :], settings.sim.x_prop.initial[:n_opt_states]
+        )
+        settings.sim.x_prop.initial = x_prop_initial_updated
 
     x_full = simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_solver)
 
@@ -67,7 +81,18 @@ def propagate_trajectory_results(
         i += 1
 
     # Calculate CTCS constraint violation
-    ctcs_violation = x_full[-1, settings.sim.idx_y_prop]
+    ctcs_violation = x_full[-1, settings.sim.ctcs_slice_prop]
+
+    # Build trajectory dictionary with all states and controls
+    trajectory_dict = {}
+
+    # Add all states (user-defined and augmented)
+    for state in result._states:
+        trajectory_dict[state.name] = x_full[:, state._slice]
+
+    # Add all controls (user-defined and augmented)
+    for control in result._controls:
+        trajectory_dict[control.name] = u_full[:, control._slice]
 
     # Update the results object with post-processing data
     result.t_full = t_full
@@ -75,5 +100,6 @@ def propagate_trajectory_results(
     result.u_full = u_full
     result.cost = cost
     result.ctcs_violation = ctcs_violation
+    result.trajectory = trajectory_dict
 
     return result
