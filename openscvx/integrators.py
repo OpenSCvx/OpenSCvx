@@ -224,7 +224,8 @@ def solve_ivp_diffrax_prop(
     of state variables in undilated time.
 
     Args:
-        f (Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray]): ODE right-hand side; signature f(t, y, *args) -> dy/dt.
+        f (Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray]): ODE right-hand side;
+            signature f(t, y, *args) -> dy/dt.
         tau_final (float): Final integration time.
         y_0 (jnp.ndarray): Initial state at tau_0.
         args (tuple): Extra arguments to pass to `f` in the solver term.
@@ -236,7 +237,8 @@ def solve_ivp_diffrax_prop(
         rtol (float, optional): Relative tolerance for adaptive stepping. Defaults to 1e-3.
         atol (float, optional): Absolute tolerance for adaptive stepping. Defaults to 1e-6.
         extra_kwargs (dict, optional): Additional keyword arguments forwarded to `diffeqsolve`.
-        save_time (jnp.ndarray, optional): Time points at which to evaluate the solution. Must be provided for export compatibility.
+        save_time (jnp.ndarray, optional): Time points at which to evaluate the solution.
+            Must be provided for export compatibility.
         mask (jnp.ndarray, optional): Boolean mask for the save_time points.
 
     Returns:

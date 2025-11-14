@@ -786,7 +786,7 @@ def plot_camera_view(result: OptimizationResults, params: Config) -> None:
 
     # Meshgrid
     if "moving_subject" in result:
-        xx = np.linspace(-10, 10, 100)
+        x = np.linspace(-10, 10, 100)
         y = np.linspace(-10, 10, 100)
         z = np.linspace(-10, 10, 100)
     else:
