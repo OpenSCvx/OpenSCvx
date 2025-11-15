@@ -177,7 +177,7 @@ nav:
       - Tutorials:
           - 'Usage/tutorial_6dof_obstacle_avoidance.md'
           - 'Usage/tutorial_6dof_los_guidance.md'
-    - API Reference: reference/
+    - Code Reference: reference/
     - Foundations:
       - 'Overview/scvx.md'
       - 'Overview/ocp.md'
