@@ -10,8 +10,8 @@ root = Path(__file__).parent.parent
 src = root / "openscvx"
 
 for path in sorted(src.rglob("*.py")):
-    module_path = path.relative_to(root).with_suffix("")
-    doc_path = path.relative_to(root).with_suffix(".md")
+    module_path = path.relative_to(src).with_suffix("")
+    doc_path = path.relative_to(src).with_suffix(".md")
     full_doc_path = Path("reference", doc_path)
 
     parts = tuple(module_path.parts)
@@ -24,16 +24,17 @@ for path in sorted(src.rglob("*.py")):
     elif parts[-1].startswith("_"):
         continue
 
-    # Generate the markdown file with mkdocstrings directive
+    # Skip if parts is empty (happens when __init__.py is at root level)
+    if not parts:
+        continue
+
+    nav[parts] = doc_path.as_posix()
+
     with mkdocs_gen_files.open(full_doc_path, "w") as fd:
-        identifier = ".".join(parts)
-        fd.write(f"# {parts[-1]}\n\n")
+        identifier = ".".join(("openscvx",) + parts)
         fd.write(f"::: {identifier}\n")
 
     mkdocs_gen_files.set_edit_path(full_doc_path, path.relative_to(root))
-
-    # Add to navigation
-    nav[parts] = doc_path.as_posix()
 
 # Write the navigation file for literate-nav
 with mkdocs_gen_files.open("reference/SUMMARY.md", "w") as nav_file:
