@@ -217,6 +217,36 @@ def solve_ivp_diffrax_prop(
     save_time: jnp.ndarray = None,
     mask: jnp.ndarray = None,
 ):
+    """
+    Solve an initial-value ODE problem using a Diffrax adaptive solver.
+    This function is specifically designed for use in the context of
+    trajectory optimization and handles the nonlinear single-shot propagation
+    of state variables in undilated time.
+
+    Args:
+        f (Callable[[jnp.ndarray, jnp.ndarray, Any], jnp.ndarray]): ODE right-hand side;
+            signature f(t, y, *args) -> dy/dt.
+        tau_final (float): Final integration time.
+        y_0 (jnp.ndarray): Initial state at tau_0.
+        args (tuple): Extra arguments to pass to `f` in the solver term.
+        tau_0 (float, optional): Initial time. Defaults to 0.0.
+        num_substeps (int, optional): Number of save points between tau_0 and tau_final.
+            Defaults to 50.
+        solver_name (str, optional): Key into SOLVER_MAP for the Diffrax solver class.
+            Defaults to "Dopri8".
+        rtol (float, optional): Relative tolerance for adaptive stepping. Defaults to 1e-3.
+        atol (float, optional): Absolute tolerance for adaptive stepping. Defaults to 1e-6.
+        extra_kwargs (dict, optional): Additional keyword arguments forwarded to `diffeqsolve`.
+        save_time (jnp.ndarray, optional): Time points at which to evaluate the solution.
+            Must be provided for export compatibility.
+        mask (jnp.ndarray, optional): Boolean mask for the save_time points.
+
+    Returns:
+        jnp.ndarray: Solution states at the requested save points, shape (num_substeps, state_dim).
+    Raises:
+        ValueError: If `solver_name` is not in SOLVER_MAP or if save_time is not provided.
+    """
+
     if save_time is None:
         raise ValueError("save_time must be provided for export compatibility.")
     if mask is None:
