@@ -78,6 +78,12 @@ plugins:
   # - optimize
   - search:
       separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - gen-files:
+      scripts:
+        - scripts/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
   - mkdocstrings:
       handlers:
         python:
@@ -171,6 +177,7 @@ nav:
       - Tutorials:
           - 'Usage/tutorial_6dof_obstacle_avoidance.md'
           - 'Usage/tutorial_6dof_los_guidance.md'
+    - API Reference: reference/
     - Foundations:
       - 'Overview/scvx.md'
       - 'Overview/ocp.md'
