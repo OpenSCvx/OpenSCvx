@@ -37,6 +37,7 @@ jobs:
       - name: Install MkDocs Material
         run: pip install mkdocs-material
       - run: pip install mkdocstrings-python
+      - run: pip install mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
       - run: pip install mike
       - name: Install package
         run: pip install -e .

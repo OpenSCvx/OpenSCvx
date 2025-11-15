@@ -67,6 +67,7 @@ jobs:
       - name: Install documentation tools
         run: |
           pip install mkdocs-material mkdocstrings-python mike
+          pip install mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
           sudo apt-get update && sudo apt-get install -y pngquant
 
       - name: Install package
