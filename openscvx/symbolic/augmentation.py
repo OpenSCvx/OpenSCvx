@@ -100,13 +100,15 @@ def sort_ctcs_constraints(
         ValueError: If user-specified idx values are inconsistent or non-contiguous
 
     Example:
-        >>> constraint1 = (x <= 5).over((0, 50))  # Auto-assigned idx
-        >>> constraint2 = (y <= 10).over((0, 50))  # Same interval, same idx
-        >>> constraint3 = (z <= 15).over((20, 80))  # Different interval, different idx
-        >>> sorted_ctcs, intervals, n_aug = sort_ctcs_constraints([c1, c2, c3])
-        >>> # constraint1.idx = 0, constraint2.idx = 0, constraint3.idx = 1
-        >>> # intervals = [(0, 50), (20, 80)]
-        >>> # n_aug = 2
+        Sort CTCS constraints by interval and index:
+
+            constraint1 = (x <= 5).over((0, 50))  # Auto-assigned idx
+            constraint2 = (y <= 10).over((0, 50))  # Same interval, same idx
+            constraint3 = (z <= 15).over((20, 80))  # Different interval, different idx
+            sorted_ctcs, intervals, n_aug = sort_ctcs_constraints([c1, c2, c3])
+            # constraint1.idx = 0, constraint2.idx = 0, constraint3.idx = 1
+            # intervals = [(0, 50), (20, 80)]
+            # n_aug = 2
     """
     idx_to_nodes: Dict[int, Tuple[int, int]] = {}
     next_idx = 0
@@ -185,14 +187,16 @@ def separate_constraints(
         ValueError: If a constraint is not one of the expected types
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> ctcs_constraint = (x <= 5).over((0, 50))
-        >>> nodal_constraint = (x >= 0).at([0, 10, 20])
-        >>> bare_constraint = ox.Norm(x) <= 1  # Will apply at all nodes
-        >>> ctcs, nodal, convex = separate_constraints(
-        ...     [ctcs_constraint, nodal_constraint, bare_constraint],
-        ...     n_nodes=50
-        ... )
+        Separate and categorize constraints:
+
+            x = ox.State("x", shape=(3,))
+            ctcs_constraint = (x <= 5).over((0, 50))
+            nodal_constraint = (x >= 0).at([0, 10, 20])
+            bare_constraint = ox.Norm(x) <= 1  # Will apply at all nodes
+            ctcs, nodal, convex = separate_constraints(
+                [ctcs_constraint, nodal_constraint, bare_constraint],
+                n_nodes=50
+            )
     """
     constraints_ctcs: List[CTCS] = []
     constraints_nodal: List[NodalConstraint] = []
@@ -266,10 +270,12 @@ def decompose_vector_nodal_constraints(
         where residual is the lhs of the constraint.
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> constraint = (x <= 5).at([0, 10, 20])  # Vector constraint, shape (3,)
-        >>> decomposed = decompose_vector_nodal_constraints([constraint])
-        >>> # Returns 3 constraints: x[0] <= 5, x[1] <= 5, x[2] <= 5
+        Decompose vector constraint into 3 constraints:
+
+            x = ox.State("x", shape=(3,))
+            constraint = (x <= 5).at([0, 10, 20])  # Vector constraint, shape (3,)
+            decomposed = decompose_vector_nodal_constraints([constraint])
+            # Returns 3 constraints: x[0] <= 5, x[1] <= 5, x[2] <= 5
     """
     decomposed_constraints = []
 
@@ -318,11 +324,13 @@ def get_nodal_constraints_from_ctcs(constraints_ctcs: List[CTCS]) -> List[Constr
         List of underlying Constraint objects from CTCS with check_nodally=True
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> # CTCS constraint that should also be checked at nodes
-        >>> constraint = (x <= 5).over((0, 50), check_nodally=True)
-        >>> nodal = get_nodal_constraints_from_ctcs([constraint])
-        >>> # Returns [x <= 5] to be enforced at all nodes
+        Extract CTCS constraint that should also be checked at nodes:
+
+            x = ox.State("x", shape=(3,))
+            constraint = (x <= 5).over((0, 50), check_nodally=True)
+            nodal = get_nodal_constraints_from_ctcs([constraint])
+
+        Returns [x <= 5] to be enforced at all nodes
     """
     nodal_ctcs = []
     for ctcs in constraints_ctcs:
@@ -371,17 +379,20 @@ def augment_with_time_state(
         constraints are added.
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> states_aug, constraints_aug = augment_with_time_state(
-        ...     states=[x],
-        ...     constraints=[],
-        ...     time_initial=0.0,
-        ...     time_final=("free", 10.0),
-        ...     time_min=0.0,
-        ...     time_max=100.0,
-        ...     N=50
-        ... )
-        >>> # states_aug now includes time state with initial=0, final=free
+        Get augmented states:
+
+            x = ox.State("x", shape=(3,))
+            states_aug, constraints_aug = augment_with_time_state(
+                states=[x],
+                constraints=[],
+                time_initial=0.0,
+                time_final=("free", 10.0),
+                time_min=0.0,
+                time_max=100.0,
+                N=50
+            )
+
+        states_aug now includes time state with initial=0, final=free
     """
     # Create copies to avoid mutating inputs
     states_aug = list(states)
@@ -475,20 +486,23 @@ def augment_dynamics_with_ctcs(
         ValueError: If no state named "time" is found in the states list
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> u = ox.Control("u", shape=(2,))
-        >>> time = ox.State("time", shape=(1,))
-        >>> xdot = u @ A  # Some dynamics
-        >>> constraint = (ox.Norm(x) <= 1.0).over((0, 50))
-        >>> xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
-        ...     xdot=xdot,
-        ...     states=[x, time],
-        ...     controls=[u],
-        ...     constraints_ctcs=[constraint],
-        ...     N=50
-        ... )
-        >>> # states_aug includes x, time, and _ctcs_aug_0
-        >>> # controls_aug includes u and _time_dilation
+        Augment dynamics with CTCS penalty states:
+
+            x = ox.State("x", shape=(3,))
+            u = ox.Control("u", shape=(2,))
+            time = ox.State("time", shape=(1,))
+            xdot = u @ A  # Some dynamics
+            constraint = (ox.Norm(x) <= 1.0).over((0, 50))
+            xdot_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
+                xdot=xdot,
+                states=[x, time],
+                controls=[u],
+                constraints_ctcs=[constraint],
+                N=50
+            )
+
+        states_aug includes x, time, and _ctcs_aug_0,
+        controls_aug includes u and _time_dilation
     """
     # Copy the original states and controls lists
     states_augmented = list(states)

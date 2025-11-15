@@ -173,9 +173,11 @@ class UnifiedState:
             UnifiedState: Sliced view containing only true state variables
 
         Example:
-            >>> unified = unify_states([position, velocity, ctcs_aug], name="x")
-            >>> true_states = unified.true  # Only position and velocity
-            >>> true_states.shape  # (6,) if position and velocity are 3D each
+            Get true user-defined state:
+
+                unified = unify_states([position, velocity, ctcs_aug], name="x")
+                true_states = unified.true  # Only position and velocity
+                true_states.shape  # (6,) if position and velocity are 3D each
         """
         return self[self._true_slice]
 
@@ -191,8 +193,10 @@ class UnifiedState:
             UnifiedState: Sliced view containing only augmented state variables
 
         Example:
-            >>> unified = unify_states([position, ctcs_aug], name="x")
-            >>> aug_states = unified.augmented  # Only CTCS states
+            Get augmented state:
+
+                unified = unify_states([position, ctcs_aug], name="x")
+                aug_states = unified.augmented  # Only CTCS states
         """
         return self[self._augmented_slice]
 
@@ -374,12 +378,16 @@ class UnifiedState:
             NotImplementedError: If idx is not a slice, or if step != 1
 
         Example:
-            >>> unified = unify_states([position, velocity], name="x")
-            >>> # position has shape (3,), velocity has shape (3,)
-            >>> first_three = unified[0:3]  # Extract position only
-            >>> print(first_three.shape)  # (3,)
-            >>> last_three = unified[3:6]  # Extract velocity only
-            >>> print(last_three.shape)  # (3,)
+            Generate unified state object
+
+                unified = unify_states([position, velocity], name="x")
+
+            position has shape (3,), velocity has shape (3,)
+
+                first_three = unified[0:3]  # Extract position only
+                print(first_three.shape)  # (3,)
+                last_three = unified[3:6]  # Extract velocity only
+                print(last_three.shape)  # (3,)
 
         Note:
             The sliced state maintains all properties (bounds, guesses, etc.) for
@@ -512,8 +520,10 @@ class UnifiedControl:
             UnifiedControl: Sliced view containing only true control variables
 
         Example:
-            >>> unified = unify_controls([thrust, torque, time_dilation], name="u")
-            >>> true_controls = unified.true  # Only thrust and torque
+            Get true user defined controls:
+
+                unified = unify_controls([thrust, torque, time_dilation], name="u")
+                true_controls = unified.true  # Only thrust and torque
         """
         return self[self._true_slice]
 
@@ -528,8 +538,10 @@ class UnifiedControl:
             UnifiedControl: Sliced view containing only augmented control variables
 
         Example:
-            >>> unified = unify_controls([thrust, time_dilation], name="u")
-            >>> aug_controls = unified.augmented  # Only time dilation
+            Get augmented controls:
+
+                unified = unify_controls([thrust, time_dilation], name="u")
+                aug_controls = unified.augmented  # Only time dilation
         """
         return self[self._augmented_slice]
 
@@ -639,10 +651,14 @@ class UnifiedControl:
             NotImplementedError: If idx is not a slice, or if step != 1
 
         Example:
-            >>> unified = unify_controls([thrust, torque], name="u")
-            >>> # thrust has shape (3,), torque has shape (3,)
-            >>> first_three = unified[0:3]  # Extract thrust only
-            >>> print(first_three.shape)  # (3,)
+            Generate unified control object:
+
+                unified = unify_controls([thrust, torque], name="u")
+
+            thrust has shape (3,), torque has shape (3,)
+
+                first_three = unified[0:3]  # Extract thrust only
+                print(first_three.shape)  # (3,)
 
         Note:
             The sliced control maintains all properties (bounds, guesses, etc.) for

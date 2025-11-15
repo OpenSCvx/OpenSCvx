@@ -95,12 +95,12 @@ def validate_variable_names(
         ValueError: If any variable name violates uniqueness or reserved name rules
 
     Example:
-        >>> x1 = ox.State("x", shape=(3,))
-        >>> x2 = ox.State("x", shape=(2,))  # Same name, different object
-        >>> validate_variable_names([x1 + x2])  # Raises ValueError: Duplicate name 'x'
+            x1 = ox.State("x", shape=(3,))
+            x2 = ox.State("x", shape=(2,))  # Same name, different object
+            validate_variable_names([x1 + x2])  # Raises ValueError: Duplicate name 'x'
 
-        >>> bad = ox.State("_internal", shape=(2,))
-        >>> validate_variable_names([bad])  # Raises ValueError: Reserved prefix '_'
+            bad = ox.State("_internal", shape=(2,))
+            validate_variable_names([bad])  # Raises ValueError: Reserved prefix '_'
     """
     seen_names = set()
     seen_ids = set()
@@ -165,11 +165,11 @@ def collect_and_assign_slices(
         ValueError: If manual slices are invalid (wrong size, overlapping, not starting at 0)
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> u = ox.Control("u", shape=(2,))
-        >>> states, controls = collect_and_assign_slices([x], [u])
-        >>> print(x._slice)  # slice(0, 3)
-        >>> print(u._slice)  # slice(0, 2)
+            x = ox.State("x", shape=(3,))
+            u = ox.Control("u", shape=(2,))
+            states, controls = collect_and_assign_slices([x], [u])
+            print(x._slice)  # slice(0, 3)
+            print(u._slice)  # slice(0, 2)
     """
 
     def assign(vars_list, start_index):
@@ -253,12 +253,12 @@ def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
         ValueError: If any constraint or constraint wrapper is found at depth > 0
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> constraint = x <= 5
-        >>> validate_constraints_at_root([constraint])  # OK - constraint at root
+            x = ox.State("x", shape=(3,))
+            constraint = x <= 5
+            validate_constraints_at_root([constraint])  # OK - constraint at root
 
-        >>> bad_expr = ox.Sum(x <= 5)  # Constraint nested inside Sum
-        >>> validate_constraints_at_root([bad_expr])  # Raises ValueError
+            bad_expr = ox.Sum(x <= 5)  # Constraint nested inside Sum
+            validate_constraints_at_root([bad_expr])  # Raises ValueError
     """
 
     # Define constraint wrappers that must also be at root level
@@ -318,12 +318,12 @@ def validate_and_normalize_constraint_nodes(exprs: Union[Expr, list[Expr]], n_no
         ValueError: If node specifications are invalid (out of range, malformed, etc.)
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> constraint = (x <= 5).at([0, 10, 20])  # NodalConstraint
-        >>> validate_and_normalize_constraint_nodes([constraint], n_nodes=50)  # OK
+            x = ox.State("x", shape=(3,))
+            constraint = (x <= 5).at([0, 10, 20])  # NodalConstraint
+            validate_and_normalize_constraint_nodes([constraint], n_nodes=50)  # OK
 
-        >>> ctcs_constraint = (x <= 5).over((0, 100))  # CTCS
-        >>> validate_and_normalize_constraint_nodes([ctcs_constraint], n_nodes=50)
+            ctcs_constraint = (x <= 5).over((0, 100))  # CTCS
+            validate_and_normalize_constraint_nodes([ctcs_constraint], n_nodes=50)
         # Raises ValueError: Range exceeds trajectory length
     """
 
@@ -368,13 +368,13 @@ def validate_dynamics_dimension(
         ValueError: If dimensions don't match or if any dynamics is not a 1D vector
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> y = ox.State("y", shape=(2,))
-        >>> dynamics = ox.Concat(x * 2, y + 1)  # Shape (5,) - matches total state dim
-        >>> validate_dynamics_dimension(dynamics, [x, y])  # OK
+            x = ox.State("x", shape=(3,))
+            y = ox.State("y", shape=(2,))
+            dynamics = ox.Concat(x * 2, y + 1)  # Shape (5,) - matches total state dim
+            validate_dynamics_dimension(dynamics, [x, y])  # OK
 
-        >>> bad_dynamics = x  # Shape (3,) - doesn't match total dim of 5
-        >>> validate_dynamics_dimension(bad_dynamics, [x, y])  # Raises ValueError
+            bad_dynamics = x  # Shape (3,) - doesn't match total dim of 5
+            validate_dynamics_dimension(bad_dynamics, [x, y])  # Raises ValueError
     """
     # Normalize inputs to lists
     dynamics_list = dynamics_expr if isinstance(dynamics_expr, (list, tuple)) else [dynamics_expr]
@@ -432,13 +432,13 @@ def validate_dynamics_dict(dynamics: Dict[str, Expr], states: List[State]) -> No
         ValueError: If there's a mismatch between state names and dynamics keys
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> y = ox.State("y", shape=(2,))
-        >>> dynamics = {"x": x * 2, "y": y + 1}
-        >>> validate_dynamics_dict(dynamics, [x, y])  # OK
+            x = ox.State("x", shape=(3,))
+            y = ox.State("y", shape=(2,))
+            dynamics = {"x": x * 2, "y": y + 1}
+            validate_dynamics_dict(dynamics, [x, y])  # OK
 
-        >>> bad_dynamics = {"x": x * 2}  # Missing "y"
-        >>> validate_dynamics_dict(bad_dynamics, [x, y])  # Raises ValueError
+            bad_dynamics = {"x": x * 2}  # Missing "y"
+            validate_dynamics_dict(bad_dynamics, [x, y])  # Raises ValueError
     """
     state_names_set = set(state.name for state in states)
     dynamics_names_set = set(dynamics.keys())
@@ -471,14 +471,14 @@ def validate_dynamics_dict_dimensions(dynamics: Dict[str, Expr], states: List[St
         ValueError: If any dynamics expression dimension doesn't match its state shape
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> y = ox.State("y", shape=(2,))
-        >>> u = ox.Control("u", shape=(3,))
-        >>> dynamics = {"x": u, "y": y + 1}
-        >>> validate_dynamics_dict_dimensions(dynamics, [x, y])  # OK
+            x = ox.State("x", shape=(3,))
+            y = ox.State("y", shape=(2,))
+            u = ox.Control("u", shape=(3,))
+            dynamics = {"x": u, "y": y + 1}
+            validate_dynamics_dict_dimensions(dynamics, [x, y])  # OK
 
-        >>> bad_dynamics = {"x": u, "y": u}  # y dynamics has wrong shape
-        >>> validate_dynamics_dict_dimensions(bad_dynamics, [x, y])  # Raises ValueError
+            bad_dynamics = {"x": u, "y": u}  # y dynamics has wrong shape
+            validate_dynamics_dict_dimensions(bad_dynamics, [x, y])  # Raises ValueError
     """
 
     def normalize_scalars(shape: Tuple[int, ...]) -> Tuple[int, ...]:
@@ -542,16 +542,16 @@ def validate_time_parameters(
         ValueError: If Time object is not provided or has invalid type
 
     Example:
-        >>> # Approach 1: Auto-create time
-        >>> x = ox.State("x", shape=(3,))
-        >>> time_obj = ox.Time(initial=0.0, final=10.0)
-        >>> validate_time_parameters([x], time_obj)
+            # Approach 1: Auto-create time
+            x = ox.State("x", shape=(3,))
+            time_obj = ox.Time(initial=0.0, final=10.0)
+            validate_time_parameters([x], time_obj)
         (False, 0.0, 10.0, 1.0, None, None)
 
-        >>> # Approach 2: User-provided time
-        >>> x = ox.State("x", shape=(3,))
-        >>> time_state = ox.State("time", shape=())
-        >>> validate_time_parameters([x, time_state], time_obj)
+            # Approach 2: User-provided time
+            x = ox.State("x", shape=(3,))
+            time_state = ox.State("time", shape=())
+            validate_time_parameters([x, time_state], time_obj)
         (True, None, None, None, None, None)
     """
     from openscvx.time import Time
@@ -599,14 +599,16 @@ def convert_dynamics_dict_to_expr(
             - Concatenated dynamics expression ordered by states list
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> y = ox.State("y", shape=(2,))
-        >>> dynamics_dict = {"x": x * 2, "y": 1.0}  # Scalar for y
-        >>> converted_dict, concat_expr = convert_dynamics_dict_to_expr(
-        ...     dynamics_dict, [x, y]
-        ... )
-        >>> # converted_dict["y"] is now Constant(1.0)
-        >>> # concat_expr is Concat(x * 2, Constant(1.0))
+        Convert dynamics dict to a single expression:
+
+            x = ox.State("x", shape=(3,))
+            y = ox.State("y", shape=(2,))
+            dynamics_dict = {"x": x * 2, "y": 1.0}  # Scalar for y
+            converted_dict, concat_expr = convert_dynamics_dict_to_expr(
+                dynamics_dict, [x, y]
+            )
+            # converted_dict["y"] is now Constant(1.0)
+            # concat_expr is Concat(x * 2, Constant(1.0))
     """
     # Create a copy to avoid mutating the input
     dynamics_converted = dict(dynamics)

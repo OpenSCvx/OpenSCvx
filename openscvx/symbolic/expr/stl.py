@@ -35,15 +35,16 @@ class Or(Expr):
         operands: List of expressions representing the disjunctive clauses
 
     Example:
-        >>> import openscvx as ox
-        >>> # Robot must reach either of two goal regions
-        >>> x = ox.State("x", shape=(2,))
-        >>> goal_a = ox.Parameter("goal_a", shape=(2,), value=[1.0, 1.0])
-        >>> goal_b = ox.Parameter("goal_b", shape=(2,), value=[-1.0, -1.0])
-        >>> # Robot is within 0.5 units of either goal
-        >>> reach_a = 0.25 - ox.Norm(x - goal_a)**2
-        >>> reach_b = 0.25 - ox.Norm(x - goal_b)**2
-        >>> reach_either = ox.Or(reach_a, reach_b)
+        Use Or STL operator to enforce that robot must reach either of two goal regions:
+
+            import openscvx as ox
+            x = ox.State("x", shape=(2,))
+            goal_a = ox.Parameter("goal_a", shape=(2,), value=[1.0, 1.0])
+            goal_b = ox.Parameter("goal_b", shape=(2,), value=[-1.0, -1.0])
+            # Robot is within 0.5 units of either goal
+            reach_a = 0.25 - ox.Norm(x - goal_a)**2
+            reach_b = 0.25 - ox.Norm(x - goal_b)**2
+            reach_either = ox.Or(reach_a, reach_b)
 
     Note:
         The Or operation produces a scalar result even when operands are vector

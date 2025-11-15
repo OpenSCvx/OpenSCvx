@@ -31,23 +31,26 @@ class Control(Variable):
         _guess: Initial guess for the control trajectory (n_points, n_controls)
 
     Example:
-        >>> # Scalar throttle control bounded [0, 1]
-        >>> throttle = Control("throttle", shape=(1,))
-        >>> throttle.min = [0.0]
-        >>> throttle.max = [1.0]
-        >>> throttle.guess = np.full((50, 1), 0.5)  # Start at 50% throttle
-        >>>
-        >>> # 3D thrust vector for spacecraft
-        >>> thrust = Control("thrust", shape=(3,))
-        >>> thrust.min = [-10, -10, 0]    # No downward thrust
-        >>> thrust.max = [10, 10, 50]     # Limited thrust
-        >>> thrust.guess = np.zeros((50, 3))  # Initialize with zero thrust
-        >>>
-        >>> # 2D steering control (left/right, forward/backward)
-        >>> steer = Control("steer", shape=(2,))
-        >>> steer.min = [-1, -1]
-        >>> steer.max = [1, 1]
-        >>> steer.guess = np.linspace([0, 0], [0, 1], 50)  # Gradual acceleration
+        Scalar throttle control bounded [0, 1]:
+
+            throttle = Control("throttle", shape=(1,))
+            throttle.min = [0.0]
+            throttle.max = [1.0]
+            throttle.guess = np.full((50, 1), 0.5)  # Start at 50% throttle
+
+        3D thrust vector for spacecraft:
+
+            thrust = Control("thrust", shape=(3,))
+            thrust.min = [-10, -10, 0]    # No downward thrust
+            thrust.max = [10, 10, 50]     # Limited thrust
+            thrust.guess = np.zeros((50, 3))  # Initialize with zero thrust
+
+        2D steering control (left/right, forward/backward):
+
+            steer = Control("steer", shape=(2,))
+            steer.min = [-1, -1]
+            steer.max = [1, 1]
+            steer.guess = np.linspace([0, 0], [0, 1], 50)  # Gradual acceleration
     """
 
     def __init__(self, name, shape):
@@ -64,9 +67,5 @@ class Control(Variable):
 
         Returns:
             Concise string showing the control name and shape.
-
-        Example:
-            >>> thrust = Control("thrust", (3,))
-            >>> print(thrust)  # Control('thrust', shape=(3,))
         """
         return f"Control('{self.name}', shape={self.shape})"

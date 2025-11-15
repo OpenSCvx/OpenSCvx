@@ -170,10 +170,12 @@ def visitor(expr_cls: Type[Expr]):
         Decorator function that registers the visitor and returns it unchanged
 
     Example:
-        >>> @visitor(Add)
-        ... def _visit_add(self, node: Add):
-        ...     # Lower addition to JAX
-        ...     ...
+        Register a visitor function for the Add expression:
+
+            @visitor(Add)
+            def _visit_add(self, node: Add):
+                # Lower addition to JAX
+                ...
 
     Note:
         Multiple expression types can share a visitor by stacking decorators::
@@ -209,9 +211,11 @@ def dispatch(lowerer: Any, expr: Expr):
         NotImplementedError: If no visitor is registered for the expression type
 
     Example:
-        >>> lowerer = JaxLowerer()
-        >>> expr = Add(x, y)
-        >>> fn = dispatch(lowerer, expr)  # Calls visit_add
+        Dispatch an expression to lower it to a JAX function:
+
+            lowerer = JaxLowerer()
+            expr = Add(x, y)
+            fn = dispatch(lowerer, expr)  # Calls visit_add
     """
     fn = _JAX_VISITORS.get(type(expr))
     if fn is None:
@@ -236,10 +240,12 @@ class JaxLowerer:
         None (stateless lowerer - all state is in the expression tree)
 
     Example:
-        >>> lowerer = JaxLowerer()
-        >>> expr = ox.Norm(x)**2 + 0.1 * ox.Norm(u)**2
-        >>> f = lowerer.lower(expr)
-        >>> result = f(x_val, u_val, node=0, params={})
+        Set up the JaxLowerer and lower an expression to a JAX function:
+
+            lowerer = JaxLowerer()
+            expr = ox.Norm(x)**2 + 0.1 * ox.Norm(u)**2
+            f = lowerer.lower(expr)
+            result = f(x_val, u_val, node=0, params={})
 
     Note:
         The lowerer is stateless and can be reused for multiple expressions.
@@ -264,11 +270,13 @@ class JaxLowerer:
             ValueError: If the expression is malformed (e.g., State without slice)
 
         Example:
-            >>> lowerer = JaxLowerer()
-            >>> x = ox.State("x", shape=(3,))
-            >>> expr = ox.Norm(x)
-            >>> f = lowerer.lower(expr)
-            >>> # f is now callable
+            Lower an expression to a JAX function:
+
+                lowerer = JaxLowerer()
+                x = ox.State("x", shape=(3,))
+                expr = ox.Norm(x)
+                f = lowerer.lower(expr)
+                # f is now callable
         """
         return dispatch(self, expr)
 

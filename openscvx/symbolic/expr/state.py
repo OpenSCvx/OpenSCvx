@@ -19,9 +19,10 @@ class BoundaryType(str, Enum):
         MAXIMIZE: Objective term to maximize the state value
 
     Example:
-        >>> # Can use either enum or string
-        >>> BoundaryType.FIXED
-        >>> "fixed"  # Equivalent
+        Can use either enum or string:
+
+            BoundaryType.FIXED
+            "fixed"  # Equivalent
     """
 
     FIXED = "fixed"
@@ -60,19 +61,21 @@ class State(Variable):
         final_type: Array of boundary condition types for final state
 
     Example:
-        >>> # Scalar time state with free initial time, minimize final time
-        >>> time = State("time", (1,))
-        >>> time.min = [0.0]
-        >>> time.max = [10.0]
-        >>> time.initial = [("free", 0.0)]
-        >>> time.final = [("minimize", 5.0)]
-        >>>
-        >>> # 3D position state with mixed boundary conditions
-        >>> pos = State("pos", (3,))
-        >>> pos.min = [0, 0, 10]
-        >>> pos.max = [10, 10, 200]
-        >>> pos.initial = [0, ("free", 1), 50]  # x fixed, y free, z fixed
-        >>> pos.final = [10, ("free", 5), ("maximize", 150)]  # Maximize final altitude
+        Scalar time state with free initial time, minimize final time:
+
+            time = State("time", (1,))
+            time.min = [0.0]
+            time.max = [10.0]
+            time.initial = [("free", 0.0)]
+            time.final = [("minimize", 5.0)]
+
+        3D position state with mixed boundary conditions:
+
+            pos = State("pos", (3,))
+            pos.min = [0, 0, 10]
+            pos.max = [10, 10, 200]
+            pos.initial = [0, ("free", 1), 50]  # x fixed, y free, z fixed
+            pos.final = [10, ("free", 5), ("maximize", 150)]  # Maximize final altitude
     """
 
     def __init__(self, name, shape):
@@ -96,9 +99,11 @@ class State(Variable):
             Array of minimum values for each state variable element.
 
         Example:
-            >>> pos = State("pos", (3,))
-            >>> pos.min = [0, 0, 10]
-            >>> print(pos.min)  # [0. 0. 10.]
+            Get lower bounds:
+
+                pos = State("pos", (3,))
+                pos.min = [0, 0, 10]
+                print(pos.min)  # [0. 0. 10.]
         """
         return self._min
 
@@ -117,9 +122,11 @@ class State(Variable):
                 boundary conditions violate the bounds
 
         Example:
-            >>> pos = State("pos", (3,))
-            >>> pos.min = [0, 0, 10]  # Set lower bounds
-            >>> pos.initial = [0, 5, 15]  # Must satisfy: 0>=0, 5>=0, 15>=10
+            Set lower bounds:
+
+                pos = State("pos", (3,))
+                pos.min = [0, 0, 10]
+                pos.initial = [0, 5, 15]  # Must satisfy: 0>=0, 5>=0, 15>=10
         """
         val = np.asarray(val)
         if val.shape != self.shape:
@@ -135,9 +142,11 @@ class State(Variable):
             Array of maximum values for each state variable element.
 
         Example:
-            >>> vel = State("vel", (3,))
-            >>> vel.max = [10, 10, 5]
-            >>> print(vel.max)  # [10. 10. 5.]
+            Get upper bounds:
+
+                vel = State("vel", (3,))
+                vel.max = [10, 10, 5]
+                print(vel.max)  # [10. 10. 5.]
         """
         return self._max
 
@@ -156,9 +165,11 @@ class State(Variable):
                 boundary conditions violate the bounds
 
         Example:
-            >>> vel = State("vel", (3,))
-            >>> vel.max = [10, 10, 5]  # Set upper bounds
-            >>> vel.final = [8, 9, 4]  # Must satisfy: 8<=10, 9<=10, 4<=5
+            Set upper bounds:
+
+                vel = State("vel", (3,))
+                vel.max = [10, 10, 5]
+                vel.final = [8, 9, 4]  # Must satisfy: 8<=10, 9<=10, 4<=5
         """
         val = np.asarray(val)
         if val.shape != self.shape:
@@ -209,10 +220,12 @@ class State(Variable):
             Use `initial_type` to see the boundary condition types for each element.
 
         Example:
-            >>> x = State("x", (2,))
-            >>> x.initial = [0, ("free", 1)]
-            >>> print(x.initial)  # [0. 1.]
-            >>> print(x.initial_type)  # ['Fix' 'Free']
+            Get initial state boundary conditions:
+
+                x = State("x", (2,))
+                x.initial = [0, ("free", 1)]
+                print(x.initial)  # [0. 1.]
+                print(x.initial_type)  # ['Fix' 'Free']
         """
         return self._initial
 
@@ -237,15 +250,18 @@ class State(Variable):
                 condition type is invalid, or if fixed values violate bounds
 
         Example:
-            >>> pos = State("pos", (3,))
-            >>> pos.min = [0, 0, 0]
-            >>> pos.max = [10, 10, 10]
-            >>> # x fixed at 0, y free (starts at 5), z fixed at 2
-            >>> pos.initial = [0, ("free", 5), 2]
-            >>>
-            >>> # Can also minimize/maximize boundary values
-            >>> time = State("t", (1,))
-            >>> time.initial = [("minimize", 0)]  # Minimize initial time
+            Set initial state boundary conditions:
+
+                pos = State("pos", (3,))
+                pos.min = [0, 0, 0]
+                pos.max = [10, 10, 10]
+                # x fixed at 0, y free (starts at 5), z fixed at 2
+                pos.initial = [0, ("free", 5), 2]
+
+            Can also minimize/maximize boundary values:
+
+                time = State("t", (1,))
+                time.initial = [("minimize", 0)]  # Minimize initial time
         """
         # Convert to list first to handle mixed types properly
         if not isinstance(arr, (list, tuple)):
@@ -300,10 +316,12 @@ class State(Variable):
             Use `final_type` to see the boundary condition types for each element.
 
         Example:
-            >>> x = State("x", (2,))
-            >>> x.final = [10, ("minimize", 0)]
-            >>> print(x.final)  # [10. 0.]
-            >>> print(x.final_type)  # ['Fix' 'Minimize']
+            Get final state boundary conditions:
+
+                x = State("x", (2,))
+                x.final = [10, ("minimize", 0)]
+                print(x.final)  # [10. 0.]
+                print(x.final_type)  # ['Fix' 'Minimize']
         """
         return self._final
 
@@ -328,15 +346,18 @@ class State(Variable):
                 condition type is invalid, or if fixed values violate bounds
 
         Example:
-            >>> pos = State("pos", (3,))
-            >>> pos.min = [0, 0, 0]
-            >>> pos.max = [10, 10, 10]
-            >>> # x fixed at 10, y free (starts at 5), z maximize altitude
-            >>> pos.final = [10, ("free", 5), ("maximize", 8)]
-            >>>
-            >>> # Minimize final time in time-optimal problem
-            >>> time = State("t", (1,))
-            >>> time.final = [("minimize", 10)]
+            Set final state boundary conditionis:
+
+                pos = State("pos", (3,))
+                pos.min = [0, 0, 0]
+                pos.max = [10, 10, 10]
+                # x fixed at 10, y free (starts at 5), z maximize altitude
+                pos.final = [10, ("free", 5), ("maximize", 8)]
+
+            Minimize final time in time-optimal problem:
+
+                time = State("t", (1,))
+                time.final = [("minimize", 10)]
         """
         # Convert to list first to handle mixed types properly
         if not isinstance(arr, (list, tuple)):
@@ -384,9 +405,5 @@ class State(Variable):
 
         Returns:
             Concise string showing the state name and shape.
-
-        Example:
-            >>> pos = State("pos", (3,))
-            >>> print(pos)  # State('pos', shape=(3,))
         """
         return f"State('{self.name}', shape={self.shape})"

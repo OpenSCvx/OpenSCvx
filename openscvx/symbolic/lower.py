@@ -80,12 +80,15 @@ def lower(expr: Expr, lowerer: Any):
         NotImplementedError: If the lowerer doesn't support the expression type
 
     Example:
-        >>> from openscvx.symbolic.lowerers.jax import JaxLowerer
-        >>> x = ox.State("x", shape=(3,))
-        >>> expr = ox.Norm(x)
-        >>> lowerer = JaxLowerer()
-        >>> f = lower(expr, lowerer)
-        >>> # f is now callable: f(x_val, u_val, node, params) -> scalar
+        Lower an expression to the appropriate backend (here JAX):
+
+            from openscvx.symbolic.lowerers.jax import JaxLowerer
+            x = ox.State("x", shape=(3,))
+            expr = ox.Norm(x)
+            lowerer = JaxLowerer()
+            f = lower(expr, lowerer)
+
+        f is now callable: f(x_val, u_val, node, params) -> scalar
     """
     return lowerer.lower(expr)
 

@@ -30,9 +30,9 @@ class Variable(Leaf):
         _guess: Initial guess for the variable trajectory (n_points, n_vars)
 
     Example:
-        >>> # Typically, use State or Control instead of Variable directly:
-        >>> pos = openscvx.State("pos", shape=(3,))
-        >>> u = openscvx.Control("u", shape=(2,))
+            # Typically, use State or Control instead of Variable directly:
+            pos = openscvx.State("pos", shape=(3,))
+            u = openscvx.Control("u", shape=(2,))
     """
 
     def __init__(self, name, shape):
@@ -59,9 +59,9 @@ class Variable(Leaf):
             Array of minimum values for each element of the variable, or None if unbounded.
 
         Example:
-            >>> pos = Variable("pos", shape=(3,))
-            >>> pos.min = [-10, -10, 0]
-            >>> print(pos.min)  # [-10., -10., 0.]
+                pos = Variable("pos", shape=(3,))
+                pos.min = [-10, -10, 0]
+                print(pos.min)  # [-10., -10., 0.]
         """
         return self._min
 
@@ -80,9 +80,9 @@ class Variable(Leaf):
             ValueError: If the shape of arr doesn't match the variable shape
 
         Example:
-            >>> pos = Variable("pos", shape=(3,))
-            >>> pos.min = -10  # Broadcasts to [-10, -10, -10]
-            >>> pos.min = [-5, -10, 0]  # Element-wise bounds
+                pos = Variable("pos", shape=(3,))
+                pos.min = -10  # Broadcasts to [-10, -10, -10]
+                pos.min = [-5, -10, 0]  # Element-wise bounds
         """
         arr = np.asarray(arr, dtype=float)
         if arr.ndim != 1 or arr.shape[0] != self.shape[0]:
@@ -100,9 +100,9 @@ class Variable(Leaf):
             Array of maximum values for each element of the variable, or None if unbounded.
 
         Example:
-            >>> vel = Variable("vel", shape=(3,))
-            >>> vel.max = [10, 10, 5]
-            >>> print(vel.max)  # [10., 10., 5.]
+                vel = Variable("vel", shape=(3,))
+                vel.max = [10, 10, 5]
+                print(vel.max)  # [10., 10., 5.]
         """
         return self._max
 
@@ -121,9 +121,9 @@ class Variable(Leaf):
             ValueError: If the shape of arr doesn't match the variable shape
 
         Example:
-            >>> vel = Variable("vel", shape=(3,))
-            >>> vel.max = 10  # Broadcasts to [10, 10, 10]
-            >>> vel.max = [15, 10, 5]  # Element-wise bounds
+                vel = Variable("vel", shape=(3,))
+                vel.max = 10  # Broadcasts to [10, 10, 10]
+                vel.max = [15, 10, 5]  # Element-wise bounds
         """
         arr = np.asarray(arr, dtype=float)
         if arr.ndim != 1 or arr.shape[0] != self.shape[0]:
@@ -145,10 +145,10 @@ class Variable(Leaf):
             over time, or None if no guess is provided.
 
         Example:
-            >>> x = Variable("x", shape=(2,))
-            >>> # Linear interpolation from [0,0] to [10,10] over 50 points
-            >>> x.guess = np.linspace([0, 0], [10, 10], 50)
-            >>> print(x.guess.shape)  # (50, 2)
+                x = Variable("x", shape=(2,))
+                # Linear interpolation from [0,0] to [10,10] over 50 points
+                x.guess = np.linspace([0, 0], [10, 10], 50)
+                print(x.guess.shape)  # (50, 2)
         """
         return self._guess
 
@@ -169,10 +169,10 @@ class Variable(Leaf):
                 match the variable dimension
 
         Example:
-            >>> pos = Variable("pos", shape=(3,))
-            >>> # Create a straight-line trajectory from origin to target
-            >>> n_points = 50
-            >>> pos.guess = np.linspace([0, 0, 0], [10, 5, 3], n_points)
+                pos = Variable("pos", shape=(3,))
+                # Create a straight-line trajectory from origin to target
+                n_points = 50
+                pos.guess = np.linspace([0, 0, 0], [10, 5, 3], n_points)
         """
         arr = np.asarray(arr)
         if arr.ndim != 2:
@@ -207,19 +207,21 @@ class Variable(Leaf):
                 Defaults to 0.0.
 
         Example:
-            >>> # Create a 2D variable and extend it to 3D
-            >>> pos_xy = Variable("pos", shape=(2,))
-            >>> pos_xy.min = [-10, -10]
-            >>> pos_xy.max = [10, 10]
-            >>> pos_xy.append(min=0, max=100)  # Add z dimension
-            >>> print(pos_xy.shape)  # (3,)
-            >>> print(pos_xy.min)  # [-10., -10., 0.]
-            >>> print(pos_xy.max)  # [10., 10., 100.]
-            >>>
-            >>> # Merge two variables
-            >>> pos = Variable("pos", shape=(3,))
-            >>> vel = Variable("vel", shape=(3,))
-            >>> pos.append(vel)  # Now pos has shape (6,)
+            Create a 2D variable and extend it to 3D:
+
+                pos_xy = Variable("pos", shape=(2,))
+                pos_xy.min = [-10, -10]
+                pos_xy.max = [10, 10]
+                pos_xy.append(min=0, max=100)  # Add z dimension
+                print(pos_xy.shape)  # (3,)
+                print(pos_xy.min)  # [-10., -10., 0.]
+                print(pos_xy.max)  # [10., 10., 100.]
+
+            Merge two variables:
+
+                pos = Variable("pos", shape=(3,))
+                vel = Variable("vel", shape=(3,))
+                pos.append(vel)  # Now pos has shape (6,)
         """
 
         def process_array(val, is_guess=False):

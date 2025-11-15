@@ -25,12 +25,13 @@ class QDCM(Expr):
         q: Quaternion expression with shape (4,)
 
     Example:
-        >>> import openscvx as ox
-        >>> q = ox.State("q", shape=(4,))
-        >>> dcm = ox.QDCM(q)  # Creates rotation matrix, shape (3, 3)
-        >>> # Use DCM to rotate a vector
-        >>> v_body = ox.Variable("v_body", shape=(3,))
-        >>> v_inertial = dcm @ v_body
+        Use the QDCM to rotate a vector:
+
+            import openscvx as ox
+            q = ox.State("q", shape=(4,))
+            dcm = ox.QDCM(q)  # Creates rotation matrix, shape (3, 3)
+            v_body = ox.Variable("v_body", shape=(3,))
+            v_inertial = dcm @ v_body
 
     Note:
         The input quaternion does not need to be normalized; the implementation
@@ -92,11 +93,13 @@ class SSMP(Expr):
         w: Angular velocity vector expression with shape (3,)
 
     Example:
-        >>> import openscvx as ox
-        >>> omega = ox.Control("omega", shape=(3,))
-        >>> q = ox.State("q", shape=(4,))
-        >>> # Quaternion kinematic equation
-        >>> q_dot = 0.5 * ox.SSMP(omega) @ q
+        Use the SSMP to compute the quaternion derivative:
+
+            import openscvx as ox
+            omega = ox.Control("omega", shape=(3,))
+            q = ox.State("q", shape=(4,))
+            # Quaternion kinematic equation
+            q_dot = 0.5 * ox.SSMP(omega) @ q
 
     See Also:
         SSM: 3x3 skew-symmetric matrix for cross product operations
@@ -157,11 +160,13 @@ class SSM(Expr):
         w: Angular velocity or 3D vector expression with shape (3,)
 
     Example:
-        >>> import openscvx as ox
-        >>> omega = ox.Control("omega", shape=(3,))
-        >>> R = ox.State("R", shape=(3, 3))  # Direction cosine matrix
-        >>> # DCM time derivative
-        >>> R_dot = ox.SSM(omega) @ R
+        Use the SSM to compute the rotation matrix derivative:
+
+            import openscvx as ox
+            omega = ox.Control("omega", shape=(3,))
+            R = ox.State("R", shape=(3, 3))  # Direction cosine matrix
+            # DCM time derivative
+            R_dot = ox.SSM(omega) @ R
 
     Note:
         The skew-symmetric property ensures that [ω]xᵀ = -[ω]x, which is
