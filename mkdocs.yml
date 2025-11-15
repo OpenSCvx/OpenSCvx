@@ -132,6 +132,7 @@ markdown_extensions:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
+      default_lang: python
   - pymdownx.inlinehilite
   - pymdownx.keys
   - pymdownx.mark
