@@ -99,3 +99,61 @@ def test_traverse_visits_all_nodes_in_preorder():
 
     # preorder: Add → a → Mul → b → c
     assert visited == ["Add", "Constant", "Mul", "Constant", "Constant"]
+
+
+# =============================================================================
+# Expr.canonicalize() Method Tests
+# =============================================================================
+
+
+def test_constants_are_unchanged_by_canonicalization():
+    """Test that constants are already normalized and unchanged by canonicalization.
+
+    Since canonicalization is now a method on Expr, this tests the base behavior
+    that Constants return themselves unchanged.
+    """
+    # Constants are now normalized at construction time, so canonicalization should be a no-op
+    const_scalar = Constant(5.0)
+    const_vector = Constant([1.0, 2.0, 3.0])
+    const_matrix = Constant([[1.0, 2.0], [3.0, 4.0]])
+
+    # Canonicalization should return the same object (no changes needed)
+    canon_scalar = const_scalar.canonicalize()
+    canon_vector = const_vector.canonicalize()
+    canon_matrix = const_matrix.canonicalize()
+
+    assert canon_scalar is const_scalar  # Should be same object
+    assert canon_vector is const_vector
+    assert canon_matrix is const_matrix
+
+    # Values should be already normalized
+    assert const_scalar.value.shape == ()
+    assert const_vector.value.shape == (3,)
+    assert const_matrix.value.shape == (2, 2)
+
+
+def test_vector_constraint_equivalence_after_canonicalization():
+    """Test that different ways of creating vector constraints become equivalent after
+    canonicalization.
+
+    This tests that canonicalize() properly normalizes expressions across the tree.
+    """
+    x = State("x", shape=(3,))
+    bounds = np.array([1.0, 2.0, 3.0])
+
+    # Two ways to create the same constraint - constants are normalized at construction now
+    constraint1 = x <= Constant(bounds)
+    constraint2 = x <= Constant(np.array([bounds]))  # Extra dimension gets squeezed at construction
+
+    # Constants should already be equivalent at construction time
+    assert np.array_equal(constraint1.rhs.value, constraint2.rhs.value)
+    assert constraint1.rhs.value.shape == constraint2.rhs.value.shape
+
+    canon1 = constraint1.canonicalize()
+    canon2 = constraint2.canonicalize()
+
+    # After canonicalization, they should remain equivalent (and in canonical form)
+    assert isinstance(canon1.rhs, Constant)
+    assert isinstance(canon2.rhs, Constant)
+    assert np.array_equal(canon1.rhs.value, canon2.rhs.value)
+    assert canon1.rhs.value.shape == canon2.rhs.value.shape

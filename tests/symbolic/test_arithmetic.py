@@ -173,3 +173,286 @@ def test_add_mul_requires_at_least_two_terms():
         Add(Constant(1))
     with pytest.raises(ValueError):
         Mul(Constant(2))
+
+
+# =============================================================================
+# Canonicalization Tests
+# =============================================================================
+
+
+def test_flatten_and_fold_add():
+    """Test that nested Add nodes flatten and constants fold during canonicalization."""
+    a = Constant(1)
+    b = Constant(2)
+    c = Constant(3)
+    nested = Add(Add(a, b), c, Constant(4))
+    result = nested.canonicalize()
+    # should be Add(1,2,3,4) then folded to Constant(10)
+    assert isinstance(result, Constant)
+    assert result.value == 10
+
+
+def test_add_eliminate_zero_and_singleton():
+    """Test that Add eliminates zero terms and reduces singleton to just the value."""
+    x = Constant(5)
+    zero = Constant(0)
+    # 5 + 0 + 0 ⇒ 5
+    expr = Add(zero, x, zero)
+    result = expr.canonicalize()
+    assert not isinstance(result, Add)
+    assert isinstance(result, Constant)
+    assert result.value == 5
+
+
+def test_flatten_and_fold_mul():
+    """Test that nested Mul nodes flatten and constants fold during canonicalization."""
+    a = Constant(2)
+    b = Constant(3)
+    c = Constant(4)
+    nested = Mul(Mul(a, b), c, Constant(5))
+    result = nested.canonicalize()
+    # 2*3*4*5 = 120
+    assert isinstance(result, Constant)
+    assert result.value == 120
+
+
+def test_mul_eliminate_one_and_singleton():
+    """Test that Mul eliminates identity (1) terms and reduces singleton."""
+    x = Constant(7)
+    one = Constant(1)
+    expr = Mul(one, x, one)
+    result = expr.canonicalize()
+    assert not isinstance(result, Mul)
+    assert isinstance(result, Constant)
+    assert result.value == 7
+
+
+def test_sub_constant_folding():
+    """Test that Sub folds constants during canonicalization."""
+    expr = Sub(Constant(10), Constant(4))
+    result = expr.canonicalize()
+    assert isinstance(result, Constant)
+    assert result.value == 6
+
+
+def test_div_constant_folding():
+    """Test that Div folds constants during canonicalization."""
+    expr = Div(Constant(20), Constant(5))
+    result = expr.canonicalize()
+    assert isinstance(result, Constant)
+    assert result.value == 4
+
+
+def test_neg_constant_folding():
+    """Test that Neg folds constants during canonicalization."""
+    expr = Neg(Constant(8))
+    result = expr.canonicalize()
+    assert isinstance(result, Constant)
+    assert result.value == -8
+
+
+def test_mul_preserves_vector_structure_with_parameter():
+    """Test that multiplying a Parameter by a vector preserves the vector structure.
+
+    Regression test for bug where Parameter * vector was incorrectly reduced to
+    Parameter * scalar during canonicalization.
+    """
+    from openscvx.symbolic.expr import Parameter
+
+    # Create a parameter
+    g = Parameter("g", value=3.7114)
+
+    # Create a vector
+    g_vec = np.array([0.0, 0.0, 1.0])
+
+    # Multiply parameter by vector
+    expr = g * g_vec
+
+    # Canonicalize
+    result = expr.canonicalize()
+
+    # The result should still be a Mul expression
+    assert isinstance(result, Mul)
+
+    # It should contain the parameter and a Constant with the FULL vector
+    has_param = False
+    has_vector_const = False
+
+    for factor in result.factors:
+        if isinstance(factor, Parameter) and factor.name == "g":
+            has_param = True
+        if isinstance(factor, Constant):
+            # The constant should be a vector [0, 0, 1], NOT a scalar 0
+            assert factor.value.shape == (3,), (
+                f"Expected vector shape (3,), got {factor.value.shape}"
+            )
+            assert np.allclose(factor.value, [0.0, 0.0, 1.0]), (
+                f"Expected [0, 0, 1], got {factor.value}"
+            )
+            has_vector_const = True
+
+    assert has_param, "Parameter 'g' should be in the canonicalized expression"
+    assert has_vector_const, "Vector constant should be preserved in canonicalized expression"
+
+
+def test_mul_vector_constant_folding():
+    """Test that multiplying multiple vector constants correctly performs element-wise mult."""
+    # Create vector constants
+    vec1 = Constant(np.array([2.0, 3.0, 4.0]))
+    vec2 = Constant(np.array([5.0, 6.0, 7.0]))
+
+    # Multiply them
+    expr = Mul(vec1, vec2)
+
+    # Canonicalize
+    result = expr.canonicalize()
+
+    # Should fold to a single constant with element-wise product
+    assert isinstance(result, Constant)
+    expected = np.array([10.0, 18.0, 28.0])
+    assert np.allclose(result.value, expected), f"Expected {expected}, got {result.value}"
+
+
+def test_mul_matrix_constant_folding():
+    """Test that multiplying matrix constants correctly performs element-wise multiplication."""
+    # Create matrix constants
+    mat1 = Constant(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    mat2 = Constant(np.array([[2.0, 3.0], [4.0, 5.0]]))
+
+    # Multiply them
+    expr = Mul(mat1, mat2)
+
+    # Canonicalize
+    result = expr.canonicalize()
+
+    # Should fold to a single constant with element-wise product
+    assert isinstance(result, Constant)
+    expected = np.array([[2.0, 6.0], [12.0, 20.0]])
+    assert np.allclose(result.value, expected), f"Expected {expected}, got {result.value}"
+
+
+def test_mul_scalar_times_vector():
+    """Test that multiplying a scalar constant by a vector constant works correctly."""
+    scalar = Constant(2.0)
+    vector = Constant(np.array([1.0, 2.0, 3.0]))
+
+    # Multiply
+    expr = Mul(scalar, vector)
+
+    # Canonicalize
+    result = expr.canonicalize()
+
+    # Should fold to a single vector constant
+    assert isinstance(result, Constant)
+    expected = np.array([2.0, 4.0, 6.0])
+    assert np.allclose(result.value, expected), f"Expected {expected}, got {result.value}"
+
+
+def test_mul_multiple_constants_with_parameter():
+    """Test that multiplying multiple constants with a parameter preserves structure correctly."""
+    from openscvx.symbolic.expr import Parameter
+
+    # This mimics the real-world case: g_vec * g where g_vec = [0, 0, 1] * g_scalar
+    g = Parameter("g", value=3.7114)
+    base_vec = np.array([0.0, 0.0, 1.0])
+    scalar = 9.807
+
+    # Create expression: Parameter * vector * scalar
+    expr = Mul(g, Constant(base_vec), Constant(scalar))
+
+    # Canonicalize
+    result = expr.canonicalize()
+
+    # Should have Parameter and a single folded constant (vector * scalar)
+    assert isinstance(result, Mul)
+
+    has_param = False
+    has_const = False
+
+    for factor in result.factors:
+        if isinstance(factor, Parameter):
+            has_param = True
+        if isinstance(factor, Constant):
+            has_const = True
+            # The two constants should be multiplied: [0, 0, 1] * 9.807 = [0, 0, 9.807]
+            expected = np.array([0.0, 0.0, 9.807])
+            assert factor.value.shape == (3,), (
+                f"Expected vector shape (3,), got {factor.value.shape}"
+            )
+            assert np.allclose(factor.value, expected), f"Expected {expected}, got {factor.value}"
+
+    assert has_param, "Parameter should be preserved"
+    assert has_const, "Folded constant should be present"
+
+
+def test_mul_gravity_vector_case():
+    """Regression test for the exact gravity vector bug case.
+
+    This tests: g_vec = np.array([0, 0, 1]) * Parameter('g', value=3.7114)
+    which should canonicalize to Parameter('g') * Const([0, 0, 1])
+    NOT Parameter('g') * Const(0.0)
+    """
+    from openscvx.symbolic.expr import Parameter
+
+    g = Parameter("g", value=3.7114)
+    g_vec_array = np.array([0.0, 0.0, 1.0], dtype=np.float64)
+
+    # This is how it appears in the dynamics
+    g_vec = g_vec_array * g
+
+    # Canonicalize
+    g_vec_canon = g_vec.canonicalize()
+
+    # Should be Mul(Parameter('g'), Const([0, 0, 1]))
+    assert isinstance(g_vec_canon, Mul), "Should be a Mul expression"
+
+    # Extract factors
+    param_factor = None
+    const_factor = None
+
+    for factor in g_vec_canon.factors:
+        if isinstance(factor, Parameter):
+            param_factor = factor
+        elif isinstance(factor, Constant):
+            const_factor = factor
+
+    assert param_factor is not None, "Should have a Parameter factor"
+    assert param_factor.name == "g", "Parameter should be 'g'"
+
+    assert const_factor is not None, "Should have a Constant factor"
+    assert const_factor.value.shape == (3,), (
+        f"Constant should be a 3D vector, got shape {const_factor.value.shape}"
+    )
+    assert np.allclose(const_factor.value, [0.0, 0.0, 1.0]), (
+        f"Expected [0, 0, 1], got {const_factor.value}"
+    )
+
+    # The bug would have produced Const(0.0) because np.prod([0, 0, 1]) = 0
+    # Verify this doesn't happen
+    assert not (const_factor.value.shape == () and const_factor.value == 0.0), (
+        "Bug detected: vector was reduced to scalar 0!"
+    )
+
+
+def test_mul_broadcasting_with_parameters():
+    """Test that broadcasting works correctly with parameters and arrays of different shapes."""
+    from openscvx.symbolic.expr import Parameter
+
+    param = Parameter("alpha", value=2.0)
+
+    # Scalar * vector
+    vec = Constant(np.array([1.0, 2.0, 3.0]))
+    expr1 = Mul(param, vec)
+    result1 = expr1.canonicalize()
+    assert isinstance(result1, Mul)
+
+    # Scalar * matrix
+    mat = Constant(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    expr2 = Mul(param, mat)
+    result2 = expr2.canonicalize()
+    assert isinstance(result2, Mul)
+
+    # Both should preserve the parameter and the array structure
+    for result in [result1, result2]:
+        has_param = any(isinstance(f, Parameter) for f in result.factors)
+        assert has_param, "Parameter should be preserved in canonicalized expression"
