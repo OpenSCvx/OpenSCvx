@@ -179,51 +179,51 @@ def preprocess_symbolic_problem(
     Example:
         Basic usage with CTCS constraint::
 
-            >>> import openscvx as ox
-            >>> x = ox.State("x", shape=(2,))
-            >>> v = ox.State("v", shape=(2,))
-            >>> u = ox.Control("u", shape=(2,))
-            >>>
-            >>> dynamics = {"x": v, "v": u}
-            >>> constraints = [(ox.Norm(x) <= 5.0).over((0, 50))]
-            >>>
-            >>> result = preprocess_symbolic_problem(
-            ...     dynamics=dynamics,
-            ...     constraints=constraints,
-            ...     states=[x, v],
-            ...     controls=[u],
-            ...     N=50,
-            ...     time=ox.Time(initial=0.0, final=10.0)
-            ... )
-            >>>
-            >>> (dynamics_aug, states_aug, controls_aug,
-            ...  ctcs, nodal, nodal_convex, params, intervals,
-            ...  dyn_prop, states_prop, controls_prop) = result
-            >>>
-            >>> # Augmented dynamics components: [x_dot, v_dot, time_dot, ctcs_aug_dot]
-            >>> # Augmented states: [x, v, time, _ctcs_aug_0]
-            >>> # Augmented controls: [u, _time_dilation]
-            >>> print([s.name for s in states_aug])
+                import openscvx as ox
+                x = ox.State("x", shape=(2,))
+                v = ox.State("v", shape=(2,))
+                u = ox.Control("u", shape=(2,))
+
+                dynamics = {"x": v, "v": u}
+                constraints = [(ox.Norm(x) <= 5.0).over((0, 50))]
+
+                result = preprocess_symbolic_problem(
+                    dynamics=dynamics,
+                    constraints=constraints,
+                    states=[x, v],
+                    controls=[u],
+                    N=50,
+                    time=ox.Time(initial=0.0, final=10.0)
+                )
+
+                (dynamics_aug, states_aug, controls_aug,
+                 ctcs, nodal, nodal_convex, params, intervals,
+                 dyn_prop, states_prop, controls_prop) = result
+
+                # Augmented dynamics components: [x_dot, v_dot, time_dot, ctcs_aug_dot]
+                # Augmented states: [x, v, time, _ctcs_aug_0]
+                # Augmented controls: [u, _time_dilation]
+                print([s.name for s in states_aug])
             ['x', 'v', 'time', '_ctcs_aug_0']
 
         With propagation-only states::
 
-            >>> distance = ox.State("distance", shape=(1,))
-            >>> dynamics_extra = {"distance": ox.Norm(v)}
-            >>>
-            >>> result = preprocess_symbolic_problem(
-            ...     dynamics=dynamics,
-            ...     constraints=constraints,
-            ...     states=[x, v],
-            ...     controls=[u],
-            ...     N=50,
-            ...     time=ox.Time(initial=0.0, final=10.0),
-            ...     dynamics_prop_extra=dynamics_extra,
-            ...     states_prop_extra=[distance]
-            ... )
-            >>>
-            >>> # Propagation states include distance for post-solve simulation
-            >>> _, _, _, _, _, _, _, _, dyn_prop, states_prop, _ = result
+                distance = ox.State("distance", shape=(1,))
+                dynamics_extra = {"distance": ox.Norm(v)}
+
+                result = preprocess_symbolic_problem(
+                    dynamics=dynamics,
+                    constraints=constraints,
+                    states=[x, v],
+                    controls=[u],
+                    N=50,
+                    time=ox.Time(initial=0.0, final=10.0),
+                    dynamics_prop_extra=dynamics_extra,
+                    states_prop_extra=[distance]
+                )
+
+                # Propagation states include distance for post-solve simulation
+                _, _, _, _, _, _, _, _, dyn_prop, states_prop, _ = result
     """
 
     # ==================== PHASE 1: Time Handling & Validation ====================
@@ -412,35 +412,35 @@ def add_propagation_states(
     Example:
         Adding distance and energy tracking for propagation::
 
-            >>> # After preprocessing, add propagation states
-            >>> import openscvx as ox
-            >>> import numpy as np
-            >>>
-            >>> # Define extra states for tracking
-            >>> distance = ox.State("distance", shape=(1,))
-            >>> distance.initial = np.array([0.0])
-            >>>
-            >>> energy = ox.State("energy", shape=(1,))
-            >>> energy.initial = np.array([0.0])
-            >>>
-            >>> # Define their dynamics (using optimization states/controls)
-            >>> # Assume v and u are optimization states/controls
-            >>> dynamics_extra = {
-            ...     "distance": ox.Norm(v),  # Integrate velocity magnitude
-            ...     "energy": ox.Norm(u)**2  # Integrate squared control
-            ... }
-            >>>
-            >>> dyn_prop, states_prop, controls_prop, params = add_propagation_states(
-            ...     dynamics_extra=dynamics_extra,
-            ...     states_extra=[distance, energy],
-            ...     dynamics_opt=dynamics_aug,
-            ...     states_opt=states_aug,
-            ...     controls_opt=controls_aug,
-            ...     parameters=parameters
-            ... )
-            >>>
-            >>> # Now states_prop includes all states for forward simulation
-            >>> # distance and energy will be integrated during propagation
+                # After preprocessing, add propagation states
+                import openscvx as ox
+                import numpy as np
+
+                # Define extra states for tracking
+                distance = ox.State("distance", shape=(1,))
+                distance.initial = np.array([0.0])
+
+                energy = ox.State("energy", shape=(1,))
+                energy.initial = np.array([0.0])
+
+                # Define their dynamics (using optimization states/controls)
+                # Assume v and u are optimization states/controls
+                dynamics_extra = {
+                    "distance": ox.Norm(v),  # Integrate velocity magnitude
+                    "energy": ox.Norm(u)**2  # Integrate squared control
+                }
+
+                dyn_prop, states_prop, controls_prop, params = add_propagation_states(
+                    dynamics_extra=dynamics_extra,
+                    states_extra=[distance, energy],
+                    dynamics_opt=dynamics_aug,
+                    states_opt=states_aug,
+                    controls_opt=controls_aug,
+                    parameters=parameters
+                )
+
+                # Now states_prop includes all states for forward simulation
+                # distance and energy will be integrated during propagation
 
     Note:
         The extra states should have initial conditions set, as they will be

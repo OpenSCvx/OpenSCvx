@@ -71,21 +71,25 @@ class NodalConstraint(Expr):
         nodes: List of integer node indices where the constraint is enforced
 
     Example:
-        >>> # Enforce position constraint only at nodes 0, 10, and 20
-        >>> x = State("x", shape=(3,))
-        >>> target = [10, 5, 0]
-        >>> constraint = (x == target).at([0, 10, 20])
-        >>>
-        >>> # Equivalent using NodalConstraint directly
-        >>> constraint = NodalConstraint(x == target, nodes=[0, 10, 20])
-        >>>
-        >>> # Periodic constraint enforcement (every 10th node)
-        >>> velocity_limit = (vel <= 100).at(list(range(0, 100, 10)))
-        >>>
-        >>> # Bare constraints are automatically applied at all nodes
-        >>> # These are equivalent:
-        >>> constraint1 = vel <= 100  # Auto-converted to all nodes
-        >>> constraint2 = (vel <= 100).at(list(range(n_nodes)))
+        Enforce position constraint only at nodes 0, 10, and 20:
+
+            x = State("x", shape=(3,))
+            target = [10, 5, 0]
+            constraint = (x == target).at([0, 10, 20])
+
+        Equivalent using NodalConstraint directly:
+
+            constraint = NodalConstraint(x == target, nodes=[0, 10, 20])
+
+        Periodic constraint enforcement (every 10th node):
+
+            velocity_limit = (vel <= 100).at(list(range(0, 100, 10)))
+
+        Bare constraints are automatically applied at all nodes.
+        These are equivalent:
+
+            constraint1 = vel <= 100  # Auto-converted to all nodes
+            constraint2 = (vel <= 100).at(list(range(n_nodes)))
     """
 
     def __init__(self, constraint: Constraint, nodes: list[int]):
@@ -159,7 +163,8 @@ class NodalConstraint(Expr):
             Self with underlying constraint's convex flag set to True (enables method chaining)
 
         Example:
-            >>> constraint = (x <= 10).at([0, 5, 10]).convex()
+            Mark a constraint as convex:
+                constraint = (x <= 10).at([0, 5, 10]).convex()
         """
         self.constraint.convex()
         return self
@@ -228,25 +233,28 @@ class CTCS(Expr):
             additional numerical robustness (creates both continuous and nodal constraints)
 
     Example:
-        >>> # Single augmented state (default behavior - same node interval)
-        >>> altitude = State("alt", shape=(1,))
-        >>> constraints = [
-        ...     (altitude >= 10).over((0, 10)),  # Both constraints share
-        ...     (altitude <= 1000).over((0, 10))  # one augmented state
-        ... ]
-        >>>
-        >>> # Multiple augmented states (different node intervals)
-        >>> constraints = [
-        ...     (altitude >= 10).over((0, 5)),  # Creates _ctcs_aug_0
-        ...     (altitude >= 20).over((5, 10))  # Creates _ctcs_aug_1
-        ... ]
-        >>>
-        >>> # Manual grouping with idx parameter
-        >>> constraints = [
-        ...     (altitude >= 10).over((0, 10), idx=0),    # Group 0
-        ...     (velocity <= 100).over((0, 10), idx=1),   # Group 1 (separate state)
-        ...     (altitude <= 1000).over((0, 10), idx=0)   # Also group 0
-        ... ]
+        Single augmented state (default behavior - same node interval):
+
+            altitude = State("alt", shape=(1,))
+            constraints = [
+                (altitude >= 10).over((0, 10)),  # Both constraints share
+                (altitude <= 1000).over((0, 10))  # one augmented state
+            ]
+
+        Multiple augmented states (different node intervals):
+
+            constraints = [
+                (altitude >= 10).over((0, 5)),  # Creates _ctcs_aug_0
+                (altitude >= 20).over((5, 10))  # Creates _ctcs_aug_1
+            ]
+
+        Manual grouping with idx parameter:
+
+            constraints = [
+                (altitude >= 10).over((0, 10), idx=0),    # Group 0
+                (velocity <= 100).over((0, 10), idx=1),   # Group 1 (separate state)
+                (altitude <= 1000).over((0, 10), idx=0)   # Also group 0
+            ]
     """
 
     def __init__(
@@ -370,9 +378,13 @@ class CTCS(Expr):
             CTCS: New CTCS constraint with the specified interval
 
         Example:
-            >>> constraint = (altitude >= 10).over((0, 50))
-            >>> # Update interval to cover different range
-            >>> constraint_updated = constraint.over((50, 100))
+            Define constraint over range:
+
+                constraint = (altitude >= 10).over((0, 50))
+
+            Update interval to cover different range:
+
+                constraint_updated = constraint.over((50, 100))
         """
         return CTCS(
             self.constraint,
@@ -467,19 +479,22 @@ def ctcs(
         CTCS: A CTCS constraint wrapping the input constraint
 
     Example:
-        >>> # Using the helper function
-        >>> from openscvx.symbolic.expr.constraint import ctcs
-        >>> altitude_constraint = ctcs(
-        ...     altitude >= 10,
-        ...     penalty="huber",
-        ...     nodes=(0, 100),
-        ...     check_nodally=True
-        ... )
-        >>>
-        >>> # Equivalent to using CTCS constructor
-        >>> altitude_constraint = CTCS(altitude >= 10, penalty="huber", nodes=(0, 100))
-        >>>
-        >>> # Also equivalent to using .over() method on constraint
-        >>> altitude_constraint = (altitude >= 10).over((0, 100), penalty="huber")
+        Using the helper function:
+
+            from openscvx.symbolic.expr.constraint import ctcs
+            altitude_constraint = ctcs(
+                altitude >= 10,
+                penalty="huber",
+                nodes=(0, 100),
+                check_nodally=True
+            )
+
+        Equivalent to using CTCS constructor:
+
+            altitude_constraint = CTCS(altitude >= 10, penalty="huber", nodes=(0, 100))
+
+        Also equivalent to using .over() method on constraint:
+
+            altitude_constraint = (altitude >= 10).over((0, 100), penalty="huber")
     """
     return CTCS(constraint, penalty, nodes, idx, check_nodally)

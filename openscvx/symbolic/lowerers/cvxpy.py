@@ -182,10 +182,12 @@ def visitor(expr_cls: Type[Expr]):
         Decorator function that registers the visitor and returns it unchanged
 
     Example:
-        >>> @visitor(Add)
-        ... def _visit_add(self, node: Add):
-        ...     # Lower addition to CVXPy
-        ...     ...
+        Register a function as the visitor for the Add expression:
+
+            @visitor(Add)
+            def _visit_add(self, node: Add):
+                # Lower addition to CVXPy
+                ...
 
     Note:
         Multiple expression types can share a visitor by stacking decorators::
@@ -221,9 +223,11 @@ def dispatch(lowerer: Any, expr: Expr):
         NotImplementedError: If no visitor is registered for the expression type
 
     Example:
-        >>> lowerer = CvxpyLowerer(variable_map={...})
-        >>> expr = Add(x, y)
-        >>> cvx_expr = dispatch(lowerer, expr)  # Calls visit_add
+        Dispatch an expression to lower it:
+
+            lowerer = CvxpyLowerer(variable_map={...})
+            expr = Add(x, y)
+            cvx_expr = dispatch(lowerer, expr)  # Calls visit_add
     """
     fn = _CVXPY_VISITORS.get(type(expr))
     if fn is None:
@@ -251,13 +255,15 @@ class CvxpyLowerer:
             names mapped to CVXPy Parameter objects or constants.
 
     Example:
-        >>> import cvxpy as cp
-        >>> lowerer = CvxpyLowerer(variable_map={
-        ...     "x": cp.Variable(3),
-        ...     "u": cp.Variable(2),
-        ... })
-        >>> expr = ox.Norm(x)**2 + 0.1 * ox.Norm(u)**2
-        >>> cvx_expr = lowerer.lower(expr)
+        Lower an expression to CVXPy:
+
+            import cvxpy as cp
+            lowerer = CvxpyLowerer(variable_map={
+                "x": cp.Variable(3),
+                "u": cp.Variable(2),
+            })
+            expr = ox.Norm(x)**2 + 0.1 * ox.Norm(u)**2
+            cvx_expr = lowerer.lower(expr)
 
     Note:
         The lowerer is stateful (stores variable_map) unlike JaxLowerer which
@@ -275,9 +281,11 @@ class CvxpyLowerer:
                 empty dictionary is created.
 
         Example:
-            >>> cvx_x = cp.Variable(3, name="x")
-            >>> cvx_u = cp.Variable(2, name="u")
-            >>> lowerer = CvxpyLowerer({"x": cvx_x, "u": cvx_u})
+            Initialize the CVXPy lowerer with the variable map:
+
+                cvx_x = cp.Variable(3, name="x")
+                cvx_u = cp.Variable(2, name="u")
+                lowerer = CvxpyLowerer({"x": cvx_x, "u": cvx_u})
         """
         self.variable_map = variable_map or {}
 
@@ -299,10 +307,12 @@ class CvxpyLowerer:
             ValueError: If required variables are not in variable_map
 
         Example:
-            >>> lowerer = CvxpyLowerer(variable_map={"x": cvx_x, "u": cvx_u})
-            >>> x = ox.State("x", shape=(3,))
-            >>> expr = ox.Norm(x)
-            >>> cvx_expr = lowerer.lower(expr)
+            Lower an expression to a CVXPy expression:
+
+                lowerer = CvxpyLowerer(variable_map={"x": cvx_x, "u": cvx_u})
+                x = ox.State("x", shape=(3,))
+                expr = ox.Norm(x)
+                cvx_expr = lowerer.lower(expr)
         """
         return dispatch(self, expr)
 
@@ -317,9 +327,11 @@ class CvxpyLowerer:
             cvx_expr: CVXPy expression to associate with the name
 
         Example:
-            >>> lowerer = CvxpyLowerer()
-            >>> lowerer.register_variable("x", cp.Variable(3))
-            >>> lowerer.register_variable("obs_center", cp.Parameter(3))
+            Register a variable:
+
+                lowerer = CvxpyLowerer()
+                lowerer.register_variable("x", cp.Variable(3))
+                lowerer.register_variable("obs_center", cp.Parameter(3))
         """
         self.variable_map[name] = cvx_expr
 

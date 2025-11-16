@@ -169,8 +169,10 @@ class Expr:
             Transpose: A Transpose expression wrapping this expression
 
         Example:
-            >>> A = ox.State("A", shape=(3, 4))
-            >>> A_T = A.T  # Creates Transpose(A), result shape (4, 3)
+            Create a transpose:
+
+                A = ox.State("A", shape=(3, 4))
+                A_T = A.T  # Creates Transpose(A), result shape (4, 3)
         """
         from .linalg import Transpose
 
@@ -240,13 +242,15 @@ class Expr:
             str: Multi-line string representation of the expression tree
 
         Example:
-            >>> expr = (x + y) * z
-            >>> print(expr.pretty())
-            Mul
-              Add
-                State
-                State
-              State
+            Pretty print an expression:
+
+                expr = (x + y) * z
+                print(expr.pretty())
+                # Mul
+                #   Add
+                #     State
+                #     State
+                #   State
         """
         pad = "  " * indent
         pad = "  " * indent
@@ -359,10 +363,6 @@ def to_expr(x: Union[Expr, float, int, np.ndarray]) -> Expr:
 
     Returns:
         The input if it's already an Expr, otherwise a Constant wrapping the value
-
-    Example:
-        >>> to_expr(5.0)  # Returns Constant(5.0)
-        >>> to_expr(var)  # Returns var unchanged if var is an Expr
     """
     return x if isinstance(x, Expr) else Constant(np.array(x))
 
@@ -376,11 +376,6 @@ def traverse(expr: Expr, visit: Callable[[Expr], None]):
     Args:
         expr: Root expression node to start traversal from
         visit: Callback function applied to each node during traversal
-
-    Example:
-        >>> def print_nodes(node):
-        ...     print(node.__class__.__name__)
-        >>> traverse(my_expr, print_nodes)
     """
     visit(expr)
     for child in expr.children():
@@ -397,9 +392,11 @@ class Add(Expr):
         terms: List of expression operands to add together
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> y = ox.State("y", shape=(3,))
-        >>> z = x + y + 5  # Creates Add(x, y, Constant(5))
+        Define an Add expression:
+
+            x = ox.State("x", shape=(3,))
+            y = ox.State("y", shape=(3,))
+            z = x + y + 5  # Creates Add(x, y, Constant(5))
     """
 
     def __init__(self, *args):
@@ -479,9 +476,11 @@ class Sub(Expr):
         right: Right-hand side expression (subtrahend)
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> y = ox.State("y", shape=(3,))
-        >>> z = x - y  # Creates Sub(x, y)
+        Define a Sub expression:
+
+            x = ox.State("x", shape=(3,))
+            y = ox.State("y", shape=(3,))
+            z = x - y  # Creates Sub(x, y)
     """
 
     def __init__(self, left, right):
@@ -539,9 +538,11 @@ class Mul(Expr):
         factors: List of expression operands to multiply together
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> y = ox.State("y", shape=(3,))
-        >>> z = x * y * 2  # Creates Mul(x, y, Constant(2))
+        Define a Mul expression:
+
+            x = ox.State("x", shape=(3,))
+            y = ox.State("y", shape=(3,))
+            z = x * y * 2  # Creates Mul(x, y, Constant(2))
     """
 
     def __init__(self, *args):
@@ -633,9 +634,11 @@ class Div(Expr):
         right: Denominator expression
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> y = ox.State("y", shape=(3,))
-        >>> z = x / y  # Creates Div(x, y)
+        Define a Div expression
+
+            x = ox.State("x", shape=(3,))
+            y = ox.State("y", shape=(3,))
+            z = x / y  # Creates Div(x, y)
     """
 
     def __init__(self, left, right):
@@ -697,9 +700,11 @@ class MatMul(Expr):
         right: Right-hand side expression
 
     Example:
-        >>> A = ox.State("A", shape=(3, 4))
-        >>> x = ox.State("x", shape=(4,))
-        >>> y = A @ x  # Creates MatMul(A, x), result shape (3,)
+        Define a MatMul expression:
+
+            A = ox.State("A", shape=(3, 4))
+            x = ox.State("x", shape=(4,))
+            y = A @ x  # Creates MatMul(A, x), result shape (3,)
     """
 
     def __init__(self, left, right):
@@ -768,8 +773,10 @@ class Neg(Expr):
         operand: Expression to negate
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> y = -x  # Creates Neg(x)
+        Define a Neg expression:
+
+            x = ox.State("x", shape=(3,))
+            y = -x  # Creates Neg(x)
     """
 
     def __init__(self, operand):
@@ -812,8 +819,10 @@ class Sum(Expr):
         operand: Expression whose elements will be summed
 
     Example:
-        >>> x = ox.State("x", shape=(3, 4))
-        >>> total = Sum(x)  # Creates Sum(x), result shape ()
+        Define a Sum expression
+
+            x = ox.State("x", shape=(3, 4))
+            total = Sum(x)  # Creates Sum(x), result shape ()
     """
 
     def __init__(self, operand):
@@ -858,9 +867,11 @@ class Index(Expr):
         index: Index specification (int, slice, or tuple of indices/slices)
 
     Example:
-        >>> x = ox.State("x", shape=(10,))
-        >>> y = x[0:5]  # Creates Index(x, slice(0, 5))
-        >>> z = x[3]    # Creates Index(x, 3)
+        Define an Index expression:
+
+            x = ox.State("x", shape=(10,))
+            y = x[0:5]  # Creates Index(x, slice(0, 5))
+            z = x[3]    # Creates Index(x, 3)
     """
 
     def __init__(self, base: Expr, index: Union[int, slice, tuple]):
@@ -909,9 +920,11 @@ class Concat(Expr):
         exprs: Tuple of expressions to concatenate
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> y = ox.State("y", shape=(4,))
-        >>> z = Concat(x, y)  # Creates Concat(x, y), result shape (7,)
+        Define a Concat expression:
+
+            x = ox.State("x", shape=(3,))
+            y = ox.State("y", shape=(4,))
+            z = Concat(x, y)  # Creates Concat(x, y), result shape (7,)
     """
 
     def __init__(self, *exprs: Expr):
@@ -962,8 +975,10 @@ class Power(Expr):
         exponent: Exponent expression
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> y = x ** 2  # Creates Power(x, Constant(2))
+        Define a Power expression:
+
+            x = ox.State("x", shape=(3,))
+            y = x ** 2  # Creates Power(x, Constant(2))
     """
 
     def __init__(self, base, exponent):
@@ -1010,9 +1025,11 @@ class Constant(Expr):
         value: The numpy array representing the constant value (squeezed)
 
     Example:
-        >>> c1 = Constant(5.0)        # Scalar constant
-        >>> c2 = Constant([1, 2, 3])  # Vector constant
-        >>> c3 = to_expr(10)          # Also creates a Constant
+        Define constants:
+
+            c1 = Constant(5.0)        # Scalar constant
+            c2 = Constant([1, 2, 3])  # Vector constant
+            c3 = to_expr(10)          # Also creates a Constant
     """
 
     def __init__(self, value: np.ndarray):
@@ -1173,8 +1190,10 @@ class Equality(Constraint):
     operator on Expr objects.
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> constraint = x == 0  # Creates Equality(x, Constant(0))
+        Define an Equality constraint:
+
+            x = ox.State("x", shape=(3,))
+            constraint = x == 0  # Creates Equality(x, Constant(0))
     """
 
     def __repr__(self):
@@ -1188,8 +1207,10 @@ class Inequality(Constraint):
     operator on Expr objects.
 
     Example:
-        >>> x = ox.State("x", shape=(3,))
-        >>> constraint = x <= 10  # Creates Inequality(x, Constant(10))
+        Define an Inequality constraint:
+
+            x = ox.State("x", shape=(3,))
+            constraint = x <= 10  # Creates Inequality(x, Constant(10))
     """
 
     def __repr__(self):

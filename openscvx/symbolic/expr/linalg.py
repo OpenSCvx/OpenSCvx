@@ -61,10 +61,12 @@ class Transpose(Expr):
         operand: Expression to transpose
 
     Example:
-        >>> A = Variable("A", shape=(3, 4))
-        >>> A_T = Transpose(A)  # or A.T, result shape (4, 3)
-        >>> v = Variable("v", shape=(5,))
-        >>> v_T = Transpose(v)  # result shape (5,) - vectors unchanged
+        Define Tranpose expressions:
+
+            A = Variable("A", shape=(3, 4))
+            A_T = Transpose(A)  # or A.T, result shape (4, 3)
+            v = Variable("v", shape=(5,))
+            v_T = Transpose(v)  # result shape (5,) - vectors unchanged
     """
 
     def __init__(self, operand):
@@ -125,8 +127,10 @@ class Diag(Expr):
         operand: 1D vector expression to place on the diagonal
 
     Example:
-        >>> v = Variable("v", shape=(3,))
-        >>> D = Diag(v)  # Creates a (3, 3) diagonal matrix
+        Define a Diag:
+
+            v = Variable("v", shape=(3,))
+            D = Diag(v)  # Creates a (3, 3) diagonal matrix
     """
 
     def __init__(self, operand):
@@ -173,10 +177,12 @@ class Norm(Expr):
             - Other values as supported by the backend
 
     Example:
-        >>> x = Variable("x", shape=(3,))
-        >>> euclidean_norm = Norm(x, ord=2)  # L2 norm, result is scalar
-        >>> A = Variable("A", shape=(3, 4))
-        >>> frobenius_norm = Norm(A)  # Frobenius norm, result is scalar
+        Define Norms:
+
+            x = Variable("x", shape=(3,))
+            euclidean_norm = Norm(x, ord=2)  # L2 norm, result is scalar
+            A = Variable("A", shape=(3, 4))
+            frobenius_norm = Norm(A)  # Frobenius norm, result is scalar
     """
 
     def __init__(self, operand, ord="fro"):
@@ -220,13 +226,15 @@ class Stack(Expr):
         rows: List of expressions to stack, each representing a "row"
 
     Example:
-        >>> x = Variable("x", shape=(3,))
-        >>> y = Variable("y", shape=(3,))
-        >>> z = Variable("z", shape=(3,))
-        >>> stacked = Stack([x, y, z])  # Creates shape (3, 3)
-        >>> # Equivalent to: [[x[0], x[1], x[2]],
-        >>> #                 [y[0], y[1], y[2]],
-        >>> #                 [z[0], z[1], z[2]]]
+        Leverage stack to combine expressions:
+
+            x = Variable("x", shape=(3,))
+            y = Variable("y", shape=(3,))
+            z = Variable("z", shape=(3,))
+            stacked = Stack([x, y, z])  # Creates shape (3, 3)
+            # Equivalent to: [[x[0], x[1], x[2]],
+            #                 [y[0], y[1], y[2]],
+            #                 [z[0], z[1], z[2]]]
     """
 
     def __init__(self, rows):
@@ -285,15 +293,17 @@ class Hstack(Expr):
         arrays: List of expressions to stack horizontally
 
     Example:
-        >>> # 1D case: concatenate vectors
-        >>> x = Variable("x", shape=(3,))
-        >>> y = Variable("y", shape=(2,))
-        >>> h = Hstack([x, y])  # Result shape (5,)
-        >>>
-        >>> # 2D case: concatenate matrices horizontally
-        >>> A = Variable("A", shape=(3, 4))
-        >>> B = Variable("B", shape=(3, 2))
-        >>> C = Hstack([A, B])  # Result shape (3, 6)
+        1D case: concatenate vectors:
+
+            x = Variable("x", shape=(3,))
+            y = Variable("y", shape=(2,))
+            h = Hstack([x, y])  # Result shape (5,)
+
+        2D case: concatenate matrices horizontally:
+
+            A = Variable("A", shape=(3, 4))
+            B = Variable("B", shape=(3, 2))
+            C = Hstack([A, B])  # Result shape (3, 6)
     """
 
     def __init__(self, arrays):
@@ -367,15 +377,17 @@ class Vstack(Expr):
         arrays: List of expressions to stack vertically
 
     Example:
-        >>> # Stack vectors to create a matrix
-        >>> x = Variable("x", shape=(3,))
-        >>> y = Variable("y", shape=(3,))
-        >>> v = Vstack([x, y])  # Result shape (2, 3)
-        >>>
-        >>> # Stack matrices vertically
-        >>> A = Variable("A", shape=(3, 4))
-        >>> B = Variable("B", shape=(2, 4))
-        >>> C = Vstack([A, B])  # Result shape (5, 4)
+        Stack vectors to create a matrix:
+
+            x = Variable("x", shape=(3,))
+            y = Variable("y", shape=(3,))
+            v = Vstack([x, y])  # Result shape (2, 3)
+
+        Stack matrices vertically:
+
+            A = Variable("A", shape=(3, 4))
+            B = Variable("B", shape=(2, 4))
+            C = Vstack([A, B])  # Result shape (5, 4)
     """
 
     def __init__(self, arrays):

@@ -57,8 +57,10 @@ class Sin(Expr):
         operand: Expression to apply sine function to
 
     Example:
-        >>> theta = Variable("theta", shape=(3,))
-        >>> sin_theta = Sin(theta)
+        Define a Sin expression:
+
+            theta = Variable("theta", shape=(3,))
+            sin_theta = Sin(theta)
     """
 
     def __init__(self, operand):
@@ -94,8 +96,10 @@ class Cos(Expr):
         operand: Expression to apply cosine function to
 
     Example:
-        >>> theta = Variable("theta", shape=(3,))
-        >>> cos_theta = Cos(theta)
+        Define a Cos expression:
+
+            theta = Variable("theta", shape=(3,))
+            cos_theta = Cos(theta)
     """
 
     def __init__(self, operand):
@@ -132,8 +136,10 @@ class Square(Expr):
         x: Expression to square
 
     Example:
-        >>> v = Variable("v", shape=(3,))
-        >>> v_squared = Square(v)  # Equivalent to v ** 2
+        Define a Square expression:
+
+            v = Variable("v", shape=(3,))
+            v_squared = Square(v)  # Equivalent to v ** 2
     """
 
     def __init__(self, x):
@@ -169,8 +175,10 @@ class Sqrt(Expr):
         operand: Expression to apply square root to
 
     Example:
-        >>> x = Variable("x", shape=(3,))
-        >>> sqrt_x = Sqrt(x)
+        Define a Sqrt expression:
+
+            x = Variable("x", shape=(3,))
+            sqrt_x = Sqrt(x)
     """
 
     def __init__(self, operand):
@@ -206,8 +214,10 @@ class Exp(Expr):
         operand: Expression to apply exponential function to
 
     Example:
-        >>> x = Variable("x", shape=(3,))
-        >>> exp_x = Exp(x)
+        Define an Exp expression:
+
+            x = Variable("x", shape=(3,))
+            exp_x = Exp(x)
     """
 
     def __init__(self, operand):
@@ -243,8 +253,10 @@ class Log(Expr):
         operand: Expression to apply logarithm to
 
     Example:
-        >>> x = Variable("x", shape=(3,))
-        >>> log_x = Log(x)
+        Define a Log expression:
+
+            x = Variable("x", shape=(3,))
+            log_x = Log(x)
     """
 
     def __init__(self, operand):
@@ -281,9 +293,11 @@ class Max(Expr):
         operands: List of expressions to compute maximum over
 
     Example:
-        >>> x = Variable("x", shape=(3,))
-        >>> y = Variable("y", shape=(3,))
-        >>> max_xy = Max(x, y, 0)  # Element-wise max(x, y, 0)
+        Define a Max expression:
+
+            x = Variable("x", shape=(3,))
+            y = Variable("y", shape=(3,))
+            max_xy = Max(x, y, 0)  # Element-wise max(x, y, 0)
     """
 
     def __init__(self, *args):
@@ -355,8 +369,10 @@ class PositivePart(Expr):
         x: Expression to apply positive part function to
 
     Example:
-        >>> constraint_violation = x - 10
-        >>> penalty = PositivePart(constraint_violation)  # Penalizes x > 10
+        Define a PositivePart expression:
+
+            constraint_violation = x - 10
+            penalty = PositivePart(constraint_violation)  # Penalizes x > 10
     """
 
     def __init__(self, x):
@@ -399,8 +415,10 @@ class Huber(Expr):
         delta: Threshold parameter controlling the transition point (default: 0.25)
 
     Example:
-        >>> residual = y_measured - y_predicted
-        >>> penalty = Huber(residual, delta=0.5)
+        Define a Huber penalty expression:
+
+            residual = y_measured - y_predicted
+            penalty = Huber(residual, delta=0.5)
     """
 
     def __init__(self, x, delta: float = 0.25):
@@ -447,8 +465,10 @@ class SmoothReLU(Expr):
         c: Smoothing parameter (default: 1e-8)
 
     Example:
-        >>> constraint_violation = x - 10
-        >>> penalty = SmoothReLU(constraint_violation, c=1e-6)
+        Define a smooth ReLU expression:
+
+            constraint_violation = x - 10
+            penalty = SmoothReLU(constraint_violation, c=1e-6)
     """
 
     def __init__(self, x, c: float = 1e-8):
