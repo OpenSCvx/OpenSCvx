@@ -7,96 +7,69 @@ import jax.numpy as jnp
 @dataclass
 class Dynamics:
     """
-    Dataclass to hold a system dynamics function and (optionally) its gradients.
-    This class is intended to be instantiated using the `dynamics` decorator
-    wrapped around a function defining the system dynamics. Both the dynamics
-    and optional gradients should be composed of `jax` primitives to enable
-    efficient computation.
+    Dataclass to hold a system dynamics function and its Jacobians.
 
-    Usage examples:
-
-    ```python
-    @dynamics
-    def f(x_, u_):
-        return x_ + u_
-    # f is now a Dynamics object
-    ```
-
-    ```python
-    @dynamics(A=grad_f_x, B=grad_f_u)
-    def f(x_, u_):
-        return x_ + u_
-    ```
-
-    Or, if a more lambda-function-style is desired, the function can be
-    directly wrapped:
-
-    ```python
-    dyn = dynamics(lambda x_, u_: x_ + u_)
-    ```
+    This dataclass is used internally by openscvx to store the compiled dynamics
+    function and its gradients after symbolic expressions are lowered to JAX.
+    Users typically don't instantiate this class directly.
 
     ---
-    **Using Parameters in Dynamics**
+    **Defining Dynamics with Symbolic Expressions**
 
-    You can use symbolic `Parameter` objects in your dynamics function to
-    represent tunable or environment-dependent values. **The argument names
-    for parameters must match the parameter name with an underscore suffix**
-    (e.g., `I_sp_` for a parameter named `I_sp`). This is required for the
-    parameter mapping to work correctly.
+    Define dynamics as a dictionary mapping state names to symbolic expressions.
+    This approach provides automatic differentiation, shape validation, and
+    declarative problem specification.
 
     Example (3DoF rocket landing):
 
     ```python
-    from openscvx.backend.parameter import Parameter
-    import jax.numpy as jnp
+    import openscvx as ox
+    import numpy as np
 
-    I_sp = Parameter("I_sp")
-    g = Parameter("g")
-    theta = Parameter("theta")
+    # Define symbolic states
+    position = ox.State("position", shape=(3,))
+    velocity = ox.State("velocity", shape=(3,))
+    mass = ox.State("mass", shape=(1,))
 
-    @dynamics
-    def rocket_dynamics(x_, u_, I_sp_, g_, theta_):
-        m = x_[6]
-        T = u_
-        r_dot = x_[3:6]
-        g_vec = jnp.array([0, 0, g_])
-        v_dot = T/m - g_vec
-        m_dot = -jnp.linalg.norm(T) / (I_sp_ * 9.807 * jnp.cos(theta_))
-        t_dot = 1
-        return jnp.hstack([r_dot, v_dot, m_dot, t_dot])
+    # Define symbolic control
+    thrust = ox.Control("thrust", shape=(3,))
 
-    # Set parameter values before solving
-    I_sp.value = 225
-    g.value = 3.7114
-    theta.value = 27 * jnp.pi / 180
+    # Define parameters
+    I_sp = ox.Parameter("I_sp", value=225.0)
+    g = ox.Parameter("g", value=3.7114)
+    theta = ox.Parameter("theta", value=27 * np.pi / 180)
+
+    # Define dynamics using symbolic expressions
+    g_vec = np.array([0, 0, 1]) * g
+    dynamics = {
+        "position": velocity,
+        "velocity": thrust / mass[0] - g_vec,
+        "mass": -ox.linalg.Norm(thrust) / (I_sp * 9.807 * ox.Cos(theta)),
+    }
+
+    # Create problem with symbolic dynamics
+    problem = ox.TrajOptProblem(
+        dynamics=dynamics,
+        states=[position, velocity, mass],
+        controls=[thrust],
+        ...
+    )
     ```
 
-    ---
-    **Using Parameters in Nodal Constraints**
+    Symbolic expressions support:
+    - Arithmetic operations: `+, -, *, /, @, **`
+    - Comparison operations: `==, <=, >=` (for constraints)
+    - Indexing and slicing: `state[0]`, `state[1:3]`
+    - Functions: `ox.Norm()`, `ox.Sin()`, `ox.Cos()`, etc.
+    - Shape checking and validation at problem setup
+    - Parameter updates without recompilation
 
-    You can also use symbolic `Parameter` objects in nodal constraints. As
-    with dynamics, the argument names for parameters in the constraint
-    function must match the parameter name with an underscore suffix
-    (e.g., `g_` for a parameter named `g`).
-
-    Example:
-
-    ```python
-    from openscvx.backend.parameter import Parameter
-    from openscvx.constraints import nodal
-    import jax.numpy as jnp
-
-    g = Parameter("g")
-    g.value = 3.7114
-
-    @nodal
-    def terminal_velocity_constraint(x_, u_, g_):
-        # Enforce a terminal velocity constraint using the gravity parameter
-        return x_[5] + g_ * x_[7]  # e.g., vz + g * t <= 0 at final node
-    ```
-
-    When building your problem, collect all parameters with
-    `Parameter.get_all()` and pass them to your problem setup.
+    During problem initialization, the symbolic dynamics are automatically:
+    1. Canonicalized (simplified algebraically)
+    2. Shape-checked for correctness
+    3. Lowered to JAX functions
+    4. Differentiated to obtain Jacobians (A, B)
+    5. Stored in this Dynamics dataclass
 
     Args:
         f (Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
@@ -107,8 +80,6 @@ class Dynamics:
             - Additional parameters: passed as keyword arguments with names
               matching the parameter name plus an underscore (e.g., g_ for
               Parameter('g')).
-            If you want to use parameters, include them as extra arguments
-            with the underscore naming convention.
             If you use vectorized integration or batch evaluation, x and u
             may be 2D arrays (N, n_x) and (N, n_u).
         A (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
@@ -117,10 +88,6 @@ class Dynamics:
         B (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
             Jacobian of `f` w.r.t. `u`. If not specified, will be calculated
             using `jax.jacfwd`.
-
-    Returns:
-        Dynamics: A dataclass bundling the system dynamics function and
-        Jacobians.
     """
 
     f: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
