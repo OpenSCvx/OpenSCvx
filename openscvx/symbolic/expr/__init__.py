@@ -23,11 +23,15 @@ Module Organization:
 
     Core Expressions (expr.py):
         Base classes and utilities including `Expr`, `Leaf`, `Parameter`, `Constant`,
-        `Sum`, `Index`, `Concat`, and helper functions `to_expr` and `traverse`.
+        `Sum`, and helper functions `to_expr` and `traverse`.
 
     Arithmetic Operations (arithmetic.py):
         Fundamental arithmetic operations including `Add`, `Sub`, `Mul`, `Div`,
         `MatMul`, `Neg`, and `Power`.
+
+    Array Operations (array.py):
+        Array manipulation operations including `Index`, `Concat`, `Stack`, `Hstack`,
+        and `Vstack` for indexing, slicing, and combining arrays.
 
     Constraints (constraint.py):
         Constraint types including `Constraint`, `Equality`, `Inequality`,
@@ -43,8 +47,7 @@ Module Organization:
         `SmoothReLU`, `Max`).
 
     Linear Algebra (linalg.py):
-        Operations including `Transpose`, `Stack`, `Hstack`, `Vstack`, `Norm`,
-        and `Diag`.
+        Matrix operations including `Transpose`, `Diag`, and `Norm`.
 
     Spatial Operations (spatial.py):
         6-DOF operations for aerospace and robotics including `QDCM` (Quaternion to
@@ -62,6 +65,9 @@ Module Organization:
 # Arithmetic operations
 from .arithmetic import Add, Div, MatMul, Mul, Neg, Power, Sub
 
+# Array operations
+from .array import Concat, Hstack, Index, Stack, Vstack
+
 # Specialized constraints
 from .constraint import CTCS, Constraint, Equality, Inequality, NodalConstraint, ctcs
 
@@ -70,10 +76,8 @@ from .control import Control
 
 # Core base classes and fundamental operations
 from .expr import (
-    Concat,
     Constant,
     Expr,
-    Index,
     Leaf,
     Parameter,
     Sum,
@@ -82,7 +86,7 @@ from .expr import (
 )
 
 # Linear algebra operations
-from .linalg import Diag, Hstack, Norm, Stack, Transpose, Vstack
+from .linalg import Diag, Norm, Transpose
 
 # Mathematical functions
 from .math import Cos, Exp, Huber, Log, Max, PositivePart, Sin, SmoothReLU, Sqrt, Square

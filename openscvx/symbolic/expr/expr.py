@@ -20,7 +20,7 @@ Architecture:
     - Reductions: `Sum`, `Norm`, etc.
     - Constraints: `Equality`, `Inequality`
     - Functions: `Sin`, `Cos`, `Exp`, `Log`, `Sqrt`, etc.
-    - Indexing: `Index`, `Concat`, `Stack`
+    - Array operations: `Index`, `Concat`, `Stack`, `Hstack`, `Vstack`
 
     Each expression node implements:
 
@@ -197,6 +197,8 @@ class Expr:
         return Power(to_expr(other), self)
 
     def __getitem__(self, idx):
+        from .array import Index
+
         return Index(self, idx)
 
     @property
@@ -465,114 +467,6 @@ class Sum(Expr):
 
     def __repr__(self):
         return f"sum({self.operand!r})"
-
-
-class Index(Expr):
-    """Indexing and slicing operation for symbolic expressions.
-
-    Represents indexing or slicing of an expression using NumPy-style indexing.
-    Can be created using square bracket notation on Expr objects.
-
-    Attributes:
-        base: Expression to index into
-        index: Index specification (int, slice, or tuple of indices/slices)
-
-    Example:
-        Define an Index expression:
-
-            x = ox.State("x", shape=(10,))
-            y = x[0:5]  # Creates Index(x, slice(0, 5))
-            z = x[3]    # Creates Index(x, 3)
-    """
-
-    def __init__(self, base: Expr, index: Union[int, slice, tuple]):
-        """Initialize an indexing operation.
-
-        Args:
-            base: Expression to index into
-            index: NumPy-style index (int, slice, or tuple of indices/slices)
-        """
-        self.base = base
-        self.index = index
-
-    def children(self):
-        return [self.base]
-
-    def canonicalize(self) -> "Expr":
-        """Canonicalize index by canonicalizing the base expression.
-
-        Returns:
-            Expr: Canonical form of the indexing expression
-        """
-        base = self.base.canonicalize()
-        return Index(base, self.index)
-
-    def check_shape(self) -> Tuple[int, ...]:
-        """Compute the shape after indexing."""
-        base_shape = self.base.check_shape()
-        dummy = np.zeros(base_shape)
-        try:
-            result = dummy[self.index]
-        except Exception as e:
-            raise ValueError(f"Bad index {self.index} for shape {base_shape}") from e
-        return result.shape
-
-    def __repr__(self):
-        return f"{self.base!r}[{self.index!r}]"
-
-
-class Concat(Expr):
-    """Concatenation operation for symbolic expressions.
-
-    Concatenates a sequence of expressions along their first dimension. All inputs
-    must have the same rank and matching dimensions except for the first dimension.
-
-    Attributes:
-        exprs: Tuple of expressions to concatenate
-
-    Example:
-        Define a Concat expression:
-
-            x = ox.State("x", shape=(3,))
-            y = ox.State("y", shape=(4,))
-            z = Concat(x, y)  # Creates Concat(x, y), result shape (7,)
-    """
-
-    def __init__(self, *exprs: Expr):
-        """Initialize a concatenation operation.
-
-        Args:
-            *exprs: Expressions to concatenate along the first dimension
-        """
-        # wrap raw values as Constant if needed
-        self.exprs = [to_expr(e) for e in exprs]
-
-    def children(self):
-        return list(self.exprs)
-
-    def canonicalize(self) -> "Expr":
-        """Canonicalize concatenation by canonicalizing all operands.
-
-        Returns:
-            Expr: Canonical form of the concatenation expression
-        """
-        exprs = [e.canonicalize() for e in self.exprs]
-        return Concat(*exprs)
-
-    def check_shape(self) -> Tuple[int, ...]:
-        """Check concatenation shape compatibility and return result shape."""
-        shapes = [e.check_shape() for e in self.exprs]
-        shapes = [(1,) if len(s) == 0 else s for s in shapes]
-        rank = len(shapes[0])
-        if any(len(s) != rank for s in shapes):
-            raise ValueError(f"Concat rank mismatch: {shapes}")
-        if any(s[1:] != shapes[0][1:] for s in shapes[1:]):
-            raise ValueError(f"Concat non-0 dims differ: {shapes}")
-        return (sum(s[0] for s in shapes),) + shapes[0][1:]
-
-    def __repr__(self):
-        inner = ", ".join(repr(e) for e in self.exprs)
-        return f"Concat({inner})"
 
 
 class Constant(Expr):
