@@ -13,10 +13,10 @@ class BoundaryType(str, Enum):
     the optimizer handles initial and final state values.
 
     Attributes:
-        FIXED: State value is fixed to a specific value
-        FREE: State value is free to be optimized within bounds
-        MINIMIZE: Objective term to minimize the state value
-        MAXIMIZE: Objective term to maximize the state value
+        FIXED (str): State value is fixed to a specific value
+        FREE (str): State value is free to be optimized within bounds
+        MINIMIZE (str): Objective term to minimize the state value
+        MAXIMIZE (str): Objective term to maximize the state value
 
     Example:
         Can use either enum or string:
@@ -41,6 +41,7 @@ class State(Variable):
     guesses to help guide the optimization solver toward good solutions.
 
     States support four types of boundary conditions:
+
     - **fixed**: State value is constrained to a specific value
     - **free**: State value is optimized within the specified bounds
     - **minimize**: Adds a term to the objective function to minimize the state value
@@ -50,23 +51,24 @@ class State(Variable):
     types, allowing for fine-grained control over the optimization.
 
     Attributes:
-        name: Unique name identifier for this state variable
-        shape: Shape of the state vector (typically 1D like (3,) for 3D position)
-        min: Minimum bounds for state variables
-        max: Maximum bounds for state variables
-        guess: Initial trajectory guess
-        initial: Initial state values with boundary condition types
-        initial_type: Array of boundary condition types for initial state
-        final: Final state values with boundary condition types
-        final_type: Array of boundary condition types for final state
+        name (str): Unique name identifier for this state variable
+        _shape (tuple[int, ...]): Shape of the state vector (typically 1D like (3,) for 3D position)
+        _slice (slice | None): Internal slice information for variable indexing
+        _min (np.ndarray | None): Minimum bounds for state variables
+        _max (np.ndarray | None): Maximum bounds for state variables
+        _guess (np.ndarray | None): Initial trajectory guess
+        _initial (np.ndarray | None): Initial state values with boundary condition types
+        initial_type (np.ndarray | None): Array of boundary condition types for initial state
+        _final (np.ndarray | None): Final state values with boundary condition types
+        final_type (np.ndarray | None): Array of boundary condition types for final state
 
     Example:
-        Scalar time state with free initial time, minimize final time:
+        Scalar time state with fixed initial time, minimize final time:
 
             time = State("time", (1,))
             time.min = [0.0]
             time.max = [10.0]
-            time.initial = [("free", 0.0)]
+            time.initial = [("fixed", 0.0)]
             time.final = [("minimize", 5.0)]
 
         3D position state with mixed boundary conditions:

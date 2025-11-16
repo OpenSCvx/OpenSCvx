@@ -6,17 +6,15 @@ for shapes and broadcasting behavior.
 
 Key Operations:
 
-    Matrix Operations:
-        `Transpose` - Matrix/tensor transposition (swaps last two dimensions)
-        `Diag` - Construct diagonal matrix from vector
-
-    Stacking and Concatenation:
-        `Stack` - Stack expressions along a new dimension
-        `Hstack` - Horizontally stack matrices/vectors
-        `Vstack` - Vertically stack matrices/vectors
-
-    Norms:
-        `Norm` - Euclidean (L2) norm of vectors/matrices
+- **Matrix Operations:**
+    - `Transpose` - Matrix/tensor transposition (swaps last two dimensions)
+    - `Diag` - Construct diagonal matrix from vector
+- **Stacking and Concatenation:**
+    - `Stack` - Stack expressions along a new dimension
+    - `Hstack` - Horizontally stack matrices/vectors
+    - `Vstack` - Vertically stack matrices/vectors
+- **Norms:**
+    - `Norm` - Euclidean (L2) norm of vectors/matrices
 
 Example:
     Building rotation matrices and transformations::

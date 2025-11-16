@@ -22,6 +22,7 @@ class Or(Expr):
     relaxed using smooth approximations (e.g., LogSumExp) during optimization.
 
     The Or operation allows expressing constraints like:
+
     - "Reach either goal A OR goal B"
     - "Avoid obstacle 1 OR obstacle 2" (at least one must be satisfied)
     - "Use path 1 OR path 2 OR path 3"

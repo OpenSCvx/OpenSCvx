@@ -4,29 +4,29 @@ This module provides the foundation for openscvx's symbolic expression framework
 implementing an Abstract Syntax Tree (AST) representation for mathematical expressions
 used in optimization problems. The expression system enables:
 
-    - Declarative problem specification: Write optimization problems using familiar
-      mathematical notation with operator overloading (+, -, *, /, @, **, etc.)
-    - Automatic differentiation: Expressions are automatically differentiated during
-      compilation to solver-specific formats
-    - Shape checking: Static validation of tensor dimensions before optimization
-    - Canonicalization: Algebraic simplification for more efficient compilation
-    - Multiple backends: Expressions can be compiled to CVXPy, JAX, or custom solvers
+- Declarative problem specification: Write optimization problems using familiar
+    mathematical notation with operator overloading (+, -, *, /, @, **, etc.)
+- Automatic differentiation: Expressions are automatically differentiated during
+    compilation to solver-specific formats
+- Shape checking: Static validation of tensor dimensions before optimization
+- Canonicalization: Algebraic simplification for more efficient compilation
+- Multiple backends: Expressions can be compiled to CVXPy, JAX, or custom solvers
 
 Architecture:
     The expression system is built around an AST where each node is an `Expr` subclass:
 
-        - Leaf nodes: `Parameter`, `Variable`, `State`, `Control` - symbolic values
-        - Arithmetic operations: `Add`, `Sub`, `Mul`, `Div`, `MatMul`, `Power`, `Neg`
-        - Reductions: `Sum`, `Norm`, etc.
-        - Constraints: `Equality`, `Inequality`
-        - Functions: `Sin`, `Cos`, `Exp`, `Log`, `Sqrt`, etc.
-        - Indexing: `Index`, `Concat`, `Stack`
+    - Leaf nodes: `Parameter`, `Variable`, `State`, `Control` - symbolic values
+    - Arithmetic operations: `Add`, `Sub`, `Mul`, `Div`, `MatMul`, `Power`, `Neg`
+    - Reductions: `Sum`, `Norm`, etc.
+    - Constraints: `Equality`, `Inequality`
+    - Functions: `Sin`, `Cos`, `Exp`, `Log`, `Sqrt`, etc.
+    - Indexing: `Index`, `Concat`, `Stack`
 
     Each expression node implements:
 
-        - `children()`: Returns child expressions in the AST
-        - `canonicalize()`: Returns a simplified/normalized version
-        - `check_shape()`: Validates and returns the output shape
+    - `children()`: Returns child expressions in the AST
+    - `canonicalize()`: Returns a simplified/normalized version
+    - `check_shape()`: Validates and returns the output shape
 
 Example:
     Creating symbolic variables and expressions::

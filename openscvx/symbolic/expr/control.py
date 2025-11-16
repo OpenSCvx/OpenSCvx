@@ -12,10 +12,12 @@ class Control(Variable):
     Controls are conceptually similar to State variables but simpler - they don't
     have boundary conditions (initial/final specifications) since controls are
     typically not constrained at the endpoints. Like States, Controls support:
+
     - Min/max bounds to enforce actuator limits
     - Initial trajectory guesses to help the optimizer converge
 
     Common examples of control inputs include:
+
     - Thrust magnitude and direction for spacecraft/rockets
     - Throttle settings for engines
     - Steering angles for vehicles
@@ -23,12 +25,12 @@ class Control(Variable):
     - Force/acceleration commands
 
     Attributes:
-        name: Unique name identifier for this control variable
-        _shape: Shape of the control vector (typically 1D like (3,) for 3D thrust)
-        _slice: Internal slice information for variable indexing
-        _min: Minimum bounds for each element of the control
-        _max: Maximum bounds for each element of the control
-        _guess: Initial guess for the control trajectory (n_points, n_controls)
+        name (str): Unique name identifier for this control variable
+        _shape (tuple[int, ...]): Shape of the control vector (typically 1D like (3,) for 3D thrust)
+        _slice (slice | None): Internal slice information for variable indexing
+        _min (np.ndarray | None): Minimum bounds for each element of the control
+        _max (np.ndarray | None): Maximum bounds for each element of the control
+        _guess (np.ndarray | None): Initial guess for the control trajectory (n_points, n_controls)
 
     Example:
         Scalar throttle control bounded [0, 1]:
