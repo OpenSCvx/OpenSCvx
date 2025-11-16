@@ -7,7 +7,27 @@ from plotly.subplots import make_subplots
 
 from openscvx.config import Config
 from openscvx.results import OptimizationResults
-from openscvx.utils import get_kp_pose, qdcm
+from openscvx.utils import get_kp_pose
+
+
+def qdcm(q: np.ndarray) -> np.ndarray:
+    """Convert a quaternion to a direction cosine matrix (DCM).
+
+    Args:
+        q: Quaternion array [w, x, y, z] where w is the scalar part
+
+    Returns:
+        3x3 rotation matrix (direction cosine matrix)
+    """
+    q_norm = (q[0] ** 2 + q[1] ** 2 + q[2] ** 2 + q[3] ** 2) ** 0.5
+    w, x, y, z = q / q_norm
+    return np.array(
+        [
+            [1 - 2 * (y**2 + z**2), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x**2 + z**2), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x**2 + y**2)],
+        ]
+    )
 
 
 def full_subject_traj_time(results: OptimizationResults, params: Config):

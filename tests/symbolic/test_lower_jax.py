@@ -1263,9 +1263,57 @@ def test_normalized_constants_preserve_dtype_in_lowering():
 
 # TODO: (norrisg) move these to separate file
 # Tests for 6DOF rigid body dynamics from drone racing example
+
+
+# Helper functions for reference implementations
+def qdcm_ref(q: jnp.ndarray) -> jnp.ndarray:
+    """Convert a quaternion to a direction cosine matrix (DCM).
+
+    Args:
+        q: Quaternion array [w, x, y, z] where w is the scalar part
+
+    Returns:
+        3x3 rotation matrix (direction cosine matrix)
+    """
+    q_norm = jnp.sqrt(q[0] ** 2 + q[1] ** 2 + q[2] ** 2 + q[3] ** 2)
+    w, x, y, z = q / q_norm
+    return jnp.array(
+        [
+            [1 - 2 * (y**2 + z**2), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x**2 + z**2), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x**2 + y**2)],
+        ]
+    )
+
+
+def ssmp_ref(w: jnp.ndarray) -> jnp.ndarray:
+    """Convert an angular rate to a 4x4 skew-symmetric matrix for quaternion kinematics.
+
+    Args:
+        w: Angular velocity vector [x, y, z]
+
+    Returns:
+        4x4 skew-symmetric matrix for quaternion propagation
+    """
+    x, y, z = w
+    return jnp.array([[0, -x, -y, -z], [x, 0, z, -y], [y, -z, 0, x], [z, y, -x, 0]])
+
+
+def ssm_ref(w: jnp.ndarray) -> jnp.ndarray:
+    """Convert an angular rate to a 3x3 skew-symmetric matrix for cross products.
+
+    Args:
+        w: Vector [x, y, z]
+
+    Returns:
+        3x3 skew-symmetric matrix such that SSM(w) @ v = w x v
+    """
+    x, y, z = w
+    return jnp.array([[0, -z, y], [z, 0, -x], [-y, x, 0]])
+
+
 def reference_6dof_dynamics_jax(x_val, u_val):
     """Reference implementation of 6DOF rigid body dynamics in pure JAX."""
-    from openscvx.utils import SSM, SSMP, qdcm
 
     # Test parameters (from drone racing example)
     m = 1.0
@@ -1288,9 +1336,9 @@ def reference_6dof_dynamics_jax(x_val, u_val):
 
     # Compute dynamics
     r_dot = v
-    v_dot = (1.0 / m) * qdcm(q_normalized) @ f + jnp.array([0, 0, g_const])
-    q_dot = 0.5 * SSMP(w) @ q_normalized
-    w_dot = jnp.diag(1.0 / J_b) @ (tau - SSM(w) @ jnp.diag(J_b) @ w)
+    v_dot = (1.0 / m) * qdcm_ref(q_normalized) @ f + jnp.array([0, 0, g_const])
+    q_dot = 0.5 * ssmp_ref(w) @ q_normalized
+    w_dot = jnp.diag(1.0 / J_b) @ (tau - ssm_ref(w) @ jnp.diag(J_b) @ w)
     t_dot = 1.0
 
     return jnp.concatenate([r_dot, v_dot, q_dot, w_dot, jnp.array([t_dot])])
