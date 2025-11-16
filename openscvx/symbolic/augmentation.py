@@ -6,7 +6,6 @@ The CTCS method enforces path constraints continuously along the trajectory rath
 just at discretization nodes.
 
 Key functionality:
-
     - CTCS constraint grouping: Sort and group CTCS constraints by time intervals
     - Constraint separation: Separate CTCS, nodal, and convex constraints
     - Vector decomposition: Decompose vector constraints into scalar components
@@ -18,6 +17,7 @@ augmented system with additional states for constraint satisfaction and time dil
 
 Architecture:
     The CTCS method works by:
+
     1. Grouping constraints by time interval and assigning index (idx)
     2. Creating augmented states (one per constraint group)
     3. Adding penalty dynamics: aug_dot = penalty(constraint_violation)
@@ -165,6 +165,7 @@ def separate_constraints(
     """Separate and categorize constraints by type and convexity.
 
     Separates constraints into three categories:
+
     1. CTCS (continuous-time) constraints
     2. Non-convex nodal constraints
     3. Convex nodal constraints
@@ -259,7 +260,8 @@ def decompose_vector_nodal_constraints(
     handle vector values internally.
 
     Args:
-        constraints_nodal: List of NodalConstraint objects (must be canonicalized)
+        constraints_nodal (List[NodalConstraint]): List of NodalConstraint objects
+            (must be canonicalized)
 
     Returns:
         List of NodalConstraint objects with vector constraints decomposed into scalars.
@@ -444,10 +446,10 @@ def augment_dynamics_with_ctcs(
     controls: List[Control],
     constraints_ctcs: List[CTCS],
     N: int,
-    licq_min=0.0,
-    licq_max=1e-4,
-    time_dilation_factor_min=0.3,
-    time_dilation_factor_max=3.0,
+    licq_min: float = 0.0,
+    licq_max: float = 1e-4,
+    time_dilation_factor_min: float = 0.3,
+    time_dilation_factor_max: float = 3.0,
 ) -> Tuple[Expr, List[State], List[Control]]:
     """Augment dynamics with continuous-time constraint satisfaction states.
 

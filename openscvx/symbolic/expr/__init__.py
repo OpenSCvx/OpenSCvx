@@ -22,9 +22,20 @@ Module Organization:
     The package is organized into the following modules:
 
     Core Expressions (expr.py):
-        Base classes and arithmetic operations including `Expr`, `Leaf`, `Parameter`,
-        `Constant`, `Add`, `Sub`, `Mul`, `Div`, `MatMul`, `Neg`, `Power`, `Sum`,
-        `Index`, `Concat`, `Constraint`, `Equality`, and `Inequality`.
+        Base classes and utilities including `Expr`, `Leaf`, `Parameter`, `Constant`,
+        and helper functions `to_expr` and `traverse`.
+
+    Arithmetic Operations (arithmetic.py):
+        Fundamental arithmetic operations including `Add`, `Sub`, `Mul`, `Div`,
+        `MatMul`, `Neg`, and `Power`.
+
+    Array Operations (array.py):
+        Array manipulation operations including `Index`, `Concat`, `Stack`, `Hstack`,
+        and `Vstack` for indexing, slicing, and combining arrays.
+
+    Constraints (constraint.py):
+        Constraint types including `Constraint`, `Equality`, `Inequality`,
+        `NodalConstraint`, and `CTCS` (Continuous-Time Constraint Satisfaction).
 
     Optimization Variables (variable.py, state.py, control.py):
         `Variable` for general optimization variables, `State` for time-varying state
@@ -36,8 +47,7 @@ Module Organization:
         `SmoothReLU`, `Max`).
 
     Linear Algebra (linalg.py):
-        Operations including `Transpose`, `Stack`, `Hstack`, `Vstack`, `Norm`,
-        and `Diag`.
+        Matrix operations (`Transpose`, `Diag`) and reductions (`Sum`, `Norm`).
 
     Spatial Operations (spatial.py):
         6-DOF operations for aerospace and robotics including `QDCM` (Quaternion to
@@ -52,37 +62,30 @@ Module Organization:
         `Or` for logical disjunction in task specifications.
 """
 
+# Arithmetic operations
+from .arithmetic import Add, Div, MatMul, Mul, Neg, Power, Sub
+
+# Array operations
+from .array import Concat, Hstack, Index, Stack, Vstack
+
 # Specialized constraints
-from .constraint import CTCS, NodalConstraint, ctcs
+from .constraint import CTCS, Constraint, Equality, Inequality, NodalConstraint, ctcs
 
 # Control
 from .control import Control
 
 # Core base classes and fundamental operations
 from .expr import (
-    Add,
-    Concat,
     Constant,
-    Constraint,
-    Div,
-    Equality,
     Expr,
-    Index,
-    Inequality,
     Leaf,
-    MatMul,
-    Mul,
-    Neg,
     Parameter,
-    Power,
-    Sub,
-    Sum,
     to_expr,
     traverse,
 )
 
 # Linear algebra operations
-from .linalg import Diag, Hstack, Norm, Stack, Transpose, Vstack
+from .linalg import Diag, Norm, Sum, Transpose
 
 # Mathematical functions
 from .math import Cos, Exp, Huber, Log, Max, PositivePart, Sin, SmoothReLU, Sqrt, Square

@@ -19,14 +19,14 @@ All basic constraints are automatically enforced at all discrete nodes unless wr
 
 #### Equality
 
-::: openscvx.symbolic.expr.expr.Equality
+::: openscvx.symbolic.expr.constraint.Equality
     options:
       show_source: false
       show_root_heading: true
 
 #### Inequality
 
-::: openscvx.symbolic.expr.expr.Inequality
+::: openscvx.symbolic.expr.constraint.Inequality
     options:
       show_source: false
       show_root_heading: true

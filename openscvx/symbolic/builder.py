@@ -9,7 +9,6 @@ it performs validation, canonicalization, and augmentation to prepare the proble
 efficient numerical solution.
 
 Key functionality:
-
     - Problem validation: Check shapes, variable names, constraint placement
     - Time handling: Auto-create time state or validate user-provided time
     - Canonicalization: Simplify expressions algebraically
@@ -29,18 +28,20 @@ Architecture:
     The main function `preprocess_symbolic_problem` orchestrates the pipeline:
 
     Input:
-        - User dynamics: Dict[str, Expr] mapping state names to dynamics
-        - User constraints: List of symbolic constraints
-        - User states & controls: Variable definitions
-        - Time configuration: Time object specifying time bounds
+
+    - User dynamics: Dict[str, Expr] mapping state names to dynamics
+    - User constraints: List of symbolic constraints
+    - User states & controls: Variable definitions
+    - Time configuration: Time object specifying time bounds
 
     Output:
-        - Augmented dynamics: Original + time + CTCS augmented state dynamics
-        - Augmented states: Original + time + CTCS augmented states
-        - Augmented controls: Original + time dilation control
-        - Separated constraints: CTCS, nodal, and convex nodal lists
-        - Parameters: Extracted parameter values
-        - Metadata: Node intervals for CTCS constraints
+
+    - Augmented dynamics: Original + time + CTCS augmented state dynamics
+    - Augmented states: Original + time + CTCS augmented states
+    - Augmented controls: Original + time dilation control
+    - Separated constraints: CTCS, nodal, and convex nodal lists
+    - Parameters: Extracted parameter values
+    - Metadata: Node intervals for CTCS constraints
 
 Example:
     Basic problem preprocessing::

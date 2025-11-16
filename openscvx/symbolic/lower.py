@@ -12,11 +12,12 @@ Architecture:
     to the appropriate backend.
 
     Lowering Flow:
-        1. Symbolic expressions are built during problem specification
-        2. lower_symbolic_expressions() coordinates the full lowering process
-        3. Backend-specific lowerers convert each expression node to executable code
-        4. Automatic differentiation creates Jacobians for dynamics and constraints
-        5. Result is a set of executable functions ready for numerical optimization
+
+    1. Symbolic expressions are built during problem specification
+    2. lower_symbolic_expressions() coordinates the full lowering process
+    3. Backend-specific lowerers convert each expression node to executable code
+    4. Automatic differentiation creates Jacobians for dynamics and constraints
+    5. Result is a set of executable functions ready for numerical optimization
 
 Backends:
     - JAX: For dynamics and non-convex constraints (with automatic differentiation)

@@ -5,7 +5,6 @@ in trajectory optimization problems. These utilities ensure that expressions are
 well-formed and constraints are properly specified before compilation to solvers.
 
 The preprocessing pipeline includes:
-
     - Shape validation: Ensure all expressions have compatible shapes
     - Variable name validation: Check for unique, non-reserved variable names
     - Constraint validation: Verify constraints appear only at root level
