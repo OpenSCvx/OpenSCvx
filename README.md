@@ -92,12 +92,6 @@ For local development:
 pip install -e ".[gui]"
 ```
 
-Or with conda:
-
-```sh
-conda env update -f environment.yml
-```
-
 The GUI features include:
 - Interactive 3D trajectory visualization with `plot_animation_pyqtgraph()`
 - SCP iteration animation with `plot_scp_animation_pyqtgraph()`
@@ -148,13 +142,22 @@ Dependencies can then be installed using Conda or Pip
 <summary>Via Conda</summary>
 
 1. Clone the repo using https or ssh
-2. Install environment packages (this will take about a minute or two):
+2. Create a conda environment with Python:
    ```sh
-   conda env create -f environment.yml
+   conda create -n openscvx python>=3.9
    ```
 3. Activate the environment:
    ```sh
    conda activate openscvx
+   ```
+4. Install the package with dependencies:
+   ```sh
+   pip install -e .
+   ```
+
+   Or install with optional dependencies:
+   ```sh
+   pip install -e ".[gui,cvxpygen]"
    ```
 </details>
 

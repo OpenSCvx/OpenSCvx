@@ -78,9 +78,9 @@ For setting up a local development environment, we recommend using Conda to mana
     git clone https://github.com/haynec/OpenSCvx.git
     cd OpenSCvx
     ```
-2.  Create and activate the conda environment from the provided file:
+2.  Create and activate a conda environment with Python:
     ```sh
-    conda env create -f environment.yml
+    conda create -n openscvx python>=3.9
     conda activate openscvx
     ```
 3.  Install the package in editable mode with all optional dependencies:
