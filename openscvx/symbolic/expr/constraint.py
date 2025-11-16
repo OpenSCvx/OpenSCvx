@@ -6,14 +6,13 @@ precise control over when and how constraints are enforced in discretized trajec
 optimization problems.
 
 Key constraint types:
-
-- **NodalConstraint:** Enforces constraints only at specific discrete time points (nodes) along the
-  trajectory. Useful for waypoint constraints, boundary conditions, and reducing computational cost
-  by selective enforcement.
-- **CTCS (Continuous-Time Constraint Satisfaction):** Guarantees strict constraint satisfaction
-  throughout the entire continuous trajectory, not just at discrete nodes. Works by augmenting the
-  state vector with additional states whose dynamics integrate constraint violation penalties.
-  Essential for safety-critical applications where inter-node violations could be catastrophic.
+    - **NodalConstraint:** Enforces constraints only at specific discrete time points (nodes) along
+    the trajectory. Useful for waypoint constraints, boundary conditions, and reducing computational
+    cost by selective enforcement.
+    - **CTCS (Continuous-Time Constraint Satisfaction):** Guarantees strict constraint satisfaction
+    throughout the entire continuous trajectory, not just at discrete nodes. Works by augmenting the
+    state vector with additional states whose dynamics integrate constraint violation penalties.
+    Essential for safety-critical applications where inter-node violations could be catastrophic.
 
 Example:
     Nodal constraints for waypoints::

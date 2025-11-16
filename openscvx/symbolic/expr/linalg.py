@@ -5,14 +5,12 @@ manipulation in optimization problems. Operations follow NumPy/JAX conventions
 for shapes and broadcasting behavior.
 
 Key Operations:
-
-- **Matrix Operations:**
-    - `Transpose` - Matrix/tensor transposition (swaps last two dimensions)
-    - `Diag` - Construct diagonal matrix from vector
-
-- **Reductions:**
-    - `Sum` - Sum all elements of an array (reduces to scalar)
-    - `Norm` - Euclidean (L2) norm and other norms of vectors/matrices
+    - **Matrix Operations:**
+        - `Transpose` - Matrix/tensor transposition (swaps last two dimensions)
+        - `Diag` - Construct diagonal matrix from vector
+    - **Reductions:**
+        - `Sum` - Sum all elements of an array (reduces to scalar)
+        - `Norm` - Euclidean (L2) norm and other norms of vectors/matrices
 
 Note:
     For array manipulation operations like stacking and concatenation, see the

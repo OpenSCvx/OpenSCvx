@@ -3,11 +3,11 @@
 This module provides the unification layer that aggregates multiple symbolic State
 and Control objects into unified representations. The unification process enables:
 
-    - Multiple separate State/Control objects in symbolic expressions
-    - Single unified state/control vectors for numerical optimization
-    - Automatic slice assignment for extracting subvectors
-    - Compatibility with existing optimization infrastructure
-    - Separation of user-defined and augmented (internal) variables
+- Multiple separate State/Control objects in symbolic expressions
+- Single unified state/control vectors for numerical optimization
+- Automatic slice assignment for extracting subvectors
+- Compatibility with existing optimization infrastructure
+- Separation of user-defined and augmented (internal) variables
 
 Architecture:
     The unification layer bridges the symbolic expression system and numerical

@@ -30,11 +30,12 @@ Lowered Function Signature:
         f(x, u, node, params) -> result
 
     Where:
-        - x: State vector (jnp.ndarray)
-        - u: Control vector (jnp.ndarray)
-        - node: Node index for time-varying behavior (scalar or array)
-        - params: Dictionary of parameter values (dict[str, Any])
-        - result: JAX array (scalar, vector, or matrix)
+
+    - x: State vector (jnp.ndarray)
+    - u: Control vector (jnp.ndarray)
+    - node: Node index for time-varying behavior (scalar or array)
+    - params: Dictionary of parameter values (dict[str, Any])
+    - result: JAX array (scalar, vector, or matrix)
 
 Example:
     Basic usage::
