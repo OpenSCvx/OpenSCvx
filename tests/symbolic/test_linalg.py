@@ -50,3 +50,44 @@ def test_sum_wraps_constants_and_expressions():
     assert isinstance(sum2.operand, Add)
     assert len(sum2.operand.children()) == 2
     assert repr(sum2) == "sum((Var('x') + Var('y')))"
+
+
+# =============================================================================
+# JAX Lowering Tests
+# =============================================================================
+
+
+def test_diag():
+    """Test the Diag compact node individually."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Diag, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    # Test with different vectors
+    test_vectors = [
+        jnp.array([1.0, 2.0, 3.0]),
+        jnp.array([0.5, -1.0, 2.5]),
+        jnp.array([0.0, 0.0, 0.0]),
+    ]
+
+    for v_val in test_vectors:
+        # Create vector state
+        v = State("v", (3,))
+        v._slice = slice(0, 3)
+
+        # Test Diag node
+        diag_expr = Diag(v)
+        fn = lower_to_jax(diag_expr)
+        result = fn(v_val, None, None, None)
+
+        # Should be 3x3 matrix
+        assert result.shape == (3, 3)
+
+        # Should be diagonal
+        expected = jnp.diag(v_val)
+        assert jnp.allclose(result, expected, atol=1e-12)
+
+        # Off-diagonal elements should be zero
+        off_diag_mask = ~jnp.eye(3, dtype=bool)
+        assert jnp.allclose(result[off_diag_mask], 0.0, atol=1e-12)

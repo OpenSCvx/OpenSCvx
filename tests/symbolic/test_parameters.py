@@ -66,3 +66,248 @@ def test_parameter_in_constraints():
     assert isinstance(ineq, Inequality)
     assert ineq.lhs is x
     assert ineq.rhs is p
+
+
+# =============================================================================
+# JAX Lowering Tests
+# =============================================================================
+
+
+def test_jax_lower_parameter_scalar():
+    """Test Parameter node with scalar value."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    param = Parameter("alpha", (), value=5.0)
+    jl = JaxLowerer()
+    f = jl._visit_parameter(param)
+    parameters = dict(alpha=5.0)
+
+    # Test with scalar parameter
+    out = f(None, None, None, parameters)
+    assert isinstance(out, jnp.ndarray)
+    assert out.shape == ()
+    assert jnp.allclose(out, 5.0)
+
+    parameters["alpha"] = -2.5
+
+    # Test with different scalar value
+    out = f(None, None, None, parameters)
+    assert jnp.allclose(out, -2.5)
+
+
+def test_jax_lower_parameter_vector():
+    """Test Parameter node with vector value."""
+    import jax.numpy as jnp
+    import numpy as np
+
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    param = Parameter("weights", (3,), value=np.array([1.0, 2.0, 3.0]))
+    jl = JaxLowerer()
+    f = jl._visit_parameter(param)
+
+    # Test with vector parameter
+    weights_val = np.array([1.0, 2.0, 3.0])
+    out = f(None, None, None, dict(weights=weights_val))
+    assert isinstance(out, jnp.ndarray)
+    assert out.shape == (3,)
+    assert jnp.allclose(out, weights_val)
+
+    # Test with different vector value
+    weights_val2 = np.array([-1.0, 0.5, 2.5])
+    out = f(None, None, None, dict(weights=weights_val2))
+    assert jnp.allclose(out, weights_val2)
+
+
+def test_jax_lower_parameter_matrix():
+    """Test Parameter node with matrix value."""
+    import jax.numpy as jnp
+    import numpy as np
+
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    param = Parameter("transform", (2, 3), value=np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]))
+    jl = JaxLowerer()
+    f = jl._visit_parameter(param)
+
+    # Test with matrix parameter
+    matrix_val = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+    out = f(None, None, None, dict(transform=matrix_val))
+    assert isinstance(out, jnp.ndarray)
+    assert out.shape == (2, 3)
+    assert jnp.allclose(out, matrix_val)
+
+
+def test_parameter_in_arithmetic_expression():
+    """Test Parameter nodes in arithmetic expressions with states."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Mul, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = jnp.array([1.0, 2.0, 3.0])
+
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+    gain = Parameter("gain", (), value=2.5)
+
+    # Expression: gain * x
+    expr = Mul(gain, state)
+
+    fn = lower_to_jax(expr)
+    result = fn(x, None, None, dict(gain=2.5))
+
+    expected = 2.5 * x
+    assert jnp.allclose(result, expected)
+
+
+def test_parameter_with_lower_to_jax():
+    """Test Parameter nodes with the top-level lower_to_jax function."""
+    import jax.numpy as jnp
+    import numpy as np
+
+    from openscvx.symbolic.lower import lower_to_jax
+
+    param = Parameter("threshold", (2,), value=np.array([1.5, 2.5]))
+
+    fn = lower_to_jax(param)
+    param_val = np.array([1.5, 2.5])
+    result = fn(None, None, None, dict(threshold=param_val))
+
+    assert isinstance(result, jnp.ndarray)
+    assert result.shape == (2,)
+    assert jnp.allclose(result, param_val)
+
+
+def test_parameter_in_double_integrator_dynamics():
+    """Test Parameter nodes in a realistic double integrator dynamics expression."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Concat, Constant, Control, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = jnp.array([1.0, 2.0, 0.5, -0.2])  # [pos_x, pos_y, vel_x, vel_y]
+    u = jnp.array([0.8, 1.2])  # [acc_x, acc_y]
+
+    # State and control
+    state = State("x", (4,))
+    state._slice = slice(0, 4)
+    control = Control("u", (2,))
+    control._slice = slice(0, 2)
+
+    # Parameters for physical system
+    mass = Parameter("m", (), value=2.0)
+    gravity = Parameter("g", (), value=9.81)
+
+    # Extract state components
+    # pos = state[0:2]  # [pos_x, pos_y]
+    vel = state[2:4]  # [vel_x, vel_y]
+
+    # Dynamics: pos_dot = vel, vel_dot = u/m + [0, -g]
+    pos_dot = vel
+    gravity_vec = Concat(Constant(0.0), -gravity)
+    vel_dot = control / mass + gravity_vec
+
+    dynamics = Concat(pos_dot, vel_dot)
+
+    fn = lower_to_jax(dynamics)
+
+    # Test with realistic parameter values
+    m_val = 2.0  # kg
+    g_val = 9.81  # m/s^2
+    parameter = dict(m=m_val, g=g_val)
+    result = fn(x, u, None, parameter)
+
+    # Expected: [vel_x, vel_y, acc_x/m, acc_y/m - g]
+    expected = jnp.array(
+        [
+            0.5,  # vel_x
+            -0.2,  # vel_y
+            0.8 / 2.0,  # acc_x / m = 0.4
+            1.2 / 2.0 - 9.81,  # acc_y / m - g = 0.6 - 9.81 = -9.21
+        ]
+    )
+
+    assert jnp.allclose(result, expected)
+    assert result.shape == (4,)
+
+
+def test_parameter_dynamics_with_jit_and_vmap():
+    """Test Parameter nodes in dynamics function with JAX JIT compilation and vmap."""
+    import jax
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Concat, Constant, Control, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    # Create double integrator dynamics with parameters
+    state = State("x", (4,))
+    state._slice = slice(0, 4)
+    control = Control("u", (2,))
+    control._slice = slice(0, 2)
+
+    mass = Parameter("m", (), value=2.0)
+    gravity = Parameter("g", (), value=9.81)
+
+    # Dynamics: pos_dot = vel, vel_dot = u/m + [0, -g]
+    pos_dot = state[2:4]  # velocity
+    gravity_vec = Concat(Constant(0.0), -gravity)
+    vel_dot = control / mass + gravity_vec
+    dynamics = Concat(pos_dot, vel_dot)
+
+    # Lower to JAX function
+    dynamics_fn = lower_to_jax(dynamics)
+
+    # Create function compatible with trajoptproblem.py calling convention
+    def dynamics_with_node(x, u, node, m, g):
+        """Dynamics function with node parameter (similar to trajoptproblem.py structure)."""
+        parameter = dict(m=m, g=g)
+        return dynamics_fn(x, u, node, parameter)
+
+    # JIT compile the function
+    dynamics_jit = jax.jit(dynamics_with_node)
+
+    # Test single evaluation
+    x = jnp.array([1.0, 2.0, 0.5, -0.2])
+    u = jnp.array([0.8, 1.2])
+    node = 0
+    m_val = 2.0
+    g_val = 9.81
+
+    result_single = dynamics_jit(x, u, node, m_val, g_val)
+    expected = jnp.array([0.5, -0.2, 0.4, -9.21])
+    assert jnp.allclose(result_single, expected)
+
+    # Test with vmap for multiple time steps (similar to trajoptproblem.py)
+    N = 5
+    x_batch = jnp.tile(x[None, :], (N, 1))  # (N, 4)
+    u_batch = jnp.tile(u[None, :], (N, 1))  # (N, 2)
+    node_batch = jnp.arange(N)  # (N,)
+
+    # Create vmapped function with parameters as None (not vectorized)
+    dynamics_vmap = jax.vmap(
+        dynamics_with_node,
+        in_axes=(0, 0, 0, None, None),  # vmap over x, u, node; keep m, g scalar
+    )
+
+    # JIT compile the vmapped function
+    dynamics_vmap_jit = jax.jit(dynamics_vmap)
+
+    # Test batch evaluation
+    result_batch = dynamics_vmap_jit(x_batch, u_batch, node_batch, m_val, g_val)
+    expected_batch = jnp.tile(expected[None, :], (N, 1))  # (N, 4)
+
+    assert result_batch.shape == (N, 4)
+    assert jnp.allclose(result_batch, expected_batch)
+
+    # Test parameter updates work correctly after compilation
+    m_val_new = 3.0
+    result_new_mass = dynamics_vmap_jit(x_batch, u_batch, node_batch, m_val_new, g_val)
+
+    # Expected with new mass: [0.5, -0.2, 0.8/3.0, 1.2/3.0 - 9.81]
+    expected_new = jnp.array([0.5, -0.2, 0.8 / 3.0, 1.2 / 3.0 - 9.81])
+    expected_new_batch = jnp.tile(expected_new[None, :], (N, 1))
+
+    assert jnp.allclose(result_new_mass, expected_new_batch)

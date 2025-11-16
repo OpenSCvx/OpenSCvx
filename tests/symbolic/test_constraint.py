@@ -429,3 +429,315 @@ def test_mixed_convex_and_nonconvex_constraints():
     assert isinstance(canonical_constraints[1], Inequality)
     assert isinstance(canonical_constraints[2], Equality)
     assert isinstance(canonical_constraints[3], Equality)
+
+
+# =============================================================================
+# JAX Lowering Tests - Constraints
+# =============================================================================
+
+
+def test_equality_constraint_lowering():
+    """Test that equality constraints are lowered to residual form (lhs - rhs)."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Control, Mul, State
+    from openscvx.symbolic.lower import lower_to_jax
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    x = jnp.array([1.0, 2.0, 3.0])
+    u = jnp.array([0.5, 1.0, 1.5])
+
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+    control = Control("u", (3,))
+    control._slice = slice(0, 3)
+
+    # Constraint: x == 2*u (should become x - 2*u == 0)
+    lhs = state
+    rhs = Mul(Constant(2.0), control)
+    constraint = Equality(lhs, rhs)
+
+    jl = JaxLowerer()
+    fn = jl._visit_constraint(constraint)
+    residual = fn(x, u, None, None)
+
+    # Residual should be lhs - rhs = x - 2*u
+    expected = x - 2.0 * u
+    assert jnp.allclose(residual, expected)
+    assert residual.shape == (3,)
+
+
+def test_inequality_constraint_lowering():
+    """Test that inequality constraints are lowered to residual form (lhs - rhs)."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    x = jnp.array([0.5, 1.5, 2.5])
+
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+
+    # Constraint: x <= 2.0 (should become x - 2.0 <= 0)
+    lhs = state
+    rhs = Constant(np.array([2.0, 2.0, 2.0]))
+    constraint = Inequality(lhs, rhs)
+
+    jl = JaxLowerer()
+    fn = jl._visit_constraint(constraint)  # Both use the same visitor
+    residual = fn(x, None, None, None)
+
+    # Residual should be lhs - rhs = x - 2.0
+    expected = x - 2.0
+    assert jnp.allclose(residual, expected)
+    assert residual.shape == (3,)
+
+    # Check that residual is negative when constraint is satisfied
+    # and positive when violated
+    assert residual[0] < 0  # 0.5 - 2.0 = -1.5 (satisfied)
+    assert residual[1] < 0  # 1.5 - 2.0 = -0.5 (satisfied)
+    assert residual[2] > 0  # 2.5 - 2.0 = 0.5 (violated)
+
+
+def test_constraint_lowering_with_lower_to_jax():
+    """Test constraint lowering through the top-level lower_to_jax function."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Add, Control, Mul, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = jnp.array([1.0, 3.0])
+    u = jnp.array([0.5])
+
+    pos = State("pos", (2,))
+    pos._slice = slice(0, 2)
+    vel = Control("vel", (1,))
+    vel._slice = slice(0, 1)
+
+    # Mixed constraint: pos[0] + 2*vel <= pos[1]
+    # Rearranged: pos[0] + 2*vel - pos[1] <= 0
+    lhs = Add(pos[0], Mul(Constant(2.0), vel))
+    rhs = pos[1]
+    constraint = Inequality(lhs, rhs)
+
+    # Lower using the top-level function
+    fn = lower_to_jax(constraint)
+    residual = fn(x, u, None, None)
+
+    # Expected: pos[0] + 2*vel - pos[1] = 1.0 + 2*0.5 - 3.0 = -1.0
+    expected = 1.0 + 2.0 * 0.5 - 3.0
+    assert jnp.allclose(residual, expected)
+    assert residual < 0  # Constraint is satisfied
+
+
+# =============================================================================
+# JAX Lowering Tests - CTCS
+# =============================================================================
+
+
+def test_ctcs_constraint_can_be_lowered_directly():
+    """Test that CTCS constraints can now be lowered directly with node context."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    x = jnp.array([1.0, 2.0, 3.0])
+
+    # Create state variable
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+
+    # Create constraint: x <= 2.0
+    lhs = state
+    rhs = Constant(np.array([2.0, 2.0, 2.0]))
+    constraint = Inequality(lhs - rhs, Constant(np.array([0.0, 0.0, 0.0])))
+
+    # Wrap in CTCS
+    ctcs_constraint = CTCS(constraint, penalty="squared_relu")
+
+    jl = JaxLowerer()
+    fn = jl.lower(ctcs_constraint)
+
+    # Should work without node context (always active)
+    result = fn(x, None, None, None)
+
+    # Expected: sum(max(x - 2, 0)^2) = sum([0, 0, 1]) = 1.0
+    assert jnp.allclose(result, 1.0)
+    assert result.shape == ()  # Should be scalar
+
+
+def test_ctcs_penalty_expression_can_be_lowered():
+    """Test that the penalty expression from CTCS can be lowered successfully."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    x = jnp.array([0.5, 1.5, 2.5])
+
+    # Create state variable
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+
+    # Create constraint: x <= 2.0
+    lhs = state
+    rhs = Constant(np.array([2.0, 2.0, 2.0]))
+    constraint = Inequality(lhs - rhs, 0)
+
+    # Wrap in CTCS
+    ctcs_constraint = CTCS(constraint, penalty="squared_relu")
+
+    # Extract the penalty expression (this is what would happen during augmentation)
+    penalty_expr = ctcs_constraint.penalty_expr()
+
+    # The penalty expression should be lowerable
+    jl = JaxLowerer()
+    fn = jl.lower(penalty_expr)
+
+    # Execute the penalty function
+    result = fn(x, None, None, None)
+
+    # Expected: Sum(Square(PositivePart(x - 2.0))) = sum([0, 0, 0.25]) = 0.25
+    # Only x[2] = 2.5 violates the constraint x <= 2.0
+    expected = 0.25  # Scalar result from Sum
+    assert jnp.allclose(result, expected)
+    assert result.shape == ()  # Should be scalar
+
+
+def test_ctcs_with_different_penalties():
+    """Test that CTCS penalty expressions work with different penalty types."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    x = jnp.array([1.0, 2.0, 3.0])
+
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+
+    # Constraint: x <= 1.5 (violations at x[1] and x[2])
+    constraint = Inequality(state - Constant(np.array([1.5, 1.5, 1.5])), np.array([0, 0, 0]))
+
+    # Test different penalty types
+    penalties = ["squared_relu", "huber", "smooth_relu"]
+
+    jl = JaxLowerer()
+
+    for penalty_type in penalties:
+        ctcs_constraint = CTCS(constraint, penalty=penalty_type)
+        penalty_expr = ctcs_constraint.penalty_expr()
+
+        # Should be able to lower without error
+        fn = jl.lower(penalty_expr)
+        result = fn(x, None, None, None)
+        # Result should be a scalar (sum of all penalties)
+        assert result.shape == ()  # Should be scalar
+        # Total penalty should be positive since there are violations
+        assert result > 0
+        if penalty_type == "squared_relu":
+            # Expected: 0^2 + 0.5^2 + 1.5^2 = 0 + 0.25 + 2.25 = 2.5
+            expected = 0.25 + 2.25
+            assert jnp.allclose(result, expected, rtol=1e-5)
+
+
+def test_ctcs_with_node_range():
+    """Test that CTCS constraints respect node ranges."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    x = jnp.array([3.0])  # Violates constraint x <= 2.0
+
+    state = State("x", (1,))
+    state._slice = slice(0, 1)
+
+    # Constraint: x <= 2.0
+    constraint = Inequality(state - Constant(np.array([2.0])), Constant(np.array([0.0])))
+
+    # CTCS active only between nodes 5-10
+    ctcs_constraint = CTCS(constraint, penalty="squared_relu", nodes=(5, 10))
+
+    jl = JaxLowerer()
+    fn = jl.lower(ctcs_constraint)
+
+    # Test at different nodes
+    result_node_3 = fn(x, None, 3, None)  # Before active range
+    result_node_7 = fn(x, None, 7, None)  # Within active range
+    result_node_12 = fn(x, None, 12, None)  # After active range
+
+    # Should be zero outside active range
+    assert jnp.allclose(result_node_3, 0.0)
+    assert jnp.allclose(result_node_12, 0.0)
+
+    # Should have penalty within active range
+    # Expected: sum(max(3 - 2, 0)^2) = 1.0
+    assert jnp.allclose(result_node_7, 1.0)
+
+
+def test_ctcs_without_node_range_always_active():
+    """Test that CTCS constraints without node range are always active."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    x = jnp.array([2.5])  # Violates constraint x <= 2.0
+
+    state = State("x", (1,))
+    state._slice = slice(0, 1)
+
+    # Constraint: x <= 2.0
+    constraint = Inequality(state - Constant(np.array([2.0])), Constant(np.array([0.0])))
+
+    # CTCS without node range (always active)
+    ctcs_constraint = CTCS(constraint, penalty="squared_relu")
+
+    jl = JaxLowerer()
+    fn = jl.lower(ctcs_constraint)
+
+    # Test at different nodes - should always be active
+    result_node_0 = fn(x, None, 0, None)
+    result_node_50 = fn(x, None, 50, None)
+    result_node_100 = fn(x, None, 100, None)
+
+    # Should have same penalty at all nodes
+    # Expected: sum(max(2.5 - 2, 0)^2) = 0.25
+    expected = 0.25
+    assert jnp.allclose(result_node_0, expected)
+    assert jnp.allclose(result_node_50, expected)
+    assert jnp.allclose(result_node_100, expected)
+
+
+def test_ctcs_with_extra_kwargs():
+    """Test that kwargs flow through all expression types."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Add, Control, Div, Mul, State, Sub
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    x = jnp.array([1.0, 2.0, 3.0])
+    u = jnp.array([0.5, 1.0])
+
+    # Create a complex expression involving multiple nodes
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+    control = Control("u", (2,))
+    control._slice = slice(0, 2)
+
+    # Complex expression: (x[0] + x[1]) * u[0] + x[2] / u[1] - 5.0
+    expr = Sub(
+        Add(Mul(Add(state[0], state[1]), control[0]), Div(state[2], control[1])), Constant(5.0)
+    )
+
+    jl = JaxLowerer()
+    fn = jl.lower(expr)
+
+    result = fn(x, u, node=10, params=None)
+
+    # Expected: (1 + 2) * 0.5 + 3 / 1.0 - 5.0 = 1.5 + 3.0 - 5.0 = -0.5
+    expected = -0.5
+    assert jnp.allclose(result, expected)

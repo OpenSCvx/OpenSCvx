@@ -456,3 +456,100 @@ def test_mul_broadcasting_with_parameters():
     for result in [result1, result2]:
         has_param = any(isinstance(f, Parameter) for f in result.factors)
         assert has_param, "Parameter should be preserved in canonicalized expression"
+
+
+# =============================================================================
+# JAX Lowering Tests
+# =============================================================================
+
+
+def test_jax_lower_add_and_mul_of_slices():
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    x = jnp.arange(8.0)
+    a = State("a", (3,))
+    a._slice = slice(0, 3)
+    b = State("b", (3,))
+    b._slice = slice(3, 6)
+    expr_add = Add(a, b)
+    expr_mul = Mul(a, b)
+
+    jl = JaxLowerer()
+    f_res_add = jl._visit_add(expr_add)
+    res_add = f_res_add(x, None, None, None)
+    f_res_mul = jl._visit_mul(expr_mul)
+    res_mul = f_res_mul(x, None, None, None)
+
+    assert jnp.allclose(res_add, x[0:3] + x[3:6])
+    assert jnp.allclose(res_mul, x[0:3] * x[3:6])
+
+
+def test_jax_lower_sub_and_div_of_slices():
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Control, State
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    x = jnp.arange(8.0)
+    u = jnp.arange(8.0) * 3.0
+    a = State("a", (3,))
+    a._slice = slice(0, 3)
+    b = Control("b", (3,))
+    b._slice = slice(0, 3)
+    c = Constant(2.0)
+    expr_sub = Sub(a, b)
+    expr_div = Div(a, c)
+
+    jl = JaxLowerer()
+    f_res_sub = jl._visit_sub(expr_sub)
+    res_sub = f_res_sub(x, u, None, None)
+    f_res_div = jl._visit_div(expr_div)
+    res_div = f_res_div(x, u, None, None)
+
+    assert jnp.allclose(res_sub, x[0:3] - u[0:3])
+    assert jnp.allclose(res_div, x[0:3] / c.value)
+
+
+def test_jax_lower_matmul_vector_matrix():
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    # (2×2 matrix) @ (2-vector)
+    M = Constant(np.array([[1.0, 0.0], [0.0, 2.0]]))
+    v = Constant(np.array([3.0, 4.0]))
+    expr = MatMul(M, v)
+
+    jl = JaxLowerer()
+    f = jl._visit_matmul(expr)
+    out = f(None, None, None, None)
+    assert isinstance(out, jnp.ndarray)
+    assert out.shape == (2,)
+    assert jnp.allclose(out, jnp.array([3.0, 8.0]))
+
+
+def test_jax_lower_neg_and_composite():
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Control, State
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    x = jnp.arange(6.0)
+    u = jnp.arange(6.0) * 3
+    a = State("a", (2,))
+    a._slice = slice(0, 2)
+    b = Control("b", (2,))
+    b._slice = slice(0, 2)
+    c = Constant(np.array([1.0, 1.0]))
+
+    # expr = -((a + b) * c)
+    expr = Neg(Mul(Add(a, b), c))
+    jl = JaxLowerer()
+    f = jl._visit_neg(expr)
+    out = f(x, u, None, None)
+
+    expected = -((x[0:2] + u[0:2]) * jnp.array([1.0, 1.0]))
+    assert jnp.allclose(out, expected)
