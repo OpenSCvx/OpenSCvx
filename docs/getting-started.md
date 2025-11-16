@@ -18,16 +18,20 @@ OpenSCvx is a JAX-based Python library for trajectory optimization using Success
 
 ## Installation
 
-You can install OpenSCvx using pip. For the most common use case, which includes support for interactive plotting and code generation, you can install the library with the `gui` and `cvxpygen` extras:
+You can install OpenSCvx using pip or uv. For the most common use case, which includes support for interactive plotting and code generation, you can install the library with the `gui` and `cvxpygen` extras:
 
 ```sh
 pip install openscvx[gui,cvxpygen]
+# or with uv
+uv pip install openscvx[gui,cvxpygen]
 ```
 
 If you only need the core library without the optional features, you can run:
 
 ```sh
 pip install openscvx
+# or with uv
+uv pip install openscvx
 ```
 
 For the latest development version, you can clone the repository and install it in editable mode:
@@ -39,6 +43,8 @@ cd OpenSCvx
 
 # Install in editable mode with all optional dependencies
 pip install -e ".[gui,cvxpygen]"
+# or with uv
+uv pip install -e ".[gui,cvxpygen]"
 ```
 
 ### Dependencies
@@ -78,14 +84,34 @@ For setting up a local development environment, we recommend using Conda to mana
     git clone https://github.com/haynec/OpenSCvx.git
     cd OpenSCvx
     ```
-2.  Create and activate the conda environment from the provided file:
+2.  Create and activate a conda environment with Python:
     ```sh
-    conda env create -f environment.yml
+    conda create -n openscvx python>=3.9
     conda activate openscvx
     ```
 3.  Install the package in editable mode with all optional dependencies:
     ```sh
     pip install -e ".[gui,cvxpygen]"
+    ```
+</details>
+
+<details>
+<summary>Via uv</summary>
+
+1.  Prerequisites: Install [uv](https://docs.astral.sh/uv/getting-started/installation/)
+2.  Clone the repository:
+    ```sh
+    git clone https://github.com/haynec/OpenSCvx.git
+    cd OpenSCvx
+    ```
+3.  Create and activate a virtual environment:
+    ```sh
+    uv venv
+    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+    ```
+4.  Install the package in editable mode with all optional dependencies:
+    ```sh
+    uv pip install -e ".[gui,cvxpygen]"
     ```
 </details>
 
