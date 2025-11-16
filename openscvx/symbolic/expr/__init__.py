@@ -22,9 +22,16 @@ Module Organization:
     The package is organized into the following modules:
 
     Core Expressions (expr.py):
-        Base classes and arithmetic operations including `Expr`, `Leaf`, `Parameter`,
-        `Constant`, `Add`, `Sub`, `Mul`, `Div`, `MatMul`, `Neg`, `Power`, `Sum`,
-        `Index`, `Concat`, `Constraint`, `Equality`, and `Inequality`.
+        Base classes and utilities including `Expr`, `Leaf`, `Parameter`, `Constant`,
+        `Sum`, `Index`, `Concat`, and helper functions `to_expr` and `traverse`.
+
+    Arithmetic Operations (arithmetic.py):
+        Fundamental arithmetic operations including `Add`, `Sub`, `Mul`, `Div`,
+        `MatMul`, `Neg`, and `Power`.
+
+    Constraints (constraint.py):
+        Constraint types including `Constraint`, `Equality`, `Inequality`,
+        `NodalConstraint`, and `CTCS` (Continuous-Time Constraint Satisfaction).
 
     Optimization Variables (variable.py, state.py, control.py):
         `Variable` for general optimization variables, `State` for time-varying state
@@ -52,6 +59,9 @@ Module Organization:
         `Or` for logical disjunction in task specifications.
 """
 
+# Arithmetic operations
+from .arithmetic import Add, Div, MatMul, Mul, Neg, Power, Sub
+
 # Specialized constraints
 from .constraint import CTCS, Constraint, Equality, Inequality, NodalConstraint, ctcs
 
@@ -60,19 +70,12 @@ from .control import Control
 
 # Core base classes and fundamental operations
 from .expr import (
-    Add,
     Concat,
     Constant,
-    Div,
     Expr,
     Index,
     Leaf,
-    MatMul,
-    Mul,
-    Neg,
     Parameter,
-    Power,
-    Sub,
     Sum,
     to_expr,
     traverse,

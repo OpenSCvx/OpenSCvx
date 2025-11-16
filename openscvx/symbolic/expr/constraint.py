@@ -40,7 +40,8 @@ from typing import Optional, Tuple, Union
 
 import numpy as np
 
-from .expr import Constant, Expr, Sub, Sum
+from .arithmetic import Sub
+from .expr import Constant, Expr, Sum
 
 
 class Constraint(Expr):
