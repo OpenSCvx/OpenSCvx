@@ -2692,15 +2692,19 @@ Controls are direct decision variables that the optimizer can freely adjust
 (within specified bounds) at each time step to influence the system dynamics.</p>
 <p>Controls are conceptually similar to State variables but simpler - they don't
 have boundary conditions (initial/final specifications) since controls are
-typically not constrained at the endpoints. Like States, Controls support:
-- Min/max bounds to enforce actuator limits
-- Initial trajectory guesses to help the optimizer converge</p>
-<p>Common examples of control inputs include:
-- Thrust magnitude and direction for spacecraft/rockets
-- Throttle settings for engines
-- Steering angles for vehicles
-- Torques for robotic manipulators
-- Force/acceleration commands</p>
+typically not constrained at the endpoints. Like States, Controls support:</p>
+<ul>
+<li>Min/max bounds to enforce actuator limits</li>
+<li>Initial trajectory guesses to help the optimizer converge</li>
+</ul>
+<p>Common examples of control inputs include:</p>
+<ul>
+<li>Thrust magnitude and direction for spacecraft/rockets</li>
+<li>Throttle settings for engines</li>
+<li>Steering angles for vehicles</li>
+<li>Torques for robotic manipulators</li>
+<li>Force/acceleration commands</li>
+</ul>
 
 
 <p><span class="doc-section-title">Attributes:</span></p>
@@ -2716,6 +2720,7 @@ typically not constrained at the endpoints. Like States, Controls support:
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.control.Control.name">name</span></code></td>
             <td>
+                  <code><span title="str">str</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2726,6 +2731,7 @@ typically not constrained at the endpoints. Like States, Controls support:
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.control.Control._shape">_shape</span></code></td>
             <td>
+                  <code><span title="tuple">tuple</span>[<span title="int">int</span>, ...]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2736,6 +2742,7 @@ typically not constrained at the endpoints. Like States, Controls support:
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.control.Control._slice">_slice</span></code></td>
             <td>
+                  <code><span title="slice">slice</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2746,6 +2753,7 @@ typically not constrained at the endpoints. Like States, Controls support:
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.control.Control._min">_min</span></code></td>
             <td>
+                  <code><span title="np.ndarray">ndarray</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2756,6 +2764,7 @@ typically not constrained at the endpoints. Like States, Controls support:
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.control.Control._max">_max</span></code></td>
             <td>
+                  <code><span title="np.ndarray">ndarray</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2766,6 +2775,7 @@ typically not constrained at the endpoints. Like States, Controls support:
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.control.Control._guess">_guess</span></code></td>
             <td>
+                  <code><span title="np.ndarray">ndarray</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">

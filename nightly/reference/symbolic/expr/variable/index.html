@@ -2908,6 +2908,7 @@ trajectory optimization.</p>
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.variable.Variable.name">name</span></code></td>
             <td>
+                  <code><span title="str">str</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2918,6 +2919,7 @@ trajectory optimization.</p>
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.variable.Variable._shape">_shape</span></code></td>
             <td>
+                  <code><span title="tuple">tuple</span>[<span title="int">int</span>, ...]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2928,6 +2930,7 @@ trajectory optimization.</p>
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.variable.Variable._slice">_slice</span></code></td>
             <td>
+                  <code><span title="slice">slice</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2938,6 +2941,7 @@ trajectory optimization.</p>
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.variable.Variable._min">_min</span></code></td>
             <td>
+                  <code><span title="numpy.ndarray">ndarray</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2948,6 +2952,7 @@ trajectory optimization.</p>
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.variable.Variable._max">_max</span></code></td>
             <td>
+                  <code><span title="numpy.ndarray">ndarray</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2958,6 +2963,7 @@ trajectory optimization.</p>
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.variable.Variable._guess">_guess</span></code></td>
             <td>
+                  <code><span title="numpy.ndarray">ndarray</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3266,12 +3272,12 @@ u = openscvx.Control("u", shape=(2,))</p>
 </span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22"></a><span class="sd">        trajectory optimization.</span>
 </span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23"></a>
 </span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24"></a><span class="sd">    Attributes:</span>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25"></a><span class="sd">        name: Name identifier for the variable</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26"></a><span class="sd">        _shape: Shape of the variable as a tuple (typically 1D)</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27"></a><span class="sd">        _slice: Internal slice information for variable indexing</span>
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28"></a><span class="sd">        _min: Minimum bounds for each element of the variable</span>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29"></a><span class="sd">        _max: Maximum bounds for each element of the variable</span>
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30"></a><span class="sd">        _guess: Initial guess for the variable trajectory (n_points, n_vars)</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25"></a><span class="sd">        name (str): Name identifier for the variable</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26"></a><span class="sd">        _shape (tuple[int, ...]): Shape of the variable as a tuple (typically 1D)</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27"></a><span class="sd">        _slice (slice | None): Internal slice information for variable indexing</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28"></a><span class="sd">        _min (np.ndarray | None): Minimum bounds for each element of the variable</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29"></a><span class="sd">        _max (np.ndarray | None): Maximum bounds for each element of the variable</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30"></a><span class="sd">        _guess (np.ndarray | None): Initial guess for the variable trajectory (n_points, n_vars)</span>
 </span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31"></a>
 </span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32"></a><span class="sd">    Example:</span>
 </span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33"></a><span class="sd">            # Typically, use State or Control instead of Variable directly:</span>

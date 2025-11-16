@@ -2924,11 +2924,13 @@ Unlike control inputs, states evolve according to dynamics constraints and can
 have boundary conditions specified at the initial and final time points.
 Like all Variables, States also support min/max bounds and initial trajectory
 guesses to help guide the optimization solver toward good solutions.</p>
-<p>States support four types of boundary conditions:
-- <strong>fixed</strong>: State value is constrained to a specific value
-- <strong>free</strong>: State value is optimized within the specified bounds
-- <strong>minimize</strong>: Adds a term to the objective function to minimize the state value
-- <strong>maximize</strong>: Adds a term to the objective function to maximize the state value</p>
+<p>States support four types of boundary conditions:</p>
+<ul>
+<li><strong>fixed</strong>: State value is constrained to a specific value</li>
+<li><strong>free</strong>: State value is optimized within the specified bounds</li>
+<li><strong>minimize</strong>: Adds a term to the objective function to minimize the state value</li>
+<li><strong>maximize</strong>: Adds a term to the objective function to maximize the state value</li>
+</ul>
 <p>Each element of a multi-dimensional state can have different boundary condition
 types, allowing for fine-grained control over the optimization.</p>
 
@@ -2946,6 +2948,7 @@ types, allowing for fine-grained control over the optimization.</p>
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.state.State.name">name</span></code></td>
             <td>
+                  <code><span title="str">str</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2954,8 +2957,9 @@ types, allowing for fine-grained control over the optimization.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><a class="autorefs autorefs-internal" href="../../reference/symbolic/expr/#openscvx.symbolic.expr.Leaf.shape">shape</a></code></td>
+            <td><code><span title="openscvx.symbolic.expr.state.State._shape">_shape</span></code></td>
             <td>
+                  <code><span title="tuple">tuple</span>[<span title="int">int</span>, ...]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2964,8 +2968,20 @@ types, allowing for fine-grained control over the optimization.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><a class="autorefs autorefs-internal" href="#openscvx.symbolic.expr.state.State.min">min</a></code></td>
+            <td><code><span title="openscvx.symbolic.expr.state.State._slice">_slice</span></code></td>
             <td>
+                  <code><span title="slice">slice</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Internal slice information for variable indexing</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="openscvx.symbolic.expr.state.State._min">_min</span></code></td>
+            <td>
+                  <code><span title="numpy.ndarray">ndarray</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2974,8 +2990,9 @@ types, allowing for fine-grained control over the optimization.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><a class="autorefs autorefs-internal" href="#openscvx.symbolic.expr.state.State.max">max</a></code></td>
+            <td><code><span title="openscvx.symbolic.expr.state.State._max">_max</span></code></td>
             <td>
+                  <code><span title="numpy.ndarray">ndarray</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2984,8 +3001,9 @@ types, allowing for fine-grained control over the optimization.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><a class="autorefs autorefs-internal" href="../api_variable/#openscvx.symbolic.expr.variable.Variable.guess">guess</a></code></td>
+            <td><code><span title="openscvx.symbolic.expr.state.State._guess">_guess</span></code></td>
             <td>
+                  <code><span title="numpy.ndarray">ndarray</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -2994,8 +3012,9 @@ types, allowing for fine-grained control over the optimization.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><a class="autorefs autorefs-internal" href="#openscvx.symbolic.expr.state.State.initial">initial</a></code></td>
+            <td><code><span title="openscvx.symbolic.expr.state.State._initial">_initial</span></code></td>
             <td>
+                  <code><span title="numpy.ndarray">ndarray</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3006,6 +3025,7 @@ types, allowing for fine-grained control over the optimization.</p>
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.state.State.initial_type">initial_type</span></code></td>
             <td>
+                  <code><span title="numpy.ndarray">ndarray</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3014,8 +3034,9 @@ types, allowing for fine-grained control over the optimization.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><a class="autorefs autorefs-internal" href="#openscvx.symbolic.expr.state.State.final">final</a></code></td>
+            <td><code><span title="openscvx.symbolic.expr.state.State._final">_final</span></code></td>
             <td>
+                  <code><span title="numpy.ndarray">ndarray</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3026,6 +3047,7 @@ types, allowing for fine-grained control over the optimization.</p>
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.state.State.final_type">final_type</span></code></td>
             <td>
+                  <code><span title="numpy.ndarray">ndarray</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3039,11 +3061,11 @@ types, allowing for fine-grained control over the optimization.</p>
 
 <details class="example" open>
   <summary>Example</summary>
-  <p>Scalar time state with free initial time, minimize final time:</p>
+  <p>Scalar time state with fixed initial time, minimize final time:</p>
 <div class="language-python highlight"><pre><span></span><code><span class="n">time</span> <span class="o">=</span> <span class="n">State</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,))</span>
 <span class="n">time</span><span class="o">.</span><span class="n">min</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">]</span>
 <span class="n">time</span><span class="o">.</span><span class="n">max</span> <span class="o">=</span> <span class="p">[</span><span class="mf">10.0</span><span class="p">]</span>
-<span class="n">time</span><span class="o">.</span><span class="n">initial</span> <span class="o">=</span> <span class="p">[(</span><span class="s2">&quot;free&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)]</span>
+<span class="n">time</span><span class="o">.</span><span class="n">initial</span> <span class="o">=</span> <span class="p">[(</span><span class="s2">&quot;fixed&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)]</span>
 <span class="n">time</span><span class="o">.</span><span class="n">final</span> <span class="o">=</span> <span class="p">[(</span><span class="s2">&quot;minimize&quot;</span><span class="p">,</span> <span class="mf">5.0</span><span class="p">)]</span>
 </code></pre></div>
 <p>3D position state with mixed boundary conditions:</p>
@@ -3411,6 +3433,7 @@ the optimizer handles initial and final state values.</p>
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.state.BoundaryType.FIXED">FIXED</span></code></td>
             <td>
+                  <code><span title="str">str</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3421,6 +3444,7 @@ the optimizer handles initial and final state values.</p>
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.state.BoundaryType.FREE">FREE</span></code></td>
             <td>
+                  <code><span title="str">str</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3431,6 +3455,7 @@ the optimizer handles initial and final state values.</p>
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.state.BoundaryType.MINIMIZE">MINIMIZE</span></code></td>
             <td>
+                  <code><span title="str">str</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -3441,6 +3466,7 @@ the optimizer handles initial and final state values.</p>
           <tr class="doc-section-item">
             <td><code><span title="openscvx.symbolic.expr.state.BoundaryType.MAXIMIZE">MAXIMIZE</span></code></td>
             <td>
+                  <code><span title="str">str</span></code>
             </td>
             <td>
               <div class="doc-md-description">

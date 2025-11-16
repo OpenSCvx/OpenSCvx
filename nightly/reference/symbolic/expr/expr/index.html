@@ -4035,31 +4035,34 @@
 <p>This module provides the foundation for openscvx's symbolic expression framework,
 implementing an Abstract Syntax Tree (AST) representation for mathematical expressions
 used in optimization problems. The expression system enables:</p>
-<div class="language-python highlight"><pre><span></span><code><span class="o">-</span> <span class="n">Declarative</span> <span class="n">problem</span> <span class="n">specification</span><span class="p">:</span> <span class="n">Write</span> <span class="n">optimization</span> <span class="n">problems</span> <span class="n">using</span> <span class="n">familiar</span>
-  <span class="n">mathematical</span> <span class="n">notation</span> <span class="k">with</span> <span class="n">operator</span> <span class="n">overloading</span> <span class="p">(</span><span class="o">+</span><span class="p">,</span> <span class="o">-</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">@</span><span class="p">,</span> <span class="o">**</span><span class="p">,</span> <span class="n">etc</span><span class="o">.</span><span class="p">)</span>
-<span class="o">-</span> <span class="n">Automatic</span> <span class="n">differentiation</span><span class="p">:</span> <span class="n">Expressions</span> <span class="n">are</span> <span class="n">automatically</span> <span class="n">differentiated</span> <span class="n">during</span>
-  <span class="n">compilation</span> <span class="n">to</span> <span class="n">solver</span><span class="o">-</span><span class="n">specific</span> <span class="n">formats</span>
-<span class="o">-</span> <span class="n">Shape</span> <span class="n">checking</span><span class="p">:</span> <span class="n">Static</span> <span class="n">validation</span> <span class="n">of</span> <span class="n">tensor</span> <span class="n">dimensions</span> <span class="n">before</span> <span class="n">optimization</span>
-<span class="o">-</span> <span class="n">Canonicalization</span><span class="p">:</span> <span class="n">Algebraic</span> <span class="n">simplification</span> <span class="k">for</span> <span class="n">more</span> <span class="n">efficient</span> <span class="n">compilation</span>
-<span class="o">-</span> <span class="n">Multiple</span> <span class="n">backends</span><span class="p">:</span> <span class="n">Expressions</span> <span class="n">can</span> <span class="n">be</span> <span class="n">compiled</span> <span class="n">to</span> <span class="n">CVXPy</span><span class="p">,</span> <span class="n">JAX</span><span class="p">,</span> <span class="ow">or</span> <span class="n">custom</span> <span class="n">solvers</span>
-</code></pre></div>
+<ul>
+<li>Declarative problem specification: Write optimization problems using familiar
+    mathematical notation with operator overloading (+, -, <em>, /, @, *</em>, etc.)</li>
+<li>Automatic differentiation: Expressions are automatically differentiated during
+    compilation to solver-specific formats</li>
+<li>Shape checking: Static validation of tensor dimensions before optimization</li>
+<li>Canonicalization: Algebraic simplification for more efficient compilation</li>
+<li>Multiple backends: Expressions can be compiled to CVXPy, JAX, or custom solvers</li>
+</ul>
 
 
 <details class="architecture" open>
   <summary>Architecture</summary>
   <p>The expression system is built around an AST where each node is an <code>Expr</code> subclass:</p>
-<div class="language-python highlight"><pre><span></span><code><span class="o">-</span> <span class="n">Leaf</span> <span class="n">nodes</span><span class="p">:</span> <span class="err">`</span><span class="n">Parameter</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">Variable</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">State</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">Control</span><span class="err">`</span> <span class="o">-</span> <span class="n">symbolic</span> <span class="n">values</span>
-<span class="o">-</span> <span class="n">Arithmetic</span> <span class="n">operations</span><span class="p">:</span> <span class="err">`</span><span class="n">Add</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">Sub</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">Mul</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">Div</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">MatMul</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">Power</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">Neg</span><span class="err">`</span>
-<span class="o">-</span> <span class="n">Reductions</span><span class="p">:</span> <span class="err">`</span><span class="n">Sum</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">Norm</span><span class="err">`</span><span class="p">,</span> <span class="n">etc</span><span class="o">.</span>
-<span class="o">-</span> <span class="n">Constraints</span><span class="p">:</span> <span class="err">`</span><span class="n">Equality</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">Inequality</span><span class="err">`</span>
-<span class="o">-</span> <span class="n">Functions</span><span class="p">:</span> <span class="err">`</span><span class="n">Sin</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">Cos</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">Exp</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">Log</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">Sqrt</span><span class="err">`</span><span class="p">,</span> <span class="n">etc</span><span class="o">.</span>
-<span class="o">-</span> <span class="n">Indexing</span><span class="p">:</span> <span class="err">`</span><span class="n">Index</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">Concat</span><span class="err">`</span><span class="p">,</span> <span class="err">`</span><span class="n">Stack</span><span class="err">`</span>
-</code></pre></div>
+<ul>
+<li>Leaf nodes: <code>Parameter</code>, <code>Variable</code>, <code>State</code>, <code>Control</code> - symbolic values</li>
+<li>Arithmetic operations: <code>Add</code>, <code>Sub</code>, <code>Mul</code>, <code>Div</code>, <code>MatMul</code>, <code>Power</code>, <code>Neg</code></li>
+<li>Reductions: <code>Sum</code>, <code>Norm</code>, etc.</li>
+<li>Constraints: <code>Equality</code>, <code>Inequality</code></li>
+<li>Functions: <code>Sin</code>, <code>Cos</code>, <code>Exp</code>, <code>Log</code>, <code>Sqrt</code>, etc.</li>
+<li>Indexing: <code>Index</code>, <code>Concat</code>, <code>Stack</code></li>
+</ul>
 <p>Each expression node implements:</p>
-<div class="language-python highlight"><pre><span></span><code><span class="o">-</span> <span class="err">`</span><span class="n">children</span><span class="p">()</span><span class="err">`</span><span class="p">:</span> <span class="n">Returns</span> <span class="n">child</span> <span class="n">expressions</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">AST</span>
-<span class="o">-</span> <span class="err">`</span><span class="n">canonicalize</span><span class="p">()</span><span class="err">`</span><span class="p">:</span> <span class="n">Returns</span> <span class="n">a</span> <span class="n">simplified</span><span class="o">/</span><span class="n">normalized</span> <span class="n">version</span>
-<span class="o">-</span> <span class="err">`</span><span class="n">check_shape</span><span class="p">()</span><span class="err">`</span><span class="p">:</span> <span class="n">Validates</span> <span class="ow">and</span> <span class="n">returns</span> <span class="n">the</span> <span class="n">output</span> <span class="n">shape</span>
-</code></pre></div>
+<ul>
+<li><code>children()</code>: Returns child expressions in the AST</li>
+<li><code>canonicalize()</code>: Returns a simplified/normalized version</li>
+<li><code>check_shape()</code>: Validates and returns the output shape</li>
+</ul>
 </details>
 
 <details class="example" open>
