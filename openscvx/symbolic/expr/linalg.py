@@ -10,7 +10,8 @@ Key Operations:
     - `Transpose` - Matrix/tensor transposition (swaps last two dimensions)
     - `Diag` - Construct diagonal matrix from vector
 
-- **Norms:**
+- **Reductions:**
+    - `Sum` - Sum all elements of an array (reduces to scalar)
     - `Norm` - Euclidean (L2) norm and other norms of vectors/matrices
 
 Note:
@@ -30,6 +31,16 @@ Example:
         # Create a diagonal matrix
         v = ox.State("v", shape=(5,))
         D = ox.Diag(v)  # Result shape (5, 5)
+
+    Reduction operations::
+
+        x = ox.State("x", shape=(3, 4))
+
+        # Sum all elements
+        total = ox.Sum(x)  # Result is scalar
+
+        # Compute norm
+        magnitude = ox.Norm(x)  # Result is scalar
 
     Computing kinetic energy with norms::
 
@@ -154,6 +165,53 @@ class Diag(Expr):
 
     def __repr__(self):
         return f"diag({self.operand!r})"
+
+
+class Sum(Expr):
+    """Sum reduction operation for symbolic expressions.
+
+    Sums all elements of an expression, reducing it to a scalar. This is a
+    reduction operation that collapses all dimensions.
+
+    Attributes:
+        operand: Expression whose elements will be summed
+
+    Example:
+        Define a Sum expression::
+
+            x = ox.State("x", shape=(3, 4))
+            total = Sum(x)  # Creates Sum(x), result shape ()
+    """
+
+    def __init__(self, operand):
+        """Initialize a sum reduction operation.
+
+        Args:
+            operand: Expression to sum over all elements
+        """
+        self.operand = to_expr(operand)
+
+    def children(self):
+        return [self.operand]
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize sum: canonicalize the operand.
+
+        Returns:
+            Expr: Canonical form of the sum expression
+        """
+        operand = self.operand.canonicalize()
+        return Sum(operand)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Sum reduces any shape to a scalar."""
+        # Validate that the operand has a valid shape
+        self.operand.check_shape()
+        # Sum always produces a scalar regardless of input shape
+        return ()
+
+    def __repr__(self):
+        return f"sum({self.operand!r})"
 
 
 class Norm(Expr):

@@ -41,7 +41,8 @@ from typing import Optional, Tuple, Union
 import numpy as np
 
 from .arithmetic import Sub
-from .expr import Constant, Expr, Sum
+from .expr import Constant, Expr
+from .linalg import Sum
 
 
 class Constraint(Expr):

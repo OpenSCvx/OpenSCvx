@@ -17,10 +17,10 @@ Architecture:
 
     - Leaf nodes: `Parameter`, `Variable`, `State`, `Control` - symbolic values
     - Arithmetic operations: `Add`, `Sub`, `Mul`, `Div`, `MatMul`, `Power`, `Neg`
-    - Reductions: `Sum`, `Norm`, etc.
+    - Array operations: `Index`, `Concat`, `Stack`, `Hstack`, `Vstack`
+    - Linear algebra: `Transpose`, `Diag`, `Sum`, `Norm`
     - Constraints: `Equality`, `Inequality`
     - Functions: `Sin`, `Cos`, `Exp`, `Log`, `Sqrt`, etc.
-    - Array operations: `Index`, `Concat`, `Stack`, `Hstack`, `Vstack`
 
     Each expression node implements:
 
@@ -420,53 +420,6 @@ def traverse(expr: Expr, visit: Callable[[Expr], None]):
     visit(expr)
     for child in expr.children():
         traverse(child, visit)
-
-
-class Sum(Expr):
-    """Sum reduction operation for symbolic expressions.
-
-    Sums all elements of an expression, reducing it to a scalar. This is a
-    reduction operation that collapses all dimensions.
-
-    Attributes:
-        operand: Expression whose elements will be summed
-
-    Example:
-        Define a Sum expression
-
-            x = ox.State("x", shape=(3, 4))
-            total = Sum(x)  # Creates Sum(x), result shape ()
-    """
-
-    def __init__(self, operand):
-        """Initialize a sum reduction operation.
-
-        Args:
-            operand: Expression to sum over all elements
-        """
-        self.operand = to_expr(operand)
-
-    def children(self):
-        return [self.operand]
-
-    def canonicalize(self) -> "Expr":
-        """Canonicalize sum: canonicalize the operand.
-
-        Returns:
-            Expr: Canonical form of the sum expression
-        """
-        operand = self.operand.canonicalize()
-        return Sum(operand)
-
-    def check_shape(self) -> Tuple[int, ...]:
-        """Sum reduces any shape to a scalar."""
-        # Validate that the operand has a valid shape
-        self.operand.check_shape()
-        # Sum always produces a scalar regardless of input shape
-        return ()
-
-    def __repr__(self):
-        return f"sum({self.operand!r})"
 
 
 class Constant(Expr):

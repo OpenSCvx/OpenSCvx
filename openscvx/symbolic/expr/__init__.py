@@ -23,7 +23,7 @@ Module Organization:
 
     Core Expressions (expr.py):
         Base classes and utilities including `Expr`, `Leaf`, `Parameter`, `Constant`,
-        `Sum`, and helper functions `to_expr` and `traverse`.
+        and helper functions `to_expr` and `traverse`.
 
     Arithmetic Operations (arithmetic.py):
         Fundamental arithmetic operations including `Add`, `Sub`, `Mul`, `Div`,
@@ -47,7 +47,7 @@ Module Organization:
         `SmoothReLU`, `Max`).
 
     Linear Algebra (linalg.py):
-        Matrix operations including `Transpose`, `Diag`, and `Norm`.
+        Matrix operations (`Transpose`, `Diag`) and reductions (`Sum`, `Norm`).
 
     Spatial Operations (spatial.py):
         6-DOF operations for aerospace and robotics including `QDCM` (Quaternion to
@@ -80,13 +80,12 @@ from .expr import (
     Expr,
     Leaf,
     Parameter,
-    Sum,
     to_expr,
     traverse,
 )
 
 # Linear algebra operations
-from .linalg import Diag, Norm, Transpose
+from .linalg import Diag, Norm, Sum, Transpose
 
 # Mathematical functions
 from .math import Cos, Exp, Huber, Log, Max, PositivePart, Sin, SmoothReLU, Sqrt, Square
