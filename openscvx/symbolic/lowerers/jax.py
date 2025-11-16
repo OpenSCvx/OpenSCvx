@@ -755,7 +755,7 @@ class JaxLowerer:
         def qdcm_fn(x, u, node, params):
             q = f(x, u, node, params)
             # Normalize the quaternion
-            q_norm = (q[0] ** 2 + q[1] ** 2 + q[2] ** 2 + q[3] ** 2) ** 0.5
+            q_norm = jnp.sqrt(q[0] ** 2 + q[1] ** 2 + q[2] ** 2 + q[3] ** 2)
             w, qx, qy, qz = q / q_norm
             # Convert to direction cosine matrix
             return jnp.array(

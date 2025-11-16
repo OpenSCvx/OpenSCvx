@@ -1275,7 +1275,7 @@ def qdcm_ref(q: jnp.ndarray) -> jnp.ndarray:
     Returns:
         3x3 rotation matrix (direction cosine matrix)
     """
-    q_norm = (q[0] ** 2 + q[1] ** 2 + q[2] ** 2 + q[3] ** 2) ** 0.5
+    q_norm = jnp.sqrt(q[0] ** 2 + q[1] ** 2 + q[2] ** 2 + q[3] ** 2)
     w, x, y, z = q / q_norm
     return jnp.array(
         [
