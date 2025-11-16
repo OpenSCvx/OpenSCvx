@@ -311,3 +311,188 @@ def test_parameter_dynamics_with_jit_and_vmap():
     expected_new_batch = jnp.tile(expected_new[None, :], (N, 1))
 
     assert jnp.allclose(result_new_mass, expected_new_batch)
+
+
+# =============================================================================
+# CVXPY Lowering Tests
+# =============================================================================
+
+
+def test_cvxpy_parameter_scalar():
+    """Test Parameter node with scalar value."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    param_value = cp.Parameter(name="alpha", value=5.0)
+    variable_map = {"alpha": param_value}
+    lowerer = CvxpyLowerer(variable_map)
+
+    # Create symbolic parameter
+    param = Parameter("alpha", (), value=5.0)
+    result = lowerer.lower(param)
+
+    # Should return the CVXPy parameter
+    assert result is param_value
+    assert isinstance(result, cp.Parameter)
+
+
+def test_cvxpy_parameter_vector():
+    """Test Parameter node with vector value."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    param_value = cp.Parameter((3,), name="weights", value=[1.0, 2.0, 3.0])
+    variable_map = {"weights": param_value}
+    lowerer = CvxpyLowerer(variable_map)
+
+    # Create symbolic parameter
+    param = Parameter("weights", (3,), value=np.array([1.0, 2.0, 3.0]))
+    result = lowerer.lower(param)
+
+    # Should return the CVXPy parameter
+    assert result is param_value
+    assert isinstance(result, cp.Parameter)
+
+
+def test_cvxpy_parameter_matrix():
+    """Test Parameter node with matrix value."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    param_value = cp.Parameter((2, 3), name="transform")
+    param_value.value = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+    variable_map = {"transform": param_value}
+    lowerer = CvxpyLowerer(variable_map)
+
+    # Create symbolic parameter
+    param = Parameter("transform", (2, 3), value=np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]))
+    result = lowerer.lower(param)
+
+    # Should return the CVXPy parameter
+    assert result is param_value
+    assert isinstance(result, cp.Parameter)
+
+
+def test_cvxpy_parameter_missing_from_map_raises():
+    """Test that missing parameter from variable_map raises ValueError."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    lowerer = CvxpyLowerer({})
+
+    # Create symbolic parameter
+    param = Parameter("missing_param", (), value=1.0)
+
+    # Should raise ValueError when parameter is missing
+    with pytest.raises(ValueError, match="Parameter 'missing_param' not found"):
+        lowerer.lower(param)
+
+
+def test_cvxpy_parameter_in_arithmetic_expression():
+    """Test Parameter nodes in arithmetic expressions with states."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Mul, State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    # CVXPy variables
+    x_var = cp.Variable(3, name="x")
+    gain_param = cp.Parameter(name="gain", value=2.5)
+    variable_map = {"x": x_var, "gain": gain_param}
+    lowerer = CvxpyLowerer(variable_map)
+
+    # Symbolic expressions
+    state = State("x", (3,))
+    gain = Parameter("gain", (), value=2.5)
+
+    # Expression: gain * x
+    expr = Mul(gain, state)
+    result = lowerer.lower(expr)
+
+    # Should be a CVXPy expression
+    assert isinstance(result, cp.Expression)
+
+
+def test_cvxpy_parameter_with_lower_to_cvxpy():
+    """Test Parameter nodes with the top-level lower_to_cvxpy function."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.lowerers.cvxpy import lower_to_cvxpy
+
+    threshold_param = cp.Parameter((2,), name="threshold", value=[1.5, 2.5])
+    variable_map = {"threshold": threshold_param}
+
+    # Create symbolic parameter
+    param = Parameter("threshold", (2,), value=np.array([1.5, 2.5]))
+
+    result = lower_to_cvxpy(param, variable_map)
+    assert result is threshold_param
+    assert isinstance(result, cp.Parameter)
+
+
+def test_cvxpy_parameter_in_constraint():
+    """Test Parameter nodes in constraint expressions."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Inequality, State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    # CVXPy variables and parameters
+    x_var = cp.Variable(3, name="x")
+    limit_param = cp.Parameter((3,), name="limit", value=[1.0, 2.0, 3.0])
+    variable_map = {"x": x_var, "limit": limit_param}
+    lowerer = CvxpyLowerer(variable_map)
+
+    # Symbolic expressions
+    state = State("x", (3,))
+    limit = Parameter("limit", (3,), value=np.array([1.0, 2.0, 3.0]))
+
+    # Constraint: x <= limit
+    constraint = Inequality(state, limit)
+    result = lowerer.lower(constraint)
+
+    # Should be a CVXPy constraint
+    assert isinstance(result, cp.Constraint)
+
+
+def test_cvxpy_parameter_in_complex_expression():
+    """Test Parameter nodes in complex expressions similar to dynamics."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Add, Concat, Constant, Control, Div, Index, Neg, State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    # CVXPy variables and parameters
+    x_var = cp.Variable(4, name="x")  # [pos_x, pos_y, vel_x, vel_y]
+    u_var = cp.Variable(2, name="u")  # [acc_x, acc_y]
+    mass_param = cp.Parameter(name="mass", value=2.0)
+    gravity_param = cp.Parameter(name="gravity", value=9.81)
+    variable_map = {"x": x_var, "u": u_var, "mass": mass_param, "gravity": gravity_param}
+    lowerer = CvxpyLowerer(variable_map)
+
+    # Symbolic expressions - double integrator dynamics
+    state = State("x", (4,))
+    state._slice = slice(0, 4)
+    control = Control("u", (2,))
+    control._slice = slice(0, 2)
+    mass = Parameter("mass", (), value=2.0)
+    gravity = Parameter("gravity", (), value=9.81)
+
+    # Extract state components: pos = x[0:2], vel = x[2:4]
+    # pos = Index(state, slice(0, 2))
+    vel = Index(state, slice(2, 4))
+
+    # Dynamics: pos_dot = vel, vel_dot = u/mass + [0, -gravity]
+    pos_dot = vel
+    gravity_vec = Concat(Constant(0.0), Neg(gravity))
+    vel_dot = Add(Div(control, mass), gravity_vec)
+
+    dynamics = Concat(pos_dot, vel_dot)
+    result = lowerer.lower(dynamics)
+
+    # Should be a CVXPy expression
+    assert isinstance(result, cp.Expression)

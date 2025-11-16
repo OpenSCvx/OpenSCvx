@@ -184,3 +184,46 @@ def test_index_and_slice():
 
     assert out_slice.shape == (2,)
     assert jnp.allclose(out_slice, x[1:3])
+
+
+# =============================================================================
+# CVXPY Lowering Tests
+# =============================================================================
+
+
+def test_cvxpy_index():
+    """Test indexing"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Index(x, 0)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_cvxpy_concat():
+    """Test concatenation"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Control, State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable(3, name="x")
+    u_cvx = cp.Variable(2, name="u")
+    variable_map = {"x": x_cvx, "u": u_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    u = Control("u", shape=(2,))
+    expr = Concat(x, u)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)

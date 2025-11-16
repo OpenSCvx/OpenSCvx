@@ -91,3 +91,98 @@ def test_diag():
         # Off-diagonal elements should be zero
         off_diag_mask = ~jnp.eye(3, dtype=bool)
         assert jnp.allclose(result[off_diag_mask], 0.0, atol=1e-12)
+
+
+# =============================================================================
+# CVXPY Lowering Tests
+# =============================================================================
+
+
+def test_cvxpy_sum():
+    """Test sum operation"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Sum(x)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_cvxpy_norm_l2():
+    """Test L2 norm operation"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Norm, State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable(3, name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Norm(x, ord=2)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_cvxpy_norm_l1():
+    """Test L1 norm operation"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Norm, State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable(3, name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Norm(x, ord=1)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_cvxpy_norm_inf():
+    """Test infinity norm operation"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Norm, State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable(3, name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Norm(x, ord="inf")
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_cvxpy_norm_fro():
+    """Test Frobenius norm operation"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Norm, State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((2, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(6,))  # Flattened 2x3 matrix
+    expr = Norm(x, ord="fro")
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)

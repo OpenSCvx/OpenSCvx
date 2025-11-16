@@ -741,3 +741,65 @@ def test_ctcs_with_extra_kwargs():
     # Expected: (1 + 2) * 0.5 + 3 / 1.0 - 5.0 = 1.5 + 3.0 - 5.0 = -0.5
     expected = -0.5
     assert jnp.allclose(result, expected)
+
+
+# =============================================================================
+# CVXPY Lowering Tests
+# =============================================================================
+
+
+def test_cvxpy_equality_constraint():
+    """Test equality constraints"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    const = Constant(np.array(0.0))
+    expr = Equality(x, const)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Constraint)
+
+
+def test_cvxpy_inequality_constraint():
+    """Test inequality constraints"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    const = Constant(np.array(1.0))
+    expr = Inequality(x, const)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Constraint)
+
+
+def test_cvxpy_ctcs_not_implemented():
+    """Test that CTCS raises NotImplementedError"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    constraint = Inequality(x, Constant(np.array(1.0)))
+    expr = ctcs(constraint)
+
+    with pytest.raises(NotImplementedError, match="CTCS constraints are for continuous-time"):
+        lowerer.lower(expr)

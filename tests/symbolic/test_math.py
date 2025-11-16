@@ -527,3 +527,116 @@ def test_log_with_exp_identity():
 
     # Should recover original values
     assert jnp.allclose(result, x, atol=1e-12)
+
+
+# =============================================================================
+# CVXPY Lowering Tests
+# =============================================================================
+
+
+def test_cvxpy_positive_part():
+    """Test positive part function"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = PositivePart(x)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_cvxpy_square():
+    """Test square function"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Square(x)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_cvxpy_huber():
+    """Test Huber loss function"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Huber(x, delta=0.5)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_cvxpy_smooth_relu():
+    """Test smooth ReLU function"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable(3, name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = SmoothReLU(x, c=1e-6)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_cvxpy_sin_not_implemented():
+    """Test that Sin raises NotImplementedError"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Cos, Sin, State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Sin(x)
+
+    with pytest.raises(NotImplementedError, match="Trigonometric functions like Sin"):
+        lowerer.lower(expr)
+
+
+def test_cvxpy_cos_not_implemented():
+    """Test that Cos raises NotImplementedError"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Cos, State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Cos(x)
+
+    with pytest.raises(NotImplementedError, match="Trigonometric functions like Cos"):
+        lowerer.lower(expr)

@@ -553,3 +553,121 @@ def test_jax_lower_neg_and_composite():
 
     expected = -((x[0:2] + u[0:2]) * jnp.array([1.0, 1.0]))
     assert jnp.allclose(out, expected)
+
+
+# =============================================================================
+# CVXPY Lowering Tests
+# =============================================================================
+
+
+def test_cvxpy_add():
+    """Test addition expressions"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    const = Constant(np.array(2.0))
+    expr = Add(x, const)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_cvxpy_sub():
+    """Test subtraction expressions"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    const = Constant(np.array(1.0))
+    expr = Sub(x, const)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_cvxpy_mul():
+    """Test multiplication expressions"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    const = Constant(np.array(2.0))
+    expr = Mul(x, const)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_cvxpy_div():
+    """Test division expressions"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    const = Constant(np.array(2.0))
+    expr = Div(x, const)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_cvxpy_matmul():
+    """Test matrix multiplication"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable(3, name="x")  # Single vector, not time series
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    A = Constant(np.eye(3))
+    expr = MatMul(A, x)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_cvxpy_neg():
+    """Test negation"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Neg(x)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
