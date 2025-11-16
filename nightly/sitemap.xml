@@ -2,98 +2,250 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/citation/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/examples/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/getting-started/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Overview/constraint_reformulation/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Overview/control_parameterization/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Overview/discretization/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Overview/ocp/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Overview/scvx/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Overview/time_dilation/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Usage/advanced_problem_setup/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Usage/api/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Usage/api_constraints/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Usage/api_control/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Usage/api_dynamics/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Usage/api_integrators/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Usage/api_results/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Usage/api_state/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Usage/api_trajoptproblem/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Usage/api_variable/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Usage/basic_problem_setup/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Usage/tutorial_6dof_los_guidance/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Usage/tutorial_6dof_obstacle_avoidance/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/Usage/tutorials/</loc>
-         <lastmod>2025-11-15</lastmod>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/SUMMARY/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/autotuning/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/caching/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/config/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/discretization/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/dynamics/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/integrators/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/io/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/ocp/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/plotting/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/post_processing/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/propagation/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/ptr/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/results/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/time/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/trajoptproblem/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/utils/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/constraints/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/constraints/lowered/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/augmentation/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/builder/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/lower/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/preprocessing/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/unified/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/expr/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/expr/constraint/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/expr/control/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/expr/expr/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/expr/linalg/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/expr/math/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/expr/spatial/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/expr/state/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/expr/stl/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/expr/variable/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/lowerers/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/lowerers/cvxpy/</loc>
+         <lastmod>2025-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/lowerers/jax/</loc>
+         <lastmod>2025-11-16</lastmod>
     </url>
 </urlset>
