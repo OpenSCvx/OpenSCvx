@@ -22,12 +22,12 @@ class Variable(Leaf):
         trajectory optimization.
 
     Attributes:
-        name: Name identifier for the variable
-        _shape: Shape of the variable as a tuple (typically 1D)
-        _slice: Internal slice information for variable indexing
-        _min: Minimum bounds for each element of the variable
-        _max: Maximum bounds for each element of the variable
-        _guess: Initial guess for the variable trajectory (n_points, n_vars)
+        name (str): Name identifier for the variable
+        _shape (tuple[int, ...]): Shape of the variable as a tuple (typically 1D)
+        _slice (slice | None): Internal slice information for variable indexing
+        _min (np.ndarray | None): Minimum bounds for each element of the variable
+        _max (np.ndarray | None): Maximum bounds for each element of the variable
+        _guess (np.ndarray | None): Initial guess for the variable trajectory (n_points, n_vars)
 
     Example:
             # Typically, use State or Control instead of Variable directly:

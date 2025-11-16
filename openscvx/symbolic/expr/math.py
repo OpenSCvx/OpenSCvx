@@ -7,19 +7,12 @@ shape of their inputs.
 
 Function Categories:
 
-    Trigonometric:
-        `Sin`, `Cos` - Standard trigonometric functions
-
-    Exponential and Roots:
-        `Exp`, `Log`, `Sqrt`, `Square` - Exponential, logarithm, square root, and
-        squaring operations
-
-    Smooth Approximations:
-        `PositivePart`, `Huber`, `SmoothReLU` - Smooth, differentiable approximations
-        of non-smooth functions like max(0, x) and absolute value
-
-    Reductions:
-        `Max` - Maximum over elements
+- **Trigonometric:** `Sin`, `Cos` - Standard trigonometric functions
+- **Exponential and Roots:** `Exp`, `Log`, `Sqrt`, `Square` - Exponential, logarithm, square root,
+    and squaring operations
+- **Smooth Approximations:** `PositivePart`, `Huber`, `SmoothReLU` - Smooth, differentiable
+    approximations of non-smooth functions like max(0, x) and absolute value
+- **Reductions:** `Max` - Maximum over elements
 
 Example:
     Using trigonometric functions in dynamics::
