@@ -30,6 +30,20 @@ pip install openscvx
 ```
 
 to install OpenSCVx in your python environment.
+
+Or using uv:
+
+```sh
+uv pip install openscvx
+```
+
+For optional dependencies:
+
+```sh
+pip install openscvx[gui,cvxpygen]
+# or with uv
+uv pip install openscvx[gui,cvxpygen]
+```
 </details>
 
 <details>
@@ -47,7 +61,15 @@ With optional dependencies:
 pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx[gui,cvxpygen]
 ```
 
-**Note:** The `--extra-index-url https://pypi.org/simple/` flag is required because TestPyPI doesn't host all dependencies (like cvxpy, jax, etc.), so pip will fetch them from the main PyPI.
+Or using uv:
+
+```sh
+uv pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx
+# With optional dependencies
+uv pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx[gui,cvxpygen]
+```
+
+**Note:** The `--extra-index-url https://pypi.org/simple/` flag is required because TestPyPI doesn't host all dependencies (like cvxpy, jax, etc.), so pip/uv will fetch them from the main PyPI.
 
 Alternatively, for local development with the latest source:
 
@@ -58,6 +80,8 @@ cd OpenSCvx
 
 # Install in editable/development mode
 pip install -e .
+# or with uv
+uv pip install -e .
 ```
 
 </details>
@@ -158,6 +182,25 @@ Dependencies can then be installed using Conda or Pip
    Or install with optional dependencies:
    ```sh
    pip install -e ".[gui,cvxpygen]"
+   ```
+</details>
+
+<details>
+<summary>Via uv</summary>
+
+1. Prerequisites
+   - Install [uv](https://docs.astral.sh/uv/getting-started/installation/)
+2. Clone the repo using https or ssh
+3. Create virtual environment and install the package:
+   ```sh
+   uv venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   uv pip install -e .
+   ```
+
+   Or install with optional dependencies:
+   ```sh
+   uv pip install -e ".[gui,cvxpygen]"
    ```
 </details>
 
