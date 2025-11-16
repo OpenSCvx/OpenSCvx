@@ -53,7 +53,7 @@ Module Organization:
 """
 
 # Specialized constraints
-from .constraint import CTCS, NodalConstraint, ctcs
+from .constraint import CTCS, Constraint, Equality, Inequality, NodalConstraint, ctcs
 
 # Control
 from .control import Control
@@ -63,12 +63,9 @@ from .expr import (
     Add,
     Concat,
     Constant,
-    Constraint,
     Div,
-    Equality,
     Expr,
     Index,
-    Inequality,
     Leaf,
     MatMul,
     Mul,

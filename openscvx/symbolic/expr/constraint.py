@@ -36,11 +36,144 @@ Example:
         safety_constraint = (distance >= obstacle_radius).over((0, 100))
 """
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 
-from .expr import Constraint, Expr, Sum
+from .expr import Constant, Expr, Sub, Sum
+
+
+class Constraint(Expr):
+    """Abstract base class for optimization constraints.
+
+    Constraints represent relationships between expressions that must be satisfied
+    in the optimization problem. This base class provides common functionality for
+    both equality and inequality constraints.
+
+    Attributes:
+        lhs: Left-hand side expression
+        rhs: Right-hand side expression
+        is_convex: Flag indicating if the constraint is known to be convex
+
+    Note:
+        Constraints are canonicalized to standard form: (lhs - rhs) {op} 0
+    """
+
+    def __init__(self, lhs: Expr, rhs: Expr):
+        """Initialize a constraint.
+
+        Args:
+            lhs: Left-hand side expression
+            rhs: Right-hand side expression
+        """
+        self.lhs = lhs
+        self.rhs = rhs
+        self.is_convex = False
+
+    def children(self):
+        return [self.lhs, self.rhs]
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize constraint to standard form: (lhs - rhs) {op} 0.
+
+        This works for both Equality and Inequality by using type(self) to
+        construct the appropriate subclass type.
+        """
+        diff = Sub(self.lhs, self.rhs)
+        canon_diff = diff.canonicalize()
+        new_constraint = type(self)(canon_diff, Constant(np.array(0)))
+        new_constraint.is_convex = self.is_convex  # Preserve convex flag
+        return new_constraint
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Check that constraint operands are broadcastable. Returns scalar shape."""
+        L_shape = self.lhs.check_shape()
+        R_shape = self.rhs.check_shape()
+
+        # Figure out their broadcasted shape (or error if incompatible)
+        try:
+            np.broadcast_shapes(L_shape, R_shape)
+        except ValueError as e:
+            constraint_type = type(self).__name__
+            raise ValueError(f"{constraint_type} not broadcastable: {L_shape} vs {R_shape}") from e
+
+        # Allow vector constraints - they're interpreted element-wise
+        # Return () as constraints always produce a scalar
+        return ()
+
+    def at(self, nodes: Union[list, tuple]):
+        """Apply this constraint only at specific discrete nodes.
+
+        Args:
+            nodes: List of node indices where the constraint should be enforced
+
+        Returns:
+            NodalConstraint wrapping this constraint with node specification
+        """
+        return NodalConstraint(self, list(nodes))
+
+    def over(
+        self,
+        interval: tuple[int, int],
+        penalty: str = "squared_relu",
+        idx: Optional[int] = None,
+        check_nodally: bool = False,
+    ):
+        """Apply this constraint over a continuous interval using CTCS.
+
+        Args:
+            interval: Tuple of (start, end) node indices for the continuous interval
+            penalty: Penalty function type ("squared_relu", "huber", "smooth_relu")
+            idx: Optional grouping index for multiple augmented states
+            check_nodally: Whether to also enforce this constraint nodally
+
+        Returns:
+            CTCS constraint wrapping this constraint with interval specification
+        """
+        return CTCS(self, penalty=penalty, nodes=interval, idx=idx, check_nodally=check_nodally)
+
+    def convex(self) -> "Constraint":
+        """Mark this constraint as convex for CVXPy lowering.
+
+        Returns:
+            Self with convex flag set to True (enables method chaining)
+        """
+        self.is_convex = True
+        return self
+
+
+class Equality(Constraint):
+    """Equality constraint for optimization problems.
+
+    Represents an equality constraint: lhs == rhs. Can be created using the ==
+    operator on Expr objects.
+
+    Example:
+        Define an Equality constraint:
+
+            x = ox.State("x", shape=(3,))
+            constraint = x == 0  # Creates Equality(x, Constant(0))
+    """
+
+    def __repr__(self):
+        return f"{self.lhs!r} == {self.rhs!r}"
+
+
+class Inequality(Constraint):
+    """Inequality constraint for optimization problems.
+
+    Represents an inequality constraint: lhs <= rhs. Can be created using the <=
+    operator on Expr objects.
+
+    Example:
+        Define an Inequality constraint:
+
+            x = ox.State("x", shape=(3,))
+            constraint = x <= 10  # Creates Inequality(x, Constant(10))
+    """
+
+    def __repr__(self):
+        return f"{self.lhs!r} <= {self.rhs!r}"
 
 
 class NodalConstraint(Expr):
