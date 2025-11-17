@@ -8,23 +8,34 @@ on:
     branches:
       - main
 
-permissions:
-  contents: read
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  lint:
-    name: 🔍 Lint
-    uses: ./.github/workflows/_lint.yml
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
-  docs-check:
-    name: 📖 Docs Build Check
-    uses: ./.github/workflows/_docs.yml
+    runs-on: ${{ matrix.os }}
 
-  test:
-    name: 🧪 Tests
-    needs: [lint, docs-check]
-    uses: ./.github/workflows/_test.yml
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+
+    - name: Install dependencies
+      run: |
+        # Install package with optional GUI and test packages
+        uv pip install --system -e ".[gui,test]"
+
+    - name: Run tests
+      run: |
+        pytest -v

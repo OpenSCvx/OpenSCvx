@@ -1,11 +1,15 @@
 name: 🔍 Lint
 
 on:
-  workflow_call:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   lint:
-    name: 🔍 Lint
     runs-on: ubuntu-latest
 
     steps:
