@@ -75,7 +75,7 @@ class Sin(Expr):
         return self.operand.check_shape()
 
     def __repr__(self):
-        return f"(sin{self.operand!r})"
+        return f"(sin({self.operand!r}))"
 
 
 class Cos(Expr):
@@ -114,7 +114,7 @@ class Cos(Expr):
         return self.operand.check_shape()
 
     def __repr__(self):
-        return f"(cos{self.operand!r})"
+        return f"(cos({self.operand!r}))"
 
 
 class Square(Expr):
