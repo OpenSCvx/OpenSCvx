@@ -46,7 +46,7 @@ jobs:
           dist/*
 
     - name: Upload Release Assets
-      if: ${{ always() }}
+      if: success()
       run: |
         gh release upload "${{ github.event.release.tag_name }}" dist/*
       env:
