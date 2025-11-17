@@ -1,14 +1,18 @@
 """Tests for spatial/6DOF operation nodes.
 
 This module tests spatial operation nodes for aerospace and robotics applications:
+
 - QDCM: Quaternion to Direction Cosine Matrix
 - SSMP: 4×4 skew-symmetric matrix for quaternion dynamics
 - SSM: 3×3 skew-symmetric matrix for cross products
 
 Tests cover:
-- Node creation and mathematical correctness
-- Integration in 6DOF rigid body dynamics
-- Lowering to JAX
+
+- Node creation and properties
+- Shape checking
+- Canonicalization
+- Lowering to JAX (with slices)
+- Lowering to CVXPY (with variable mapping)
 """
 
 import jax.numpy as jnp
@@ -111,7 +115,7 @@ def reference_6dof_dynamics_jax(x_val, u_val):
 
 
 # =============================================================================
-# Individual Spatial Node Tests
+# QDCM
 # =============================================================================
 
 
@@ -147,6 +151,23 @@ def test_qdcm():
         # Should have determinant 1 (proper rotation)
         det = jnp.linalg.det(result)
         assert jnp.allclose(det, 1.0, atol=1e-10)
+
+
+# --- QDCM: Shape Checking --- TODO: (norrisg)
+
+
+# --- QDCM: Canonicalization --- TODO: (norrisg)
+
+
+# --- QDCM: JAX Lowering --- TODO: (norrisg)
+
+
+# --- QDCM: CVXPy Lowering --- TODO: (norrisg)
+
+
+# =============================================================================
+# SSMP
+# =============================================================================
 
 
 def test_ssmp():
@@ -188,6 +209,23 @@ def test_ssmp():
         assert jnp.allclose(result, expected, atol=1e-12)
 
 
+# --- SSMP: Shape Checking --- TODO: (norrisg)
+
+
+# --- SSMP: Canonicalization --- TODO: (norrisg)
+
+
+# --- SSMP: JAX Lowering --- TODO: (norrisg)
+
+
+# --- SSMP: CVXPy Lowering --- TODO: (norrisg)
+
+
+# =============================================================================
+# SSM
+# =============================================================================
+
+
 def test_ssm():
     """Test the SSM compact node individually."""
     # Test with different angular velocities
@@ -223,8 +261,20 @@ def test_ssm():
         assert jnp.allclose(result, expected, atol=1e-12)
 
 
+# --- SSM: Shape Checking --- TODO: (norrisg)
+
+
+# --- SSM: Canonicalization --- TODO: (norrisg)
+
+
+# --- SSM: JAX Lowering --- TODO: (norrisg)
+
+
+# --- SSM: CVXPy Lowering --- TODO: (norrisg)
+
+
 # =============================================================================
-# 6DOF Rigid Body Dynamics Tests
+# Integration Tests: 6DOF Rigid Body Dynamics
 # =============================================================================
 
 
