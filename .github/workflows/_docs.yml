@@ -21,7 +21,7 @@ on:
         default: false
 
 permissions:
-  contents: write  # Needed for mike deploy --push
+  contents: inherit  # Needs write for mike deploy --push, else only read
 
 jobs:
   docs:
