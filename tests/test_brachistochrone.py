@@ -31,6 +31,8 @@ def _print_comparison_metrics(comparison, test_name="Brachistochrone"):
         print(
             f"  Cycloid parameters:  R={comparison['R']:.4f}, φ_final={comparison['phi_final']:.4f}"
         )
+    if "arc_length" in comparison:
+        print(f"  Arc length:          {comparison['arc_length']:.4f} m")
 
 
 def _assert_brachistochrone_accuracy(comparison, problem, result):
@@ -496,6 +498,183 @@ def test_brachistochrone_parameters():
         f"for gravity scaling"
     )
     print(f"  Time ratio (Moon/Earth): {time_ratio:.2f} (expected: {expected_ratio:.2f})")
+
+    # Clean up JAX caches
+    jax.clear_caches()
+
+
+def test_brachistochrone_propagation():
+    """
+    Test brachistochrone with propagation dynamics to track distance travelled.
+
+    This test demonstrates using dynamics_prop and states_prop to add an
+    extra state (distance) that is only propagated forward and not included
+    in the optimization problem. The distance state integrates velocity to
+    track the total arc length travelled along the brachistochrone curve.
+    """
+    import jax.numpy as jnp
+    import numpy as np
+
+    import openscvx as ox
+    from openscvx import TrajOptProblem
+
+    # Problem parameters
+    n = 2
+    total_time = 2.0
+    g = 9.81
+
+    # Boundary conditions
+    x0, y0 = 0.0, 10.0
+    x1, y1 = 10.0, 5.0
+
+    # Define state components (optimization states)
+    position = ox.State("position", shape=(2,))  # 2D position [x, y]
+    position.max = np.array([10.0, 10.0])
+    position.min = np.array([0.0, 0.0])
+    position.initial = np.array([x0, y0])
+    position.final = [x1, y1]
+    position.guess = np.linspace(position.initial, position.final, n)
+
+    velocity = ox.State("velocity", shape=(1,))  # Scalar speed
+    velocity.max = np.array([10.0])
+    velocity.min = np.array([0.0])
+    velocity.initial = np.array([0.0])
+    velocity.final = [("free", 10.0)]
+    velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
+
+    # Define control
+    theta = ox.Control("theta", shape=(1,))  # Angle from vertical
+    theta.max = np.array([100.5 * jnp.pi / 180])
+    theta.min = np.array([0.0])
+    theta.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1)
+
+    # Optimization states and controls
+    states = [position, velocity]
+    controls = [theta]
+
+    # Define propagation-only state for tracking total distance traveled
+    distance = ox.State("distance", shape=(1,))
+    distance.initial = np.array([0.0])
+    distance.min = np.array([0.0])
+    distance.max = np.array([100.0])
+    distance.guess = np.zeros((n, 1))
+
+    # Extra propagation states: only the NEW states, not optimization states
+    states_prop_extra = [distance]
+
+    # Define dynamics for optimization states
+    dynamics = {
+        "position": ox.Concat(
+            velocity[0] * ox.Sin(theta[0]),  # x_dot
+            -velocity[0] * ox.Cos(theta[0]),  # y_dot
+        ),
+        "velocity": g * ox.Cos(theta[0]),
+    }
+
+    # Define EXTRA propagation dynamics (only for new states)
+    # distance_dot = velocity (total arc length traveled)
+    dynamics_prop_extra = {
+        "distance": velocity[0],
+    }
+
+    # Generate box constraints for optimization states
+    constraint_exprs = []
+    for state in states:
+        constraint_exprs.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
+
+    time = ox.Time(
+        initial=0.0,
+        final=("minimize", total_time),
+        min=0.0,
+        max=total_time,
+    )
+
+    problem = TrajOptProblem(
+        dynamics=dynamics,
+        states=states,
+        controls=controls,
+        time=time,
+        constraints=constraint_exprs,
+        N=n,
+        licq_max=1e-8,
+        dynamics_prop=dynamics_prop_extra,  # Only extra states
+        states_prop=states_prop_extra,  # Only extra states
+    )
+
+    problem.settings.prp.dt = 0.01
+    problem.settings.cvx.solver_args = {"abstol": 1e-6, "reltol": 1e-9}
+    problem.settings.scp.w_tr = 1e1  # Weight on the Trust Region
+    problem.settings.scp.lam_cost = 1e0  # Weight on the Minimal Time Objective
+    problem.settings.scp.lam_vc = 1e1  # Weight on the Virtual Control Objective
+    problem.settings.scp.uniform_time_grid = True
+    problem.settings.sim.save_compiled = False
+
+    # Disable printing for cleaner test output
+    if hasattr(problem.settings, "dev"):
+        problem.settings.dev.printing = False
+
+    # Run optimization
+    problem.initialize()
+    result = problem.solve()
+    result = problem.post_process(result)
+
+    # Check convergence
+    assert result["converged"], "Problem failed to converge"
+
+    # Compare to analytical solution
+    comparison = compare_trajectory_to_analytical(
+        result.t_full,
+        result.trajectory["position"],
+        result.trajectory["velocity"],
+        x0,
+        y0,
+        x1,
+        y1,
+        g,
+    )
+
+    _print_comparison_metrics(comparison, "Brachistochrone Propagation")
+    _assert_brachistochrone_accuracy(comparison, problem, result)
+
+    # Verify that the distance state was propagated
+    assert "distance" in result.trajectory, "Distance state not found in trajectory"
+    distance_traj = result.trajectory["distance"]
+    assert distance_traj.shape[0] == len(result.t_full), "Distance trajectory length mismatch"
+
+    # Check that distance is monotonically increasing (since velocity >= 0)
+    distance_values = distance_traj.flatten()
+    assert np.all(np.diff(distance_values) >= -1e-6), "Distance should be monotonically increasing"
+
+    # Check that initial distance is 0
+    assert abs(distance_values[0]) < 1e-6, f"Initial distance should be 0, got {distance_values[0]}"
+
+    # Check that final distance is positive and reasonable
+    final_distance = distance_values[-1]
+    assert final_distance > 0, "Final distance should be positive"
+
+    # Compare numerical distance to analytical arc length
+    analytical_arc_length = comparison["arc_length"]
+    distance_error_pct = 100 * abs(final_distance - analytical_arc_length) / analytical_arc_length
+
+    # Distance should match analytical arc length within 2%
+    assert distance_error_pct < 2.0, (
+        f"Distance error {distance_error_pct:.2f}% exceeds 2% threshold "
+        f"(analytical: {analytical_arc_length:.4f}m, "
+        f"numerical: {final_distance:.4f}m)"
+    )
+
+    # Sanity checks: arc length should be longer than straight line
+    straight_line_distance = np.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
+    assert analytical_arc_length > straight_line_distance * 0.99, (
+        f"Analytical arc length {analytical_arc_length:.4f}m should be greater than "
+        f"straight-line distance {straight_line_distance:.4f}m"
+    )
+
+    print(f"\n  Distance travelled:    {final_distance:.4f} m")
+    print(f"  Analytical arc length: {analytical_arc_length:.4f} m")
+    print(f"  Distance error:        {distance_error_pct:.2f}%")
+    print(f"  Straight-line dist:    {straight_line_distance:.4f} m")
+    print(f"  Ratio (arc/line):      {analytical_arc_length / straight_line_distance:.4f}")
 
     # Clean up JAX caches
     jax.clear_caches()

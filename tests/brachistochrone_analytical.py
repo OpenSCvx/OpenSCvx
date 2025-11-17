@@ -102,6 +102,31 @@ def evaluate_brachistochrone_trajectory(x0, y0, R, phi_final, g=9.81, num_points
     }
 
 
+def compute_cycloid_arc_length(R, phi_final):
+    """
+    Compute the arc length of a cycloid curve.
+
+    For a cycloid parametrized as:
+        x(φ) = R(φ - sin(φ))
+        y(φ) = -R(1 - cos(φ))
+
+    The arc length from φ=0 to φ=φ_final is:
+        s = ∫[0 to φ_final] sqrt((dx/dφ)² + (dy/dφ)²) dφ
+        s = ∫[0 to φ_final] sqrt(R²(1 - cos(φ))² + R²sin²(φ)) dφ
+        s = ∫[0 to φ_final] R*sqrt(2(1 - cos(φ))) dφ
+        s = ∫[0 to φ_final] 2R*sin(φ/2) dφ
+        s = 4R[1 - cos(φ_final/2)]
+
+    Args:
+        R: Cycloid radius parameter
+        phi_final: Final parameter value
+
+    Returns:
+        float: Arc length of the cycloid
+    """
+    return 4 * R * (1 - np.cos(phi_final / 2))
+
+
 def compare_trajectory_to_analytical(
     t,
     position,
@@ -134,6 +159,7 @@ def compare_trajectory_to_analytical(
             - 'position_max_error': Maximum position error
             - 'velocity_rmse': RMS error in velocity
             - 'analytical_trajectory': Analytical trajectory data
+            - 'arc_length': Analytical arc length of cycloid
     """
     # Extract x, y from position array
     x_num = position[:, 0]
@@ -165,6 +191,9 @@ def compare_trajectory_to_analytical(
     velocity_errors = np.abs(v_num - v_analytical_interp)
     velocity_rmse = np.sqrt(np.mean(velocity_errors**2))
 
+    # Compute analytical arc length
+    arc_length = compute_cycloid_arc_length(R, phi_final)
+
     return {
         "analytical_time": T_analytical,
         "numerical_time": T_numerical,
@@ -175,4 +204,5 @@ def compare_trajectory_to_analytical(
         "analytical_trajectory": analytical,
         "R": R,
         "phi_final": phi_final,
+        "arc_length": arc_length,
     }
