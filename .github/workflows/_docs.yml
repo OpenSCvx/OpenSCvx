@@ -52,7 +52,7 @@ jobs:
       if: inputs.deploy
       uses: actions/cache@v4
       with:
-        key: mkdocs-material-${{ hashfiles('mkdocs.yml', 'docs/**', 'openscvx/**/*.py', 'scripts/gen_ref_pages.py') }}
+        key: mkdocs-material-${{ hashFiles('mkdocs.yml', 'docs/**', 'openscvx/**/*.py', 'scripts/gen_ref_pages.py') }}
         path: .cache
         restore-keys: |
           mkdocs-material-
