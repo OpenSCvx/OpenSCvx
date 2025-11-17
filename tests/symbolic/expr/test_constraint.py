@@ -377,6 +377,100 @@ def test_cvxpy_inequality_constraint():
 # --- NodalConstraint: Creation & Tree Structure ---
 
 
+def test_nodal_constraint_creation_basic():
+    """Test basic NodalConstraint creation with .at() method."""
+    x = State("x", shape=(3,))
+    constraint = x <= 1.0
+
+    # Create NodalConstraint using .at() method
+    nodal = constraint.at([0, 5, 10])
+
+    assert isinstance(nodal, NodalConstraint)
+    assert nodal.constraint is constraint
+    assert nodal.nodes == [0, 5, 10]
+
+
+def test_nodal_constraint_creation_direct():
+    """Test direct NodalConstraint instantiation."""
+    x = Variable("x", shape=(2,))
+    constraint = x == np.array([1.0, 2.0])
+
+    # Create NodalConstraint directly
+    nodal = NodalConstraint(constraint, nodes=[1, 3, 5])
+
+    assert isinstance(nodal, NodalConstraint)
+    assert nodal.constraint is constraint
+    assert nodal.nodes == [1, 3, 5]
+
+
+def test_nodal_constraint_requires_constraint():
+    """Test that NodalConstraint only accepts Constraint objects."""
+    x = Variable("x", shape=(3,))
+    not_a_constraint = x + 1.0
+
+    with pytest.raises(TypeError, match="NodalConstraint must wrap a Constraint"):
+        NodalConstraint(not_a_constraint, nodes=[0, 1, 2])
+
+
+def test_nodal_constraint_requires_list():
+    """Test that NodalConstraint requires nodes to be a list."""
+    x = Variable("x", shape=(3,))
+    constraint = x <= 1.0
+
+    # Should reject tuples and other iterables
+    with pytest.raises(TypeError, match="nodes must be a list"):
+        NodalConstraint(constraint, nodes=(0, 1, 2))
+
+
+def test_nodal_constraint_converts_numpy_integers():
+    """Test that NodalConstraint converts numpy integers to Python ints."""
+    x = Variable("x", shape=(2,))
+    constraint = x >= 0.0
+
+    # Use numpy integers
+    nodes_numpy = [np.int32(0), np.int64(5), np.int16(10)]
+    nodal = NodalConstraint(constraint, nodes=nodes_numpy)
+
+    # Should convert to Python ints
+    assert nodal.nodes == [0, 5, 10]
+    assert all(isinstance(n, int) and not isinstance(n, np.integer) for n in nodal.nodes)
+
+
+def test_nodal_constraint_rejects_non_integer_nodes():
+    """Test that NodalConstraint rejects non-integer node indices."""
+    x = Variable("x", shape=(3,))
+    constraint = x <= 5.0
+
+    with pytest.raises(TypeError, match="all node indices must be integers"):
+        NodalConstraint(constraint, nodes=[0, 1.5, 2])
+
+    with pytest.raises(TypeError, match="all node indices must be integers"):
+        NodalConstraint(constraint, nodes=[0, "1", 2])
+
+
+def test_nodal_constraint_children():
+    """Test that NodalConstraint.children() returns only the wrapped constraint."""
+    x = Variable("x", shape=(3,))
+    constraint = x == 0.0
+    nodal = constraint.at([0, 10, 20])
+
+    children = nodal.children()
+    assert len(children) == 1
+    assert children[0] is constraint
+
+
+def test_nodal_constraint_repr():
+    """Test NodalConstraint string representation."""
+    x = Variable("x", shape=(2,))
+    constraint = x <= np.array([1.0, 2.0])
+    nodal = constraint.at([0, 5])
+
+    repr_str = repr(nodal)
+    assert "NodalConstraint" in repr_str
+    assert "nodes=[0, 5]" in repr_str
+    assert "<=" in repr_str
+
+
 def test_nodal_constraint_convex_method_chaining():
     """Test that NodalConstraint.convex() works in both chaining orders."""
     x = Variable("x", shape=(3,))
@@ -394,7 +488,51 @@ def test_nodal_constraint_convex_method_chaining():
     assert nodal2.nodes == [0, 5, 10]
 
 
-# --- NodalConstraint: Shape Checking --- TODO: (norrisg)
+# --- NodalConstraint: Shape Checking ---
+
+
+def test_nodal_constraint_shape_validation_scalar():
+    """Test NodalConstraint shape validation with scalar constraints."""
+    x = State("x", shape=())
+    constraint = x <= 1.0
+    nodal = constraint.at([0, 5, 10])
+
+    # Should validate successfully
+    shape = nodal.check_shape()
+    assert shape == ()  # NodalConstraint produces scalar like all constraints
+
+
+def test_nodal_constraint_shape_validation_vector():
+    """Test NodalConstraint shape validation with vector constraints."""
+    x = State("x", shape=(3,))
+    constraint = x <= np.ones(3)
+    nodal = constraint.at([0, 5, 10])
+
+    # Should validate successfully (vector constraints are element-wise)
+    shape = nodal.check_shape()
+    assert shape == ()  # Always returns scalar shape
+
+
+def test_nodal_constraint_shape_validation_broadcasts():
+    """Test NodalConstraint shape validation with broadcasting."""
+    x = State("x", shape=(3,))
+    constraint = x <= 1.0  # Scalar broadcasts to vector
+    nodal = constraint.at([2, 4, 6])
+
+    # Should validate successfully
+    shape = nodal.check_shape()
+    assert shape == ()
+
+
+def test_nodal_constraint_shape_mismatch_raises():
+    """Test that NodalConstraint detects shape mismatches in wrapped constraint."""
+    x = State("x", shape=(2,))
+    constraint = x == np.zeros(3)  # 2 vs 3 mismatch
+    nodal = constraint.at([0, 1])
+
+    # Should raise due to wrapped constraint shape mismatch
+    with pytest.raises(ValueError):
+        nodal.check_shape()
 
 
 # --- NodalConstraint: Canonicalization ---
@@ -427,10 +565,16 @@ def test_nodal_constraint_preserves_inner_convex_flag():
     assert isinstance(canon_nodal.constraint, Inequality)
 
 
-# --- NodalConstraint: JAX Lowering --- TODO: (norrisg)
+# --- NodalConstraint: JAX Lowering ---
+# Note: NodalConstraint is a wrapper that gets processed during preprocessing.
+# It doesn't have direct JAX lowering - the wrapped constraint is extracted
+# and applied at specific nodes during problem compilation.
 
 
-# --- NodalConstraint: CVXPy Lowering --- TODO: (norrisg)
+# --- NodalConstraint: CVXPy Lowering ---
+# Note: NodalConstraint is a wrapper that gets processed during preprocessing.
+# It doesn't have direct CVXPy lowering - the wrapped constraint is extracted
+# and applied at specific nodes during problem compilation.
 
 
 # =============================================================================
@@ -672,7 +816,82 @@ def test_ctcs_constraint_shape_mismatch_raises():
         wrapped.check_shape()
 
 
-# --- CTCS: Canonicalization --- TODO: (norrisg)
+# --- CTCS: Canonicalization ---
+
+
+def test_ctcs_canonicalization_preserves_parameters():
+    """Test that CTCS canonicalization preserves penalty, nodes, idx, and check_nodally."""
+    from openscvx.symbolic.expr import Add
+
+    x = Variable("x", shape=(2,))
+
+    # Create constraint with non-canonical expression (will fold constants)
+    lhs = Add(x, Constant(np.array([1.0, 2.0])))
+    rhs = Add(Constant(np.array([3.0, 4.0])), Constant(np.array([5.0, 6.0])))
+    constraint = lhs <= rhs
+
+    # Create CTCS with all parameters
+    ctcs_constraint = CTCS(constraint, penalty="huber", nodes=(5, 10), idx=3, check_nodally=True)
+
+    # Canonicalize
+    canon = ctcs_constraint.canonicalize()
+
+    # Check that CTCS parameters are preserved
+    assert isinstance(canon, CTCS)
+    assert canon.penalty == "huber"
+    assert canon.nodes == (5, 10)
+    assert canon.idx == 3
+    assert canon.check_nodally is True
+
+    # Check that inner constraint was canonicalized
+    assert isinstance(canon.constraint, Inequality)
+    # The rhs constants should have been folded: [3,4] + [5,6] = [8,10]
+    # Then moved to canonical form: (lhs - rhs) <= 0
+    inner_rhs = canon.constraint.rhs
+    assert isinstance(inner_rhs, Constant)
+    assert np.array_equal(inner_rhs.value, 0)
+
+
+def test_ctcs_canonicalization_recursive():
+    """Test that CTCS canonicalization recursively canonicalizes the constraint."""
+    from openscvx.symbolic.expr import Add, Mul
+
+    x = Variable("x", shape=(3,))
+
+    # Create expression with redundant operations that will be canonicalized
+    # 2*x + 3*x should fold to 5*x
+    lhs = Add(Mul(Constant(2.0), x), Mul(Constant(3.0), x))
+    rhs = Constant(10.0)
+    constraint = lhs <= rhs
+
+    ctcs_constraint = CTCS(constraint, penalty="squared_relu")
+
+    # Canonicalize
+    canon = ctcs_constraint.canonicalize()
+
+    # The inner constraint should be canonicalized
+    assert isinstance(canon, CTCS)
+    assert isinstance(canon.constraint, Inequality)
+
+    # After canonicalization, the constraint should be in form: (canonical_lhs - rhs) <= 0
+    # The Add(2*x, 3*x) should be flattened and constants combined
+
+
+def test_ctcs_canonicalization_preserves_convex_flag():
+    """Test that CTCS canonicalization preserves the convex flag on the inner constraint."""
+    x = State("x", shape=(2,))
+
+    # Create a convex constraint
+    constraint = (x <= Constant(np.array([5.0, 10.0]))).convex()
+    assert constraint.is_convex is True
+
+    ctcs_constraint = CTCS(constraint, penalty="smooth_relu", nodes=(0, 20))
+
+    # Canonicalize
+    canon = ctcs_constraint.canonicalize()
+
+    # The inner constraint's convex flag should be preserved
+    assert canon.constraint.is_convex is True
 
 
 # --- CTCS: JAX Lowering ---

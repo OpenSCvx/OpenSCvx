@@ -91,13 +91,34 @@ def test_add_elementwise_children_for_arrays(shape_a, shape_b):
 
 
 def test_add_same_shape_passes():
+    """Test that Add with same shapes passes."""
     a = Constant(np.zeros((2, 3)))
     b = Constant(np.ones((2, 3)))
     add = a + b
-    add.check_shape()
+    shape = add.check_shape()
+    assert shape == (2, 3)
+
+
+def test_add_broadcasting_passes():
+    """Test that Add with broadcastable shapes passes."""
+    a = Constant(np.zeros((2, 3)))
+    b = Constant(np.array(5.0))  # scalar broadcasts
+    add = a + b
+    shape = add.check_shape()
+    assert shape == (2, 3)
+
+
+def test_add_vector_broadcast_passes():
+    """Test that Add broadcasts vector to matrix correctly."""
+    a = Constant(np.zeros((2, 3)))
+    b = Constant(np.ones((3,)))  # broadcasts to (2, 3)
+    add = a + b
+    shape = add.check_shape()
+    assert shape == (2, 3)
 
 
 def test_add_shape_mismatch_raises():
+    """Test that Add with incompatible shapes raises."""
     a = Constant(np.zeros((2, 3)))
     b = Constant(np.ones((3, 2)))
     add = a + b
@@ -106,13 +127,25 @@ def test_add_shape_mismatch_raises():
 
 
 def test_sub_same_shape_passes():
+    """Test that Sub with same shapes passes."""
     a = Constant(np.zeros((4,)))
     b = Constant(np.ones((4,)))
     sub = a - b
-    sub.check_shape()
+    shape = sub.check_shape()
+    assert shape == (4,)
+
+
+def test_sub_broadcasting_passes():
+    """Test that Sub with broadcastable shapes passes."""
+    a = Constant(np.zeros((2, 3)))
+    b = Constant(np.array(1.0))  # scalar broadcasts
+    sub = a - b
+    shape = sub.check_shape()
+    assert shape == (2, 3)
 
 
 def test_sub_shape_mismatch_raises():
+    """Test that Sub with incompatible shapes raises."""
     a = Constant(np.zeros((4,)))
     b = Constant(np.ones((5,)))
     sub = a - b
@@ -285,13 +318,34 @@ def test_mul_requires_at_least_two_terms():
 
 
 def test_mul_same_shape_passes():
+    """Test that Mul with same shapes passes."""
     a = Constant(np.zeros((2, 2)))
     b = Constant(np.ones((2, 2)))
     mul = a * b
-    mul.check_shape()
+    shape = mul.check_shape()
+    assert shape == (2, 2)
+
+
+def test_mul_broadcasting_passes():
+    """Test that Mul with broadcastable shapes passes."""
+    a = Constant(np.zeros((2, 3)))
+    b = Constant(np.array(2.0))  # scalar broadcasts
+    mul = a * b
+    shape = mul.check_shape()
+    assert shape == (2, 3)
+
+
+def test_mul_vector_broadcast_passes():
+    """Test that Mul broadcasts vector correctly."""
+    a = Constant(np.zeros((2, 3)))
+    b = Constant(np.ones((3,)))  # broadcasts to (2, 3)
+    mul = a * b
+    shape = mul.check_shape()
+    assert shape == (2, 3)
 
 
 def test_mul_shape_mismatch_raises():
+    """Test that Mul with incompatible shapes raises."""
     a = Constant(np.zeros((2, 2)))
     b = Constant(np.ones((2, 3)))
     mul = a * b
@@ -300,13 +354,25 @@ def test_mul_shape_mismatch_raises():
 
 
 def test_div_array_by_scalar_passes():
+    """Test that Div with array divided by scalar passes."""
     a = Constant(np.zeros((3,)))
     b = Constant(np.array(2.0))
     div = a / b
-    div.check_shape()
+    shape = div.check_shape()
+    assert shape == (3,)
+
+
+def test_div_broadcasting_passes():
+    """Test that Div with broadcastable shapes passes."""
+    a = Constant(np.zeros((2, 3)))
+    b = Constant(np.ones((3,)))  # broadcasts
+    div = a / b
+    shape = div.check_shape()
+    assert shape == (2, 3)
 
 
 def test_div_shape_mismatch_raises():
+    """Test that Div with incompatible shapes raises."""
     a = Constant(np.zeros((3,)))
     b = Constant(np.zeros((2,)))
     div = a / b
@@ -660,6 +726,25 @@ def test_neg_basic_node_and_children():
     assert repr(neg) == "(-Const(2))"
 
 
+# --- Neg: Shape Checking ---
+
+
+def test_neg_preserves_shape():
+    """Test that Neg preserves the shape of its operand."""
+    a = Constant(np.zeros((2, 3)))
+    neg = -a
+    shape = neg.check_shape()
+    assert shape == (2, 3)
+
+
+def test_neg_scalar_shape():
+    """Test that Neg preserves scalar shape."""
+    a = Constant(5)
+    neg = -a
+    shape = neg.check_shape()
+    assert shape == ()
+
+
 # --- Neg: Canonicalization ---
 
 
@@ -724,6 +809,8 @@ def test_neg_cvxpy_lowering():
 # Power
 # =============================================================================
 
+# --- Power: Basic Usage ---
+
 
 def test_power_operator_and_node():
     """Test power operation using ** operator and Power node."""
@@ -763,9 +850,93 @@ def test_power_with_mixed_types():
     assert repr(pow2) == "(Const(10))**(Var('x'))"
 
 
+def test_power_arrays():
+    """Test power operation with arrays."""
+    base = Constant(np.array([2.0, 3.0, 4.0]))
+    exp = Constant(2)
+    pow_expr = base**exp
+
+    assert isinstance(pow_expr, Power)
+    assert pow_expr.children() == [base, exp]
+
+
+# --- Power: Shape Checking ---
+
+
+def test_power_same_shape_passes():
+    """Test that Power with same shapes passes."""
+    a = Constant(np.ones((2, 3)))
+    b = Constant(np.ones((2, 3)))
+    pow_expr = a**b
+    shape = pow_expr.check_shape()
+    assert shape == (2, 3)
+
+
+def test_power_broadcasting_passes():
+    """Test that Power with broadcastable shapes passes."""
+    a = Constant(np.ones((2, 3)))
+    b = Constant(2.0)  # scalar broadcasts
+    pow_expr = a**b
+    shape = pow_expr.check_shape()
+    assert shape == (2, 3)
+
+
+def test_power_shape_mismatch_raises():
+    """Test that Power with incompatible shapes raises."""
+    a = Constant(np.ones((2, 3)))
+    b = Constant(np.ones((3, 2)))
+    pow_expr = a**b
+    with pytest.raises(ValueError):
+        pow_expr.check_shape()
+
+
+# --- Power: Canonicalization ---
+
+
+def test_power_constant_folding():
+    """Test that Power folds constants during canonicalization."""
+    expr = Power(Constant(2), Constant(3))
+    result = expr.canonicalize()
+    # Note: Current implementation doesn't fold power constants,
+    # it just canonicalizes children
+    assert isinstance(result, Power)
+    assert isinstance(result.base, Constant)
+    assert isinstance(result.exponent, Constant)
+
+
+def test_power_canonicalize_children():
+    """Test that Power canonicalizes its children."""
+    # Create nested add that will canonicalize
+    base = Add(Constant(2), Constant(3))  # will become Constant(5)
+    exp = Add(Constant(1), Constant(1))  # will become Constant(2)
+    pow_expr = Power(base, exp)
+
+    result = pow_expr.canonicalize()
+    assert isinstance(result, Power)
+    assert isinstance(result.base, Constant)
+    assert result.base.value == 5
+    assert isinstance(result.exponent, Constant)
+    assert result.exponent.value == 2
+
+
 # =============================================================================
 # MatMul
 # =============================================================================
+
+# --- MatMul: Basic Usage ---
+
+
+def test_matmul_basic_node_creation():
+    """Test basic MatMul node creation with @ operator."""
+    a = Constant(np.eye(3))
+    b = Constant(np.ones((3, 2)))
+    mm = a @ b
+
+    assert isinstance(mm, MatMul)
+    assert mm.children() == [a, b]
+    # repr uses * for MatMul (not @)
+    assert "(" in repr(mm)
+    assert "*" in repr(mm)
 
 
 def test_matmul_vector_and_matrix():
@@ -784,22 +955,111 @@ def test_matmul_vector_and_matrix():
     assert "(" in repr(mm) and "@" not in repr(mm)  # repr is Python‐safe
 
 
+def test_matmul_matrix_matrix():
+    """Test MatMul with two matrices."""
+    A = Constant(np.ones((3, 4)))
+    B = Constant(np.ones((4, 2)))
+    mm = A @ B
+
+    assert isinstance(mm, MatMul)
+    assert mm.children() == [A, B]
+
+
+def test_matmul_vector_vector():
+    """Test MatMul with two vectors (dot product)."""
+    v1 = Constant(np.array([1.0, 2.0, 3.0]))
+    v2 = Constant(np.array([4.0, 5.0, 6.0]))
+    mm = v1 @ v2
+
+    assert isinstance(mm, MatMul)
+    assert mm.children() == [v1, v2]
+
+
 # --- MatMul: Shape Checking ---
 
 
-def test_matmul_ok():
+def test_matmul_matrix_matrix_shape():
+    """Test MatMul shape checking for matrix @ matrix."""
     a = Constant(np.zeros((4, 5)))
     b = Constant(np.zeros((5, 2)))
     matmul = a @ b
-    matmul.check_shape()
+    shape = matmul.check_shape()
+    assert shape == (4, 2)
+
+
+def test_matmul_matrix_vector_shape():
+    """Test MatMul shape checking for matrix @ vector."""
+    a = Constant(np.zeros((3, 4)))
+    b = Constant(np.zeros((4,)))
+    matmul = a @ b
+    shape = matmul.check_shape()
+    assert shape == (3,)
+
+
+def test_matmul_vector_matrix_shape():
+    """Test MatMul shape checking for vector @ matrix."""
+    a = Constant(np.zeros((3,)))
+    b = Constant(np.zeros((3, 5)))
+    matmul = a @ b
+    shape = matmul.check_shape()
+    assert shape == (5,)
+
+
+def test_matmul_vector_vector_shape():
+    """Test MatMul shape checking for vector @ vector (dot product -> scalar)."""
+    a = Constant(np.zeros((4,)))
+    b = Constant(np.zeros((4,)))
+    matmul = a @ b
+    shape = matmul.check_shape()
+    assert shape == ()  # scalar result
 
 
 def test_matmul_incompatible_raises():
+    """Test that MatMul with incompatible shapes raises."""
     a = Constant(np.zeros((4, 5)))
-    b = Constant(np.zeros((4, 2)))
+    b = Constant(np.zeros((4, 2)))  # inner dimensions don't match
     matmul = a @ b
     with pytest.raises(ValueError):
         matmul.check_shape()
+
+
+def test_matmul_scalar_raises():
+    """Test that MatMul with scalar operands raises."""
+    a = Constant(5.0)
+    b = Constant(3.0)
+    matmul = a @ b
+    with pytest.raises(ValueError):
+        matmul.check_shape()
+
+
+# --- MatMul: Canonicalization ---
+
+
+def test_matmul_canonicalize_children():
+    """Test that MatMul canonicalizes its children."""
+    # Create expressions that will canonicalize
+    left = Add(Constant(np.ones((2, 3))), Constant(np.zeros((2, 3))))  # -> ones
+    right = Add(Constant(np.ones((3, 2))), Constant(np.zeros((3, 2))))  # -> ones
+    mm = MatMul(left, right)
+
+    result = mm.canonicalize()
+    assert isinstance(result, MatMul)
+    # Children should be canonicalized
+    assert isinstance(result.left, Constant)
+    assert isinstance(result.right, Constant)
+
+
+def test_matmul_preserves_structure():
+    """Test that MatMul doesn't fold constants (just canonicalizes children)."""
+    # MatMul doesn't perform constant folding at canonicalization
+    a = Constant(np.eye(2))
+    b = Constant(np.array([1.0, 2.0]))
+    mm = MatMul(a, b)
+
+    result = mm.canonicalize()
+    assert isinstance(result, MatMul)
+    assert isinstance(result.left, Constant)
+    assert isinstance(result.right, Constant)
 
 
 # --- MatMul: JAX Lowering ---

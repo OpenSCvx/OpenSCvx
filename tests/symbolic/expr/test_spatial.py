@@ -118,6 +118,76 @@ def reference_6dof_dynamics_jax(x_val, u_val):
 # QDCM
 # =============================================================================
 
+# --- QDCM: Basic Usage ---
+
+
+def test_qdcm_creation_and_properties():
+    """Test that QDCM can be created and has correct properties."""
+    q = State("q", (4,))
+    qdcm = QDCM(q)
+
+    # Check that children() returns the quaternion
+    assert qdcm.children() == [q]
+
+    # Check repr
+    assert repr(qdcm) == f"qdcm({q!r})"
+
+
+def test_qdcm_with_constant():
+    """Test that QDCM can be created with a constant quaternion."""
+    q_val = np.array([1.0, 0.0, 0.0, 0.0])
+    qdcm = QDCM(q_val)
+
+    # Should wrap constant in to_expr
+    assert len(qdcm.children()) == 1
+    assert isinstance(qdcm.children()[0], Constant)
+
+
+# --- QDCM: Shape Checking ---
+
+
+def test_qdcm_shape_inference():
+    """Test that QDCM infers shape (3, 3) from quaternion input."""
+    q = State("q", (4,))
+    qdcm = QDCM(q)
+
+    assert qdcm.check_shape() == (3, 3)
+
+
+def test_qdcm_shape_validation_wrong_input_shape():
+    """Test that QDCM raises error for non-quaternion input."""
+    import pytest
+
+    # Create a 3D vector instead of a quaternion
+    v = State("v", (3,))
+    qdcm = QDCM(v)
+
+    with pytest.raises(ValueError, match=r"QDCM expects quaternion with shape \(4,\), got \(3,\)"):
+        qdcm.check_shape()
+
+
+# --- QDCM: Canonicalization ---
+
+
+def test_qdcm_canonicalize_preserves_structure():
+    """Test that QDCM canonicalizes its child."""
+    from openscvx.symbolic.expr import Add
+
+    q = State("q", (4,))
+    # Create an expression that can be canonicalized
+    q_expr = Add(q, Constant(np.zeros(4)))
+    qdcm = QDCM(q_expr)
+
+    canonical = qdcm.canonicalize()
+
+    # Should still be a QDCM node
+    assert isinstance(canonical, QDCM)
+    # Child should be canonicalized (Add with zero should simplify to q)
+    assert canonical.children()[0] == q
+
+
+# --- QDCM: JAX Lowering ---
+
 
 def test_qdcm():
     """Test the QDCM compact node individually."""
@@ -153,21 +223,85 @@ def test_qdcm():
         assert jnp.allclose(det, 1.0, atol=1e-10)
 
 
-# --- QDCM: Shape Checking --- TODO: (norrisg)
-
-
-# --- QDCM: Canonicalization --- TODO: (norrisg)
-
-
-# --- QDCM: JAX Lowering --- TODO: (norrisg)
-
-
-# --- QDCM: CVXPy Lowering --- TODO: (norrisg)
+# --- QDCM: CVXPy Lowering ---
+# Note: QDCM is not applicable to CVXPY (nonlinear operation)
 
 
 # =============================================================================
 # SSMP
 # =============================================================================
+
+# --- SSMP: Basic Usage ---
+
+
+def test_ssmp_creation_and_properties():
+    """Test that SSMP can be created and has correct properties."""
+    w = State("w", (3,))
+    ssmp = SSMP(w)
+
+    # Check that children() returns the angular velocity
+    assert ssmp.children() == [w]
+
+    # Check repr
+    assert repr(ssmp) == f"ssmp({w!r})"
+
+
+def test_ssmp_with_constant():
+    """Test that SSMP can be created with a constant angular velocity."""
+    w_val = np.array([0.1, 0.2, 0.3])
+    ssmp = SSMP(w_val)
+
+    # Should wrap constant in to_expr
+    assert len(ssmp.children()) == 1
+    assert isinstance(ssmp.children()[0], Constant)
+
+
+# --- SSMP: Shape Checking ---
+
+
+def test_ssmp_shape_inference():
+    """Test that SSMP infers shape (4, 4) from 3D angular velocity input."""
+    w = State("w", (3,))
+    ssmp = SSMP(w)
+
+    assert ssmp.check_shape() == (4, 4)
+
+
+def test_ssmp_shape_validation_wrong_input_shape():
+    """Test that SSMP raises error for non-3D input."""
+    import pytest
+
+    # Create a 4D vector instead of 3D
+    v = State("v", (4,))
+    ssmp = SSMP(v)
+
+    with pytest.raises(
+        ValueError, match=r"SSMP expects angular velocity with shape \(3,\), got \(4,\)"
+    ):
+        ssmp.check_shape()
+
+
+# --- SSMP: Canonicalization ---
+
+
+def test_ssmp_canonicalize_preserves_structure():
+    """Test that SSMP canonicalizes its child."""
+    from openscvx.symbolic.expr import Add
+
+    w = State("w", (3,))
+    # Create an expression that can be canonicalized
+    w_expr = Add(w, Constant(np.zeros(3)))
+    ssmp = SSMP(w_expr)
+
+    canonical = ssmp.canonicalize()
+
+    # Should still be an SSMP node
+    assert isinstance(canonical, SSMP)
+    # Child should be canonicalized (Add with zero should simplify to w)
+    assert canonical.children()[0] == w
+
+
+# --- SSMP: JAX Lowering ---
 
 
 def test_ssmp():
@@ -209,21 +343,85 @@ def test_ssmp():
         assert jnp.allclose(result, expected, atol=1e-12)
 
 
-# --- SSMP: Shape Checking --- TODO: (norrisg)
-
-
-# --- SSMP: Canonicalization --- TODO: (norrisg)
-
-
-# --- SSMP: JAX Lowering --- TODO: (norrisg)
-
-
-# --- SSMP: CVXPy Lowering --- TODO: (norrisg)
+# --- SSMP: CVXPy Lowering ---
+# Note: SSMP is not applicable to CVXPY (nonlinear operation)
 
 
 # =============================================================================
 # SSM
 # =============================================================================
+
+# --- SSM: Basic Usage ---
+
+
+def test_ssm_creation_and_properties():
+    """Test that SSM can be created and has correct properties."""
+    w = State("w", (3,))
+    ssm = SSM(w)
+
+    # Check that children() returns the angular velocity
+    assert ssm.children() == [w]
+
+    # Check repr
+    assert repr(ssm) == f"ssm({w!r})"
+
+
+def test_ssm_with_constant():
+    """Test that SSM can be created with a constant vector."""
+    w_val = np.array([0.1, 0.2, 0.3])
+    ssm = SSM(w_val)
+
+    # Should wrap constant in to_expr
+    assert len(ssm.children()) == 1
+    assert isinstance(ssm.children()[0], Constant)
+
+
+# --- SSM: Shape Checking ---
+
+
+def test_ssm_shape_inference():
+    """Test that SSM infers shape (3, 3) from 3D vector input."""
+    w = State("w", (3,))
+    ssm = SSM(w)
+
+    assert ssm.check_shape() == (3, 3)
+
+
+def test_ssm_shape_validation_wrong_input_shape():
+    """Test that SSM raises error for non-3D input."""
+    import pytest
+
+    # Create a 2D vector instead of 3D
+    v = State("v", (2,))
+    ssm = SSM(v)
+
+    with pytest.raises(
+        ValueError, match=r"SSM expects angular velocity with shape \(3,\), got \(2,\)"
+    ):
+        ssm.check_shape()
+
+
+# --- SSM: Canonicalization ---
+
+
+def test_ssm_canonicalize_preserves_structure():
+    """Test that SSM canonicalizes its child."""
+    from openscvx.symbolic.expr import Add
+
+    w = State("w", (3,))
+    # Create an expression that can be canonicalized
+    w_expr = Add(w, Constant(np.zeros(3)))
+    ssm = SSM(w_expr)
+
+    canonical = ssm.canonicalize()
+
+    # Should still be an SSM node
+    assert isinstance(canonical, SSM)
+    # Child should be canonicalized (Add with zero should simplify to w)
+    assert canonical.children()[0] == w
+
+
+# --- SSM: JAX Lowering ---
 
 
 def test_ssm():
@@ -261,16 +459,8 @@ def test_ssm():
         assert jnp.allclose(result, expected, atol=1e-12)
 
 
-# --- SSM: Shape Checking --- TODO: (norrisg)
-
-
-# --- SSM: Canonicalization --- TODO: (norrisg)
-
-
-# --- SSM: JAX Lowering --- TODO: (norrisg)
-
-
-# --- SSM: CVXPy Lowering --- TODO: (norrisg)
+# --- SSM: CVXPy Lowering ---
+# Note: SSM is not applicable to CVXPY (nonlinear operation)
 
 
 # =============================================================================

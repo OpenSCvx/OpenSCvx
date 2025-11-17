@@ -66,10 +66,51 @@ def test_parameter_in_constraints():
     assert ineq.rhs is p
 
 
-# --- Parameter: Shape Checking --- TODO: (norrisg)
+# --- Parameter: Shape Checking ---
 
 
-# --- Parameter: Canonicalization --- TODO: (norrisg)
+def test_parameter_shape_scalar():
+    """Test Parameter with scalar shape."""
+    p = Parameter("alpha", shape=(), value=5.0)
+    assert p.shape == ()
+    assert p.value.shape == ()
+
+
+def test_parameter_shape_vector():
+    """Test Parameter with vector shape."""
+    p = Parameter("weights", shape=(3,), value=np.array([1.0, 2.0, 3.0]))
+    assert p.shape == (3,)
+    assert p.value.shape == (3,)
+
+
+def test_parameter_shape_matrix():
+    """Test Parameter with matrix shape."""
+    p = Parameter("matrix", shape=(2, 3), value=np.ones((2, 3)))
+    assert p.shape == (2, 3)
+    assert p.value.shape == (2, 3)
+
+
+def test_parameter_requires_value():
+    """Test that Parameter requires a value."""
+    with pytest.raises(ValueError, match="requires an initial value"):
+        Parameter("param", shape=())
+
+
+# --- Parameter: Canonicalization ---
+
+
+def test_parameter_canonicalization_unchanged():
+    """Test that Parameter canonicalization returns self."""
+    p = Parameter("alpha", value=5.0)
+    canonical = p.canonicalize()
+    assert canonical is p
+
+
+def test_parameter_canonicalization_with_array():
+    """Test that Parameter with array value canonicalizes to self."""
+    p = Parameter("weights", shape=(3,), value=np.array([1.0, 2.0, 3.0]))
+    canonical = p.canonicalize()
+    assert canonical is p
 
 
 # --- Parameter: JAX Lowering ---

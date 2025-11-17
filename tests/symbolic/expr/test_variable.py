@@ -13,14 +13,274 @@ Tests are organized by node type, with each section containing:
 import pytest
 
 # =============================================================================
-# State & Control
+# Variable (Base Class)
 # =============================================================================
 
-# --- State & Control: Creation --- TODO: (norrisg)
+# --- Variable: Creation ---
 
-# --- State & Control: Shape Checking --- TODO: (norrisg)
 
-# --- State & Control: Canonicalization --- TODO: (norrisg)
+def test_variable_creation():
+    """Test basic Variable creation and properties."""
+    from openscvx.symbolic.expr.variable import Variable
+
+    v = Variable("x", shape=(3,))
+    assert v.name == "x"
+    assert v.shape == (3,)
+    assert repr(v) == "Var('x')"
+    assert v._min is None
+    assert v._max is None
+    assert v._guess is None
+
+
+def test_variable_min_max_bounds():
+    """Test setting min/max bounds on Variable."""
+    import numpy as np
+
+    from openscvx.symbolic.expr.variable import Variable
+
+    v = Variable("x", shape=(2,))
+    v.min = [-5.0, -10.0]
+    v.max = [5.0, 10.0]
+    assert np.allclose(v.min, [-5.0, -10.0])
+    assert np.allclose(v.max, [5.0, 10.0])
+
+
+def test_variable_guess():
+    """Test setting initial guess trajectory."""
+    import numpy as np
+
+    from openscvx.symbolic.expr.variable import Variable
+
+    v = Variable("x", shape=(2,))
+    guess = np.linspace([0, 0], [10, 10], 50)
+    v.guess = guess
+    assert v.guess.shape == (50, 2)
+    assert np.allclose(v.guess, guess)
+
+
+# --- Variable: Shape Checking ---
+
+
+def test_variable_min_shape_validation():
+    """Test that min bounds must match variable shape."""
+    from openscvx.symbolic.expr.variable import Variable
+
+    v = Variable("x", shape=(3,))
+    with pytest.raises(ValueError, match="min must be 1D with shape"):
+        v.min = [1.0, 2.0]  # Wrong shape
+
+
+def test_variable_max_shape_validation():
+    """Test that max bounds must match variable shape."""
+    from openscvx.symbolic.expr.variable import Variable
+
+    v = Variable("x", shape=(3,))
+    with pytest.raises(ValueError, match="max must be 1D with shape"):
+        v.max = [1.0, 2.0, 3.0, 4.0]  # Wrong shape
+
+
+def test_variable_guess_shape_validation():
+    """Test that guess must be 2D with correct second dimension."""
+    import numpy as np
+
+    from openscvx.symbolic.expr.variable import Variable
+
+    v = Variable("x", shape=(3,))
+    with pytest.raises(ValueError, match="Guess must be a 2D array"):
+        v.guess = np.array([1.0, 2.0, 3.0])  # 1D instead of 2D
+
+    with pytest.raises(ValueError, match="Guess must have second dimension"):
+        v.guess = np.zeros((10, 2))  # Wrong second dimension
+
+
+# --- Variable: Canonicalization ---
+
+
+def test_variable_canonicalize():
+    """Test that Variable canonicalize returns itself unchanged."""
+    from openscvx.symbolic.expr.variable import Variable
+
+    v = Variable("x", shape=(3,))
+    v_canon = v.canonicalize()
+    assert v_canon is v  # Should return same object
+
+
+# =============================================================================
+# State
+# =============================================================================
+
+# --- State: Creation ---
+
+
+def test_state_creation():
+    """Test basic State creation and properties."""
+    from openscvx.symbolic.expr import State
+
+    s = State("pos", shape=(3,))
+    assert s.name == "pos"
+    assert s.shape == (3,)
+    assert repr(s) == "State('pos', shape=(3,))"
+    assert s._initial is None
+    assert s._final is None
+
+
+def test_state_boundary_conditions_fixed():
+    """Test setting fixed boundary conditions on State."""
+    import numpy as np
+
+    from openscvx.symbolic.expr import State
+
+    s = State("x", shape=(2,))
+    s.min = [-10.0, -10.0]
+    s.max = [10.0, 10.0]
+    s.initial = [0.0, 1.0]  # Fixed by default
+    s.final = [5.0, 6.0]
+
+    assert np.allclose(s.initial, [0.0, 1.0])
+    assert np.allclose(s.final, [5.0, 6.0])
+    assert all(s.initial_type == "Fix")
+    assert all(s.final_type == "Fix")
+
+
+def test_state_boundary_conditions_mixed():
+    """Test mixed boundary condition types."""
+    import numpy as np
+
+    from openscvx.symbolic.expr import State
+
+    s = State("x", shape=(3,))
+    s.min = [0.0, 0.0, 0.0]
+    s.max = [10.0, 10.0, 10.0]
+    s.initial = [0, ("free", 1.0), ("minimize", 2.0)]
+    s.final = [10, ("maximize", 8.0), ("free", 5.0)]
+
+    assert np.allclose(s.initial, [0.0, 1.0, 2.0])
+    assert np.allclose(s.final, [10.0, 8.0, 5.0])
+    assert s.initial_type[0] == "Fix"
+    assert s.initial_type[1] == "Free"
+    assert s.initial_type[2] == "Minimize"
+    assert s.final_type[0] == "Fix"
+    assert s.final_type[1] == "Maximize"
+    assert s.final_type[2] == "Free"
+
+
+# --- State: Shape Checking ---
+
+
+def test_state_min_max_shape_validation():
+    """Test that State min/max must match state shape exactly."""
+    from openscvx.symbolic.expr import State
+
+    s = State("x", shape=(3,))
+    with pytest.raises(ValueError, match="Min shape .* does not match State shape"):
+        s.min = [1.0, 2.0]  # Wrong shape
+
+    with pytest.raises(ValueError, match="Max shape .* does not match State shape"):
+        s.max = [1.0, 2.0, 3.0, 4.0]  # Wrong shape
+
+
+def test_state_initial_final_shape_validation():
+    """Test that initial/final conditions must match state shape."""
+    from openscvx.symbolic.expr import State
+
+    s = State("x", shape=(3,))
+    with pytest.raises(ValueError, match="Length mismatch"):
+        s.initial = [0.0, 1.0]  # Wrong length
+
+    with pytest.raises(ValueError, match="Length mismatch"):
+        s.final = [0.0, 1.0, 2.0, 3.0]  # Wrong length
+
+
+def test_state_bounds_validation():
+    """Test that fixed boundary conditions must respect min/max bounds."""
+    from openscvx.symbolic.expr import State
+
+    # Test initial bounds violation
+    s1 = State("x", shape=(2,))
+    s1.min = [0.0, 0.0]
+    s1.max = [10.0, 10.0]
+    with pytest.raises(ValueError, match="Initial Fixed value .* is lower then the min"):
+        s1.initial = [-1.0, 5.0]  # -1 < 0
+
+    # Test final bounds violation
+    s2 = State("x", shape=(2,))
+    s2.min = [0.0, 0.0]
+    s2.max = [10.0, 10.0]
+    with pytest.raises(ValueError, match="Final Fixed value .* is greater then the max"):
+        s2.final = [5.0, 15.0]  # 15 > 10
+
+
+# --- State: Canonicalization ---
+
+
+def test_state_canonicalize():
+    """Test that State canonicalize returns itself unchanged."""
+    from openscvx.symbolic.expr import State
+
+    s = State("x", shape=(3,))
+    s_canon = s.canonicalize()
+    assert s_canon is s  # Should return same object
+
+
+# =============================================================================
+# Control
+# =============================================================================
+
+# --- Control: Creation ---
+
+
+def test_control_creation():
+    """Test basic Control creation and properties."""
+    from openscvx.symbolic.expr import Control
+
+    c = Control("thrust", shape=(3,))
+    assert c.name == "thrust"
+    assert c.shape == (3,)
+    assert repr(c) == "Control('thrust', shape=(3,))"
+    assert c._min is None
+    assert c._max is None
+    assert c._guess is None
+
+
+def test_control_bounds():
+    """Test setting min/max bounds on Control."""
+    import numpy as np
+
+    from openscvx.symbolic.expr import Control
+
+    c = Control("u", shape=(2,))
+    c.min = [-1.0, 0.0]
+    c.max = [1.0, 10.0]
+    assert np.allclose(c.min, [-1.0, 0.0])
+    assert np.allclose(c.max, [1.0, 10.0])
+
+
+# --- Control: Shape Checking ---
+
+
+def test_control_min_max_shape_validation():
+    """Test that Control min/max must match control shape."""
+    from openscvx.symbolic.expr import Control
+
+    c = Control("u", shape=(3,))
+    with pytest.raises(ValueError, match="min must be 1D with shape"):
+        c.min = [1.0, 2.0]  # Wrong shape
+
+    with pytest.raises(ValueError, match="max must be 1D with shape"):
+        c.max = [1.0, 2.0, 3.0, 4.0]  # Wrong shape
+
+
+# --- Control: Canonicalization ---
+
+
+def test_control_canonicalize():
+    """Test that Control canonicalize returns itself unchanged."""
+    from openscvx.symbolic.expr import Control
+
+    c = Control("u", shape=(3,))
+    c_canon = c.canonicalize()
+    assert c_canon is c  # Should return same object
+
 
 # --- State & Control: JAX Lowering ---
 

@@ -29,6 +29,49 @@ from openscvx.symbolic.expr import Concat, Constant, Hstack, Index, Vstack
 # Index
 # =============================================================================
 
+# --- Index: Basic Usage ---
+
+
+def test_index_creation_with_integer():
+    """Test that Index can be created with an integer index."""
+    from openscvx.symbolic.expr import State
+
+    x = State("x", shape=(5,))
+    indexed = x[2]
+
+    assert isinstance(indexed, Index)
+    assert indexed.base is x
+    assert indexed.index == 2
+    assert len(indexed.children()) == 1
+    assert indexed.children()[0] is x
+
+
+def test_index_creation_with_slice():
+    """Test that Index can be created with a slice."""
+    from openscvx.symbolic.expr import State
+
+    x = State("x", shape=(10,))
+    sliced = x[2:7]
+
+    assert isinstance(sliced, Index)
+    assert sliced.base is x
+    assert sliced.index == slice(2, 7)
+    assert len(sliced.children()) == 1
+
+
+def test_index_creation_with_tuple():
+    """Test that Index can be created with a tuple for multidimensional indexing."""
+    from openscvx.symbolic.expr import State
+
+    A = State("A", shape=(5, 4))
+    indexed = A[1, 2]
+
+    assert isinstance(indexed, Index)
+    assert indexed.base is A
+    assert indexed.index == (1, 2)
+    assert len(indexed.children()) == 1
+
+
 # --- Index: Shape Checking ---
 
 
@@ -115,6 +158,48 @@ def test_cvxpy_index():
 # =============================================================================
 # Concat
 # =============================================================================
+
+# --- Concat: Basic Usage ---
+
+
+def test_concat_creation_with_two_exprs():
+    """Test that Concat can be created with two expressions."""
+    from openscvx.symbolic.expr import State
+
+    x = State("x", shape=(3,))
+    y = State("y", shape=(4,))
+    concat = Concat(x, y)
+
+    assert isinstance(concat, Concat)
+    assert len(concat.exprs) == 2
+    assert concat.exprs[0] is x
+    assert concat.exprs[1] is y
+    assert len(concat.children()) == 2
+
+
+def test_concat_creation_with_multiple_exprs():
+    """Test that Concat can be created with multiple expressions."""
+    a = Constant([1, 2])
+    b = Constant([3, 4])
+    c = Constant([5])
+    concat = Concat(a, b, c)
+
+    assert isinstance(concat, Concat)
+    assert len(concat.exprs) == 3
+    assert len(concat.children()) == 3
+
+
+def test_concat_wraps_constants():
+    """Test that Concat wraps raw values as Constants."""
+    from openscvx.symbolic.expr import State
+
+    x = State("x", shape=(3,))
+    concat = Concat(x, [1, 2])  # Raw list should be wrapped
+
+    assert isinstance(concat, Concat)
+    assert len(concat.exprs) == 2
+    assert isinstance(concat.exprs[1], Constant)
+
 
 # --- Concat: Shape Checking ---
 
@@ -207,8 +292,185 @@ def test_cvxpy_concat():
 
 
 # =============================================================================
+# Stack
+# =============================================================================
+
+# --- Stack: Basic Usage ---
+
+
+def test_stack_creation_with_vectors():
+    """Test that Stack can be created with vector expressions."""
+    from openscvx.symbolic.expr import Stack, State
+
+    x = State("x", shape=(3,))
+    y = State("y", shape=(3,))
+    z = State("z", shape=(3,))
+    stacked = Stack([x, y, z])
+
+    assert isinstance(stacked, Stack)
+    assert len(stacked.rows) == 3
+    assert stacked.rows[0] is x
+    assert stacked.rows[1] is y
+    assert stacked.rows[2] is z
+    assert len(stacked.children()) == 3
+
+
+def test_stack_wraps_constants():
+    """Test that Stack wraps raw values as Constants."""
+    from openscvx.symbolic.expr import Stack
+
+    stacked = Stack([[1, 2, 3], [4, 5, 6]])
+
+    assert isinstance(stacked, Stack)
+    assert len(stacked.rows) == 2
+    assert all(isinstance(row, Constant) for row in stacked.rows)
+
+
+# --- Stack: Shape Checking ---
+
+
+def test_stack_shape_inference():
+    """Test that Stack infers shape correctly."""
+    from openscvx.symbolic.expr import Stack
+
+    a = Constant(np.array([1.0, 2.0, 3.0]))
+    b = Constant(np.array([4.0, 5.0, 6.0]))
+    c = Constant(np.array([7.0, 8.0, 9.0]))
+    stacked = Stack([a, b, c])
+
+    shape = stacked.check_shape()
+    assert shape == (3, 3)
+
+
+def test_stack_empty_raises():
+    """Test that Stack with no rows raises an error."""
+    from openscvx.symbolic.expr import Stack
+
+    stacked = Stack([])
+    with pytest.raises(ValueError) as exc:
+        stacked.check_shape()
+    assert "at least one row" in str(exc.value)
+
+
+def test_stack_shape_mismatch_raises():
+    """Test that Stack with mismatched row shapes raises an error."""
+    from openscvx.symbolic.expr import Stack
+
+    a = Constant(np.array([1.0, 2.0, 3.0]))
+    b = Constant(np.array([4.0, 5.0]))  # Different shape
+    stacked = Stack([a, b])
+
+    with pytest.raises(ValueError) as exc:
+        stacked.check_shape()
+    assert "shape" in str(exc.value)
+
+
+# --- Stack: Canonicalization ---
+
+
+def test_stack_canonicalize():
+    """Test that Stack canonicalizes its rows."""
+    from openscvx.symbolic.expr import Stack
+
+    a = Constant([1, 2])
+    b = Constant([3, 4])
+    stacked = Stack([a, b])
+
+    result = stacked.canonicalize()
+    assert isinstance(result, Stack)
+    assert len(result.rows) == 2
+    assert all(isinstance(row, Constant) for row in result.rows)
+
+
+# --- Stack: JAX Lowering ---
+
+
+def test_stack_jax_lowering():
+    """Test JAX lowering of Stack operation."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Stack, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = jnp.array([10.0, 20.0, 30.0, 40.0, 50.0, 60.0])
+
+    s1 = State("s1", (3,))
+    s1._slice = slice(0, 3)
+    s2 = State("s2", (3,))
+    s2._slice = slice(3, 6)
+
+    stacked = Stack([s1, s2])
+
+    fn = lower_to_jax(stacked)
+    result = fn(x, None, None, None)
+
+    expected = jnp.array([[10.0, 20.0, 30.0], [40.0, 50.0, 60.0]])
+    assert jnp.allclose(result, expected)
+    assert result.shape == (2, 3)
+
+
+# =============================================================================
 # Hstack & Vstack
 # =============================================================================
+
+# --- Hstack & Vstack: Basic Usage ---
+
+
+def test_hstack_creation_with_vectors():
+    """Test that Hstack can be created with vector expressions."""
+    from openscvx.symbolic.expr import State
+
+    x = State("x", shape=(3,))
+    y = State("y", shape=(4,))
+    stacked = Hstack([x, y])
+
+    assert isinstance(stacked, Hstack)
+    assert len(stacked.arrays) == 2
+    assert stacked.arrays[0] is x
+    assert stacked.arrays[1] is y
+    assert len(stacked.children()) == 2
+
+
+def test_hstack_creation_with_matrices():
+    """Test that Hstack can be created with matrix expressions."""
+    from openscvx.symbolic.expr import State
+
+    A = State("A", shape=(3, 4))
+    B = State("B", shape=(3, 2))
+    stacked = Hstack([A, B])
+
+    assert isinstance(stacked, Hstack)
+    assert len(stacked.arrays) == 2
+    assert len(stacked.children()) == 2
+
+
+def test_vstack_creation_with_vectors():
+    """Test that Vstack can be created with vector expressions."""
+    from openscvx.symbolic.expr import State, Vstack
+
+    x = State("x", shape=(3,))
+    y = State("y", shape=(3,))
+    stacked = Vstack([x, y])
+
+    assert isinstance(stacked, Vstack)
+    assert len(stacked.arrays) == 2
+    assert stacked.arrays[0] is x
+    assert stacked.arrays[1] is y
+    assert len(stacked.children()) == 2
+
+
+def test_vstack_creation_with_matrices():
+    """Test that Vstack can be created with matrix expressions."""
+    from openscvx.symbolic.expr import State, Vstack
+
+    A = State("A", shape=(3, 4))
+    B = State("B", shape=(2, 4))
+    stacked = Vstack([A, B])
+
+    assert isinstance(stacked, Vstack)
+    assert len(stacked.arrays) == 2
+    assert len(stacked.children()) == 2
+
 
 # --- Hstack & Vstack: Shape Checking ---
 
@@ -256,7 +518,34 @@ def test_vstack_trailing_dimension_mismatch_raises():
     assert "trailing dimensions" in str(exc.value)
 
 
-# --- Hstack & Vstack: Canonicalization --- TODO: (norrisg)
+# --- Hstack & Vstack: Canonicalization ---
+
+
+def test_hstack_canonicalize():
+    """Test that Hstack canonicalizes its arrays."""
+    a = Constant([1, 2])
+    b = Constant([3, 4, 5])
+    stacked = Hstack([a, b])
+
+    result = stacked.canonicalize()
+    assert isinstance(result, Hstack)
+    assert len(result.arrays) == 2
+    assert all(isinstance(arr, Constant) for arr in result.arrays)
+
+
+def test_vstack_canonicalize():
+    """Test that Vstack canonicalizes its arrays."""
+    from openscvx.symbolic.expr import Vstack
+
+    a = Constant([1, 2])
+    b = Constant([3, 4])
+    stacked = Vstack([a, b])
+
+    result = stacked.canonicalize()
+    assert isinstance(result, Vstack)
+    assert len(result.arrays) == 2
+    assert all(isinstance(arr, Constant) for arr in result.arrays)
+
 
 # --- Hstack & Vstack: JAX Lowering ---
 
