@@ -49,6 +49,8 @@ jobs:
   deploy-docs:
     name: 📖 Deploy Versioned Docs
     needs: publish
+    permissions:
+      contents: write  # Required for mike deploy --push to gh-pages
     uses: ./.github/workflows/_docs.yml
     with:
       deploy: true
