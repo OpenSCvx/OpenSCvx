@@ -20,9 +20,6 @@ on:
         type: boolean
         default: false
 
-permissions:
-  contents: inherit  # Needs write for mike deploy --push, else only read
-
 jobs:
   docs:
     name: 📖 Documentation
