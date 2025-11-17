@@ -24,23 +24,29 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
       - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
       - uses: actions/cache@v4
         with:
           key: mkdocs-material-${{ env.cache_id }}
-          path: .cache 
+          path: .cache
           restore-keys: |
             mkdocs-material-
       - run: sudo apt-get update && sudo apt-get install -y pngquant
       # - name: Install MkDocs Material Insiders
-      #   run: pip install git+https://${{ secrets.MKDOCS_INSIDERS_TOKEN }}@github.com/squidfunk/mkdocs-material-insiders.git
+      #   run: uv pip install --system git+https://${{ secrets.MKDOCS_INSIDERS_TOKEN }}@github.com/squidfunk/mkdocs-material-insiders.git
       - name: Install MkDocs Material
-        run: pip install mkdocs-material
-      - run: pip install mkdocstrings-python
-      - run: pip install mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
-      - run: pip install mike
+        run: uv pip install --system mkdocs-material
+      - run: uv pip install --system mkdocstrings-python
+      - run: uv pip install --system mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
+      - run: uv pip install --system mike
       - name: Install package
-        run: pip install -e .
+        run: uv pip install --system -e .
       - name: Deploy nightly documentation
         run: |
           git fetch origin gh-pages --depth=1 || true
