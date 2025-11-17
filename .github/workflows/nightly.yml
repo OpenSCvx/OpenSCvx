@@ -23,6 +23,7 @@ jobs:
 
   docs:
     name: 📖 Deploy Nightly Docs
+    needs: build  # Wait for build to succeed, but don't depend on publish
     permissions:
       contents: write  # Needs write for pushing to gh-pages
     uses: ./.github/workflows/_docs.yml
@@ -54,4 +55,4 @@ jobs:
         UV_PUBLISH_PASSWORD: ${{ secrets.TEST_PYPI_PASSWORD }}
         UV_PUBLISH_URL: https://test.pypi.org/legacy/
       run: |
-        uv publish dist/*
+        uv publish --skip-existing dist/*
