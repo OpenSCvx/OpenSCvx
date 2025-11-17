@@ -47,17 +47,11 @@ jobs:
       with:
         enable-cache: true
 
-    - name: Install twine
-      run: uv pip install --system twine
-
     - name: Publish to TestPyPI
       env:
-        TWINE_USERNAME: ${{ secrets.TEST_PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.TEST_PYPI_PASSWORD }}
+        # reuse your existing secrets, just mapped to uv's env vars
+        UV_PUBLISH_USERNAME: ${{ secrets.TEST_PYPI_USERNAME }}
+        UV_PUBLISH_PASSWORD: ${{ secrets.TEST_PYPI_PASSWORD }}
+        UV_PUBLISH_URL: https://test.pypi.org/legacy/
       run: |
-        twine upload \
-          --repository testpypi \
-          --non-interactive \
-          --verbose \
-          --skip-existing \
-          dist/*
+        uv publish dist/*

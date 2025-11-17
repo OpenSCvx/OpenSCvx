@@ -31,19 +31,13 @@ jobs:
       with:
         enable-cache: true
 
-    - name: Install twine
-      run: uv pip install --system twine
-
     - name: Publish to PyPI
       env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        # you can keep using the same secrets, just wired into uv’s env vars
+        UV_PUBLISH_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
-        twine upload \
-          --non-interactive \
-          --verbose \
-          --skip-existing \
-          dist/*
+        uv publish dist/*
 
     - name: Upload Release Assets
       if: success()
