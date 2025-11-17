@@ -46,6 +46,9 @@ cvxpygen = [
 stl = [
     "stljax",
 ]
+test = [
+    "pytest",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
