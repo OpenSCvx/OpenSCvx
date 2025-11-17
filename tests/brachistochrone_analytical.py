@@ -8,6 +8,7 @@ two points. The solution is a cycloid parametrized by:
 
 where R is determined by the boundary conditions and φ is the parameter.
 """
+
 import numpy as np
 from scipy.optimize import fsolve
 
@@ -93,11 +94,11 @@ def evaluate_brachistochrone_trajectory(x0, y0, R, phi_final, g=9.81, num_points
     t = np.sqrt(R / g) * phi
 
     return {
-        'phi': phi,
-        'x': x,
-        'y': y,
-        'v': v,
-        't': t,
+        "phi": phi,
+        "x": x,
+        "y": y,
+        "v": v,
+        "t": t,
     }
 
 
@@ -143,17 +144,17 @@ def compare_trajectory_to_analytical(
 
     # Compute analytical solution
     R, phi_final, T_analytical = compute_brachistochrone_parameters(x0, y0, x1, y1, g)
-    analytical = evaluate_brachistochrone_trajectory(
-        x0, y0, R, phi_final, g, num_points=len(t)
-    )
+    analytical = evaluate_brachistochrone_trajectory(x0, y0, R, phi_final, g, num_points=len(t))
 
     # Interpolate analytical solution to match numerical time points
-    x_analytical_interp = np.interp(t, analytical['t'], analytical['x'])
-    y_analytical_interp = np.interp(t, analytical['t'], analytical['y'])
-    v_analytical_interp = np.interp(t, analytical['t'], analytical['v'])
+    x_analytical_interp = np.interp(t, analytical["t"], analytical["x"])
+    y_analytical_interp = np.interp(t, analytical["t"], analytical["y"])
+    v_analytical_interp = np.interp(t, analytical["t"], analytical["v"])
 
     # Compute errors
-    position_errors = np.sqrt((x_num - x_analytical_interp)**2 + (y_num - y_analytical_interp)**2)
+    position_errors = np.sqrt(
+        (x_num - x_analytical_interp) ** 2 + (y_num - y_analytical_interp) ** 2
+    )
     position_rmse = np.sqrt(np.mean(position_errors**2))
     position_max_error = np.max(position_errors)
 
@@ -165,13 +166,13 @@ def compare_trajectory_to_analytical(
     velocity_rmse = np.sqrt(np.mean(velocity_errors**2))
 
     return {
-        'analytical_time': T_analytical,
-        'numerical_time': T_numerical,
-        'time_error_pct': time_error_pct,
-        'position_rmse': position_rmse,
-        'position_max_error': position_max_error,
-        'velocity_rmse': velocity_rmse,
-        'analytical_trajectory': analytical,
-        'R': R,
-        'phi_final': phi_final,
+        "analytical_time": T_analytical,
+        "numerical_time": T_numerical,
+        "time_error_pct": time_error_pct,
+        "position_rmse": position_rmse,
+        "position_max_error": position_max_error,
+        "velocity_rmse": velocity_rmse,
+        "analytical_trajectory": analytical,
+        "R": R,
+        "phi_final": phi_final,
     }
