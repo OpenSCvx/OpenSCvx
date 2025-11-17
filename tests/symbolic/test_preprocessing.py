@@ -386,119 +386,134 @@ def test_empty_states_list_raises():
 def test_add_same_shape_passes():
     a = Constant(np.zeros((2, 3)))
     b = Constant(np.ones((2, 3)))
-    validate_shapes(a + b)
+    add = a + b
+    add.check_shape()
 
 
 def test_add_shape_mismatch_raises():
     a = Constant(np.zeros((2, 3)))
     b = Constant(np.ones((3, 2)))
+    add = a + b
     with pytest.raises(ValueError):
-        validate_shapes(a + b)
+        add.check_shape()
 
 
 def test_sub_same_shape_passes():
     a = Constant(np.zeros((4,)))
     b = Constant(np.ones((4,)))
-    validate_shapes(a - b)
+    sub = a - b
+    sub.check_shape()
 
 
 def test_sub_shape_mismatch_raises():
     a = Constant(np.zeros((4,)))
     b = Constant(np.ones((5,)))
+    sub = a - b
     with pytest.raises(ValueError):
-        validate_shapes(a - b)
+        sub.check_shape()
 
 
 def test_mul_same_shape_passes():
     a = Constant(np.zeros((2, 2)))
     b = Constant(np.ones((2, 2)))
-    validate_shapes(a * b)
+    mul = a * b
+    mul.check_shape()
 
 
 def test_mul_shape_mismatch_raises():
     a = Constant(np.zeros((2, 2)))
     b = Constant(np.ones((2, 3)))
+    mul = a * b
     with pytest.raises(ValueError):
-        validate_shapes(a * b)
+        mul.check_shape()
 
 
 def test_div_array_by_scalar_passes():
     a = Constant(np.zeros((3,)))
     b = Constant(np.array(2.0))
-    validate_shapes(a / b)
+    div = a / b
+    div.check_shape()
 
 
 def test_div_shape_mismatch_raises():
     a = Constant(np.zeros((3,)))
     b = Constant(np.zeros((2,)))
+    div = a / b
     with pytest.raises(ValueError):
-        validate_shapes(a / b)
+        div.check_shape()
 
 
 def test_matmul_ok():
     a = Constant(np.zeros((4, 5)))
     b = Constant(np.zeros((5, 2)))
-    validate_shapes(a @ b)
+    matmul = a @ b
+    matmul.check_shape()
 
 
 def test_matmul_incompatible_raises():
     a = Constant(np.zeros((4, 5)))
     b = Constant(np.zeros((4, 2)))
+    matmul = a @ b
     with pytest.raises(ValueError):
-        validate_shapes(a @ b)
+        matmul.check_shape()
 
 
 def test_concat_1d_passes():
     a = Constant(np.zeros((2,)))
     b = Constant(np.ones((3,)))
-    validate_shapes(Concat(a, b))
+    concat = Concat(a, b)
+    concat.check_shape()
 
 
 def test_concat_rank_mismatch_raises():
     a = Constant(np.zeros((2, 2)))
     b = Constant(np.ones((3, 2, 2)))  # Changed to (3, 2, 2) to avoid squeeze collapsing dimensions
+    concat = Concat(a, b)
     with pytest.raises(ValueError):
-        validate_shapes(Concat(a, b))
+        concat.check_shape()
 
 
 def test_concat_nonzero_axes_mismatch_raises():
     a = Constant(np.zeros((2, 3)))
     b = Constant(np.ones((3, 4)))
     # shapes (2,3) vs (3,4) agree on rank but not on axis>0
+    concat = Concat(a, b)
     with pytest.raises(ValueError):
-        validate_shapes(Concat(a, b))
+        concat.check_shape()
 
 
 def test_index_valid_passes():
     a = Constant(np.zeros((5,)))
-    validate_shapes(a[2:4])
+    index = a[2:4]
+    index.check_shape()
 
 
 def test_index_out_of_bounds_raises():
     a = Constant(np.zeros((3,)))
+    index = a[5]
     with pytest.raises(ValueError):
-        validate_shapes(a[5])
+        index.check_shape()
 
 
 def test_constraint_zero_dim_scalar_passes():
     # a true scalar (shape=()) on both sides
     a = Constant(np.array(2.5))
     c = a == 1.0
-    validate_shapes(c)
+    c.check_shape()
 
 
 def test_constraint_length1_array_passes():
     # 1-element arrays count as "scalar"
     b = Constant(np.array([7.0]))
     c = b <= np.ones((1,))
-    validate_shapes(c)
+    c.check_shape()
 
 
 def test_constraint_vector_passes():
     """Vector constraints should now pass validation (interpreted element-wise)"""
     a = Constant(np.zeros((2,)))
     c = a <= np.ones((2,))
-    validate_shapes(c)  # Should NOT raise
+    c.check_shape()  # Should NOT raise
 
 
 def test_constraint_shape_mismatch_raises():
@@ -506,14 +521,14 @@ def test_constraint_shape_mismatch_raises():
     a = Constant(np.zeros((2,)))
     c = a == np.zeros((3,))
     with pytest.raises(ValueError):
-        validate_shapes(c)
+        c.check_shape()
 
 
 def test_constraint_broadcasting_passes():
     """Test constraint broadcasting: scalar op vector"""
     x = State("x", (3,))
     c = Constant(np.array(0.0)) <= x  # broadcasts to vector constraint
-    validate_shapes(c)
+    c.check_shape()
 
 
 def test_ctcs_basic_shape_validation():
@@ -525,7 +540,7 @@ def test_ctcs_basic_shape_validation():
     wrapped = ctcs(constraint, penalty="squared_relu")
 
     # Should validate both constraint and penalty expression shapes
-    validate_shapes(wrapped)
+    wrapped.check_shape()
 
 
 def test_ctcs_penalty_shape_consistency():
@@ -536,7 +551,7 @@ def test_ctcs_penalty_shape_consistency():
     constraint = x >= np.zeros((2, 2))
     wrapped = ctcs(constraint, penalty="huber")
 
-    validate_shapes(wrapped)
+    wrapped.check_shape()
 
     # Penalty should have same shape as constraint LHS
     penalty_expr = wrapped.penalty_expr()
@@ -555,7 +570,7 @@ def test_ctcs_constraint_shape_mismatch_raises():
 
     # Should raise due to underlying constraint shape mismatch
     with pytest.raises(ValueError):
-        validate_shapes(wrapped)
+        wrapped.check_shape()
 
 
 def test_constant_normalization_invariant():
@@ -603,7 +618,7 @@ def test_constant_normalization_validation_invariant():
 
     # Create a properly normalized constant
     c = Constant(np.array([1.0, 2.0]))
-    validate_shapes(c)  # Should not raise
+    c.check_shape()  # Should not raise
 
     # Test that validation would catch violation if it occurred
     # (Though this shouldn't happen with new __init__ logic)
@@ -667,15 +682,15 @@ def test_constant_normalization_preserves_broadcasting():
 
     # Broadcasting should still work with normalized constants
     scalar_plus_vector = scalar + vector  # () + (3,) should broadcast to (3,)
-    validate_shapes(scalar_plus_vector)  # Should not raise
+    scalar_plus_vector.check_shape()  # Should not raise
 
     # Test broadcasting between normalized constants
     scalar_times_matrix = scalar * matrix  # () * (2,2) should broadcast to (2,2)
-    validate_shapes(scalar_times_matrix)  # Should not raise
+    scalar_times_matrix.check_shape()  # Should not raise
 
     # Vector with matrix should fail (non-broadcastable)
     with pytest.raises(ValueError):
-        validate_shapes(vector + matrix)  # (3,) + (2,2) should fail
+        (vector + matrix).check_shape()  # (3,) + (2,2) should fail
 
 
 def test_vector_constraints_with_normalized_constants():
@@ -707,7 +722,7 @@ def test_vector_constraints_with_normalized_constants():
     assert scalar_bound.value.shape == ()
 
     scalar_constraint = x <= scalar_bound  # (3,) <= () should broadcast
-    validate_shapes(scalar_constraint)  # Should not raise
+    scalar_constraint.check_shape()  # Should not raise
 
 
 def test_constant_normalization_preserves_dtype():
@@ -970,7 +985,6 @@ def test_hstack_basic_passes():
     b = Constant(np.array([3.0, 4.0, 5.0]))  # (3,)
 
     stacked = Hstack([a, b])
-    validate_shapes(stacked)
 
     result_shape = stacked.check_shape()
     assert result_shape == (5,)  # 2 + 3 = 5
@@ -982,7 +996,7 @@ def test_hstack_dimension_mismatch_raises():
     b = Constant(np.ones((2, 3)))  # 2D
 
     with pytest.raises(ValueError) as exc:
-        validate_shapes(Hstack([a, b]))
+        (Hstack([a, b])).check_shape()
     assert "dimensions" in str(exc.value)
 
 
@@ -992,7 +1006,7 @@ def test_vstack_basic_passes():
     b = Constant(np.ones((4, 3)))  # (4, 3)
 
     stacked = Vstack([a, b])
-    validate_shapes(stacked)
+    stacked.check_shape()
 
     result_shape = stacked.check_shape()
     assert result_shape == (6, 3)  # 2 + 4 = 6 rows
@@ -1004,5 +1018,5 @@ def test_vstack_trailing_dimension_mismatch_raises():
     b = Constant(np.ones((4, 5)))  # (4, 5) - different second dim
 
     with pytest.raises(ValueError) as exc:
-        validate_shapes(Vstack([a, b]))
+        (Vstack([a, b])).check_shape()
     assert "trailing dimensions" in str(exc.value)
