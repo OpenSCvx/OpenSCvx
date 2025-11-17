@@ -34,6 +34,7 @@ jobs:
       uses: astral-sh/setup-uv@v4
       with:
         enable-cache: true
+        cache-dependency-path: pyproject.toml
 
     - name: Build distributions (exact version)
       if: inputs.use-exact-version
