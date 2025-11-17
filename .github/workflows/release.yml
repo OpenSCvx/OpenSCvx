@@ -43,7 +43,7 @@ jobs:
             --non-interactive \
             --verbose \
             --skip-existing \
-            dist/*.whl
+            dist/*
 
       - name: Upload Release Assets
         if: ${{ always() }}
