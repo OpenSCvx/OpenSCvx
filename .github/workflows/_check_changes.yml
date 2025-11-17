@@ -1,0 +1,44 @@
+name: 🔍 Check Changes
+
+on:
+  workflow_call:
+    inputs:
+      paths:
+        description: 'Paths to check for changes (space-separated)'
+        type: string
+        default: 'openscvx/ pyproject.toml'
+      since:
+        description: 'Time period to check (e.g., "24 hours ago", "1 day ago")'
+        type: string
+        default: '24 hours ago'
+    outputs:
+      has-changes:
+        description: 'Whether changes were detected in the specified paths'
+        value: ${{ jobs.check.outputs.has-changes }}
+
+jobs:
+  check:
+    name: 🔍 Check for Changes
+    runs-on: ubuntu-latest
+    outputs:
+      has-changes: ${{ steps.check.outputs.has-changes }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check for changes
+      id: check
+      run: |
+        # Check if there are commits affecting specified paths in the time period
+        COMMIT_COUNT=$(git log --since='${{ inputs.since }}' --oneline -- ${{ inputs.paths }} | wc -l)
+
+        if [ $COMMIT_COUNT -gt 0 ]; then
+          echo "has-changes=true" >> $GITHUB_OUTPUT
+          echo "✅ Found $COMMIT_COUNT commit(s) affecting: ${{ inputs.paths }}"
+        else
+          echo "has-changes=false" >> $GITHUB_OUTPUT
+          echo "ℹ️  No changes in the specified paths since ${{ inputs.since }}"
+        fi
