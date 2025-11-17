@@ -347,9 +347,9 @@ def test_brachistochrone_parameters():
     """
     Test brachistochrone with Parameter objects.
 
-    This tests the use of ox.Parameter for problem constants (like gravity),
-    similar to how parameters are used in examples/abstract/3DoF_pdg.py.
-    Parameters allow symbolic representation of constants in the problem formulation.
+    This tests the use of ox.Parameter for problem constants (like gravity).
+    Parameters allow symbolic representation of constants in the problem formulation,
+    and can be modified between solves without re-initialization.
     """
     import jax.numpy as jnp
     import numpy as np
@@ -436,26 +436,66 @@ def test_brachistochrone_parameters():
     if hasattr(problem.settings, "dev"):
         problem.settings.dev.printing = False
 
-    # Run optimization
+    # Run optimization with initial gravity parameter
     problem.initialize()
     result = problem.solve()
     result = problem.post_process(result)
 
     # Check convergence
-    assert result["converged"], "Problem failed to converge"
+    assert result["converged"], "Problem failed to converge (first run)"
 
     # Extract position and velocity
-    position = result.trajectory["position"]
-    velocity = result.trajectory["velocity"]
+    position_traj = result.trajectory["position"]
+    velocity_traj = result.trajectory["velocity"]
 
     # Compare to analytical solution (using g_param.value for comparison)
     comparison = compare_trajectory_to_analytical(
-        result.t_full, position, velocity, x0, y0, x1, y1, g_param.value
+        result.t_full, position_traj, velocity_traj, x0, y0, x1, y1, g_param.value
     )
 
-    _print_comparison_metrics(comparison, "Brachistochrone Parameters")
+    _print_comparison_metrics(comparison, "Brachistochrone Parameters (g=9.81)")
     print(f"  Using g parameter:   {g_param.value} m/s^2")
     _assert_brachistochrone_accuracy(comparison, problem, result)
+
+    # Second run with different gravity parameter (e.g., Moon gravity)
+    # Similar to how dubins_car.py modifies obstacle parameters
+    g_moon = 1.62  # Moon's gravity in m/s^2
+    problem.parameters["g"] = g_moon
+
+    # Reset guesses for second run
+    position.guess = np.linspace(position.initial, position.final, n)
+    velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
+    theta.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1)
+
+    # Solve again without re-initialization (parameters are updated)
+    result2 = problem.solve()
+    result2 = problem.post_process(result2)
+
+    # Check convergence
+    assert result2["converged"], "Problem failed to converge (second run with Moon gravity)"
+
+    # Extract position and velocity
+    position_traj2 = result2.trajectory["position"]
+    velocity_traj2 = result2.trajectory["velocity"]
+
+    # Compare to analytical solution with Moon gravity
+    comparison2 = compare_trajectory_to_analytical(
+        result2.t_full, position_traj2, velocity_traj2, x0, y0, x1, y1, g_moon
+    )
+
+    _print_comparison_metrics(comparison2, "Brachistochrone Parameters (g=1.62, Moon)")
+    print(f"  Using g parameter:   {g_moon} m/s^2")
+    _assert_brachistochrone_accuracy(comparison2, problem, result2)
+
+    # Verify that the optimal time is longer with Moon gravity (weaker gravity)
+    # Time should be proportional to 1/sqrt(g), so Moon time should be ~2.45x longer
+    time_ratio = comparison2["analytical_time"] / comparison["analytical_time"]
+    expected_ratio = np.sqrt(g_param.value / g_moon)  # sqrt(9.81/1.62) ≈ 2.46
+    assert abs(time_ratio - expected_ratio) < 0.1, (
+        f"Time ratio {time_ratio:.2f} doesn't match expected {expected_ratio:.2f} "
+        f"for gravity scaling"
+    )
+    print(f"  Time ratio (Moon/Earth): {time_ratio:.2f} (expected: {expected_ratio:.2f})")
 
     # Clean up JAX caches
     jax.clear_caches()
