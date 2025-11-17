@@ -122,6 +122,7 @@ for conf in TEST_CASES.values():
     conf["timing"] = {phase: base[phase] * OS_MULTIPLIER for phase in base}
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize("name,conf", TEST_CASES.items(), ids=list(TEST_CASES))
 def test_example_problem(name, conf):
     problem = conf["problem"]

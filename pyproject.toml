@@ -129,3 +129,8 @@ ignore-names = [
     "np",            # NumPy alias
     "jnp",           # JAX NumPy alias
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: expensive integration tests that solve full examples",
+]

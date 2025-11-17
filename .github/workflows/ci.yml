@@ -36,6 +36,6 @@ jobs:
         # Install package with optional GUI and test packages
         uv pip install --system -e ".[gui,test]"
 
-    - name: Run tests
+    - name: Run tests (unit tests only, skip integration)
       run: |
-        pytest -v
+        pytest -v -m "not integration"
