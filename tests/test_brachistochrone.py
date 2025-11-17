@@ -13,51 +13,13 @@ The analytical solution gives an optimal time of approximately 1.808 seconds.
 """
 
 import jax
-import pytest
 
 from tests.brachistochrone_analytical import compare_trajectory_to_analytical
 
 
-def test_brachistochrone_example():
-    """
-    Test the brachistochrone example from examples/abstract/brachistochrone.py.
-
-    This validates against the known analytical solution and checks timing.
-    """
-    from examples.abstract.brachistochrone import problem
-
-    # Disable printing for cleaner test output
-    if hasattr(problem.settings, "dev"):
-        problem.settings.dev.printing = False
-
-    # Run optimization
-    problem.initialize()
-    result = problem.solve()
-    result = problem.post_process(result)
-
-    # Check convergence
-    assert result["converged"], "Brachistochrone failed to converge"
-
-    # Compare numerical solution to analytical brachistochrone solution
-    # Extract boundary conditions from problem definition
-    x0, y0 = 0.0, 10.0
-    x1, y1 = 10.0, 5.0
-    g = 9.81
-
-    # Compare to analytical solution
-    comparison = compare_trajectory_to_analytical(
-        result.t_full,
-        result.trajectory["position"],
-        result.trajectory["velocity"],
-        x0,
-        y0,
-        x1,
-        y1,
-        g,
-    )
-
-    # Print comparison metrics (visible in verbose mode)
-    print("\nBrachistochrone Validation Metrics:")
+def _print_comparison_metrics(comparison, test_name="Brachistochrone"):
+    """Print comparison metrics for brachistochrone validation."""
+    print(f"\n{test_name} Validation Metrics:")
     print(f"  Analytical time:     {comparison['analytical_time']:.4f} s")
     print(f"  Numerical time:      {comparison['numerical_time']:.4f} s")
     print(f"  Time error:          {comparison['time_error_pct']:.2f}%")
@@ -65,8 +27,14 @@ def test_brachistochrone_example():
     print(f"  Max position error:  {comparison['position_max_error']:.4f}")
     if comparison["velocity_rmse"] is not None:
         print(f"  Velocity RMSE:       {comparison['velocity_rmse']:.4f} m/s")
-    print(f"  Cycloid parameters:  R={comparison['R']:.4f}, φ_final={comparison['phi_final']:.4f}")
+    if "R" in comparison and "phi_final" in comparison:
+        print(
+            f"  Cycloid parameters:  R={comparison['R']:.4f}, φ_final={comparison['phi_final']:.4f}"
+        )
 
+
+def _assert_brachistochrone_accuracy(comparison, problem, result):
+    """Common assertions for brachistochrone test validation."""
     # Check time accuracy: numerical should be within 1% of analytical
     time_error_pct = comparison["time_error_pct"]
     assert time_error_pct < 1.0, (
@@ -111,6 +79,48 @@ def test_brachistochrone_example():
     assert problem.timing_post < 5.0, (
         f"Post-processing took {problem.timing_post:.2f}s (expected < 5s)"
     )
+
+
+def test_brachistochrone_example():
+    """
+    Test the brachistochrone example from examples/abstract/brachistochrone.py.
+
+    This validates against the known analytical solution and checks timing.
+    """
+    from examples.abstract.brachistochrone import problem
+
+    # Disable printing for cleaner test output
+    if hasattr(problem.settings, "dev"):
+        problem.settings.dev.printing = False
+
+    # Run optimization
+    problem.initialize()
+    result = problem.solve()
+    result = problem.post_process(result)
+
+    # Check convergence
+    assert result["converged"], "Brachistochrone failed to converge"
+
+    # Compare numerical solution to analytical brachistochrone solution
+    # Extract boundary conditions from problem definition
+    x0, y0 = 0.0, 10.0
+    x1, y1 = 10.0, 5.0
+    g = 9.81
+
+    # Compare to analytical solution
+    comparison = compare_trajectory_to_analytical(
+        result.t_full,
+        result.trajectory["position"],
+        result.trajectory["velocity"],
+        x0,
+        y0,
+        x1,
+        y1,
+        g,
+    )
+
+    _print_comparison_metrics(comparison, "Brachistochrone")
+    _assert_brachistochrone_accuracy(comparison, problem, result)
 
     # Clean up JAX caches
     jax.clear_caches()
@@ -212,53 +222,8 @@ def test_brachistochrone_monolithic():
         result.t_full, position, velocity, x0, y0, x1, y1, g
     )
 
-    # Print comparison metrics (visible in verbose mode)
-    print("\nBrachistochrone Monolithic Validation Metrics:")
-    print(f"  Analytical time:     {comparison['analytical_time']:.4f} s")
-    print(f"  Numerical time:      {comparison['numerical_time']:.4f} s")
-    print(f"  Time error:          {comparison['time_error_pct']:.2f}%")
-    print(f"  Position RMSE:       {comparison['position_rmse']:.4f}")
-    print(f"  Max position error:  {comparison['position_max_error']:.4f}")
-    if comparison["velocity_rmse"] is not None:
-        print(f"  Velocity RMSE:       {comparison['velocity_rmse']:.4f} m/s")
-
-    # Check time accuracy: numerical should be within 1% of analytical
-    time_error_pct = comparison["time_error_pct"]
-    assert time_error_pct < 1.0, f"Time error {time_error_pct:.2f}% exceeds 1% threshold"
-
-    # Check that numerical time is close to but not significantly better than analytical
-    assert comparison["numerical_time"] >= comparison["analytical_time"] * 0.95, (
-        f"Numerical time {comparison['numerical_time']:.4f}s is suspiciously "
-        f"better than analytical {comparison['analytical_time']:.4f}s"
-    )
-
-    # Check trajectory shape: position RMSE should be small
-    position_rmse = comparison["position_rmse"]
-    assert position_rmse < 0.05, f"Position RMSE {position_rmse:.4f} exceeds threshold of 0.05"
-
-    # Check maximum position error
-    max_pos_error = comparison["position_max_error"]
-    assert max_pos_error < 0.1, (
-        f"Maximum position error {max_pos_error:.4f} exceeds threshold of 0.1"
-    )
-
-    # Check velocity accuracy
-    velocity_rmse = comparison["velocity_rmse"]
-    assert velocity_rmse < 0.05, f"Velocity RMSE {velocity_rmse:.4f} exceeds threshold of 0.05 m/s"
-
-    # Check that we didn't take too many iterations
-    if "discretization_history" in result:
-        num_iters = len(result["discretization_history"])
-        assert num_iters < 15, f"Took {num_iters} SCP iterations (expected < 15)"
-
-    # Check timing - these are generous limits for a simple problem like brachistochrone
-    assert problem.timing_init < 10.0, (
-        f"Initialization took {problem.timing_init:.2f}s (expected < 10s)"
-    )
-    assert problem.timing_solve < 1.0, f"Solve took {problem.timing_solve:.2f}s (expected < 1s)"
-    assert problem.timing_post < 5.0, (
-        f"Post-processing took {problem.timing_post:.2f}s (expected < 5s)"
-    )
+    _print_comparison_metrics(comparison, "Brachistochrone Monolithic")
+    _assert_brachistochrone_accuracy(comparison, problem, result)
 
     # Clean up JAX caches
     jax.clear_caches()
@@ -371,53 +336,8 @@ def test_brachistochrone_nodal():
         g,
     )
 
-    # Print comparison metrics (visible in verbose mode)
-    print("\nBrachistochrone Inline Validation Metrics:")
-    print(f"  Analytical time:     {comparison['analytical_time']:.4f} s")
-    print(f"  Numerical time:      {comparison['numerical_time']:.4f} s")
-    print(f"  Time error:          {comparison['time_error_pct']:.2f}%")
-    print(f"  Position RMSE:       {comparison['position_rmse']:.4f}")
-    print(f"  Max position error:  {comparison['position_max_error']:.4f}")
-    if comparison["velocity_rmse"] is not None:
-        print(f"  Velocity RMSE:       {comparison['velocity_rmse']:.4f} m/s")
-
-    # Check time accuracy: numerical should be within 1% of analytical
-    time_error_pct = comparison["time_error_pct"]
-    assert time_error_pct < 1.0, f"Time error {time_error_pct:.2f}% exceeds 1% threshold"
-
-    # Check that numerical time is close to but not significantly better than analytical
-    assert comparison["numerical_time"] >= comparison["analytical_time"] * 0.95, (
-        f"Numerical time {comparison['numerical_time']:.4f}s is suspiciously "
-        f"better than analytical {comparison['analytical_time']:.4f}s"
-    )
-
-    # Check trajectory shape: position RMSE should be small
-    position_rmse = comparison["position_rmse"]
-    assert position_rmse < 0.05, f"Position RMSE {position_rmse:.4f} exceeds threshold of 0.05"
-
-    # Check maximum position error
-    max_pos_error = comparison["position_max_error"]
-    assert max_pos_error < 0.1, (
-        f"Maximum position error {max_pos_error:.4f} exceeds threshold of 0.1"
-    )
-
-    # Check velocity accuracy
-    velocity_rmse = comparison["velocity_rmse"]
-    assert velocity_rmse < 0.05, f"Velocity RMSE {velocity_rmse:.4f} exceeds threshold of 0.05 m/s"
-
-    # Check that we didn't take too many iterations
-    if "discretization_history" in result:
-        num_iters = len(result["discretization_history"])
-        assert num_iters < 15, f"Took {num_iters} SCP iterations (expected < 15)"
-
-    # Check timing - these are generous limits for a simple problem like brachistochrone
-    assert problem.timing_init < 10.0, (
-        f"Initialization took {problem.timing_init:.2f}s (expected < 10s)"
-    )
-    assert problem.timing_solve < 1.0, f"Solve took {problem.timing_solve:.2f}s (expected < 1s)"
-    assert problem.timing_post < 5.0, (
-        f"Post-processing took {problem.timing_post:.2f}s (expected < 5s)"
-    )
+    _print_comparison_metrics(comparison, "Brachistochrone Nodal")
+    _assert_brachistochrone_accuracy(comparison, problem, result)
 
     # Clean up JAX caches
     jax.clear_caches()
@@ -533,54 +453,9 @@ def test_brachistochrone_parameters():
         result.t_full, position, velocity, x0, y0, x1, y1, g_param.value
     )
 
-    # Print comparison metrics (visible in verbose mode)
-    print("\nBrachistochrone Parameters Validation Metrics:")
-    print(f"  Analytical time:     {comparison['analytical_time']:.4f} s")
-    print(f"  Numerical time:      {comparison['numerical_time']:.4f} s")
-    print(f"  Time error:          {comparison['time_error_pct']:.2f}%")
-    print(f"  Position RMSE:       {comparison['position_rmse']:.4f}")
-    print(f"  Max position error:  {comparison['position_max_error']:.4f}")
-    if comparison["velocity_rmse"] is not None:
-        print(f"  Velocity RMSE:       {comparison['velocity_rmse']:.4f} m/s")
+    _print_comparison_metrics(comparison, "Brachistochrone Parameters")
     print(f"  Using g parameter:   {g_param.value} m/s^2")
-
-    # Check time accuracy: numerical should be within 1% of analytical
-    time_error_pct = comparison["time_error_pct"]
-    assert time_error_pct < 1.0, f"Time error {time_error_pct:.2f}% exceeds 1% threshold"
-
-    # Check that numerical time is close to but not significantly better than analytical
-    assert comparison["numerical_time"] >= comparison["analytical_time"] * 0.95, (
-        f"Numerical time {comparison['numerical_time']:.4f}s is suspiciously "
-        f"better than analytical {comparison['analytical_time']:.4f}s"
-    )
-
-    # Check trajectory shape: position RMSE should be small
-    position_rmse = comparison["position_rmse"]
-    assert position_rmse < 0.05, f"Position RMSE {position_rmse:.4f} exceeds threshold of 0.05"
-
-    # Check maximum position error
-    max_pos_error = comparison["position_max_error"]
-    assert max_pos_error < 0.1, (
-        f"Maximum position error {max_pos_error:.4f} exceeds threshold of 0.1"
-    )
-
-    # Check velocity accuracy
-    velocity_rmse = comparison["velocity_rmse"]
-    assert velocity_rmse < 0.05, f"Velocity RMSE {velocity_rmse:.4f} exceeds threshold of 0.05 m/s"
-
-    # Check that we didn't take too many iterations
-    if "discretization_history" in result:
-        num_iters = len(result["discretization_history"])
-        assert num_iters < 15, f"Took {num_iters} SCP iterations (expected < 15)"
-
-    # Check timing - these are generous limits for a simple problem like brachistochrone
-    assert problem.timing_init < 10.0, (
-        f"Initialization took {problem.timing_init:.2f}s (expected < 10s)"
-    )
-    assert problem.timing_solve < 1.0, f"Solve took {problem.timing_solve:.2f}s (expected < 1s)"
-    assert problem.timing_post < 5.0, (
-        f"Post-processing took {problem.timing_post:.2f}s (expected < 5s)"
-    )
+    _assert_brachistochrone_accuracy(comparison, problem, result)
 
     # Clean up JAX caches
     jax.clear_caches()
