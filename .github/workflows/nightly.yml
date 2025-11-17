@@ -7,8 +7,6 @@ on:
   push:
     branches:
       - main
-  # schedule:
-  #   - cron: '0 0 * * *'   # daily at midnight UTC
 
 concurrency:
   group: nightly
