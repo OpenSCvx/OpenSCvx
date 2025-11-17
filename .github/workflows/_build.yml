@@ -1,4 +1,4 @@
-name: 📦 Build Package (Reusable)
+name: 📦 Build Package
 
 on:
   workflow_call:

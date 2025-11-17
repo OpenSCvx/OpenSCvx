@@ -1,4 +1,4 @@
-name: 📖 Documentation (Reusable)
+name: 📖 Documentation
 
 on:
   workflow_call:

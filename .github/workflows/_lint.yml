@@ -1,4 +1,4 @@
-name: 🔍 Lint (Reusable)
+name: 🔍 Lint
 
 on:
   workflow_call:
