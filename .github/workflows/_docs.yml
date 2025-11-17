@@ -12,13 +12,12 @@ jobs:
   docs:
     name: 📖 Documentation
     runs-on: ubuntu-latest
-    if: ${{ !inputs.version || github.event.repository.fork == false }}
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        fetch-depth: ${{ inputs.version && 0 || 1 }}
+        fetch-depth: 0  # Full history needed for mike versioning
 
     - name: Configure Git Credentials
       if: inputs.version
@@ -37,7 +36,6 @@ jobs:
         enable-cache: true
 
     - name: Cache MkDocs build
-      if: inputs.version
       uses: actions/cache@v4
       with:
         key: mkdocs-material-${{ hashFiles('mkdocs.yml', 'docs/**') }}
@@ -64,17 +62,16 @@ jobs:
       if: ${{ !inputs.version }}
       run: mkdocs build
 
-    - name: Deploy documentation
+    - name: Fetch gh-pages branch
       if: inputs.version
-      run: |
-        git fetch origin gh-pages --depth=1 || true
-        VERSION="${{ inputs.version }}"
+      run: git fetch origin gh-pages --depth=1 || true
 
-        # For versioned releases (e.g., v1.2.3), deploy with 'latest' alias and set as default
-        if [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-          mike deploy --push --update-aliases "$VERSION" latest
-          mike set-default --push latest
-        # For nightly, just deploy without alias or default
-        else
-          mike deploy --push "$VERSION"
-        fi
+    - name: Deploy versioned release documentation
+      if: inputs.version && startsWith(inputs.version, 'v')
+      run: |
+        mike deploy --push --update-aliases "${{ inputs.version }}" latest
+        mike set-default --push latest
+
+    - name: Deploy nightly documentation
+      if: inputs.version && !startsWith(inputs.version, 'v')
+      run: mike deploy --push "${{ inputs.version }}"
