@@ -1,13 +1,11 @@
 """Tests for arithmetic operation nodes.
 
 This module tests arithmetic operation nodes: Add, Sub, Mul, Div, MatMul, Neg, Power.
-Tests cover:
+Tests are organized by node/node-group, with each section covering:
 - Node creation and tree structure
-- Operator overloading (__add__, __sub__, etc.)
-- Shape inference and broadcasting
-- Lowering to JAX
-- Lowering to CVXPY
 - Canonicalization patterns
+- JAX lowering
+- CVXPY lowering
 """
 
 import numpy as np
@@ -27,91 +25,42 @@ from openscvx.symbolic.expr import (
 )
 
 # =============================================================================
-# Node Creation and Tree Structure
+# Add & Sub
 # =============================================================================
 
 
-def test_basic_arithmetic_nodes_and_children_repr():
+def test_add_sub_basic_nodes_and_children():
+    """Test basic Add and Sub node creation, children, and repr."""
     a, b = Constant(2), Constant(3)
     add = a + b
     sub = a - b
-    mul = a * b
-    div = a / b
-    neg = -a
 
     # types
     assert isinstance(add, Add)
     assert isinstance(sub, Sub)
-    assert isinstance(mul, Mul)
-    assert isinstance(div, Div)
-    assert isinstance(neg, Neg)
 
     # children
     assert add.children() == [a, b]
     assert sub.children() == [a, b]
-    assert mul.children() == [a, b]
-    assert div.children() == [a, b]
-    assert neg.children() == [a]
 
     # repr should nest correctly
     assert repr(add) == "(Const(2) + Const(3))"
     assert repr(sub) == "(Const(2) - Const(3))"
-    assert repr(mul) == "(Const(2) * Const(3))"
-    assert repr(div) == "(Const(2) / Const(3))"
-    assert repr(neg) == "(-Const(2))"
 
 
-def test_power_operator_and_node():
-    """Test power operation using ** operator and Power node."""
-    a, b = Constant(2), Constant(3)
+def test_add_accepts_many_terms():
+    """Test that Add can accept multiple terms."""
+    a, b, c, d = Constant(5), Constant(3), Constant(1), Constant(2)
+    add = Add(a, b, c, d)
 
-    # Test ** operator
-    pow1 = a**b
-    assert isinstance(pow1, Power)
-    assert pow1.children() == [a, b]
-    assert repr(pow1) == "(Const(2))**(Const(3))"
-
-    # Test direct Power node creation
-    pow2 = Power(a, b)
-    assert isinstance(pow2, Power)
-    assert pow2.children() == [a, b]
-    assert repr(pow2) == "(Const(2))**(Const(3))"
+    assert add.children() == [a, b, c, d]
+    assert repr(add) == "(Const(5) + Const(3) + Const(1) + Const(2))"
 
 
-def test_power_with_mixed_types():
-    """Test power operation with mixed numeric and expression types."""
-    x = Variable("x", shape=(1,))
-
-    # Expression ** numeric
-    pow1 = x**2
-    assert isinstance(pow1, Power)
-    assert pow1.base is x
-    assert isinstance(pow1.exponent, Constant)
-    assert pow1.exponent.value == 2
-    assert repr(pow1) == "(Var('x'))**(Const(2))"
-
-    # Numeric ** expression (rpow)
-    pow2 = 10**x
-    assert isinstance(pow2, Power)
-    assert isinstance(pow2.base, Constant)
-    assert pow2.base.value == 10
-    assert pow2.exponent is x
-    assert repr(pow2) == "(Const(10))**(Var('x'))"
-
-
-def test_matmul_vector_and_matrix():
-    # 2×2 identity matrix × 2-vector
-    M = Constant(np.eye(2))
-    v = Constant(np.array([1.0, 2.0]))
-    mm = M @ v
-
-    assert isinstance(mm, MatMul)
-    children = mm.children()
-    assert children[0] is M and children[1] is v
-
-    # repr should reflect operator
-    assert "MatMul" in mm.pretty()  # tree form contains the node name
-    assert "(" in repr(mm) and "@" not in repr(mm)  # repr is Python‐safe
+def test_add_requires_at_least_two_terms():
+    """Test that Add requires at least two terms."""
+    with pytest.raises(ValueError):
+        Add(Constant(1))
 
 
 @pytest.mark.parametrize(
@@ -121,7 +70,8 @@ def test_matmul_vector_and_matrix():
         ((2, 2), (2, 2)),  # matrix + matrix
     ],
 )
-def test_elementwise_addition_children_for_arrays(shape_a, shape_b):
+def test_add_elementwise_children_for_arrays(shape_a, shape_b):
+    """Test that Add captures children correctly for arrays."""
     A = Constant(np.ones(shape_a))
     B = Constant(np.full(shape_b, 2.0))
     expr = A + B
@@ -135,52 +85,10 @@ def test_elementwise_addition_children_for_arrays(shape_a, shape_b):
     assert "Const" in rep
 
 
-def test_combined_ops_produce_correct_constraint_tree():
-    # (x + y) @ z >= 5
-    x = Variable("x", (3,))
-    y = Variable("y", (3,))
-    z = Variable("z", (3,))
-
-    # note: MatMul between two 3-vectors is allowed at AST level
-    expr = (x + y) @ z <= 5
-    # root is Constraint
-    assert isinstance(expr, Inequality)
-    # check tree structure via pretty()
-    p = expr.pretty().splitlines()
-    assert p[0].strip().startswith("Inequality")
-    # next line is MatMul
-    assert "MatMul" in p[1]
-
-    # children of the constraint:
-    assert isinstance(expr.lhs, MatMul)
-    assert isinstance(expr.rhs, Constant)
+# --- Add & Sub: Canonicalization ---
 
 
-def test_add_mul_accept_many_terms():
-    a, b, c, d = Constant(5), Constant(3), Constant(1), Constant(2)
-    add = Add(a, b, c, d)
-    mul = Mul(a, b, c, d)
-
-    assert add.children() == [a, b, c, d]
-    assert mul.children() == [a, b, c, d]
-
-    assert repr(add) == "(Const(5) + Const(3) + Const(1) + Const(2))"
-    assert repr(mul) == "(Const(5) * Const(3) * Const(1) * Const(2))"
-
-
-def test_add_mul_requires_at_least_two_terms():
-    with pytest.raises(ValueError):
-        Add(Constant(1))
-    with pytest.raises(ValueError):
-        Mul(Constant(2))
-
-
-# =============================================================================
-# Canonicalization Tests
-# =============================================================================
-
-
-def test_flatten_and_fold_add():
+def test_add_flatten_and_fold():
     """Test that nested Add nodes flatten and constants fold during canonicalization."""
     a = Constant(1)
     b = Constant(2)
@@ -204,7 +112,144 @@ def test_add_eliminate_zero_and_singleton():
     assert result.value == 5
 
 
-def test_flatten_and_fold_mul():
+def test_sub_constant_folding():
+    """Test that Sub folds constants during canonicalization."""
+    expr = Sub(Constant(10), Constant(4))
+    result = expr.canonicalize()
+    assert isinstance(result, Constant)
+    assert result.value == 6
+
+
+# --- Add & Sub: JAX Lowering ---
+
+
+def test_add_jax_lowering():
+    """Test JAX lowering for Add operation."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    x = jnp.arange(8.0)
+    a = State("a", (3,))
+    a._slice = slice(0, 3)
+    b = State("b", (3,))
+    b._slice = slice(3, 6)
+    expr_add = Add(a, b)
+
+    jl = JaxLowerer()
+    f_res_add = jl._visit_add(expr_add)
+    res_add = f_res_add(x, None, None, None)
+
+    assert jnp.allclose(res_add, x[0:3] + x[3:6])
+
+
+def test_sub_jax_lowering():
+    """Test JAX lowering for Sub operation."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Control, State
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    x = jnp.arange(8.0)
+    u = jnp.arange(8.0) * 3.0
+    a = State("a", (3,))
+    a._slice = slice(0, 3)
+    b = Control("b", (3,))
+    b._slice = slice(0, 3)
+    expr_sub = Sub(a, b)
+
+    jl = JaxLowerer()
+    f_res_sub = jl._visit_sub(expr_sub)
+    res_sub = f_res_sub(x, u, None, None)
+
+    assert jnp.allclose(res_sub, x[0:3] - u[0:3])
+
+
+# --- Add & Sub: CVXPY Lowering ---
+
+
+def test_add_cvxpy_lowering():
+    """Test CVXPY lowering for Add operation."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    const = Constant(np.array(2.0))
+    expr = Add(x, const)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_sub_cvxpy_lowering():
+    """Test CVXPY lowering for Sub operation."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    const = Constant(np.array(1.0))
+    expr = Sub(x, const)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+# =============================================================================
+# Mul & Div
+# =============================================================================
+
+
+def test_mul_div_basic_nodes_and_children():
+    """Test basic Mul and Div node creation, children, and repr."""
+    a, b = Constant(2), Constant(3)
+    mul = a * b
+    div = a / b
+
+    # types
+    assert isinstance(mul, Mul)
+    assert isinstance(div, Div)
+
+    # children
+    assert mul.children() == [a, b]
+    assert div.children() == [a, b]
+
+    # repr should nest correctly
+    assert repr(mul) == "(Const(2) * Const(3))"
+    assert repr(div) == "(Const(2) / Const(3))"
+
+
+def test_mul_accepts_many_terms():
+    """Test that Mul can accept multiple terms."""
+    a, b, c, d = Constant(5), Constant(3), Constant(1), Constant(2)
+    mul = Mul(a, b, c, d)
+
+    assert mul.children() == [a, b, c, d]
+    assert repr(mul) == "(Const(5) * Const(3) * Const(1) * Const(2))"
+
+
+def test_mul_requires_at_least_two_terms():
+    """Test that Mul requires at least two terms."""
+    with pytest.raises(ValueError):
+        Mul(Constant(2))
+
+
+# --- Mul & Div: Canonicalization ---
+
+
+def test_mul_flatten_and_fold():
     """Test that nested Mul nodes flatten and constants fold during canonicalization."""
     a = Constant(2)
     b = Constant(3)
@@ -227,28 +272,12 @@ def test_mul_eliminate_one_and_singleton():
     assert result.value == 7
 
 
-def test_sub_constant_folding():
-    """Test that Sub folds constants during canonicalization."""
-    expr = Sub(Constant(10), Constant(4))
-    result = expr.canonicalize()
-    assert isinstance(result, Constant)
-    assert result.value == 6
-
-
 def test_div_constant_folding():
     """Test that Div folds constants during canonicalization."""
     expr = Div(Constant(20), Constant(5))
     result = expr.canonicalize()
     assert isinstance(result, Constant)
     assert result.value == 4
-
-
-def test_neg_constant_folding():
-    """Test that Neg folds constants during canonicalization."""
-    expr = Neg(Constant(8))
-    result = expr.canonicalize()
-    assert isinstance(result, Constant)
-    assert result.value == -8
 
 
 def test_mul_preserves_vector_structure_with_parameter():
@@ -458,12 +487,11 @@ def test_mul_broadcasting_with_parameters():
         assert has_param, "Parameter should be preserved in canonicalized expression"
 
 
-# =============================================================================
-# JAX Lowering Tests
-# =============================================================================
+# --- Mul & Div: JAX Lowering ---
 
 
-def test_jax_lower_add_and_mul_of_slices():
+def test_mul_jax_lowering():
+    """Test JAX lowering for Mul operation."""
     import jax.numpy as jnp
 
     from openscvx.symbolic.expr import State
@@ -474,64 +502,112 @@ def test_jax_lower_add_and_mul_of_slices():
     a._slice = slice(0, 3)
     b = State("b", (3,))
     b._slice = slice(3, 6)
-    expr_add = Add(a, b)
     expr_mul = Mul(a, b)
 
     jl = JaxLowerer()
-    f_res_add = jl._visit_add(expr_add)
-    res_add = f_res_add(x, None, None, None)
     f_res_mul = jl._visit_mul(expr_mul)
     res_mul = f_res_mul(x, None, None, None)
 
-    assert jnp.allclose(res_add, x[0:3] + x[3:6])
     assert jnp.allclose(res_mul, x[0:3] * x[3:6])
 
 
-def test_jax_lower_sub_and_div_of_slices():
+def test_div_jax_lowering():
+    """Test JAX lowering for Div operation."""
     import jax.numpy as jnp
 
-    from openscvx.symbolic.expr import Control, State
+    from openscvx.symbolic.expr import State
     from openscvx.symbolic.lowerers.jax import JaxLowerer
 
     x = jnp.arange(8.0)
-    u = jnp.arange(8.0) * 3.0
     a = State("a", (3,))
     a._slice = slice(0, 3)
-    b = Control("b", (3,))
-    b._slice = slice(0, 3)
     c = Constant(2.0)
-    expr_sub = Sub(a, b)
     expr_div = Div(a, c)
 
     jl = JaxLowerer()
-    f_res_sub = jl._visit_sub(expr_sub)
-    res_sub = f_res_sub(x, u, None, None)
     f_res_div = jl._visit_div(expr_div)
-    res_div = f_res_div(x, u, None, None)
+    res_div = f_res_div(x, None, None, None)
 
-    assert jnp.allclose(res_sub, x[0:3] - u[0:3])
     assert jnp.allclose(res_div, x[0:3] / c.value)
 
 
-def test_jax_lower_matmul_vector_matrix():
-    import jax.numpy as jnp
-
-    from openscvx.symbolic.lowerers.jax import JaxLowerer
-
-    # (2×2 matrix) @ (2-vector)
-    M = Constant(np.array([[1.0, 0.0], [0.0, 2.0]]))
-    v = Constant(np.array([3.0, 4.0]))
-    expr = MatMul(M, v)
-
-    jl = JaxLowerer()
-    f = jl._visit_matmul(expr)
-    out = f(None, None, None, None)
-    assert isinstance(out, jnp.ndarray)
-    assert out.shape == (2,)
-    assert jnp.allclose(out, jnp.array([3.0, 8.0]))
+# --- Mul & Div: CVXPY Lowering ---
 
 
-def test_jax_lower_neg_and_composite():
+def test_mul_cvxpy_lowering():
+    """Test CVXPY lowering for Mul operation."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    const = Constant(np.array(2.0))
+    expr = Mul(x, const)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+def test_div_cvxpy_lowering():
+    """Test CVXPY lowering for Div operation."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    const = Constant(np.array(2.0))
+    expr = Div(x, const)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+# =============================================================================
+# Neg
+# =============================================================================
+
+
+def test_neg_basic_node_and_children():
+    """Test basic Neg node creation, children, and repr."""
+    a = Constant(2)
+    neg = -a
+
+    # type
+    assert isinstance(neg, Neg)
+
+    # children
+    assert neg.children() == [a]
+
+    # repr should nest correctly
+    assert repr(neg) == "(-Const(2))"
+
+
+# --- Neg: Canonicalization ---
+
+
+def test_neg_constant_folding():
+    """Test that Neg folds constants during canonicalization."""
+    expr = Neg(Constant(8))
+    result = expr.canonicalize()
+    assert isinstance(result, Constant)
+    assert result.value == -8
+
+
+# --- Neg: JAX Lowering ---
+
+
+def test_neg_jax_lowering():
+    """Test JAX lowering for Neg operation with composite expression."""
     import jax.numpy as jnp
 
     from openscvx.symbolic.expr import Control, State
@@ -555,89 +631,118 @@ def test_jax_lower_neg_and_composite():
     assert jnp.allclose(out, expected)
 
 
+# --- Neg: CVXPY Lowering ---
+
+
+def test_neg_cvxpy_lowering():
+    """Test CVXPY lowering for Neg operation."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Neg(x)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
 # =============================================================================
-# CVXPY Lowering Tests
+# Power
 # =============================================================================
 
 
-def test_cvxpy_add():
-    """Test addition expressions"""
-    import cvxpy as cp
+def test_power_operator_and_node():
+    """Test power operation using ** operator and Power node."""
+    a, b = Constant(2), Constant(3)
 
-    from openscvx.symbolic.expr import State
-    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+    # Test ** operator
+    pow1 = a**b
+    assert isinstance(pow1, Power)
+    assert pow1.children() == [a, b]
+    assert repr(pow1) == "(Const(2))**(Const(3))"
 
-    x_cvx = cp.Variable((10, 3), name="x")
-    variable_map = {"x": x_cvx}
-    lowerer = CvxpyLowerer(variable_map)
-
-    x = State("x", shape=(3,))
-    const = Constant(np.array(2.0))
-    expr = Add(x, const)
-
-    result = lowerer.lower(expr)
-    assert isinstance(result, cp.Expression)
+    # Test direct Power node creation
+    pow2 = Power(a, b)
+    assert isinstance(pow2, Power)
+    assert pow2.children() == [a, b]
+    assert repr(pow2) == "(Const(2))**(Const(3))"
 
 
-def test_cvxpy_sub():
-    """Test subtraction expressions"""
-    import cvxpy as cp
+def test_power_with_mixed_types():
+    """Test power operation with mixed numeric and expression types."""
+    x = Variable("x", shape=(1,))
 
-    from openscvx.symbolic.expr import State
-    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+    # Expression ** numeric
+    pow1 = x**2
+    assert isinstance(pow1, Power)
+    assert pow1.base is x
+    assert isinstance(pow1.exponent, Constant)
+    assert pow1.exponent.value == 2
+    assert repr(pow1) == "(Var('x'))**(Const(2))"
 
-    x_cvx = cp.Variable((10, 3), name="x")
-    variable_map = {"x": x_cvx}
-    lowerer = CvxpyLowerer(variable_map)
-
-    x = State("x", shape=(3,))
-    const = Constant(np.array(1.0))
-    expr = Sub(x, const)
-
-    result = lowerer.lower(expr)
-    assert isinstance(result, cp.Expression)
-
-
-def test_cvxpy_mul():
-    """Test multiplication expressions"""
-    import cvxpy as cp
-
-    from openscvx.symbolic.expr import State
-    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
-
-    x_cvx = cp.Variable((10, 3), name="x")
-    variable_map = {"x": x_cvx}
-    lowerer = CvxpyLowerer(variable_map)
-
-    x = State("x", shape=(3,))
-    const = Constant(np.array(2.0))
-    expr = Mul(x, const)
-
-    result = lowerer.lower(expr)
-    assert isinstance(result, cp.Expression)
+    # Numeric ** expression (rpow)
+    pow2 = 10**x
+    assert isinstance(pow2, Power)
+    assert isinstance(pow2.base, Constant)
+    assert pow2.base.value == 10
+    assert pow2.exponent is x
+    assert repr(pow2) == "(Const(10))**(Var('x'))"
 
 
-def test_cvxpy_div():
-    """Test division expressions"""
-    import cvxpy as cp
-
-    from openscvx.symbolic.expr import State
-    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
-
-    x_cvx = cp.Variable((10, 3), name="x")
-    variable_map = {"x": x_cvx}
-    lowerer = CvxpyLowerer(variable_map)
-
-    x = State("x", shape=(3,))
-    const = Constant(np.array(2.0))
-    expr = Div(x, const)
-
-    result = lowerer.lower(expr)
-    assert isinstance(result, cp.Expression)
+# =============================================================================
+# MatMul
+# =============================================================================
 
 
-def test_cvxpy_matmul():
-    """Test matrix multiplication"""
+def test_matmul_vector_and_matrix():
+    """Test MatMul with vector and matrix."""
+    # 2×2 identity matrix × 2-vector
+    M = Constant(np.eye(2))
+    v = Constant(np.array([1.0, 2.0]))
+    mm = M @ v
+
+    assert isinstance(mm, MatMul)
+    children = mm.children()
+    assert children[0] is M and children[1] is v
+
+    # repr should reflect operator
+    assert "MatMul" in mm.pretty()  # tree form contains the node name
+    assert "(" in repr(mm) and "@" not in repr(mm)  # repr is Python‐safe
+
+
+# --- MatMul: JAX Lowering ---
+
+
+def test_matmul_jax_lowering():
+    """Test JAX lowering for MatMul operation."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    # (2×2 matrix) @ (2-vector)
+    M = Constant(np.array([[1.0, 0.0], [0.0, 2.0]]))
+    v = Constant(np.array([3.0, 4.0]))
+    expr = MatMul(M, v)
+
+    jl = JaxLowerer()
+    f = jl._visit_matmul(expr)
+    out = f(None, None, None, None)
+    assert isinstance(out, jnp.ndarray)
+    assert out.shape == (2,)
+    assert jnp.allclose(out, jnp.array([3.0, 8.0]))
+
+
+# --- MatMul: CVXPY Lowering ---
+
+
+def test_matmul_cvxpy_lowering():
+    """Test CVXPY lowering for MatMul operation."""
     import cvxpy as cp
 
     from openscvx.symbolic.expr import State
@@ -655,19 +760,28 @@ def test_cvxpy_matmul():
     assert isinstance(result, cp.Expression)
 
 
-def test_cvxpy_neg():
-    """Test negation"""
-    import cvxpy as cp
+# =============================================================================
+# Integration Tests
+# =============================================================================
 
-    from openscvx.symbolic.expr import State
-    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
 
-    x_cvx = cp.Variable((10, 3), name="x")
-    variable_map = {"x": x_cvx}
-    lowerer = CvxpyLowerer(variable_map)
+def test_combined_ops_produce_correct_constraint_tree():
+    """Test that combined operations produce correct constraint tree structure."""
+    # (x + y) @ z >= 5
+    x = Variable("x", (3,))
+    y = Variable("y", (3,))
+    z = Variable("z", (3,))
 
-    x = State("x", shape=(3,))
-    expr = Neg(x)
+    # note: MatMul between two 3-vectors is allowed at AST level
+    expr = (x + y) @ z <= 5
+    # root is Constraint
+    assert isinstance(expr, Inequality)
+    # check tree structure via pretty()
+    p = expr.pretty().splitlines()
+    assert p[0].strip().startswith("Inequality")
+    # next line is MatMul
+    assert "MatMul" in p[1]
 
-    result = lowerer.lower(expr)
-    assert isinstance(result, cp.Expression)
+    # children of the constraint:
+    assert isinstance(expr.lhs, MatMul)
+    assert isinstance(expr.rhs, Constant)
