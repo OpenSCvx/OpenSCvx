@@ -5,12 +5,11 @@ This module tests mathematical function nodes:
 - Exponential: Exp, Log, Sqrt
 - Nonlinear: Square, PositivePart, Huber, SmoothReLU, Max
 
-Tests cover:
-- Node creation and properties
-- Behavior with constants and variables
-- Lowering to JAX
-- Lowering to CVXPY (where applicable)
-- Special properties (differentiability, convexity)
+Tests are organized by node/node-group, with each section containing:
+1. Node creation and properties
+2. JAX lowering tests
+3. CVXPY lowering tests (where applicable)
+4. Integration tests (where applicable)
 """
 
 import numpy as np
@@ -25,40 +24,17 @@ from openscvx.symbolic.expr import (
 )
 
 # =============================================================================
-# Penalty/Nonlinear Function Node Creation
+# PositivePart
 # =============================================================================
 
 
-def test_penalty_expressions():
-    """Test the penalty expression building blocks."""
+def test_positive_part_creation():
+    """Test PositivePart node creation and properties."""
     x = Variable("x", shape=(1,))
 
-    # PositivePart
     pos = PositivePart(x)
     assert repr(pos) == "pos(Var('x'))"
     assert pos.children() == [x]
-
-    # Square
-    sq = Square(x)
-    assert repr(sq) == "(Var('x'))^2"
-    assert sq.children() == [x]
-
-    # Huber
-    hub = Huber(x, delta=0.5)
-    assert repr(hub) == "huber(Var('x'), delta=0.5)"
-    assert hub.delta == 0.5
-    assert hub.children() == [x]
-
-    # SmoothReLU
-    smooth = SmoothReLU(x, c=1e-6)
-    assert repr(smooth) == "smooth_relu(Var('x'), c=1e-06)"
-    assert smooth.c == 1e-6
-    assert smooth.children() == [x]
-
-
-# =============================================================================
-# JAX Lowering Tests - Penalty Functions
-# =============================================================================
 
 
 def test_positive_part_constant():
@@ -122,6 +98,38 @@ def test_positive_part_expression():
     assert jnp.allclose(result, expected)
 
 
+def test_cvxpy_positive_part():
+    """Test positive part function"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = PositivePart(x)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+# =============================================================================
+# Square
+# =============================================================================
+
+
+def test_square_creation():
+    """Test Square node creation and properties."""
+    x = Variable("x", shape=(1,))
+
+    sq = Square(x)
+    assert repr(sq) == "(Var('x'))^2"
+    assert sq.children() == [x]
+
+
 def test_square_constant():
     """Test Square with constant values."""
     import jax.numpy as jnp
@@ -180,6 +188,39 @@ def test_squared_relu_pattern():
     # Expected: [0, 0, 0, 1, 4]
     expected = jnp.maximum(x, 0.0) ** 2
     assert jnp.allclose(result, expected)
+
+
+def test_cvxpy_square():
+    """Test square function"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Square(x)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+# =============================================================================
+# Huber
+# =============================================================================
+
+
+def test_huber_creation():
+    """Test Huber node creation and properties."""
+    x = Variable("x", shape=(1,))
+
+    hub = Huber(x, delta=0.5)
+    assert repr(hub) == "huber(Var('x'), delta=0.5)"
+    assert hub.delta == 0.5
+    assert hub.children() == [x]
 
 
 def test_huber_constant():
@@ -260,6 +301,39 @@ def test_huber_with_positive_part():
     # Then apply Huber
     expected = jnp.where(jnp.abs(pos_x) <= 0.5, 0.5 * pos_x**2, 0.5 * (jnp.abs(pos_x) - 0.5 * 0.5))
     assert jnp.allclose(result, expected)
+
+
+def test_cvxpy_huber():
+    """Test Huber loss function"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Huber(x, delta=0.5)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+# =============================================================================
+# SmoothReLU
+# =============================================================================
+
+
+def test_smooth_relu_creation():
+    """Test SmoothReLU node creation and properties."""
+    x = Variable("x", shape=(1,))
+
+    smooth = SmoothReLU(x, c=1e-6)
+    assert repr(smooth) == "smooth_relu(Var('x'), c=1e-06)"
+    assert smooth.c == 1e-6
+    assert smooth.children() == [x]
 
 
 def test_smooth_relu_constant():
@@ -352,6 +426,157 @@ def test_smooth_relu_differentiability_at_zero():
     assert jnp.allclose(result, expected)
 
 
+def test_cvxpy_smooth_relu():
+    """Test smooth ReLU function"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable(3, name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = SmoothReLU(x, c=1e-6)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+# =============================================================================
+# Exp & Log
+# =============================================================================
+
+
+def test_exp_constant():
+    """Test Exp with constant values."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Constant, Exp
+    from openscvx.symbolic.lower import lower_to_jax
+
+    values = np.array([0.0, 1.0, -1.0, 2.0])
+    expr = Exp(Constant(values))
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    expected = jnp.exp(values)
+    assert jnp.allclose(result, expected)
+
+
+def test_exp_state_and_control():
+    """Test Exp with state and control variables in expression."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Control, Exp, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = jnp.array([1.0, 0.0, -0.5])
+    u = jnp.array([0.5])
+
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+    control = Control("u", (1,))
+    control._slice = slice(0, 1)
+
+    # Expression: exp(x[0] + u[0])
+    expr = Exp(state[0] + control[0])
+
+    fn = lower_to_jax(expr)
+    result = fn(x, u, None, None)
+
+    # Expected: exp(1.0 + 0.5) = exp(1.5)
+    expected = jnp.exp(1.5)
+    assert jnp.allclose(result, expected)
+
+
+def test_log_constant():
+    """Test Log with constant values."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Constant, Log
+    from openscvx.symbolic.lower import lower_to_jax
+
+    values = np.array([1.0, np.e, 2.0, 0.5])
+    expr = Log(Constant(values))
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    expected = jnp.log(values)
+    assert jnp.allclose(result, expected)
+
+
+def test_log_with_exp_identity():
+    """Test that log(exp(x)) = x for reasonable values."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Exp, Log, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = jnp.array([0.0, 1.0, -1.0, 2.0])
+
+    state = State("x", (4,))
+    state._slice = slice(0, 4)
+
+    # Expression: log(exp(x))
+    expr = Log(Exp(state))
+
+    fn = lower_to_jax(expr)
+    result = fn(x, None, None, None)
+
+    # Should recover original values
+    assert jnp.allclose(result, x, atol=1e-12)
+
+
+# =============================================================================
+# Sin & Cos
+# =============================================================================
+
+
+def test_cvxpy_sin_not_implemented():
+    """Test that Sin raises NotImplementedError"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Sin, State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Sin(x)
+
+    with pytest.raises(NotImplementedError, match="Trigonometric functions like Sin"):
+        lowerer.lower(expr)
+
+
+def test_cvxpy_cos_not_implemented():
+    """Test that Cos raises NotImplementedError"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Cos, State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Cos(x)
+
+    with pytest.raises(NotImplementedError, match="Trigonometric functions like Cos"):
+        lowerer.lower(expr)
+
+
+# =============================================================================
+# Integration Tests - Combined Penalty Functions
+# =============================================================================
+
+
 def test_penalty_in_constraint_expression():
     """Test penalty functions used in a constraint-like expression."""
     import jax.numpy as jnp
@@ -440,203 +665,3 @@ def test_penalty_with_control():
     # Expected: [0, 0, 1] since only u[2]=2.0 violates
     expected = jnp.array([0.0, 0.0, 1.0])
     assert jnp.allclose(result, expected)
-
-
-# =============================================================================
-# JAX Lowering Tests - Exp and Log
-# =============================================================================
-
-
-def test_exp_constant():
-    """Test Exp with constant values."""
-    import jax.numpy as jnp
-
-    from openscvx.symbolic.expr import Constant, Exp
-    from openscvx.symbolic.lower import lower_to_jax
-
-    values = np.array([0.0, 1.0, -1.0, 2.0])
-    expr = Exp(Constant(values))
-
-    fn = lower_to_jax(expr)
-    result = fn(None, None, None, None)
-
-    expected = jnp.exp(values)
-    assert jnp.allclose(result, expected)
-
-
-def test_exp_state_and_control():
-    """Test Exp with state and control variables in expression."""
-    import jax.numpy as jnp
-
-    from openscvx.symbolic.expr import Control, Exp, State
-    from openscvx.symbolic.lower import lower_to_jax
-
-    x = jnp.array([1.0, 0.0, -0.5])
-    u = jnp.array([0.5])
-
-    state = State("x", (3,))
-    state._slice = slice(0, 3)
-    control = Control("u", (1,))
-    control._slice = slice(0, 1)
-
-    # Expression: exp(x[0] + u[0])
-    expr = Exp(state[0] + control[0])
-
-    fn = lower_to_jax(expr)
-    result = fn(x, u, None, None)
-
-    # Expected: exp(1.0 + 0.5) = exp(1.5)
-    expected = jnp.exp(1.5)
-    assert jnp.allclose(result, expected)
-
-
-def test_log_constant():
-    """Test Log with constant values."""
-    import jax.numpy as jnp
-
-    from openscvx.symbolic.expr import Constant, Log
-    from openscvx.symbolic.lower import lower_to_jax
-
-    values = np.array([1.0, np.e, 2.0, 0.5])
-    expr = Log(Constant(values))
-
-    fn = lower_to_jax(expr)
-    result = fn(None, None, None, None)
-
-    expected = jnp.log(values)
-    assert jnp.allclose(result, expected)
-
-
-def test_log_with_exp_identity():
-    """Test that log(exp(x)) = x for reasonable values."""
-    import jax.numpy as jnp
-
-    from openscvx.symbolic.expr import Exp, Log, State
-    from openscvx.symbolic.lower import lower_to_jax
-
-    x = jnp.array([0.0, 1.0, -1.0, 2.0])
-
-    state = State("x", (4,))
-    state._slice = slice(0, 4)
-
-    # Expression: log(exp(x))
-    expr = Log(Exp(state))
-
-    fn = lower_to_jax(expr)
-    result = fn(x, None, None, None)
-
-    # Should recover original values
-    assert jnp.allclose(result, x, atol=1e-12)
-
-
-# =============================================================================
-# CVXPY Lowering Tests
-# =============================================================================
-
-
-def test_cvxpy_positive_part():
-    """Test positive part function"""
-    import cvxpy as cp
-
-    from openscvx.symbolic.expr import State
-    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
-
-    x_cvx = cp.Variable((10, 3), name="x")
-    variable_map = {"x": x_cvx}
-    lowerer = CvxpyLowerer(variable_map)
-
-    x = State("x", shape=(3,))
-    expr = PositivePart(x)
-
-    result = lowerer.lower(expr)
-    assert isinstance(result, cp.Expression)
-
-
-def test_cvxpy_square():
-    """Test square function"""
-    import cvxpy as cp
-
-    from openscvx.symbolic.expr import State
-    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
-
-    x_cvx = cp.Variable((10, 3), name="x")
-    variable_map = {"x": x_cvx}
-    lowerer = CvxpyLowerer(variable_map)
-
-    x = State("x", shape=(3,))
-    expr = Square(x)
-
-    result = lowerer.lower(expr)
-    assert isinstance(result, cp.Expression)
-
-
-def test_cvxpy_huber():
-    """Test Huber loss function"""
-    import cvxpy as cp
-
-    from openscvx.symbolic.expr import State
-    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
-
-    x_cvx = cp.Variable((10, 3), name="x")
-    variable_map = {"x": x_cvx}
-    lowerer = CvxpyLowerer(variable_map)
-
-    x = State("x", shape=(3,))
-    expr = Huber(x, delta=0.5)
-
-    result = lowerer.lower(expr)
-    assert isinstance(result, cp.Expression)
-
-
-def test_cvxpy_smooth_relu():
-    """Test smooth ReLU function"""
-    import cvxpy as cp
-
-    from openscvx.symbolic.expr import State
-    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
-
-    x_cvx = cp.Variable(3, name="x")
-    variable_map = {"x": x_cvx}
-    lowerer = CvxpyLowerer(variable_map)
-
-    x = State("x", shape=(3,))
-    expr = SmoothReLU(x, c=1e-6)
-
-    result = lowerer.lower(expr)
-    assert isinstance(result, cp.Expression)
-
-
-def test_cvxpy_sin_not_implemented():
-    """Test that Sin raises NotImplementedError"""
-    import cvxpy as cp
-
-    from openscvx.symbolic.expr import Sin, State
-    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
-
-    x_cvx = cp.Variable((10, 3), name="x")
-    variable_map = {"x": x_cvx}
-    lowerer = CvxpyLowerer(variable_map)
-
-    x = State("x", shape=(3,))
-    expr = Sin(x)
-
-    with pytest.raises(NotImplementedError, match="Trigonometric functions like Sin"):
-        lowerer.lower(expr)
-
-
-def test_cvxpy_cos_not_implemented():
-    """Test that Cos raises NotImplementedError"""
-    import cvxpy as cp
-
-    from openscvx.symbolic.expr import Cos, State
-    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
-
-    x_cvx = cp.Variable((10, 3), name="x")
-    variable_map = {"x": x_cvx}
-    lowerer = CvxpyLowerer(variable_map)
-
-    x = State("x", shape=(3,))
-    expr = Cos(x)
-
-    with pytest.raises(NotImplementedError, match="Trigonometric functions like Cos"):
-        lowerer.lower(expr)
