@@ -464,6 +464,13 @@ def test_brachistochrone_parameters():
     g_moon = 1.62  # Moon's gravity in m/s^2
     problem.parameters["g"] = g_moon
 
+    # Update time bounds for Moon gravity (weaker gravity means longer optimal time)
+    # Expected time scales as 1/sqrt(g), so Moon time ≈ 2.46x Earth time
+    total_time_moon = 10.0  # Generous upper bound for Moon gravity
+    time_slice = problem.settings.sim.x.time_slice
+    problem.settings.sim.x.max[time_slice] = total_time_moon
+    problem.settings.sim.x.final[time_slice] = total_time_moon
+
     # Reset guesses for second run
     position.guess = np.linspace(position.initial, position.final, n)
     velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
