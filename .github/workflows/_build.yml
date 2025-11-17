@@ -1,0 +1,58 @@
+name: 📦 Build Package (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      use-exact-version:
+        description: 'Use exact version from tag (for releases)'
+        type: boolean
+        default: false
+    outputs:
+      artifact-name:
+        description: 'Name of the uploaded artifact containing dist files'
+        value: ${{ jobs.build.outputs.artifact-name }}
+
+jobs:
+  build:
+    name: 📦 Build Package
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-name: dist-${{ github.run_id }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+
+    - name: Build distributions (exact version)
+      if: inputs.use-exact-version
+      env:
+        SETUPTOOLS_SCM_VERSION_SCHEME: only-version
+        SETUPTOOLS_SCM_LOCAL_SCHEME: no-local-version
+      run: |
+        rm -rf dist
+        uv build
+
+    - name: Build distributions (dev version)
+      if: ${{ !inputs.use-exact-version }}
+      run: |
+        rm -rf dist
+        uv build
+
+    - name: Upload distributions as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist-${{ github.run_id }}
+        path: dist/*
+        retention-days: 5
