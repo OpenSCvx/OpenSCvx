@@ -38,11 +38,10 @@ jobs:
           rm -rf dist
           uv build
 
-      - name: Publish to TestPyPI
+      - name: Publish to PyPI
         env:
-          UV_PUBLISH_USERNAME: ${{ secrets.TEST_PYPI_USERNAME }}
-          UV_PUBLISH_PASSWORD: ${{ secrets.TEST_PYPI_PASSWORD }}
-          UV_PUBLISH_URL: https://test.pypi.org/legacy/
+          UV_PUBLISH_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
           uv publish --skip-existing dist/*
 

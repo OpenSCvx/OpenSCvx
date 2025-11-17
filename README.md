@@ -46,27 +46,27 @@ uv pip install openscvx[gui,cvxpygen]
 <details>
 <summary>Nightly</summary>
 
-To install the latest development version (nightly) without cloning:
+To install the latest development version (nightly):
 
 ```sh
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx
+pip install --pre openscvx
 ```
 
 With optional dependencies:
 
 ```sh
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx[gui,cvxpygen]
+pip install --pre openscvx[gui,cvxpygen]
 ```
 
 Or using uv:
 
 ```sh
-uv pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx
+uv pip install --pre openscvx
 # With optional dependencies
-uv pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx[gui,cvxpygen]
+uv pip install --pre openscvx[gui,cvxpygen]
 ```
 
-**Note:** The `--extra-index-url https://pypi.org/simple/` flag is required because TestPyPI doesn't host all dependencies (like cvxpy, jax, etc.), so pip/uv will fetch them from the main PyPI.
+**Note:** The `--pre` flag tells pip/uv to install pre-release versions (e.g., `1.2.4.dev3`) from PyPI.
 
 Alternatively, for local development with the latest source:
 
