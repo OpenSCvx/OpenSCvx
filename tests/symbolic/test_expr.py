@@ -12,7 +12,6 @@ respective test_*_nodes.py files.
 """
 
 import numpy as np
-import pytest
 
 from openscvx.symbolic.expr import (
     Add,

@@ -22,15 +22,14 @@ import pytest
 
 from openscvx.symbolic.expr import (
     Add,
-    Concat,
     Constant,
     Control,
-    Div,
     Index,
     Inequality,
     MatMul,
     Mul,
     Norm,
+    Square,
     State,
     Sub,
 )
@@ -174,7 +173,3 @@ class TestCvxpyLowerer:
 
         result = lowerer.lower(constraint)
         assert isinstance(result, cp.Constraint)
-
-
-# Need to import Square for test_complex_expression
-from openscvx.symbolic.expr import Square

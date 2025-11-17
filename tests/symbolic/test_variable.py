@@ -9,7 +9,6 @@ Tests cover:
 - Lowering to CVXPY (with variable mapping)
 """
 
-import numpy as np
 import pytest
 
 # =============================================================================
@@ -18,8 +17,6 @@ import pytest
 
 
 def test_jax_lower_state_without_slice_raises():
-    import jax.numpy as jnp
-
     from openscvx.symbolic.expr import State
     from openscvx.symbolic.lowerers.jax import JaxLowerer
 
@@ -30,8 +27,6 @@ def test_jax_lower_state_without_slice_raises():
 
 
 def test_jax_lower_control_without_slice_raises():
-    import jax.numpy as jnp
-
     from openscvx.symbolic.expr import Control
     from openscvx.symbolic.lowerers.jax import JaxLowerer
 

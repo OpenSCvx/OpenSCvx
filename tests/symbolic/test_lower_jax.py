@@ -302,7 +302,7 @@ def test_constant_vs_implicit_conversion_equivalence():
     control._slice = slice(0, 2)
 
     # Test various expression types with both explicit and implicit constants
-    from openscvx.symbolic.expr import Div, Inequality, Mul
+    from openscvx.symbolic.expr import Inequality, Mul
 
     # 1. Arithmetic operations
     scalar_value = 2.5

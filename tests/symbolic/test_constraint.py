@@ -441,7 +441,6 @@ def test_equality_constraint_lowering():
     import jax.numpy as jnp
 
     from openscvx.symbolic.expr import Control, Mul, State
-    from openscvx.symbolic.lower import lower_to_jax
     from openscvx.symbolic.lowerers.jax import JaxLowerer
 
     x = jnp.array([1.0, 2.0, 3.0])
@@ -606,8 +605,8 @@ def test_ctcs_penalty_expression_can_be_lowered():
     assert result.shape == ()  # Should be scalar
 
 
-def test_ctcs_with_different_penalties():
-    """Test that CTCS penalty expressions work with different penalty types."""
+def test_ctcs_penalty_lowering_with_different_penalties():
+    """Test that CTCS penalty expressions can be lowered with different penalty types."""
     import jax.numpy as jnp
 
     from openscvx.symbolic.expr import State

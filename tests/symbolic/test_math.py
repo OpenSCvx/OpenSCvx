@@ -610,7 +610,7 @@ def test_cvxpy_sin_not_implemented():
     """Test that Sin raises NotImplementedError"""
     import cvxpy as cp
 
-    from openscvx.symbolic.expr import Cos, Sin, State
+    from openscvx.symbolic.expr import Sin, State
     from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
 
     x_cvx = cp.Variable((10, 3), name="x")

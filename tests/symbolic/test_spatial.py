@@ -13,7 +13,6 @@ Tests cover:
 
 import jax.numpy as jnp
 import numpy as np
-import pytest
 
 from openscvx.symbolic.expr import (
     QDCM,
@@ -23,11 +22,8 @@ from openscvx.symbolic.expr import (
     Constant,
     Control,
     Diag,
-    MatMul,
-    Mul,
     Norm,
     State,
-    Sub,
 )
 from openscvx.symbolic.lower import lower_to_jax
 

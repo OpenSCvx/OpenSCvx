@@ -11,7 +11,6 @@ Tests cover:
 """
 
 import numpy as np
-import pytest
 
 from openscvx.symbolic.expr import Concat, Constant, Index
 

@@ -378,7 +378,6 @@ def test_cvxpy_parameter_matrix():
 
 def test_cvxpy_parameter_missing_from_map_raises():
     """Test that missing parameter from variable_map raises ValueError."""
-    import cvxpy as cp
 
     from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
 
