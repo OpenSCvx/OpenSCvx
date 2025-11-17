@@ -1,6 +1,7 @@
 """Tests for constraint nodes.
 
 This module tests constraint node types:
+
 - Constraint: Base constraint class
 - Equality: Equality constraints (==)
 - Inequality: Inequality constraints (<=, >=)
@@ -8,7 +9,9 @@ This module tests constraint node types:
 - CTCS: Continuous-Time Constraint Satisfaction
 
 Tests are organized by node type, with each section covering:
+
 - Node creation and tree structure
+- Shape Checking
 - Canonicalization
 - JAX lowering
 - CVXPY lowering
@@ -38,9 +41,8 @@ from openscvx.symbolic.expr import (
 # Equality & Inequality Constraints
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# Creation & Tree Structure
-# -----------------------------------------------------------------------------
+
+# --- Equality & Inequality: Creation & Tree Structure ---
 
 
 def test_equality_creation_and_children():
@@ -82,9 +84,7 @@ def test_inequality_reverse_creation_and_children():
     assert repr(c) == "Const([0.0, 1.0, 2.0]) <= Var('x')"
 
 
-# -----------------------------------------------------------------------------
-# Shape Checking
-# -----------------------------------------------------------------------------
+# --- Equality & Inequality: Shape Checking ---
 
 
 def test_constraint_zero_dim_scalar_passes():
@@ -123,9 +123,7 @@ def test_constraint_broadcasting_passes():
     c.check_shape()
 
 
-# -----------------------------------------------------------------------------
-# Canonicalization
-# -----------------------------------------------------------------------------
+# --- Equality & Inequality: Canonicalization ---
 
 
 def test_constraint_recursion_and_type():
@@ -233,9 +231,7 @@ def test_mixed_convex_and_nonconvex_constraints():
     assert isinstance(canonical_constraints[3], Equality)
 
 
-# -----------------------------------------------------------------------------
-# JAX Lowering
-# -----------------------------------------------------------------------------
+# --- Equality & Inequality: JAX Lowering ---
 
 
 def test_equality_constraint_lowering():
@@ -332,9 +328,7 @@ def test_constraint_lowering_with_lower_to_jax():
     assert residual < 0  # Constraint is satisfied
 
 
-# -----------------------------------------------------------------------------
-# CVXPY Lowering
-# -----------------------------------------------------------------------------
+# --- Equality & Inequality: CVXPy Lowering ---
 
 
 def test_cvxpy_equality_constraint():
@@ -379,9 +373,8 @@ def test_cvxpy_inequality_constraint():
 # NodalConstraint
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# Creation & Tree Structure
-# -----------------------------------------------------------------------------
+
+# --- NodalConstraint: Creation & Tree Structure ---
 
 
 def test_nodal_constraint_convex_method_chaining():
@@ -401,9 +394,10 @@ def test_nodal_constraint_convex_method_chaining():
     assert nodal2.nodes == [0, 5, 10]
 
 
-# -----------------------------------------------------------------------------
-# Canonicalization
-# -----------------------------------------------------------------------------
+# --- NodalConstraint: Shape Checking --- TODO: (norrisg)
+
+
+# --- NodalConstraint: Canonicalization ---
 
 
 def test_nodal_constraint_preserves_inner_convex_flag():
@@ -433,13 +427,18 @@ def test_nodal_constraint_preserves_inner_convex_flag():
     assert isinstance(canon_nodal.constraint, Inequality)
 
 
+# --- NodalConstraint: JAX Lowering --- TODO: (norrisg)
+
+
+# --- NodalConstraint: CVXPy Lowering --- TODO: (norrisg)
+
+
 # =============================================================================
 # CTCS (Continuous-Time Constraint Satisfaction)
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# Creation & Tree Structure
-# -----------------------------------------------------------------------------
+
+# --- CTCS: Creation & Tree Structure ---
 
 
 def test_ctcs_wraps_constraint():
@@ -587,9 +586,7 @@ def test_ctcs_pretty_print():
     assert "Constant" in pretty
 
 
-# -----------------------------------------------------------------------------
-# Penalty Expression
-# -----------------------------------------------------------------------------
+# --- CTCS: Penalty Expression ---
 
 
 def test_ctcs_penalty_expr_method():
@@ -630,9 +627,7 @@ def test_ctcs_unknown_penalty():
         ctcs_constraint.penalty_expr()
 
 
-# -----------------------------------------------------------------------------
-# Shape Checking
-# -----------------------------------------------------------------------------
+# --- CTCS: Shape Checking ---
 
 
 def test_ctcs_basic_shape_validation():
@@ -677,9 +672,10 @@ def test_ctcs_constraint_shape_mismatch_raises():
         wrapped.check_shape()
 
 
-# -----------------------------------------------------------------------------
-# JAX Lowering
-# -----------------------------------------------------------------------------
+# --- CTCS: Canonicalization --- TODO: (norrisg)
+
+
+# --- CTCS: JAX Lowering ---
 
 
 def test_ctcs_constraint_can_be_lowered_directly():
@@ -889,9 +885,7 @@ def test_ctcs_with_extra_kwargs():
     assert jnp.allclose(result, expected)
 
 
-# -----------------------------------------------------------------------------
-# CVXPY Lowering
-# -----------------------------------------------------------------------------
+# --- CTCS: CVXPy Lowering ---
 
 
 def test_cvxpy_ctcs_not_implemented():

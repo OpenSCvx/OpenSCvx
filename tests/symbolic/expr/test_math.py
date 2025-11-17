@@ -1,15 +1,19 @@
 """Tests for mathematical function nodes.
 
 This module tests mathematical function nodes:
+
 - Trigonometric: Sin, Cos
 - Exponential: Exp, Log, Sqrt
 - Nonlinear: Square, PositivePart, Huber, SmoothReLU, Max
 
 Tests are organized by node/node-group, with each section containing:
+
 1. Node creation and properties
-2. JAX lowering tests
-3. CVXPY lowering tests (where applicable)
-4. Integration tests (where applicable)
+2. Shape Checking
+3. Canonicalization
+4. JAX lowering tests
+5. CVXPY lowering tests (where applicable)
+6. Integration tests (where applicable)
 """
 
 import numpy as np
@@ -35,6 +39,15 @@ def test_positive_part_creation():
     pos = PositivePart(x)
     assert repr(pos) == "pos(Var('x'))"
     assert pos.children() == [x]
+
+
+# --- PositivePart: Shape Checking --- TODO: (norrisg)
+
+
+# --- PositivePart: Canonicalization --- TODO: (norrisg)
+
+
+# --- PositivePart: JAX Lowering ---
 
 
 def test_positive_part_constant():
@@ -98,6 +111,9 @@ def test_positive_part_expression():
     assert jnp.allclose(result, expected)
 
 
+# --- PositivePart: CVXPy Lowering ---
+
+
 def test_cvxpy_positive_part():
     """Test positive part function"""
     import cvxpy as cp
@@ -128,6 +144,15 @@ def test_square_creation():
     sq = Square(x)
     assert repr(sq) == "(Var('x'))^2"
     assert sq.children() == [x]
+
+
+# --- Square: Shape Checking --- TODO: (norrisg)
+
+
+# --- Square: Canonicalization --- TODO: (norrisg)
+
+
+# --- Square: JAX Lowering ---
 
 
 def test_square_constant():
@@ -190,6 +215,9 @@ def test_squared_relu_pattern():
     assert jnp.allclose(result, expected)
 
 
+# --- Square: CVXPy Lowering ---
+
+
 def test_cvxpy_square():
     """Test square function"""
     import cvxpy as cp
@@ -221,6 +249,15 @@ def test_huber_creation():
     assert repr(hub) == "huber(Var('x'), delta=0.5)"
     assert hub.delta == 0.5
     assert hub.children() == [x]
+
+
+# --- Huber: Shape Checking --- TODO: (norrisg)
+
+
+# --- Huber: Canonicalization --- TODO: (norrisg)
+
+
+# --- Huber: JAX Lowering ---
 
 
 def test_huber_constant():
@@ -303,6 +340,9 @@ def test_huber_with_positive_part():
     assert jnp.allclose(result, expected)
 
 
+# --- Huber: CVXPy Lowering ---
+
+
 def test_cvxpy_huber():
     """Test Huber loss function"""
     import cvxpy as cp
@@ -334,6 +374,15 @@ def test_smooth_relu_creation():
     assert repr(smooth) == "smooth_relu(Var('x'), c=1e-06)"
     assert smooth.c == 1e-6
     assert smooth.children() == [x]
+
+
+# --- SmoothReLU: Shape Checking --- TODO: (norrisg)
+
+
+# --- SmoothReLU: Canonicalization --- TODO: (norrisg)
+
+
+# --- SmoothReLU: JAX Lowering ---
 
 
 def test_smooth_relu_constant():
@@ -426,6 +475,9 @@ def test_smooth_relu_differentiability_at_zero():
     assert jnp.allclose(result, expected)
 
 
+# --- SmoothReLU: CVXPy Lowering ---
+
+
 def test_cvxpy_smooth_relu():
     """Test smooth ReLU function"""
     import cvxpy as cp
@@ -464,6 +516,15 @@ def test_exp_constant():
 
     expected = jnp.exp(values)
     assert jnp.allclose(result, expected)
+
+
+# --- Exp & Log: Shape Checking --- TODO: (norrisg)
+
+
+# --- Exp & Log: Canonicalization --- TODO: (norrisg)
+
+
+# --- Exp & Log: JAX Lowering ---
 
 
 def test_exp_state_and_control():
@@ -531,9 +592,24 @@ def test_log_with_exp_identity():
     assert jnp.allclose(result, x, atol=1e-12)
 
 
+# --- Exp & Log: CVXPy Lowering --- TODO: (norrisg)
+
+
 # =============================================================================
 # Sin & Cos
 # =============================================================================
+
+
+# --- Sin & Cos: Shape Checking --- TODO: (norrisg)
+
+
+# --- Sin & Cos: Canonicalization --- TODO: (norrisg)
+
+
+# --- Sin & Cos: JAX Lowering --- TODO: (norrisg)
+
+
+# --- Sin & Cos: CVXPy Lowering ---
 
 
 def test_cvxpy_sin_not_implemented():

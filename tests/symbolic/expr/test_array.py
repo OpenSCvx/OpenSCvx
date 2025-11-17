@@ -2,6 +2,7 @@
 
 This module tests array operation nodes: Index, Concat, Stack, Hstack, Vstack.
 Tests cover:
+
 - Node creation and indexing/slicing operations
 - Concatenation and stacking operations
 - Shape inference
@@ -10,6 +11,7 @@ Tests cover:
 - Canonicalization patterns
 
 Tests are organized by node type, with each section containing:
+
 1. Node creation and tree structure tests
 2. Shape/dimension tests (if applicable)
 3. Canonicalization tests
@@ -27,6 +29,8 @@ from openscvx.symbolic.expr import Concat, Constant, Hstack, Index, Vstack
 # Index
 # =============================================================================
 
+# --- Index: Shape Checking ---
+
 
 def test_index_valid_passes():
     a = Constant(np.zeros((5,)))
@@ -41,6 +45,9 @@ def test_index_out_of_bounds_raises():
         index.check_shape()
 
 
+# --- Index: Canonicalization ---
+
+
 def test_index_canonicalize():
     """Test that Index canonicalizes its children recursively."""
     idx = Index(Constant([5, 6, 7]), 1)
@@ -48,6 +55,9 @@ def test_index_canonicalize():
     assert isinstance(result, Index)
     assert result.index == 1
     assert isinstance(result.base, Constant)
+
+
+# --- Index: JAX Lowering ---
 
 
 def test_index_and_slice():
@@ -81,6 +91,9 @@ def test_index_and_slice():
     assert jnp.allclose(out_slice, x[1:3])
 
 
+# --- Index: CVXPy Lowering ---
+
+
 def test_cvxpy_index():
     """Test CVXPY lowering of indexing."""
     import cvxpy as cp
@@ -102,6 +115,8 @@ def test_cvxpy_index():
 # =============================================================================
 # Concat
 # =============================================================================
+
+# --- Concat: Shape Checking ---
 
 
 def test_concat_1d_passes():
@@ -128,6 +143,9 @@ def test_concat_nonzero_axes_mismatch_raises():
         concat.check_shape()
 
 
+# --- Concat: Canonicalization ---
+
+
 def test_concat_canonicalize():
     """Test that Concat canonicalizes its children recursively."""
     # Concat should simply rebuild with canonical children
@@ -138,6 +156,9 @@ def test_concat_canonicalize():
     assert isinstance(result, Concat)
     # both children are still Constant
     assert all(isinstance(c, Constant) for c in result.exprs)
+
+
+# --- Concat: JAX Lowering ---
 
 
 def test_concat_simple():
@@ -160,6 +181,9 @@ def test_concat_simple():
     expected = jnp.concatenate([x[0:2], x[2:4], jnp.array([9.0])], axis=0)
     assert jnp.allclose(out, expected)
     assert out.shape == (5,)
+
+
+# --- Concat: CVXPy Lowering ---
 
 
 def test_cvxpy_concat():
@@ -185,6 +209,8 @@ def test_cvxpy_concat():
 # =============================================================================
 # Hstack & Vstack
 # =============================================================================
+
+# --- Hstack & Vstack: Shape Checking ---
 
 
 def test_hstack_basic_passes():
@@ -228,6 +254,11 @@ def test_vstack_trailing_dimension_mismatch_raises():
     with pytest.raises(ValueError) as exc:
         (Vstack([a, b])).check_shape()
     assert "trailing dimensions" in str(exc.value)
+
+
+# --- Hstack & Vstack: Canonicalization --- TODO: (norrisg)
+
+# --- Hstack & Vstack: JAX Lowering ---
 
 
 def test_hstack_constants():
@@ -319,3 +350,6 @@ def test_vstack_vectors():
     expected = jnp.array([[10.0, 20.0], [30.0, 40.0]])
     assert jnp.allclose(result, expected)
     assert result.shape == (2, 2)
+
+
+# --- Hstack & Vstack: CVXPy Lowering --- TODO: (norrisg)

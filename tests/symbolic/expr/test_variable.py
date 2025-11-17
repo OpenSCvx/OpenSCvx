@@ -2,9 +2,12 @@
 
 This module tests variable node types: Variable, State, Control.
 Tests cover:
+
 - Node creation and properties
 - Bounds and constraints
 - Slice assignment and usage
+- Shape checking
+- Canonicalization
 - Lowering to JAX (with slices)
 - Lowering to CVXPY (with variable mapping)
 """
@@ -14,6 +17,12 @@ import pytest
 # =============================================================================
 # JAX Lowering Tests
 # =============================================================================
+
+# --- Variable: Shape Checking --- TODO: (norrisg)
+
+# --- Variable: Canonicalization --- TODO: (norrisg)
+
+# --- Variable: JAX Lowering ---
 
 
 def test_jax_lower_state_without_slice_raises():
@@ -70,9 +79,7 @@ def test_jax_lower_control_with_slice():
     assert jnp.allclose(out, u[5:8])
 
 
-# =============================================================================
-# CVXPY Lowering Tests
-# =============================================================================
+# --- Variable: CVXPy Lowering ---
 
 
 def test_cvxpy_state_variable():

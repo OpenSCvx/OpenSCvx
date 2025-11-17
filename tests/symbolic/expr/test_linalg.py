@@ -3,10 +3,13 @@
 This module tests linear algebra operation nodes: Transpose, Diag, Sum, Norm.
 
 Tests are organized by node/node-group, with each section containing:
+
 1. Node creation and properties
-2. JAX lowering tests
-3. CVXPY lowering tests (where applicable)
-4. Integration tests (where applicable)
+2. Shape Checking
+3. Canonicalization
+4. JAX lowering tests
+5. CVXPY lowering tests (where applicable)
+6. Integration tests (where applicable)
 """
 
 import numpy as np
@@ -19,8 +22,10 @@ from openscvx.symbolic.expr import (
 )
 
 # =============================================================================
-# Sum Node Tests
+# Sum
 # =============================================================================
+
+# --- Sum: Creation & Tree Structure ---
 
 
 def test_sum_node_creation_and_children():
@@ -51,6 +56,18 @@ def test_sum_wraps_constants_and_expressions():
     assert repr(sum2) == "sum((Var('x') + Var('y')))"
 
 
+# --- Sum: Shape Checking --- TODO: (norrisg)
+
+
+# --- Sum: Canonicalization --- TODO: (norrisg)
+
+
+# --- Sum: JAX Lowering --- TODO: (norrisg)
+
+
+# --- Sum: CVXPy Lowering ---
+
+
 def test_cvxpy_sum():
     """Test sum operation"""
     import cvxpy as cp
@@ -70,7 +87,7 @@ def test_cvxpy_sum():
 
 
 # =============================================================================
-# JAX Lowering Tests
+# Diag
 # =============================================================================
 
 
@@ -108,6 +125,38 @@ def test_diag():
         # Off-diagonal elements should be zero
         off_diag_mask = ~jnp.eye(3, dtype=bool)
         assert jnp.allclose(result[off_diag_mask], 0.0, atol=1e-12)
+
+
+# --- Diag: Shape Checking --- TODO: (norrisg)
+
+
+# --- Diag: Canonicalization --- TODO: (norrisg)
+
+
+# --- Diag: JAX Lowering --- TODO: (norrisg)
+
+
+# --- Diag: CVXPy Lowering --- TODO: (norrisg)
+
+
+# =============================================================================
+# Norm
+# =============================================================================
+
+
+# --- Norm: Shape Checking --- TODO: (norrisg)
+
+
+# --- Norm: Canonicalization --- TODO: (norrisg)
+
+
+# --- Norm: JAX Lowering --- TODO: (norrisg)
+
+
+# --- Norm: CVXPy Lowering --- TODO: (norrisg)
+
+
+# --- Norm: CVXPy Lowering ---
 
 
 def test_cvxpy_norm_l2():

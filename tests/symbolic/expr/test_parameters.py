@@ -2,9 +2,12 @@
 
 This module tests the Parameter node type and its behavior throughout the symbolic
 expression system, including:
+
 - Parameter creation and properties
 - Parameter usage in arithmetic expressions
 - Parameter usage in constraints
+- Parameter shape checking
+- Parameter canonicalization
 - Parameter lowering to JAX
 - Parameter lowering to CVXPY
 """
@@ -37,11 +40,6 @@ def test_parameter_creation():
     assert p2.shape == (3,)
 
 
-# =============================================================================
-# Parameter in Expressions
-# =============================================================================
-
-
 def test_parameter_arithmetic_operations():
     """Test Parameter in arithmetic operations."""
     p = Parameter("param", value=1.0)
@@ -68,9 +66,13 @@ def test_parameter_in_constraints():
     assert ineq.rhs is p
 
 
-# =============================================================================
-# JAX Lowering Tests
-# =============================================================================
+# --- Parameter: Shape Checking --- TODO: (norrisg)
+
+
+# --- Parameter: Canonicalization --- TODO: (norrisg)
+
+
+# --- Parameter: JAX Lowering ---
 
 
 def test_jax_lower_parameter_scalar():
@@ -313,9 +315,7 @@ def test_parameter_dynamics_with_jit_and_vmap():
     assert jnp.allclose(result_new_mass, expected_new_batch)
 
 
-# =============================================================================
-# CVXPY Lowering Tests
-# =============================================================================
+# --- Parameter: CVXPy Lowering ---
 
 
 def test_cvxpy_parameter_scalar():

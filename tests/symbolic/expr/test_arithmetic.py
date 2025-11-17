@@ -2,7 +2,9 @@
 
 This module tests arithmetic operation nodes: Add, Sub, Mul, Div, MatMul, Neg, Power.
 Tests are organized by node/node-group, with each section covering:
+
 - Node creation and tree structure
+- Shape Checking
 - Canonicalization patterns
 - JAX lowering
 - CVXPY lowering
