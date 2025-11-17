@@ -1,12 +1,12 @@
 """Tests for linear algebra operation nodes.
 
 This module tests linear algebra operation nodes: Transpose, Diag, Sum, Norm.
-Tests cover:
-- Node creation and properties
-- Different norm types (L1, L2, Linf, Frobenius)
-- Sum reduction operations
-- Lowering to JAX
-- Lowering to CVXPY
+
+Tests are organized by node/node-group, with each section containing:
+1. Node creation and properties
+2. JAX lowering tests
+3. CVXPY lowering tests (where applicable)
+4. Integration tests (where applicable)
 """
 
 import numpy as np
@@ -51,6 +51,24 @@ def test_sum_wraps_constants_and_expressions():
     assert repr(sum2) == "sum((Var('x') + Var('y')))"
 
 
+def test_cvxpy_sum():
+    """Test sum operation"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Sum(x)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
 # =============================================================================
 # JAX Lowering Tests
 # =============================================================================
@@ -90,29 +108,6 @@ def test_diag():
         # Off-diagonal elements should be zero
         off_diag_mask = ~jnp.eye(3, dtype=bool)
         assert jnp.allclose(result[off_diag_mask], 0.0, atol=1e-12)
-
-
-# =============================================================================
-# CVXPY Lowering Tests
-# =============================================================================
-
-
-def test_cvxpy_sum():
-    """Test sum operation"""
-    import cvxpy as cp
-
-    from openscvx.symbolic.expr import State
-    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
-
-    x_cvx = cp.Variable((10, 3), name="x")
-    variable_map = {"x": x_cvx}
-    lowerer = CvxpyLowerer(variable_map)
-
-    x = State("x", shape=(3,))
-    expr = Sum(x)
-
-    result = lowerer.lower(expr)
-    assert isinstance(result, cp.Expression)
 
 
 def test_cvxpy_norm_l2():
