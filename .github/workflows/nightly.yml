@@ -1,7 +1,7 @@
 name: 🌙 Nightly
 
 permissions:
-  contents: write
+  contents: read  # Only needs read access for build; no git operations
 
 on:
   push:
