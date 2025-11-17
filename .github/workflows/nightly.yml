@@ -1,7 +1,7 @@
 name: 🌙 Nightly
 
 permissions:
-  contents: read  # Default - least privilege
+  contents: write
 
 on:
   push:
@@ -15,44 +15,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: 📦 Build
-    uses: ./.github/workflows/_build.yml
-    with:
-      use-exact-version: false
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Build distributions
+        run: |
+          rm -rf dist
+          uv build
+
+      - name: Publish to TestPyPI
+        env:
+          UV_PUBLISH_USERNAME: ${{ secrets.TEST_PYPI_USERNAME }}
+          UV_PUBLISH_PASSWORD: ${{ secrets.TEST_PYPI_PASSWORD }}
+          UV_PUBLISH_URL: https://test.pypi.org/legacy/
+        run: |
+          uv publish --skip-existing dist/*
 
   docs:
     name: 📖 Deploy Nightly Docs
-    needs: build  # Wait for build to succeed, but don't depend on publish
+    needs: nightly
     permissions:
-      contents: write  # Needs write for pushing to gh-pages
+      contents: write  # Required for mike deploy --push to gh-pages
     uses: ./.github/workflows/_docs.yml
     with:
       deploy: true
       version: nightly
-
-  publish:
-    name: 📤 Publish to TestPyPI
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Download distributions
-      uses: actions/download-artifact@v4
-      with:
-        name: ${{ needs.build.outputs.artifact-name }}
-        path: dist
-
-    - name: Install uv
-      uses: astral-sh/setup-uv@v7
-      with:
-        enable-cache: true
-
-    - name: Publish to TestPyPI
-      env:
-        # reuse your existing secrets, just mapped to uv's env vars
-        UV_PUBLISH_USERNAME: ${{ secrets.TEST_PYPI_USERNAME }}
-        UV_PUBLISH_PASSWORD: ${{ secrets.TEST_PYPI_PASSWORD }}
-        UV_PUBLISH_URL: https://test.pypi.org/legacy/
-      run: |
-        uv publish --skip-existing dist/*

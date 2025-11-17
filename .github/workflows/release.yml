@@ -8,43 +8,46 @@ on:
     types: [published]
 
 jobs:
-  build:
-    name: 📦 Build
-    uses: ./.github/workflows/_build.yml
-    with:
-      use-exact-version: true
-
   publish:
-    name: 📤 Publish to PyPI
-    needs: build
     runs-on: ubuntu-latest
-
     steps:
-    - name: Download distributions
-      uses: actions/download-artifact@v4
-      with:
-        name: ${{ needs.build.outputs.artifact-name }}
-        path: dist
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Install uv
-      uses: astral-sh/setup-uv@v7
-      with:
-        enable-cache: true
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-    - name: Publish to PyPI
-      env:
-        # you can keep using the same secrets, just wired into uv’s env vars
-        UV_PUBLISH_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      run: |
-        uv publish dist/*
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
 
-    - name: Upload Release Assets
-      if: success()
-      run: |
-        gh release upload "${{ github.event.release.tag_name }}" dist/*
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build distributions
+        env:
+          # on this job only, use "only-version" so on tag vX.Y.Z you get X.Y.Z exactly
+          SETUPTOOLS_SCM_VERSION_SCHEME: only-version
+          SETUPTOOLS_SCM_LOCAL_SCHEME: no-local-version
+        run: |
+          rm -rf dist
+          uv build
+
+      - name: Publish to PyPI
+        env:
+          UV_PUBLISH_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        run: |
+          uv publish dist/*
+
+      - name: Upload Release Assets
+        if: success()
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-docs:
     name: 📖 Deploy Versioned Docs
