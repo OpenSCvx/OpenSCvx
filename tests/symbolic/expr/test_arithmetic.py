@@ -85,6 +85,39 @@ def test_add_elementwise_children_for_arrays(shape_a, shape_b):
     assert "Const" in rep
 
 
+# --- Add & Sub: Shape Checking ---
+
+
+def test_add_same_shape_passes():
+    a = Constant(np.zeros((2, 3)))
+    b = Constant(np.ones((2, 3)))
+    add = a + b
+    add.check_shape()
+
+
+def test_add_shape_mismatch_raises():
+    a = Constant(np.zeros((2, 3)))
+    b = Constant(np.ones((3, 2)))
+    add = a + b
+    with pytest.raises(ValueError):
+        add.check_shape()
+
+
+def test_sub_same_shape_passes():
+    a = Constant(np.zeros((4,)))
+    b = Constant(np.ones((4,)))
+    sub = a - b
+    sub.check_shape()
+
+
+def test_sub_shape_mismatch_raises():
+    a = Constant(np.zeros((4,)))
+    b = Constant(np.ones((5,)))
+    sub = a - b
+    with pytest.raises(ValueError):
+        sub.check_shape()
+
+
 # --- Add & Sub: Canonicalization ---
 
 
@@ -244,6 +277,39 @@ def test_mul_requires_at_least_two_terms():
     """Test that Mul requires at least two terms."""
     with pytest.raises(ValueError):
         Mul(Constant(2))
+
+
+# --- Mul & Div: Shape Checking ---
+
+
+def test_mul_same_shape_passes():
+    a = Constant(np.zeros((2, 2)))
+    b = Constant(np.ones((2, 2)))
+    mul = a * b
+    mul.check_shape()
+
+
+def test_mul_shape_mismatch_raises():
+    a = Constant(np.zeros((2, 2)))
+    b = Constant(np.ones((2, 3)))
+    mul = a * b
+    with pytest.raises(ValueError):
+        mul.check_shape()
+
+
+def test_div_array_by_scalar_passes():
+    a = Constant(np.zeros((3,)))
+    b = Constant(np.array(2.0))
+    div = a / b
+    div.check_shape()
+
+
+def test_div_shape_mismatch_raises():
+    a = Constant(np.zeros((3,)))
+    b = Constant(np.zeros((2,)))
+    div = a / b
+    with pytest.raises(ValueError):
+        div.check_shape()
 
 
 # --- Mul & Div: Canonicalization ---
@@ -714,6 +780,24 @@ def test_matmul_vector_and_matrix():
     # repr should reflect operator
     assert "MatMul" in mm.pretty()  # tree form contains the node name
     assert "(" in repr(mm) and "@" not in repr(mm)  # repr is Python‐safe
+
+
+# --- MatMul: Shape Checking ---
+
+
+def test_matmul_ok():
+    a = Constant(np.zeros((4, 5)))
+    b = Constant(np.zeros((5, 2)))
+    matmul = a @ b
+    matmul.check_shape()
+
+
+def test_matmul_incompatible_raises():
+    a = Constant(np.zeros((4, 5)))
+    b = Constant(np.zeros((4, 2)))
+    matmul = a @ b
+    with pytest.raises(ValueError):
+        matmul.check_shape()
 
 
 # --- MatMul: JAX Lowering ---

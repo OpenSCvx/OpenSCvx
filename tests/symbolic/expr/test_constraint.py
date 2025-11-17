@@ -27,6 +27,7 @@ from openscvx.symbolic.expr import (
     PositivePart,
     SmoothReLU,
     Square,
+    State,
     Sum,
     Variable,
     ctcs,
@@ -79,6 +80,47 @@ def test_inequality_reverse_creation_and_children():
     assert rhs is x
     assert isinstance(lhs, Constant)
     assert repr(c) == "Const([0.0, 1.0, 2.0]) <= Var('x')"
+
+
+# -----------------------------------------------------------------------------
+# Shape Checking
+# -----------------------------------------------------------------------------
+
+
+def test_constraint_zero_dim_scalar_passes():
+    # a true scalar (shape=()) on both sides
+    a = Constant(np.array(2.5))
+    c = a == 1.0
+    c.check_shape()
+
+
+def test_constraint_length1_array_passes():
+    # 1-element arrays count as "scalar"
+    b = Constant(np.array([7.0]))
+    c = b <= np.ones((1,))
+    c.check_shape()
+
+
+def test_constraint_vector_passes():
+    """Vector constraints should now pass validation (interpreted element-wise)"""
+    a = Constant(np.zeros((2,)))
+    c = a <= np.ones((2,))
+    c.check_shape()  # Should NOT raise
+
+
+def test_constraint_shape_mismatch_raises():
+    """Shape mismatches should still error out"""
+    a = Constant(np.zeros((2,)))
+    c = a == np.zeros((3,))
+    with pytest.raises(ValueError):
+        c.check_shape()
+
+
+def test_constraint_broadcasting_passes():
+    """Test constraint broadcasting: scalar op vector"""
+    x = State("x", (3,))
+    c = Constant(np.array(0.0)) <= x  # broadcasts to vector constraint
+    c.check_shape()
 
 
 # -----------------------------------------------------------------------------
@@ -586,6 +628,53 @@ def test_ctcs_unknown_penalty():
 
     with pytest.raises(ValueError, match="Unknown penalty"):
         ctcs_constraint.penalty_expr()
+
+
+# -----------------------------------------------------------------------------
+# Shape Checking
+# -----------------------------------------------------------------------------
+
+
+def test_ctcs_basic_shape_validation():
+    """Test basic CTCS shape validation with penalty expression checking"""
+    from openscvx.symbolic.expr import ctcs
+
+    x = State("x", (3,))
+    constraint = x <= np.ones((3,))
+    wrapped = ctcs(constraint, penalty="squared_relu")
+
+    # Should validate both constraint and penalty expression shapes
+    wrapped.check_shape()
+
+
+def test_ctcs_penalty_shape_consistency():
+    """Test that penalty expressions have same shape as constraint LHS"""
+    from openscvx.symbolic.expr import ctcs
+
+    x = State("x", (2, 2))  # matrix state
+    constraint = x >= np.zeros((2, 2))
+    wrapped = ctcs(constraint, penalty="huber")
+
+    wrapped.check_shape()
+
+    # Penalty should have same shape as constraint LHS
+    penalty_expr = wrapped.penalty_expr()
+    penalty_shape = penalty_expr.check_shape()
+    assert penalty_shape == ()
+
+
+def test_ctcs_constraint_shape_mismatch_raises():
+    """Test that CTCS catches underlying constraint shape mismatches"""
+    from openscvx.symbolic.expr import ctcs
+
+    x = State("x", (2,))
+    # Create constraint with mismatched shapes
+    constraint = x <= np.ones((3,))  # 2 vs 3 mismatch
+    wrapped = ctcs(constraint)
+
+    # Should raise due to underlying constraint shape mismatch
+    with pytest.raises(ValueError):
+        wrapped.check_shape()
 
 
 # -----------------------------------------------------------------------------

@@ -19,12 +19,26 @@ Tests are organized by node type, with each section containing:
 """
 
 import numpy as np
+import pytest
 
-from openscvx.symbolic.expr import Concat, Constant, Index
+from openscvx.symbolic.expr import Concat, Constant, Hstack, Index, Vstack
 
 # =============================================================================
 # Index
 # =============================================================================
+
+
+def test_index_valid_passes():
+    a = Constant(np.zeros((5,)))
+    index = a[2:4]
+    index.check_shape()
+
+
+def test_index_out_of_bounds_raises():
+    a = Constant(np.zeros((3,)))
+    index = a[5]
+    with pytest.raises(ValueError):
+        index.check_shape()
 
 
 def test_index_canonicalize():
@@ -90,6 +104,30 @@ def test_cvxpy_index():
 # =============================================================================
 
 
+def test_concat_1d_passes():
+    a = Constant(np.zeros((2,)))
+    b = Constant(np.ones((3,)))
+    concat = Concat(a, b)
+    concat.check_shape()
+
+
+def test_concat_rank_mismatch_raises():
+    a = Constant(np.zeros((2, 2)))
+    b = Constant(np.ones((3, 2, 2)))  # Changed to (3, 2, 2) to avoid squeeze collapsing dimensions
+    concat = Concat(a, b)
+    with pytest.raises(ValueError):
+        concat.check_shape()
+
+
+def test_concat_nonzero_axes_mismatch_raises():
+    a = Constant(np.zeros((2, 3)))
+    b = Constant(np.ones((3, 4)))
+    # shapes (2,3) vs (3,4) agree on rank but not on axis>0
+    concat = Concat(a, b)
+    with pytest.raises(ValueError):
+        concat.check_shape()
+
+
 def test_concat_canonicalize():
     """Test that Concat canonicalizes its children recursively."""
     # Concat should simply rebuild with canonical children
@@ -147,6 +185,49 @@ def test_cvxpy_concat():
 # =============================================================================
 # Hstack & Vstack
 # =============================================================================
+
+
+def test_hstack_basic_passes():
+    """Test basic horizontal stacking functionality"""
+    a = Constant(np.array([1.0, 2.0]))  # (2,)
+    b = Constant(np.array([3.0, 4.0, 5.0]))  # (3,)
+
+    stacked = Hstack([a, b])
+
+    result_shape = stacked.check_shape()
+    assert result_shape == (5,)  # 2 + 3 = 5
+
+
+def test_hstack_dimension_mismatch_raises():
+    """Test that arrays with different numbers of dimensions raise error"""
+    a = Constant(np.zeros((2,)))  # 1D
+    b = Constant(np.ones((2, 3)))  # 2D
+
+    with pytest.raises(ValueError) as exc:
+        (Hstack([a, b])).check_shape()
+    assert "dimensions" in str(exc.value)
+
+
+def test_vstack_basic_passes():
+    """Test basic vertical stacking functionality"""
+    a = Constant(np.zeros((2, 3)))  # (2, 3)
+    b = Constant(np.ones((4, 3)))  # (4, 3)
+
+    stacked = Vstack([a, b])
+    stacked.check_shape()
+
+    result_shape = stacked.check_shape()
+    assert result_shape == (6, 3)  # 2 + 4 = 6 rows
+
+
+def test_vstack_trailing_dimension_mismatch_raises():
+    """Test that arrays with mismatched trailing dimensions raise error"""
+    a = Constant(np.zeros((2, 3)))  # (2, 3)
+    b = Constant(np.ones((4, 5)))  # (4, 5) - different second dim
+
+    with pytest.raises(ValueError) as exc:
+        (Vstack([a, b])).check_shape()
+    assert "trailing dimensions" in str(exc.value)
 
 
 def test_hstack_constants():
