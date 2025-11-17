@@ -7,13 +7,11 @@ This module tests constraint node types:
 - NodalConstraint: Constraints applied at specific nodes
 - CTCS: Continuous-Time Constraint Satisfaction
 
-Tests cover:
-- Constraint creation and tree structure
-- Convexity flags and marking
-- CTCS wrapper and penalty expressions
-- Lowering to JAX
-- Lowering to CVXPY
+Tests are organized by node type, with each section covering:
+- Node creation and tree structure
 - Canonicalization
+- JAX lowering
+- CVXPY lowering
 """
 
 import numpy as np
@@ -36,8 +34,12 @@ from openscvx.symbolic.expr import (
 )
 
 # =============================================================================
-# Basic Constraint Creation
+# Equality & Inequality Constraints
 # =============================================================================
+
+# -----------------------------------------------------------------------------
+# Creation & Tree Structure
+# -----------------------------------------------------------------------------
 
 
 def test_equality_creation_and_children():
@@ -79,9 +81,265 @@ def test_inequality_reverse_creation_and_children():
     assert repr(c) == "Const([0.0, 1.0, 2.0]) <= Var('x')"
 
 
+# -----------------------------------------------------------------------------
+# Canonicalization
+# -----------------------------------------------------------------------------
+
+
+def test_constraint_recursion_and_type():
+    """Test that constraints canonicalize their subexpressions recursively."""
+    from openscvx.symbolic.expr import Add
+
+    # test an inequality and equality on two equal constants 3+3 == 6
+    lhs = Add(Constant(3), Constant(3))  # will fold to Constant(6)
+    rhs = Constant(5)
+    ineq = lhs <= rhs
+    eq = lhs == rhs
+
+    ineq_c = ineq.canonicalize()
+    eq_c = eq.canonicalize()
+
+    assert isinstance(ineq_c, Inequality)
+    assert isinstance(ineq_c.lhs, Constant) and ineq_c.lhs.value == 1
+    assert isinstance(ineq_c.rhs, Constant) and ineq_c.rhs.value == 0
+
+    assert isinstance(eq_c, Equality)
+    assert isinstance(eq_c.lhs, Constant) and eq_c.lhs.value == 1
+    assert isinstance(eq_c.rhs, Constant) and eq_c.rhs.value == 0
+
+
+def test_inequality_preserves_convex_flag():
+    """Test that canonicalization preserves the is_convex flag for Inequality constraints."""
+    from openscvx.symbolic.expr import State
+
+    x = State("x", shape=(3,))
+
+    # Create a regular (non-convex) inequality constraint
+    constraint_nonconvex = x <= Constant([1, 2, 3])
+    assert constraint_nonconvex.is_convex is False
+
+    # Create a convex inequality constraint
+    constraint_convex = (x <= Constant([1, 2, 3])).convex()
+    assert constraint_convex.is_convex is True
+
+    # Canonicalize both
+    canon_nonconvex = constraint_nonconvex.canonicalize()
+    canon_convex = constraint_convex.canonicalize()
+
+    # Check that convex flags are preserved
+    assert canon_nonconvex.is_convex is False
+    assert canon_convex.is_convex is True
+
+    # Verify they're still Inequality objects
+    assert isinstance(canon_nonconvex, Inequality)
+    assert isinstance(canon_convex, Inequality)
+
+
+def test_equality_preserves_convex_flag():
+    """Test that canonicalization preserves the is_convex flag for Equality constraints."""
+    from openscvx.symbolic.expr import State
+
+    x = State("x", shape=(3,))
+
+    # Create a regular (non-convex) equality constraint
+    constraint_nonconvex = x == Constant([1, 2, 3])
+    assert constraint_nonconvex.is_convex is False
+
+    # Create a convex equality constraint
+    constraint_convex = (x == Constant([1, 2, 3])).convex()
+    assert constraint_convex.is_convex is True
+
+    # Canonicalize both
+    canon_nonconvex = constraint_nonconvex.canonicalize()
+    canon_convex = constraint_convex.canonicalize()
+
+    # Check that convex flags are preserved
+    assert canon_nonconvex.is_convex is False
+    assert canon_convex.is_convex is True
+
+    # Verify they're still Equality objects
+    assert isinstance(canon_nonconvex, Equality)
+    assert isinstance(canon_convex, Equality)
+
+
+def test_mixed_convex_and_nonconvex_constraints():
+    """Test canonicalization with a mix of convex and non-convex constraints."""
+    from openscvx.symbolic.expr import State
+
+    x = State("x", shape=(2,))
+
+    # Create various constraints
+    constraint1 = x <= Constant([1, 2])  # non-convex
+    constraint2 = (x >= Constant([0, 0])).convex()  # convex inequality
+    constraint3 = (x == Constant([5, 6])).convex()  # convex equality
+    constraint4 = x == Constant([3, 4])  # non-convex equality
+
+    constraints = [constraint1, constraint2, constraint3, constraint4]
+    expected_convex = [False, True, True, False]
+
+    # Canonicalize all constraints
+    canonical_constraints = [c.canonicalize() for c in constraints]
+
+    # Verify convex flags are preserved
+    for canon_c, expected in zip(canonical_constraints, expected_convex):
+        assert canon_c.is_convex == expected
+
+    # Verify types are preserved
+    assert isinstance(canonical_constraints[0], Inequality)
+    assert isinstance(canonical_constraints[1], Inequality)
+    assert isinstance(canonical_constraints[2], Equality)
+    assert isinstance(canonical_constraints[3], Equality)
+
+
+# -----------------------------------------------------------------------------
+# JAX Lowering
+# -----------------------------------------------------------------------------
+
+
+def test_equality_constraint_lowering():
+    """Test that equality constraints are lowered to residual form (lhs - rhs)."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Control, Mul, State
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    x = jnp.array([1.0, 2.0, 3.0])
+    u = jnp.array([0.5, 1.0, 1.5])
+
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+    control = Control("u", (3,))
+    control._slice = slice(0, 3)
+
+    # Constraint: x == 2*u (should become x - 2*u == 0)
+    lhs = state
+    rhs = Mul(Constant(2.0), control)
+    constraint = Equality(lhs, rhs)
+
+    jl = JaxLowerer()
+    fn = jl._visit_constraint(constraint)
+    residual = fn(x, u, None, None)
+
+    # Residual should be lhs - rhs = x - 2*u
+    expected = x - 2.0 * u
+    assert jnp.allclose(residual, expected)
+    assert residual.shape == (3,)
+
+
+def test_inequality_constraint_lowering():
+    """Test that inequality constraints are lowered to residual form (lhs - rhs)."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    x = jnp.array([0.5, 1.5, 2.5])
+
+    state = State("x", (3,))
+    state._slice = slice(0, 3)
+
+    # Constraint: x <= 2.0 (should become x - 2.0 <= 0)
+    lhs = state
+    rhs = Constant(np.array([2.0, 2.0, 2.0]))
+    constraint = Inequality(lhs, rhs)
+
+    jl = JaxLowerer()
+    fn = jl._visit_constraint(constraint)  # Both use the same visitor
+    residual = fn(x, None, None, None)
+
+    # Residual should be lhs - rhs = x - 2.0
+    expected = x - 2.0
+    assert jnp.allclose(residual, expected)
+    assert residual.shape == (3,)
+
+    # Check that residual is negative when constraint is satisfied
+    # and positive when violated
+    assert residual[0] < 0  # 0.5 - 2.0 = -1.5 (satisfied)
+    assert residual[1] < 0  # 1.5 - 2.0 = -0.5 (satisfied)
+    assert residual[2] > 0  # 2.5 - 2.0 = 0.5 (violated)
+
+
+def test_constraint_lowering_with_lower_to_jax():
+    """Test constraint lowering through the top-level lower_to_jax function."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Add, Control, Mul, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = jnp.array([1.0, 3.0])
+    u = jnp.array([0.5])
+
+    pos = State("pos", (2,))
+    pos._slice = slice(0, 2)
+    vel = Control("vel", (1,))
+    vel._slice = slice(0, 1)
+
+    # Mixed constraint: pos[0] + 2*vel <= pos[1]
+    # Rearranged: pos[0] + 2*vel - pos[1] <= 0
+    lhs = Add(pos[0], Mul(Constant(2.0), vel))
+    rhs = pos[1]
+    constraint = Inequality(lhs, rhs)
+
+    # Lower using the top-level function
+    fn = lower_to_jax(constraint)
+    residual = fn(x, u, None, None)
+
+    # Expected: pos[0] + 2*vel - pos[1] = 1.0 + 2*0.5 - 3.0 = -1.0
+    expected = 1.0 + 2.0 * 0.5 - 3.0
+    assert jnp.allclose(residual, expected)
+    assert residual < 0  # Constraint is satisfied
+
+
+# -----------------------------------------------------------------------------
+# CVXPY Lowering
+# -----------------------------------------------------------------------------
+
+
+def test_cvxpy_equality_constraint():
+    """Test equality constraints"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    const = Constant(np.array(0.0))
+    expr = Equality(x, const)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Constraint)
+
+
+def test_cvxpy_inequality_constraint():
+    """Test inequality constraints"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    const = Constant(np.array(1.0))
+    expr = Inequality(x, const)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Constraint)
+
+
 # =============================================================================
-# NodalConstraint Tests
+# NodalConstraint
 # =============================================================================
+
+# -----------------------------------------------------------------------------
+# Creation & Tree Structure
+# -----------------------------------------------------------------------------
 
 
 def test_nodal_constraint_convex_method_chaining():
@@ -101,9 +359,45 @@ def test_nodal_constraint_convex_method_chaining():
     assert nodal2.nodes == [0, 5, 10]
 
 
+# -----------------------------------------------------------------------------
+# Canonicalization
+# -----------------------------------------------------------------------------
+
+
+def test_nodal_constraint_preserves_inner_convex_flag():
+    """Test that canonicalization preserves the is_convex flag for constraints wrapped in
+    NodalConstraint"""
+    from openscvx.symbolic.expr import State
+
+    x = State("x", shape=(3,))
+
+    # Create a convex constraint and wrap it in NodalConstraint
+    base_constraint = (x <= Constant([1, 2, 3])).convex()
+    assert base_constraint.is_convex is True
+
+    nodal_constraint = base_constraint.at([0, 5, 10])
+    assert isinstance(nodal_constraint, NodalConstraint)
+    assert nodal_constraint.constraint.is_convex is True
+
+    # Canonicalize the nodal constraint
+    canon_nodal = nodal_constraint.canonicalize()
+
+    # Check that the inner constraint's convex flag is preserved
+    assert isinstance(canon_nodal, NodalConstraint)
+    assert canon_nodal.constraint.is_convex is True
+    assert canon_nodal.nodes == [0, 5, 10]
+
+    # The inner constraint should still be an Inequality
+    assert isinstance(canon_nodal.constraint, Inequality)
+
+
 # =============================================================================
-# CTCS Wrapper Tests
+# CTCS (Continuous-Time Constraint Satisfaction)
 # =============================================================================
+
+# -----------------------------------------------------------------------------
+# Creation & Tree Structure
+# -----------------------------------------------------------------------------
 
 
 def test_ctcs_wraps_constraint():
@@ -251,9 +545,9 @@ def test_ctcs_pretty_print():
     assert "Constant" in pretty
 
 
-# =============================================================================
-# CTCS Penalty Expression Tests
-# =============================================================================
+# -----------------------------------------------------------------------------
+# Penalty Expression
+# -----------------------------------------------------------------------------
 
 
 def test_ctcs_penalty_expr_method():
@@ -294,245 +588,9 @@ def test_ctcs_unknown_penalty():
         ctcs_constraint.penalty_expr()
 
 
-# =============================================================================
-# Canonicalization Tests
-# =============================================================================
-
-
-def test_constraint_recursion_and_type():
-    """Test that constraints canonicalize their subexpressions recursively."""
-    from openscvx.symbolic.expr import Add
-
-    # test an inequality and equality on two equal constants 3+3 == 6
-    lhs = Add(Constant(3), Constant(3))  # will fold to Constant(6)
-    rhs = Constant(5)
-    ineq = lhs <= rhs
-    eq = lhs == rhs
-
-    ineq_c = ineq.canonicalize()
-    eq_c = eq.canonicalize()
-
-    assert isinstance(ineq_c, Inequality)
-    assert isinstance(ineq_c.lhs, Constant) and ineq_c.lhs.value == 1
-    assert isinstance(ineq_c.rhs, Constant) and ineq_c.rhs.value == 0
-
-    assert isinstance(eq_c, Equality)
-    assert isinstance(eq_c.lhs, Constant) and eq_c.lhs.value == 1
-    assert isinstance(eq_c.rhs, Constant) and eq_c.rhs.value == 0
-
-
-def test_inequality_preserves_convex_flag():
-    """Test that canonicalization preserves the is_convex flag for Inequality constraints."""
-    from openscvx.symbolic.expr import State
-
-    x = State("x", shape=(3,))
-
-    # Create a regular (non-convex) inequality constraint
-    constraint_nonconvex = x <= Constant([1, 2, 3])
-    assert constraint_nonconvex.is_convex is False
-
-    # Create a convex inequality constraint
-    constraint_convex = (x <= Constant([1, 2, 3])).convex()
-    assert constraint_convex.is_convex is True
-
-    # Canonicalize both
-    canon_nonconvex = constraint_nonconvex.canonicalize()
-    canon_convex = constraint_convex.canonicalize()
-
-    # Check that convex flags are preserved
-    assert canon_nonconvex.is_convex is False
-    assert canon_convex.is_convex is True
-
-    # Verify they're still Inequality objects
-    assert isinstance(canon_nonconvex, Inequality)
-    assert isinstance(canon_convex, Inequality)
-
-
-def test_equality_preserves_convex_flag():
-    """Test that canonicalization preserves the is_convex flag for Equality constraints."""
-    from openscvx.symbolic.expr import State
-
-    x = State("x", shape=(3,))
-
-    # Create a regular (non-convex) equality constraint
-    constraint_nonconvex = x == Constant([1, 2, 3])
-    assert constraint_nonconvex.is_convex is False
-
-    # Create a convex equality constraint
-    constraint_convex = (x == Constant([1, 2, 3])).convex()
-    assert constraint_convex.is_convex is True
-
-    # Canonicalize both
-    canon_nonconvex = constraint_nonconvex.canonicalize()
-    canon_convex = constraint_convex.canonicalize()
-
-    # Check that convex flags are preserved
-    assert canon_nonconvex.is_convex is False
-    assert canon_convex.is_convex is True
-
-    # Verify they're still Equality objects
-    assert isinstance(canon_nonconvex, Equality)
-    assert isinstance(canon_convex, Equality)
-
-
-def test_nodal_constraint_preserves_inner_convex_flag():
-    """Test that canonicalization preserves the is_convex flag for constraints wrapped in
-    NodalConstraint"""
-    from openscvx.symbolic.expr import State
-
-    x = State("x", shape=(3,))
-
-    # Create a convex constraint and wrap it in NodalConstraint
-    base_constraint = (x <= Constant([1, 2, 3])).convex()
-    assert base_constraint.is_convex is True
-
-    nodal_constraint = base_constraint.at([0, 5, 10])
-    assert isinstance(nodal_constraint, NodalConstraint)
-    assert nodal_constraint.constraint.is_convex is True
-
-    # Canonicalize the nodal constraint
-    canon_nodal = nodal_constraint.canonicalize()
-
-    # Check that the inner constraint's convex flag is preserved
-    assert isinstance(canon_nodal, NodalConstraint)
-    assert canon_nodal.constraint.is_convex is True
-    assert canon_nodal.nodes == [0, 5, 10]
-
-    # The inner constraint should still be an Inequality
-    assert isinstance(canon_nodal.constraint, Inequality)
-
-
-def test_mixed_convex_and_nonconvex_constraints():
-    """Test canonicalization with a mix of convex and non-convex constraints."""
-    from openscvx.symbolic.expr import State
-
-    x = State("x", shape=(2,))
-
-    # Create various constraints
-    constraint1 = x <= Constant([1, 2])  # non-convex
-    constraint2 = (x >= Constant([0, 0])).convex()  # convex inequality
-    constraint3 = (x == Constant([5, 6])).convex()  # convex equality
-    constraint4 = x == Constant([3, 4])  # non-convex equality
-
-    constraints = [constraint1, constraint2, constraint3, constraint4]
-    expected_convex = [False, True, True, False]
-
-    # Canonicalize all constraints
-    canonical_constraints = [c.canonicalize() for c in constraints]
-
-    # Verify convex flags are preserved
-    for canon_c, expected in zip(canonical_constraints, expected_convex):
-        assert canon_c.is_convex == expected
-
-    # Verify types are preserved
-    assert isinstance(canonical_constraints[0], Inequality)
-    assert isinstance(canonical_constraints[1], Inequality)
-    assert isinstance(canonical_constraints[2], Equality)
-    assert isinstance(canonical_constraints[3], Equality)
-
-
-# =============================================================================
-# JAX Lowering Tests - Constraints
-# =============================================================================
-
-
-def test_equality_constraint_lowering():
-    """Test that equality constraints are lowered to residual form (lhs - rhs)."""
-    import jax.numpy as jnp
-
-    from openscvx.symbolic.expr import Control, Mul, State
-    from openscvx.symbolic.lowerers.jax import JaxLowerer
-
-    x = jnp.array([1.0, 2.0, 3.0])
-    u = jnp.array([0.5, 1.0, 1.5])
-
-    state = State("x", (3,))
-    state._slice = slice(0, 3)
-    control = Control("u", (3,))
-    control._slice = slice(0, 3)
-
-    # Constraint: x == 2*u (should become x - 2*u == 0)
-    lhs = state
-    rhs = Mul(Constant(2.0), control)
-    constraint = Equality(lhs, rhs)
-
-    jl = JaxLowerer()
-    fn = jl._visit_constraint(constraint)
-    residual = fn(x, u, None, None)
-
-    # Residual should be lhs - rhs = x - 2*u
-    expected = x - 2.0 * u
-    assert jnp.allclose(residual, expected)
-    assert residual.shape == (3,)
-
-
-def test_inequality_constraint_lowering():
-    """Test that inequality constraints are lowered to residual form (lhs - rhs)."""
-    import jax.numpy as jnp
-
-    from openscvx.symbolic.expr import State
-    from openscvx.symbolic.lowerers.jax import JaxLowerer
-
-    x = jnp.array([0.5, 1.5, 2.5])
-
-    state = State("x", (3,))
-    state._slice = slice(0, 3)
-
-    # Constraint: x <= 2.0 (should become x - 2.0 <= 0)
-    lhs = state
-    rhs = Constant(np.array([2.0, 2.0, 2.0]))
-    constraint = Inequality(lhs, rhs)
-
-    jl = JaxLowerer()
-    fn = jl._visit_constraint(constraint)  # Both use the same visitor
-    residual = fn(x, None, None, None)
-
-    # Residual should be lhs - rhs = x - 2.0
-    expected = x - 2.0
-    assert jnp.allclose(residual, expected)
-    assert residual.shape == (3,)
-
-    # Check that residual is negative when constraint is satisfied
-    # and positive when violated
-    assert residual[0] < 0  # 0.5 - 2.0 = -1.5 (satisfied)
-    assert residual[1] < 0  # 1.5 - 2.0 = -0.5 (satisfied)
-    assert residual[2] > 0  # 2.5 - 2.0 = 0.5 (violated)
-
-
-def test_constraint_lowering_with_lower_to_jax():
-    """Test constraint lowering through the top-level lower_to_jax function."""
-    import jax.numpy as jnp
-
-    from openscvx.symbolic.expr import Add, Control, Mul, State
-    from openscvx.symbolic.lower import lower_to_jax
-
-    x = jnp.array([1.0, 3.0])
-    u = jnp.array([0.5])
-
-    pos = State("pos", (2,))
-    pos._slice = slice(0, 2)
-    vel = Control("vel", (1,))
-    vel._slice = slice(0, 1)
-
-    # Mixed constraint: pos[0] + 2*vel <= pos[1]
-    # Rearranged: pos[0] + 2*vel - pos[1] <= 0
-    lhs = Add(pos[0], Mul(Constant(2.0), vel))
-    rhs = pos[1]
-    constraint = Inequality(lhs, rhs)
-
-    # Lower using the top-level function
-    fn = lower_to_jax(constraint)
-    residual = fn(x, u, None, None)
-
-    # Expected: pos[0] + 2*vel - pos[1] = 1.0 + 2*0.5 - 3.0 = -1.0
-    expected = 1.0 + 2.0 * 0.5 - 3.0
-    assert jnp.allclose(residual, expected)
-    assert residual < 0  # Constraint is satisfied
-
-
-# =============================================================================
-# JAX Lowering Tests - CTCS
-# =============================================================================
+# -----------------------------------------------------------------------------
+# JAX Lowering
+# -----------------------------------------------------------------------------
 
 
 def test_ctcs_constraint_can_be_lowered_directly():
@@ -742,47 +800,9 @@ def test_ctcs_with_extra_kwargs():
     assert jnp.allclose(result, expected)
 
 
-# =============================================================================
-# CVXPY Lowering Tests
-# =============================================================================
-
-
-def test_cvxpy_equality_constraint():
-    """Test equality constraints"""
-    import cvxpy as cp
-
-    from openscvx.symbolic.expr import State
-    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
-
-    x_cvx = cp.Variable((10, 3), name="x")
-    variable_map = {"x": x_cvx}
-    lowerer = CvxpyLowerer(variable_map)
-
-    x = State("x", shape=(3,))
-    const = Constant(np.array(0.0))
-    expr = Equality(x, const)
-
-    result = lowerer.lower(expr)
-    assert isinstance(result, cp.Constraint)
-
-
-def test_cvxpy_inequality_constraint():
-    """Test inequality constraints"""
-    import cvxpy as cp
-
-    from openscvx.symbolic.expr import State
-    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
-
-    x_cvx = cp.Variable((10, 3), name="x")
-    variable_map = {"x": x_cvx}
-    lowerer = CvxpyLowerer(variable_map)
-
-    x = State("x", shape=(3,))
-    const = Constant(np.array(1.0))
-    expr = Inequality(x, const)
-
-    result = lowerer.lower(expr)
-    assert isinstance(result, cp.Constraint)
+# -----------------------------------------------------------------------------
+# CVXPY Lowering
+# -----------------------------------------------------------------------------
 
 
 def test_cvxpy_ctcs_not_implemented():
