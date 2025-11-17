@@ -1,7 +1,7 @@
 name: 🌙 Nightly
 
 permissions:
-  contents: read  # Only needs read access for build; no git operations
+  contents: read  # Default - least privilege
 
 on:
   push:
@@ -20,6 +20,15 @@ jobs:
     uses: ./.github/workflows/_build.yml
     with:
       use-exact-version: false
+
+  docs:
+    name: 📖 Deploy Nightly Docs
+    permissions:
+      contents: write  # Needs write for pushing to gh-pages
+    uses: ./.github/workflows/_docs.yml
+    with:
+      deploy: true
+      version: nightly
 
   publish:
     name: 📤 Publish to TestPyPI

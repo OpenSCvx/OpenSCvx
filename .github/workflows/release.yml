@@ -53,40 +53,11 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-docs:
-    name: 📖 Deploy Documentation
-    runs-on: ubuntu-latest
+    name: 📖 Deploy Versioned Docs
     needs: publish
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Configure Git Credentials
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.x
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-
-      - name: Install documentation tools
-        run: |
-          uv pip install --system mkdocs-material mkdocstrings-python mike
-          uv pip install --system mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
-          sudo apt-get update && sudo apt-get install -y pngquant
-
-      - name: Install package
-        run: uv pip install --system -e .
-
-      - name: Deploy versioned documentation
-        run: |
-          git fetch origin gh-pages --depth=1 || true
-          VERSION="${{ github.event.release.tag_name }}"
-          mike deploy --push --update-aliases "${VERSION}" latest
-          mike set-default --push latest
+    uses: ./.github/workflows/_docs.yml
+    with:
+      deploy: true
+      version: ${{ github.event.release.tag_name }}
+      alias: latest
+      set-default: true

@@ -1,0 +1,90 @@
+name: 📖 Documentation (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      deploy:
+        description: 'Whether to deploy (push) or just build for validation'
+        type: boolean
+        default: false
+      version:
+        description: 'Version identifier for mike (e.g., "1.0.0", "nightly")'
+        type: string
+        default: 'nightly'
+      alias:
+        description: 'Alias to update (e.g., "latest")'
+        type: string
+        required: false
+      set-default:
+        description: 'Set this version as the default'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write  # Needed for mike deploy --push
+
+jobs:
+  docs:
+    name: 📖 Documentation
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.deploy || github.event.repository.fork == false }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: ${{ inputs.deploy && 0 || 1 }}
+
+    - name: Configure Git Credentials
+      if: inputs.deploy
+      run: |
+        git config user.name github-actions[bot]
+        git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+
+    - name: Cache MkDocs build
+      if: inputs.deploy
+      uses: actions/cache@v4
+      with:
+        key: mkdocs-material-${{ hashfiles('mkdocs.yml', 'docs/**', 'openscvx/**/*.py', 'scripts/gen_ref_pages.py') }}
+        path: .cache
+        restore-keys: |
+          mkdocs-material-
+
+    - name: Install system dependencies
+      run: sudo apt-get update && sudo apt-get install -y pngquant
+
+    # - name: Install MkDocs Material Insiders
+    #   run: uv pip install --system git+https://${{ secrets.MKDOCS_INSIDERS_TOKEN }}@github.com/squidfunk/mkdocs-material-insiders.git
+
+    - name: Install documentation tools
+      run: |
+        uv pip install --system mkdocs-material mkdocstrings-python
+        uv pip install --system mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
+        uv pip install --system mike
+
+    - name: Install package
+      run: uv pip install --system -e .
+
+    - name: Build documentation (check only)
+      if: ${{ !inputs.deploy }}
+      run: mkdocs build
+
+    - name: Deploy documentation
+      if: inputs.deploy
+      run: |
+        git fetch origin gh-pages --depth=1 || true
+        mike deploy --push --update-aliases "${{ inputs.version }}" ${{ inputs.alias }}
+
+    - name: Set default version
+      if: ${{ inputs.deploy && inputs.set-default }}
+      run: mike set-default --push ${{ inputs.alias || inputs.version }}
