@@ -52,5 +52,4 @@ jobs:
       contents: write  # Required for mike deploy --push to gh-pages
     uses: ./.github/workflows/_docs.yml
     with:
-      deploy: true
       version: nightly

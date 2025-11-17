@@ -3,37 +3,25 @@ name: 📖 Documentation
 on:
   workflow_call:
     inputs:
-      deploy:
-        description: 'Whether to deploy (push) or just build for validation'
-        type: boolean
-        default: false
       version:
-        description: 'Version identifier for mike (e.g., "1.0.0", "nightly")'
-        type: string
-        default: 'nightly'
-      alias:
-        description: 'Alias to update (e.g., "latest")'
+        description: 'Version to deploy (e.g., "v1.2.3", "nightly"). Omit to only build without deploying.'
         type: string
         required: false
-      set-default:
-        description: 'Set this version as the default'
-        type: boolean
-        default: false
 
 jobs:
   docs:
     name: 📖 Documentation
     runs-on: ubuntu-latest
-    if: ${{ !inputs.deploy || github.event.repository.fork == false }}
+    if: ${{ !inputs.version || github.event.repository.fork == false }}
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        fetch-depth: ${{ inputs.deploy && 0 || 1 }}
+        fetch-depth: ${{ inputs.version && 0 || 1 }}
 
     - name: Configure Git Credentials
-      if: inputs.deploy
+      if: inputs.version
       run: |
         git config user.name github-actions[bot]
         git config user.email 41898282+github-actions[bot]@users.noreply.github.com
@@ -49,10 +37,10 @@ jobs:
         enable-cache: true
 
     - name: Cache MkDocs build
-      if: inputs.deploy
+      if: inputs.version
       uses: actions/cache@v4
       with:
-        key: mkdocs-material-${{ hashFiles('mkdocs.yml', 'docs/**', 'openscvx/**/*.py', 'scripts/gen_ref_pages.py') }}
+        key: mkdocs-material-${{ hashFiles('mkdocs.yml', 'docs/**') }}
         path: .cache
         restore-keys: |
           mkdocs-material-
@@ -73,15 +61,20 @@ jobs:
       run: uv pip install --system -e .
 
     - name: Build documentation (check only)
-      if: ${{ !inputs.deploy }}
+      if: ${{ !inputs.version }}
       run: mkdocs build
 
     - name: Deploy documentation
-      if: inputs.deploy
+      if: inputs.version
       run: |
         git fetch origin gh-pages --depth=1 || true
-        mike deploy --push --update-aliases "${{ inputs.version }}" ${{ inputs.alias }}
+        VERSION="${{ inputs.version }}"
 
-    - name: Set default version
-      if: ${{ inputs.deploy && inputs.set-default }}
-      run: mike set-default --push ${{ inputs.alias || inputs.version }}
+        # For versioned releases (e.g., v1.2.3), deploy with 'latest' alias and set as default
+        if [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+          mike deploy --push --update-aliases "$VERSION" latest
+          mike set-default --push latest
+        # For nightly, just deploy without alias or default
+        else
+          mike deploy --push "$VERSION"
+        fi

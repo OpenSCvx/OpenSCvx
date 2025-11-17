@@ -56,7 +56,4 @@ jobs:
       contents: write  # Required for mike deploy --push to gh-pages
     uses: ./.github/workflows/_docs.yml
     with:
-      deploy: true
       version: ${{ github.event.release.tag_name }}
-      alias: latest
-      set-default: true

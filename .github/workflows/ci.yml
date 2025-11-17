@@ -23,8 +23,6 @@ jobs:
   docs-check:
     name: 📖 Docs Build Check
     uses: ./.github/workflows/_docs.yml
-    with:
-      deploy: false
 
   test:
     name: 🧪 Tests
