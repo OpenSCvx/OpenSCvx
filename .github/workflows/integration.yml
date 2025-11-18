@@ -11,13 +11,13 @@ jobs:
   integration-tests:
     name: Integration Tests
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60  # Integration tests can be slow
+    timeout-minutes: 30  # Integration tests can be slow
 
     strategy:
       fail-fast: false  # Continue testing other examples even if one fails
       matrix:
-        python-version: ['3.13']
         os: [ubuntu-latest, macos-latest]
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
     - name: Checkout repository
