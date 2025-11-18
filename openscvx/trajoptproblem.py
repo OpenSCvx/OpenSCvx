@@ -399,7 +399,8 @@ class TrajOptProblem:
         functions_to_hash = [self.dynamics_augmented.f, self.dynamics_augmented_prop.f]
         for constraint in self.settings.sim.constraints_nodal:
             functions_to_hash.append(constraint.func)
-        # Note: CTCS constraints are already included in dynamics_augmented.f, so we don't need to add them separately
+        # Note: CTCS constraints are already included in dynamics_augmented.f,
+        # so we don't need to add them separately
 
         # Get cache file paths
         dis_solver_file, prop_solver_file = get_solver_cache_paths(
