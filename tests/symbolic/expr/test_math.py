@@ -5,6 +5,8 @@ This module tests mathematical function nodes:
 - Trigonometric: Sin, Cos
 - Exponential: Exp, Log, Sqrt
 - Nonlinear: Square, PositivePart, Huber, SmoothReLU, Max
+- Absolute value: Abs
+- Smooth maximum: LogSumExp
 
 Tests are organized by node/node-group, with each section containing:
 
@@ -20,7 +22,9 @@ import numpy as np
 import pytest
 
 from openscvx.symbolic.expr import (
+    Abs,
     Huber,
+    LogSumExp,
     PositivePart,
     SmoothReLU,
     Square,
@@ -876,6 +880,175 @@ def test_log_with_exp_identity():
 
 
 # =============================================================================
+# Abs
+# =============================================================================
+
+
+def test_abs_creation():
+    """Test Abs node creation and properties."""
+    x = Variable("x", shape=(1,))
+
+    abs_x = Abs(x)
+    assert repr(abs_x) == "abs(Var('x'))"
+    assert abs_x.children() == [x]
+
+
+# --- Abs: Shape Checking ---
+
+
+def test_abs_shape_preserves_input():
+    """Test that Abs preserves the shape of its input."""
+    x = Variable("x", shape=(3, 4))
+
+    abs_x = Abs(x)
+    assert abs_x.check_shape() == (3, 4)
+
+
+def test_abs_shape_with_scalar():
+    """Test Abs shape with scalar input."""
+    x = Variable("x", shape=())
+
+    abs_x = Abs(x)
+    assert abs_x.check_shape() == ()
+
+
+def test_abs_shape_with_vector():
+    """Test Abs shape with vector input."""
+    x = Variable("x", shape=(10,))
+
+    abs_x = Abs(x)
+    assert abs_x.check_shape() == (10,)
+
+
+# --- Abs: Canonicalization ---
+
+
+def test_abs_canonicalize_preserves_structure():
+    """Test that Abs canonicalization preserves structure."""
+    x = Variable("x", shape=(3,))
+
+    abs_x = Abs(x)
+    canonical = abs_x.canonicalize()
+
+    assert isinstance(canonical, Abs)
+    assert canonical.operand == x
+
+
+def test_abs_canonicalize_recursively():
+    """Test that Abs canonicalization recurses into operands."""
+    from openscvx.symbolic.expr import Add, Constant
+
+    x = Variable("x", shape=(3,))
+    # Abs(x + 0) should canonicalize to Abs(x)
+    expr = Abs(Add(x, Constant(0.0)))
+    canonical = expr.canonicalize()
+
+    assert isinstance(canonical, Abs)
+    assert canonical.operand == x
+
+
+# --- Abs: JAX Lowering ---
+
+
+def test_abs_constant():
+    """Test Abs with constant values."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Constant
+    from openscvx.symbolic.lower import lower_to_jax
+
+    values = np.array([-2.0, -1.0, 0.0, 1.0, 2.0])
+    expr = Abs(Constant(values))
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    expected = jnp.abs(values)
+    assert jnp.allclose(result, expected)
+
+
+def test_abs_state():
+    """Test Abs with state variables."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = jnp.array([-3.0, -1.5, 0.0, 1.5, 3.0])
+
+    state = State("s", (5,))
+    state._slice = slice(0, 5)
+    expr = Abs(state)
+
+    fn = lower_to_jax(expr)
+    result = fn(x, None, None, None)
+
+    expected = jnp.abs(x)
+    assert jnp.allclose(result, expected)
+
+
+def test_abs_expression():
+    """Test Abs with a composite expression."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Constant, State, Sub
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = jnp.array([1.0, 2.0, 3.0])
+
+    state = State("s", (3,))
+    state._slice = slice(0, 3)
+    threshold = Constant(np.array([2.0, 2.0, 2.0]))
+
+    # abs(x - 2)
+    expr = Abs(Sub(state, threshold))
+
+    fn = lower_to_jax(expr)
+    result = fn(x, None, None, None)
+
+    expected = jnp.abs(x - 2.0)
+    assert jnp.allclose(result, expected)
+
+
+def test_abs_matrix():
+    """Test Abs with matrix values."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Constant
+    from openscvx.symbolic.lower import lower_to_jax
+
+    values = np.array([[-2.0, 1.0], [3.0, -4.0]])
+    expr = Abs(Constant(values))
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    expected = jnp.abs(values)
+    assert jnp.allclose(result, expected)
+
+
+# --- Abs: CVXPy Lowering ---
+
+
+def test_cvxpy_abs():
+    """Test absolute value function."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Abs(x)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+
+
+# =============================================================================
 # Sqrt
 # =============================================================================
 
@@ -1268,6 +1441,333 @@ def test_max_with_zero_relu_pattern():
 
 
 # --- Max: CVXPy Lowering --- TODO: (norrisg)
+
+
+# =============================================================================
+# LogSumExp
+# =============================================================================
+
+
+def test_logsumexp_creation():
+    """Test LogSumExp node creation and properties."""
+    x = Variable("x", shape=(3,))
+    y = Variable("y", shape=(3,))
+
+    lse = LogSumExp(x, y)
+    assert repr(lse) == "logsumexp(Var('x'), Var('y'))"
+    assert lse.children() == [x, y]
+
+
+def test_logsumexp_creation_with_multiple_operands():
+    """Test LogSumExp node creation with more than two operands."""
+    from openscvx.symbolic.expr import Constant
+
+    x = Variable("x", shape=(1,))
+    y = Variable("y", shape=(1,))
+    z = Constant(0.0)
+
+    lse = LogSumExp(x, y, z)
+    assert len(lse.children()) == 3
+    assert repr(lse) == "logsumexp(Var('x'), Var('y'), Const(0.0))"
+
+
+def test_logsumexp_requires_at_least_two_operands():
+    """Test that LogSumExp raises ValueError with fewer than two operands."""
+    x = Variable("x", shape=(1,))
+
+    with pytest.raises(ValueError, match="LogSumExp requires two or more operands"):
+        LogSumExp(x)
+
+
+# --- LogSumExp: Shape Checking ---
+
+
+def test_logsumexp_shape_with_same_shapes():
+    """Test LogSumExp shape when all operands have the same shape."""
+    x = Variable("x", shape=(3,))
+    y = Variable("y", shape=(3,))
+    z = Variable("z", shape=(3,))
+
+    lse = LogSumExp(x, y, z)
+    assert lse.check_shape() == (3,)
+
+
+def test_logsumexp_shape_with_broadcasting():
+    """Test LogSumExp shape with broadcasting."""
+    from openscvx.symbolic.expr import Constant
+
+    x = Variable("x", shape=(3, 4))
+    y = Constant(np.array([1.0, 2.0, 3.0, 4.0]))  # shape (4,)
+
+    lse = LogSumExp(x, y)
+    assert lse.check_shape() == (3, 4)
+
+
+def test_logsumexp_shape_with_scalar_broadcast():
+    """Test LogSumExp shape with scalar broadcasting."""
+    from openscvx.symbolic.expr import Constant
+
+    x = Variable("x", shape=(5, 5))
+    scalar = Constant(0.0)  # scalar
+
+    lse = LogSumExp(x, scalar)
+    assert lse.check_shape() == (5, 5)
+
+
+def test_logsumexp_shape_incompatible_raises_error():
+    """Test that LogSumExp raises ValueError for incompatible shapes."""
+    x = Variable("x", shape=(3,))
+    y = Variable("y", shape=(4,))
+
+    lse = LogSumExp(x, y)
+    with pytest.raises(ValueError, match="LogSumExp shapes not broadcastable"):
+        lse.check_shape()
+
+
+# --- LogSumExp: Canonicalization ---
+
+
+def test_logsumexp_canonicalize_flattens_nested():
+    """Test that LogSumExp canonicalization flattens nested LogSumExp operations."""
+    x = Variable("x", shape=(3,))
+    y = Variable("y", shape=(3,))
+    z = Variable("z", shape=(3,))
+
+    # LogSumExp(x, LogSumExp(y, z)) should flatten to LogSumExp(x, y, z)
+    nested = LogSumExp(x, LogSumExp(y, z))
+    canonical = nested.canonicalize()
+
+    assert isinstance(canonical, LogSumExp)
+    assert len(canonical.operands) == 3
+    assert x in canonical.operands
+    assert y in canonical.operands
+    assert z in canonical.operands
+
+
+def test_logsumexp_canonicalize_folds_constants():
+    """Test that LogSumExp canonicalization folds constant values."""
+    from openscvx.symbolic.expr import Constant
+
+    x = Variable("x", shape=())
+    c1 = Constant(1.0)
+    c2 = Constant(2.0)
+
+    # LogSumExp(x, c1, c2) should fold c1 and c2 into a single constant
+    expr = LogSumExp(x, c1, c2)
+    canonical = expr.canonicalize()
+
+    assert isinstance(canonical, LogSumExp)
+    assert len(canonical.operands) == 2
+    # One should be x, one should be the folded constant
+    non_const = [op for op in canonical.operands if not isinstance(op, Constant)]
+    consts = [op for op in canonical.operands if isinstance(op, Constant)]
+    assert len(non_const) == 1
+    assert non_const[0] == x
+    assert len(consts) == 1
+    # Check that the constant is the logsumexp of c1 and c2
+    expected = np.log(np.exp(1.0) + np.exp(2.0))
+    assert np.allclose(consts[0].value, expected)
+
+
+def test_logsumexp_canonicalize_single_operand_collapses():
+    """Test that LogSumExp with single operand after canonicalization returns that operand."""
+    from openscvx.symbolic.expr import Constant
+
+    # LogSumExp with only constants should fold to a single constant
+    c1 = Constant(1.0)
+    c2 = Constant(2.0)
+
+    expr = LogSumExp(c1, c2)
+    canonical = expr.canonicalize()
+
+    # Should collapse to just a constant
+    assert isinstance(canonical, Constant)
+    expected = np.log(np.exp(1.0) + np.exp(2.0))
+    assert np.allclose(canonical.value, expected)
+
+
+def test_logsumexp_canonicalize_recursively():
+    """Test that LogSumExp canonicalization recurses into operands."""
+    from openscvx.symbolic.expr import Add, Constant
+
+    x = Variable("x", shape=(3,))
+    y = Variable("y", shape=(3,))
+
+    # LogSumExp(x + 0, y + 0) should canonicalize to LogSumExp(x, y)
+    expr = LogSumExp(Add(x, Constant(0.0)), Add(y, Constant(0.0)))
+    canonical = expr.canonicalize()
+
+    assert isinstance(canonical, LogSumExp)
+    assert len(canonical.operands) == 2
+    assert x in canonical.operands
+    assert y in canonical.operands
+
+
+# --- LogSumExp: JAX Lowering ---
+
+
+def test_logsumexp_constant():
+    """Test LogSumExp with constant values."""
+    import jax.numpy as jnp
+    from jax.scipy.special import logsumexp
+
+    from openscvx.symbolic.expr import Constant
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = np.array([1.0, 5.0, 2.0])
+    y = np.array([3.0, 2.0, 4.0])
+
+    expr = LogSumExp(Constant(x), Constant(y))
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    # Element-wise logsumexp
+    stacked = jnp.stack([x, y], axis=0)
+    expected = logsumexp(stacked, axis=0)
+    assert jnp.allclose(result, expected)
+
+
+def test_logsumexp_state_variables():
+    """Test LogSumExp with state variables."""
+    import jax.numpy as jnp
+    from jax.scipy.special import logsumexp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x_val = jnp.array([1.0, 2.0, 3.0])
+    y_val = jnp.array([2.0, 1.5, 3.5])
+
+    x = State("x", (3,))
+    x._slice = slice(0, 3)
+    y = State("y", (3,))
+    y._slice = slice(3, 6)
+
+    expr = LogSumExp(x, y)
+
+    state_vec = jnp.concatenate([x_val, y_val])
+    fn = lower_to_jax(expr)
+    result = fn(state_vec, None, None, None)
+
+    stacked = jnp.stack([x_val, y_val], axis=0)
+    expected = logsumexp(stacked, axis=0)
+    assert jnp.allclose(result, expected)
+
+
+def test_logsumexp_multiple_operands():
+    """Test LogSumExp with more than two operands."""
+    import jax.numpy as jnp
+    from jax.scipy.special import logsumexp
+
+    from openscvx.symbolic.expr import Constant
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = np.array([1.0, 5.0, 2.0])
+    y = np.array([3.0, 2.0, 4.0])
+    z = np.array([2.0, 6.0, 1.0])
+
+    expr = LogSumExp(Constant(x), Constant(y), Constant(z))
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    stacked = jnp.stack([x, y, z], axis=0)
+    expected = logsumexp(stacked, axis=0)
+    assert jnp.allclose(result, expected)
+
+
+def test_logsumexp_approximates_max():
+    """Test that LogSumExp approximates the maximum function."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Constant, Max
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = np.array([1.0, 5.0, 2.0])
+    y = np.array([3.0, 2.0, 4.0])
+
+    lse_expr = LogSumExp(Constant(x), Constant(y))
+    max_expr = Max(Constant(x), Constant(y))
+
+    lse_fn = lower_to_jax(lse_expr)
+    max_fn = lower_to_jax(max_expr)
+
+    lse_result = lse_fn(None, None, None, None)
+    max_result = max_fn(None, None, None, None)
+
+    # LogSumExp should be >= max
+    assert jnp.all(lse_result >= max_result)
+
+    # LogSumExp should be <= max + log(2)
+    assert jnp.all(lse_result <= max_result + np.log(2))
+
+
+def test_logsumexp_scalar_operands():
+    """Test LogSumExp with scalar operands."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Constant
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = 1.0
+    y = 2.0
+    z = 0.5
+
+    expr = LogSumExp(Constant(x), Constant(y), Constant(z))
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    # Should compute log(exp(1) + exp(2) + exp(0.5))
+    expected = np.log(np.exp(x) + np.exp(y) + np.exp(z))
+    assert jnp.allclose(result, expected)
+
+
+def test_logsumexp_with_broadcasting():
+    """Test LogSumExp with broadcasting."""
+    import jax.numpy as jnp
+    from jax.scipy.special import logsumexp
+
+    from openscvx.symbolic.expr import Constant
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = np.array([[1.0, 2.0], [3.0, 4.0]])  # shape (2, 2)
+    y = np.array([0.5, 1.5])  # shape (2,)
+
+    expr = LogSumExp(Constant(x), Constant(y))
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    # Broadcast and stack
+    broadcasted = jnp.broadcast_arrays(x, y)
+    stacked = jnp.stack(list(broadcasted), axis=0)
+    expected = logsumexp(stacked, axis=0)
+    assert jnp.allclose(result, expected)
+
+
+# --- LogSumExp: CVXPy Lowering ---
+
+
+def test_cvxpy_logsumexp():
+    """Test log-sum-exp function."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    y_cvx = cp.Variable((10, 3), name="y")
+    variable_map = {"x": x_cvx, "y": y_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    y = State("y", shape=(3,))
+    expr = LogSumExp(x, y)
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
 
 
 # =============================================================================

@@ -132,6 +132,7 @@ import cvxpy as cp
 
 from openscvx.symbolic.expr import (
     CTCS,
+    Abs,
     Add,
     Concat,
     Constant,
@@ -144,6 +145,7 @@ from openscvx.symbolic.expr import (
     Index,
     Inequality,
     Log,
+    LogSumExp,
     MatMul,
     Max,
     Mul,
@@ -707,6 +709,27 @@ class CvxpyLowerer:
         operand = self.lower(node.operand)
         return cp.log(operand)
 
+    @visitor(Abs)
+    def _visit_abs(self, node: Abs) -> cp.Expression:
+        """Lower absolute value to CVXPy expression.
+
+        Absolute value is a convex function and DCP-compliant when used in
+        appropriate contexts (e.g., minimizing |x| or constraints like |x| <= c).
+
+        Args:
+            node: Abs expression node
+
+        Returns:
+            CVXPy expression representing |operand|
+
+        Note:
+            Absolute value is convex, so it's valid in:
+            - Objective: minimize abs(x)
+            - Constraints: abs(x) <= c (convex constraint)
+        """
+        operand = self.lower(node.operand)
+        return cp.abs(operand)
+
     @visitor(Equality)
     def _visit_equality(self, node: Equality) -> cp.Constraint:
         """Lower equality constraint to CVXPy constraint (lhs == rhs).
@@ -910,6 +933,34 @@ class CvxpyLowerer:
             for op in operands[2:]:
                 result = cp.maximum(result, op)
             return result
+
+    @visitor(LogSumExp)
+    def _visit_logsumexp(self, node: LogSumExp) -> cp.Expression:
+        """Lower log-sum-exp to CVXPy expression.
+
+        Log-sum-exp is convex and is a smooth approximation to the maximum function.
+        CVXPy's log_sum_exp atom computes log(sum(exp(x_i))) for stacked operands.
+
+        Args:
+            node: LogSumExp expression node with multiple operands
+
+        Returns:
+            CVXPy expression representing log-sum-exp
+
+        Note:
+            Log-sum-exp is convex and DCP-compliant. It satisfies:
+            max(x₁, ..., xₙ) ≤ logsumexp(x₁, ..., xₙ) ≤ max(x₁, ..., xₙ) + log(n)
+        """
+        operands = [self.lower(op) for op in node.operands]
+
+        # CVXPy's log_sum_exp expects a stacked expression with an axis parameter
+        # For element-wise log-sum-exp, we stack along a new axis and reduce along it
+        if len(operands) == 1:
+            return operands[0]
+
+        # Stack operands along a new axis (axis 0) and compute log_sum_exp along that axis
+        stacked = cp.vstack(operands)
+        return cp.log_sum_exp(stacked, axis=0)
 
     @visitor(Transpose)
     def _visit_transpose(self, node: Transpose) -> cp.Expression:
