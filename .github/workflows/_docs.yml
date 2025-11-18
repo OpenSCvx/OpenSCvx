@@ -1,0 +1,77 @@
+name: 📖 Documentation
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., "v1.2.3", "nightly"). Omit to only build without deploying.'
+        type: string
+        required: false
+
+jobs:
+  docs:
+    name: 📖 Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history needed for mike versioning
+
+    - name: Configure Git Credentials
+      if: inputs.version
+      run: |
+        git config user.name github-actions[bot]
+        git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+
+    - name: Cache MkDocs build
+      uses: actions/cache@v4
+      with:
+        key: mkdocs-material-${{ hashFiles('mkdocs.yml', 'docs/**') }}
+        path: .cache
+        restore-keys: |
+          mkdocs-material-
+
+    - name: Install system dependencies
+      run: sudo apt-get update && sudo apt-get install -y pngquant
+
+    # - name: Install MkDocs Material Insiders
+    #   run: uv pip install --system git+https://${{ secrets.MKDOCS_INSIDERS_TOKEN }}@github.com/squidfunk/mkdocs-material-insiders.git
+
+    - name: Install documentation tools
+      run: |
+        uv pip install --system mkdocs-material mkdocstrings-python
+        uv pip install --system mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
+        uv pip install --system mike
+
+    - name: Install package
+      run: uv pip install --system -e .
+
+    - name: Build documentation (check only)
+      if: ${{ !inputs.version }}
+      run: mkdocs build
+
+    - name: Fetch gh-pages branch
+      if: inputs.version
+      run: git fetch origin gh-pages --depth=1 || true
+
+    - name: Deploy versioned release documentation
+      if: inputs.version && startsWith(inputs.version, 'v')
+      run: |
+        mike deploy --push --update-aliases "${{ inputs.version }}" latest
+        mike set-default --push latest
+
+    - name: Deploy nightly documentation
+      if: inputs.version && !startsWith(inputs.version, 'v')
+      run: mike deploy --push "${{ inputs.version }}"

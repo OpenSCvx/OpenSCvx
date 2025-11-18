@@ -152,7 +152,7 @@ problem.settings.scp.lam_vc = 1.2e0
 # problem.settings.scp.ep_tr = 5e-3
 # problem.settings.scp.ep_vc = 1e-10
 
-problem.settings.dis.solver = "Dopri8"
+# problem.settings.dis.solver = "Dopri8"
 
 problem.settings.cvx.solver = "CLARABEL"
 problem.settings.cvx.solver_args = {"enforce_dpp": True}

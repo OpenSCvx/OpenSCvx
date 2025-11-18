@@ -291,7 +291,9 @@ def decompose_vector_nodal_constraints(
             residual_shape = constraint.lhs.check_shape()
 
             # Check if this is a vector constraint
-            if len(residual_shape) > 0 and np.prod(residual_shape) > 1:
+            # Decompose ALL vector-shaped constraints (including shape=(1,)) to avoid
+            # vmap adding an extra dimension when stacking results
+            if len(residual_shape) > 0:
                 # Vector constraint - decompose into scalar constraints
                 total_elements = int(np.prod(residual_shape))
 

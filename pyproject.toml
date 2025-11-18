@@ -46,6 +46,10 @@ cvxpygen = [
 stl = [
     "stljax",
 ]
+test = [
+    "pytest",
+    "scipy",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -125,4 +129,9 @@ ignore-names = [
     "cp",            # CVXPY alias
     "np",            # NumPy alias
     "jnp",           # JAX NumPy alias
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: expensive integration tests that solve full examples",
 ]
