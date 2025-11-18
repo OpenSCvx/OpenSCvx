@@ -1,0 +1,8 @@
+{#-
+  This file was automatically generated - do not edit
+-#}
+{% if page.meta.comments %}
+  <h2 id="__comments">{{ lang.t("meta.comments") }}</h2>
+  <script src="https://giscus.app/client.js" data-repo="squidfunk/mkdocs-material" data-repo-id="MDEwOlJlcG9zaXRvcnk1MDYxNzQyOA==" data-category="_" data-category-id="DIC_kwDOAwRcVM4CAtJY" data-mapping="pathname" data-reactions-enabled="1" data-emit-metadata="1" data-theme="light" data-lang="en" crossorigin="anonymous" async></script>
+  <script>var giscus=document.querySelector("script[src*=giscus]"),palette=__md_get("__palette");if(palette&&"object"==typeof palette.color){var theme="slate"===palette.color.scheme?"transparent_dark":"light";giscus.setAttribute("data-theme",theme)}document.addEventListener("DOMContentLoaded",(function(){document.querySelector("[data-md-component=palette]").addEventListener("change",(function(){var e=__md_get("__palette");if(e&&"object"==typeof e.color){var t="slate"===e.color.scheme?"transparent_dark":"light";document.querySelector(".giscus-frame").contentWindow.postMessage({giscus:{setConfig:{theme:t}}},"https://giscus.app")}}))}))</script>
+{% endif %}
