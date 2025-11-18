@@ -112,11 +112,11 @@ from jax.lax import cond
 from jax.scipy.special import logsumexp
 
 from openscvx.symbolic.expr import (
-    Abs,
     CTCS,
     QDCM,
     SSM,
     SSMP,
+    Abs,
     Add,
     Concat,
     Constant,

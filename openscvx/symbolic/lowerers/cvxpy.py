@@ -131,8 +131,8 @@ from typing import Any, Callable, Dict, Type
 import cvxpy as cp
 
 from openscvx.symbolic.expr import (
-    Abs,
     CTCS,
+    Abs,
     Add,
     Concat,
     Constant,
