@@ -9,6 +9,7 @@ import openscvx.symbolic.expr.spatial as spatial
 import openscvx.symbolic.expr.stl as stl
 from openscvx.symbolic.expr import (
     CTCS,
+    Abs,
     Add,
     Concat,
     Constant,
@@ -23,6 +24,7 @@ from openscvx.symbolic.expr import (
     Inequality,
     Leaf,
     Log,
+    LogSumExp,
     MatMul,
     Max,
     Mul,
@@ -70,8 +72,10 @@ __all__ = [
     "Sin",
     "Cos",
     "Sqrt",
+    "Abs",
     "Exp",
     "Log",
+    "LogSumExp",
     "Max",
     # Constraints
     "Constraint",

@@ -88,7 +88,20 @@ from .expr import (
 from .linalg import Diag, Norm, Sum, Transpose
 
 # Mathematical functions
-from .math import Cos, Exp, Huber, Log, Max, PositivePart, Sin, SmoothReLU, Sqrt, Square
+from .math import (
+    Abs,
+    Cos,
+    Exp,
+    Huber,
+    Log,
+    LogSumExp,
+    Max,
+    PositivePart,
+    Sin,
+    SmoothReLU,
+    Sqrt,
+    Square,
+)
 
 # Spatial/3D operations
 from .spatial import QDCM, SSM, SSMP
@@ -134,12 +147,14 @@ __all__ = [
     "Sin",
     "Cos",
     "Sqrt",
+    "Abs",
     "PositivePart",
     "Square",
     "Huber",
     "SmoothReLU",
     "Exp",
     "Log",
+    "LogSumExp",
     "Max",
     # Linear algebra operations
     "Transpose",
