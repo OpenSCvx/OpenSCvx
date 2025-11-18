@@ -14,6 +14,36 @@ import pytest
 
 IGNORED_FILES = ["__init__.py", "plotting.py"]
 
+# Timing bounds for specific examples (in seconds)
+# Format: "relative/path/to/example.py": {"init": max_init, "solve": max_solve, "post": max_post}
+TIMING_BOUNDS = {
+    "abstract/brachistochrone.py": {
+        "init": 10.0,
+        "solve": 1.0,
+        "post": 5.0,
+    },
+    "car/dubins_car.py": {
+        "init": 15.0,
+        "solve": 2.0,
+        "post": 5.0,
+    },
+    "drone/obstacle_avoidance.py": {
+        "init": 20.0,
+        "solve": 0.5,
+        "post": 5.0,
+    },
+    "drone/dr_vp.py": {
+        "init": 75.0,
+        "solve": 2.0,
+        "post": 6.0,
+    },
+    "drone/cinema_vp.py": {
+        "init": 25.0,
+        "solve": 1.3,
+        "post": 5.0,
+    },
+}
+
 
 def discover_examples():
     """Discover all runnable examples in the examples/ directory."""
@@ -77,6 +107,7 @@ def test_example(name, metadata):
     2. problem.solve()
     3. problem.post_process()
     4. Assert convergence
+    5. Check timing bounds (if specified for this example)
     """
     problem = metadata["problem"]
 
@@ -95,6 +126,39 @@ def test_example(name, metadata):
 
     # Check convergence
     assert result["converged"], f"Example {name} ({metadata['path']}) failed to converge"
+
+    # Check timing bounds if specified for this example
+    example_path = metadata["path"]
+    if example_path in TIMING_BOUNDS:
+        bounds = TIMING_BOUNDS[example_path]
+        timing_issues = []
+
+        if "init" in bounds and hasattr(problem, "timing_init"):
+            if problem.timing_init > bounds["init"]:
+                timing_issues.append(f"init: {problem.timing_init:.2f}s > {bounds['init']:.2f}s")
+
+        if "solve" in bounds and hasattr(problem, "timing_solve"):
+            if problem.timing_solve > bounds["solve"]:
+                timing_issues.append(f"solve: {problem.timing_solve:.2f}s > {bounds['solve']:.2f}s")
+
+        if "post" in bounds and hasattr(problem, "timing_post"):
+            if problem.timing_post > bounds["post"]:
+                timing_issues.append(f"post: {problem.timing_post:.2f}s > {bounds['post']:.2f}s")
+
+        if timing_issues:
+            actual = ""
+            if hasattr(problem, "timing_init"):
+                actual += f"init={problem.timing_init:.2f}s, "
+            if hasattr(problem, "timing_solve"):
+                actual += f"solve={problem.timing_solve:.2f}s, "
+            if hasattr(problem, "timing_post"):
+                actual += f"post={problem.timing_post:.2f}s"
+
+            assert False, (
+                f"Example {name} ({example_path}) exceeded timing bounds:\n"
+                f"  Violations: {', '.join(timing_issues)}\n"
+                f"  Actual: {actual}"
+            )
 
     # Clean up JAX caches
     jax.clear_caches()
