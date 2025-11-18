@@ -3,6 +3,7 @@
 <img src="figures/openscvx_logo.svg" width="1200"/>
 <p align="center">
     <a href="https://github.com/haynec/OpenSCvx/actions/workflows/ci.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/ci.yml/badge.svg"/></a>
+    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/integration.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/integration.yml/badge.svg"/></a>
     <a href="https://github.com/haynec/OpenSCvx/actions/workflows/nightly.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/nightly.yml/badge.svg"/></a>
     <a href="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml/badge.svg"/></a>
     <a href="https://arxiv.org/abs/2410.22596"><img src="http://img.shields.io/badge/arXiv-2410.22596-B31B1B.svg"/></a>
