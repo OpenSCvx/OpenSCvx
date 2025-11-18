@@ -145,6 +145,7 @@ from openscvx.symbolic.expr import (
     Index,
     Inequality,
     Log,
+    LogSumExp,
     MatMul,
     Max,
     Mul,
@@ -932,6 +933,27 @@ class CvxpyLowerer:
             for op in operands[2:]:
                 result = cp.maximum(result, op)
             return result
+
+    @visitor(LogSumExp)
+    def _visit_logsumexp(self, node: LogSumExp) -> cp.Expression:
+        """Lower log-sum-exp to CVXPy expression.
+
+        Log-sum-exp is convex and is a smooth approximation to the maximum function.
+        CVXPy's log_sum_exp atom computes log(sum(exp(x_i))) for multiple operands.
+
+        Args:
+            node: LogSumExp expression node with multiple operands
+
+        Returns:
+            CVXPy expression representing log-sum-exp
+
+        Note:
+            Log-sum-exp is convex and DCP-compliant. It satisfies:
+            max(x₁, ..., xₙ) ≤ logsumexp(x₁, ..., xₙ) ≤ max(x₁, ..., xₙ) + log(n)
+        """
+        operands = [self.lower(op) for op in node.operands]
+        # CVXPy's log_sum_exp can take multiple arguments
+        return cp.log_sum_exp(*operands)
 
     @visitor(Transpose)
     def _visit_transpose(self, node: Transpose) -> cp.Expression:

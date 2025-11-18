@@ -13,6 +13,7 @@ Function Categories:
     - **Smooth Approximations:** `PositivePart`, `Huber`, `SmoothReLU` - Smooth, differentiable
         approximations of non-smooth functions like max(0, x) and absolute value
     - **Reductions:** `Max` - Maximum over elements
+    - **Smooth Maximum:** `LogSumExp` - Log-sum-exp function, a smooth approximation to maximum
 
 Example:
     Using trigonometric functions in dynamics::
@@ -528,3 +529,102 @@ class SmoothReLU(Expr):
 
     def __repr__(self):
         return f"smooth_relu({self.x!r}, c={self.c})"
+
+
+class LogSumExp(Expr):
+    """Log-sum-exp function for symbolic expressions.
+
+    Computes the log-sum-exp (LSE) of multiple operands, which is a smooth,
+    differentiable approximation to the maximum function. The log-sum-exp is
+    defined as:
+
+        logsumexp(x₁, x₂, ..., xₙ) = log(exp(x₁) + exp(x₂) + ... + exp(xₙ))
+
+    This function is numerically stable and is commonly used in optimization
+    as a smooth alternative to the non-differentiable maximum function. It
+    satisfies the inequality:
+
+        max(x₁, x₂, ..., xₙ) ≤ logsumexp(x₁, x₂, ..., xₙ) ≤ max(x₁, x₂, ..., xₙ) + log(n)
+
+    The log-sum-exp is convex and is particularly useful for:
+    - Smooth approximations of maximum constraints
+    - Soft maximum operations in neural networks
+    - Relaxing logical OR operations in STL specifications
+
+    Attributes:
+        operands: List of expressions to compute log-sum-exp over
+
+    Example:
+        Define a LogSumExp expression:
+
+            x = Variable("x", shape=(3,))
+            y = Variable("y", shape=(3,))
+            z = Variable("z", shape=(3,))
+            lse = LogSumExp(x, y, z)  # Smooth approximation to max(x, y, z)
+
+        Use in STL relaxation:
+
+            import openscvx as ox
+            # Relax: Or(φ₁, φ₂) using log-sum-exp
+            phi1 = ox.Norm(x - goal1) - 0.5
+            phi2 = ox.Norm(x - goal2) - 0.5
+            relaxed_or = LogSumExp(phi1, phi2) >= 0
+    """
+
+    def __init__(self, *args):
+        """Initialize a log-sum-exp operation.
+
+        Args:
+            *args: Two or more expressions to compute log-sum-exp over
+
+        Raises:
+            ValueError: If fewer than two operands are provided
+        """
+        if len(args) < 2:
+            raise ValueError("LogSumExp requires two or more operands")
+        self.operands = [to_expr(a) for a in args]
+
+    def children(self):
+        return list(self.operands)
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize log-sum-exp: flatten nested LogSumExp, fold constants."""
+        from .expr import Constant
+
+        operands = []
+        const_vals = []
+
+        for op in self.operands:
+            c = op.canonicalize()
+            if isinstance(c, LogSumExp):
+                operands.extend(c.operands)
+            elif isinstance(c, Constant):
+                const_vals.append(c.value)
+            else:
+                operands.append(c)
+
+        # If we have constants, compute their log-sum-exp and keep it
+        if const_vals:
+            # For constants, we can compute logsumexp directly
+            # logsumexp(c1, c2, ..., cn) = log(sum(exp(ci)))
+            exp_vals = [np.exp(v) for v in const_vals]
+            lse_const = np.log(np.sum(exp_vals))
+            operands.append(Constant(lse_const))
+
+        if not operands:
+            raise ValueError("LogSumExp must have at least one operand after canonicalization")
+        if len(operands) == 1:
+            return operands[0]
+        return LogSumExp(*operands)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """LogSumExp broadcasts shapes like NumPy, preserving element-wise shape."""
+        shapes = [child.check_shape() for child in self.children()]
+        try:
+            return np.broadcast_shapes(*shapes)
+        except ValueError as e:
+            raise ValueError(f"LogSumExp shapes not broadcastable: {shapes}") from e
+
+    def __repr__(self):
+        inner = ", ".join(repr(op) for op in self.operands)
+        return f"logsumexp({inner})"
