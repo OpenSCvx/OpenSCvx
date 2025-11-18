@@ -218,6 +218,35 @@ class Expr:
 
         return Transpose(self)
 
+    def node(self, k: int) -> "NodeReference":
+        """Reference this expression at a specific trajectory node.
+
+        This method enables inter-node constraints where you can reference
+        the value of an expression at different time steps. This works on any
+        expression, not just leaf variables, allowing for flexible constraint
+        definitions like:
+        - Rate limits: velocity.node(k) - velocity.node(k-1) <= max_rate
+        - Indexed node access: position[0].node(k) - position[0].node(k-1) <= threshold
+
+        Args:
+            k: Node index (integer) in the trajectory
+
+        Returns:
+            NodeReference: An expression representing this expression at node k
+
+        Example:
+            Node references on compound expressions:
+
+                position = State("pos", shape=(3,))
+
+                # Node reference on indexed expression
+                x_rate = (position[0].node(k) - position[0].node(k-1) <= 0.1)
+
+                # Node reference on the full vector
+                pos_rate = (position.node(k) - position.node(k-1) <= threshold)
+        """
+        return NodeReference(self, k)
+
     def children(self):
         """Return the child expressions of this node.
 
@@ -485,3 +514,103 @@ class Constant(Expr):
         else:
             # Array: show as Python list for readability
             return f"Const({self.value.tolist()!r})"
+
+
+class NodeReference(Expr):
+    """Reference to a variable at a specific trajectory node.
+
+    NodeReference enables inter-node constraints by allowing you to reference
+    the value of a state or control variable at a specific discrete time point
+    (node) in the trajectory. This is essential for expressing temporal relationships
+    such as:
+
+    - Rate limits and smoothness constraints
+    - Consistency between consecutive time steps
+    - Multi-step dependencies and recurrence relations
+
+    The node index can be a concrete integer or a symbolic reference (though
+    during compilation, it will be resolved to specific node indices based on
+    the constraint's `.at()` specification).
+
+    Attributes:
+        base: The expression (typically a Leaf like State or Control) being referenced
+        node_idx: The trajectory node index (integer or symbolic node reference)
+
+    Example:
+        Basic inter-node constraints:
+
+            position = State("pos", shape=(3,))
+
+            # Rate limit: change between consecutive nodes
+            rate_constraint = (position.node(k) - position.node(k-1) <= 0.1).at(range(1, N))
+
+        Multi-step dependencies:
+
+            state = State("x", shape=(1,))
+
+            # Fibonacci-like recurrence
+            recurrence = (state.node(k) == state.node(k-1) + state.node(k-2)).at(range(2, N))
+
+        Combine with spatial indexing:
+
+            velocity = State("vel", shape=(3,))
+
+            # Rate limit on just the z-component
+            z_rate = (velocity[2].node(k) - velocity[2].node(k-1) <= 0.05)
+
+    Note:
+        NodeReference is typically created via the `.node(k)` method on Leaf
+        expressions rather than constructed directly.
+    """
+
+    def __init__(self, base: Expr, node_idx: int):
+        """Initialize a NodeReference.
+
+        Args:
+            base: Expression to reference at a specific node (typically a Leaf)
+            node_idx: Trajectory node index (integer)
+
+        Raises:
+            TypeError: If node_idx is not an integer
+        """
+        if not isinstance(node_idx, int):
+            raise TypeError(f"Node index must be an integer, got {type(node_idx).__name__}")
+
+        self.base = base
+        self.node_idx = node_idx
+
+    def children(self):
+        """Return the base expression as the only child.
+
+        Returns:
+            list: Single-element list containing the base expression
+        """
+        return [self.base]
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize by canonicalizing the base expression.
+
+        Returns:
+            NodeReference: A new NodeReference with canonicalized base
+        """
+        canon_base = self.base.canonicalize()
+        return NodeReference(canon_base, self.node_idx)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Return the shape of the base expression.
+
+        NodeReference doesn't change the shape of the underlying expression,
+        it just references it at a specific time point.
+
+        Returns:
+            tuple: The shape of the base expression
+        """
+        return self.base.check_shape()
+
+    def __repr__(self):
+        """String representation of the NodeReference.
+
+        Returns:
+            str: String showing the base expression and node index
+        """
+        return f"{self.base!r}.node({self.node_idx})"

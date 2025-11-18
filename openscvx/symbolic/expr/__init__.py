@@ -79,6 +79,7 @@ from .expr import (
     Constant,
     Expr,
     Leaf,
+    NodeReference,
     Parameter,
     to_expr,
     traverse,
@@ -106,6 +107,7 @@ __all__ = [
     # Core base classes and fundamental operations
     "Expr",
     "Leaf",
+    "NodeReference",
     "Parameter",
     "to_expr",
     "traverse",
