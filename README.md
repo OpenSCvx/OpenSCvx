@@ -2,8 +2,8 @@
 
 <img src="figures/openscvx_logo.svg" width="1200"/>
 <p align="center">
-    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/tests-unit.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/tests-unit.yml/badge.svg"/></a>
     <a href="https://github.com/haynec/OpenSCvx/actions/workflows/lint.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/lint.yml/badge.svg"/></a>
+    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/tests-unit.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/tests-unit.yml/badge.svg"/></a>
     <a href="https://github.com/haynec/OpenSCvx/actions/workflows/tests-integration.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/tests-integration.yml/badge.svg"/></a>
     <a href="https://github.com/haynec/OpenSCvx/actions/workflows/nightly.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/nightly.yml/badge.svg"/></a>
     <a href="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml/badge.svg"/></a>

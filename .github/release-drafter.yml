@@ -44,6 +44,7 @@ autolabeler:
   - label: 'documentation'
     branch:
       - '/^[Dd]ocumentation\/.+/'
+      - '/^[Dd]ocs\/.+/'
       - '/^[Dd]oc\/.+/'
 template: |
   ## What's Changed
