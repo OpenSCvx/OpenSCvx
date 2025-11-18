@@ -8,6 +8,7 @@ import openscvx.symbolic.expr.linalg as linalg
 import openscvx.symbolic.expr.spatial as spatial
 import openscvx.symbolic.expr.stl as stl
 from openscvx.symbolic.expr import (
+    Abs,
     CTCS,
     Add,
     Concat,
@@ -70,6 +71,7 @@ __all__ = [
     "Sin",
     "Cos",
     "Sqrt",
+    "Abs",
     "Exp",
     "Log",
     "Max",

@@ -131,6 +131,7 @@ from typing import Any, Callable, Dict, Type
 import cvxpy as cp
 
 from openscvx.symbolic.expr import (
+    Abs,
     CTCS,
     Add,
     Concat,
@@ -706,6 +707,27 @@ class CvxpyLowerer:
         """
         operand = self.lower(node.operand)
         return cp.log(operand)
+
+    @visitor(Abs)
+    def _visit_abs(self, node: Abs) -> cp.Expression:
+        """Lower absolute value to CVXPy expression.
+
+        Absolute value is a convex function and DCP-compliant when used in
+        appropriate contexts (e.g., minimizing |x| or constraints like |x| <= c).
+
+        Args:
+            node: Abs expression node
+
+        Returns:
+            CVXPy expression representing |operand|
+
+        Note:
+            Absolute value is convex, so it's valid in:
+            - Objective: minimize abs(x)
+            - Constraints: abs(x) <= c (convex constraint)
+        """
+        operand = self.lower(node.operand)
+        return cp.abs(operand)
 
     @visitor(Equality)
     def _visit_equality(self, node: Equality) -> cp.Constraint:

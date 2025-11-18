@@ -9,6 +9,7 @@ Function Categories:
     - **Trigonometric:** `Sin`, `Cos` - Standard trigonometric functions
     - **Exponential and Roots:** `Exp`, `Log`, `Sqrt`, `Square` - Exponential, logarithm, square
         root, and squaring operations
+    - **Absolute Value:** `Abs` - Element-wise absolute value function
     - **Smooth Approximations:** `PositivePart`, `Huber`, `SmoothReLU` - Smooth, differentiable
         approximations of non-smooth functions like max(0, x) and absolute value
     - **Reductions:** `Max` - Maximum over elements
@@ -272,6 +273,46 @@ class Log(Expr):
 
     def __repr__(self):
         return f"log({self.operand!r})"
+
+
+class Abs(Expr):
+    """Element-wise absolute value function for symbolic expressions.
+
+    Computes the absolute value (|x|) of each element in the operand. Preserves
+    the shape of the input expression. The absolute value function is convex
+    and DCP-compliant in CVXPy.
+
+    Attributes:
+        operand: Expression to apply absolute value to
+
+    Example:
+        Define an Abs expression:
+
+            x = Variable("x", shape=(3,))
+            abs_x = Abs(x)  # Element-wise |x|
+    """
+
+    def __init__(self, operand):
+        """Initialize an absolute value operation.
+
+        Args:
+            operand: Expression to apply absolute value to
+        """
+        self.operand = to_expr(operand)
+
+    def children(self):
+        return [self.operand]
+
+    def canonicalize(self) -> "Expr":
+        operand = self.operand.canonicalize()
+        return Abs(operand)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Abs preserves the shape of its operand."""
+        return self.operand.check_shape()
+
+    def __repr__(self):
+        return f"abs({self.operand!r})"
 
 
 class Max(Expr):

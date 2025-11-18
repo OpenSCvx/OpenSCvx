@@ -111,6 +111,7 @@ import jax.numpy as jnp
 from jax.lax import cond
 
 from openscvx.symbolic.expr import (
+    Abs,
     CTCS,
     QDCM,
     SSM,
@@ -500,6 +501,12 @@ class JaxLowerer:
         """Lower natural logarithm to JAX function."""
         fO = self.lower(node.operand)
         return lambda x, u, node, params: jnp.log(fO(x, u, node, params))
+
+    @visitor(Abs)
+    def _visit_abs(self, node: Abs):
+        """Lower absolute value to JAX function."""
+        fO = self.lower(node.operand)
+        return lambda x, u, node, params: jnp.abs(fO(x, u, node, params))
 
     @visitor(Equality)
     @visitor(Inequality)
