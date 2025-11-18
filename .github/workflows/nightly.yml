@@ -41,7 +41,7 @@ jobs:
           UV_PUBLISH_USERNAME: ${{ secrets.PYPI_USERNAME }}
           UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          uv publish --skip-existing dist/*
+          uv publish --check-url https://pypi.org/simple/ dist/*
 
   docs:
     name: 📖 Deploy Nightly Docs

@@ -40,7 +40,7 @@ jobs:
           UV_PUBLISH_USERNAME: ${{ secrets.PYPI_USERNAME }}
           UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          uv publish dist/*
+          uv publish --check-url https://pypi.org/simple/ dist/*
 
       - name: Upload Release Assets
         if: success()
