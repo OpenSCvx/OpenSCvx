@@ -79,22 +79,22 @@ def print_problem_summary(settings):
     try:
         # Phase 1: Create CVXPy variables
         ocp_vars = create_cvxpy_variables(settings)
-        
+
         # Phase 2: Lower convex constraints to CVXPy (needed for problem construction)
         lowered_convex_constraints, _ = lower_convex_constraints(
             settings.sim.constraints_nodal_convex, ocp_vars, None
         )
-        
+
         # Temporarily store lowered constraints for problem construction
         original_constraints = settings.sim.constraints_nodal_convex
         settings.sim.constraints_nodal_convex = lowered_convex_constraints
-        
+
         # Phase 3: Build complete optimal control problem
         prob = OptimalControlProblem(settings, ocp_vars)
-        
+
         # Restore original constraints
         settings.sim.constraints_nodal_convex = original_constraints
-        
+
         # Get the actual problem size information like CVXPy verbose output
         n_cvx_variables = sum(var.size for var in prob.variables())
         n_cvx_parameters = sum(param.size for param in prob.parameters())
