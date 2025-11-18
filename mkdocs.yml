@@ -14,6 +14,7 @@ copyright: Copyright &copy; 2025 Chris Hayner
 # Configuration
 theme:
   name: material
+  custom_dir: material/overrides
   logo: assets/logo.svg
   toc:
     depth: 2
