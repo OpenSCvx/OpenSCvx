@@ -9,13 +9,16 @@ on:
       - main
 
 jobs:
-  build:
+  unit-tests:
+    name: Unit Tests (Python ${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15  # Unit tests should be fast
+
     strategy:
+      fail-fast: false  # Continue testing other versions even if one fails
       matrix:
         os: [ubuntu-latest, macos-latest]
         python-version: ['3.10', '3.11', '3.12', '3.13']
-
-    runs-on: ${{ matrix.os }}
 
     steps:
     - name: Checkout repository
@@ -36,6 +39,16 @@ jobs:
         # Install package with optional GUI and test packages
         uv pip install --system -e ".[gui,test]"
 
-    - name: Run tests (unit tests only, skip integration)
+    - name: Run unit tests
       run: |
-        pytest -v -m "not integration"
+        pytest -v -m "not integration" --durations=10 --tb=short
+
+    - name: Upload test results on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: unit-test-results-py${{ matrix.python-version }}-${{ matrix.os }}
+        path: |
+          .pytest_cache/
+          test-results/
+        retention-days: 7
