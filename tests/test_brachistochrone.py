@@ -413,7 +413,7 @@ def test_brachistochrone_parameters():
         initial=0.0,
         final=("minimize", total_time),
         min=0.0,
-        max=total_time,
+        max=10.0,
     )
 
     problem = TrajOptProblem(
@@ -433,6 +433,19 @@ def test_brachistochrone_parameters():
     problem.settings.scp.lam_vc = 1e1
     problem.settings.scp.uniform_time_grid = True
     problem.settings.sim.save_compiled = False
+
+    # Apply scaling override for time state
+    time_slice = problem.settings.sim.time_slice
+    if time_slice is not None:
+        # Use time bounds for scaling override
+        problem.settings.sim.scaling_x_overrides = [
+            (total_time, 0.0, time_slice),
+        ]
+
+    # Save original weight values for second problem setup
+    original_w_tr = problem.settings.scp.w_tr
+    original_lam_cost = problem.settings.scp.lam_cost
+    original_lam_vc = problem.settings.scp.lam_vc
 
     # Disable printing for cleaner test output
     if hasattr(problem.settings, "dev"):
@@ -475,6 +488,11 @@ def test_brachistochrone_parameters():
     position.guess = np.linspace(position.initial, position.final, n)
     velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
     theta.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1)
+
+    # Restore original weight values for second problem setup
+    problem.settings.scp.w_tr = original_w_tr
+    problem.settings.scp.lam_cost = original_lam_cost
+    problem.settings.scp.lam_vc = original_lam_vc
 
     # Solve again without re-initialization (parameters are updated)
     result2 = problem.solve()
