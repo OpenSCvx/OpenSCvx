@@ -939,7 +939,7 @@ class CvxpyLowerer:
         """Lower log-sum-exp to CVXPy expression.
 
         Log-sum-exp is convex and is a smooth approximation to the maximum function.
-        CVXPy's log_sum_exp atom computes log(sum(exp(x_i))) for multiple operands.
+        CVXPy's log_sum_exp atom computes log(sum(exp(x_i))) for stacked operands.
 
         Args:
             node: LogSumExp expression node with multiple operands
@@ -952,8 +952,15 @@ class CvxpyLowerer:
             max(x₁, ..., xₙ) ≤ logsumexp(x₁, ..., xₙ) ≤ max(x₁, ..., xₙ) + log(n)
         """
         operands = [self.lower(op) for op in node.operands]
-        # CVXPy's log_sum_exp can take multiple arguments
-        return cp.log_sum_exp(*operands)
+
+        # CVXPy's log_sum_exp expects a stacked expression with an axis parameter
+        # For element-wise log-sum-exp, we stack along a new axis and reduce along it
+        if len(operands) == 1:
+            return operands[0]
+
+        # Stack operands along a new axis (axis 0) and compute log_sum_exp along that axis
+        stacked = cp.vstack(operands)
+        return cp.log_sum_exp(stacked, axis=0)
 
     @visitor(Transpose)
     def _visit_transpose(self, node: Transpose) -> cp.Expression:
