@@ -98,8 +98,8 @@ problem.settings.scp.uniform_time_grid = True
 # Enable CLI printing for optimization iterations
 problem.settings.dev.printing = True
 
-problem.settings.cvx.cvxpygen = True
-problem.settings.cvx.solver = "qocogen"
+# problem.settings.cvx.cvxpygen = True
+# problem.settings.cvx.solver = "qocogen"
 problem.settings.cvx.solver_args = {}
 # problem.settings.cvx.cvxpygen_override = True
 

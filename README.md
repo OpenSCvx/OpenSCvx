@@ -2,14 +2,15 @@
 
 <img src="figures/openscvx_logo.svg" width="1200"/>
 <p align="center">
-    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/ci.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/ci.yml/badge.svg"/></a>
     <a href="https://github.com/haynec/OpenSCvx/actions/workflows/lint.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/lint.yml/badge.svg"/></a>
-    <a href="https://arxiv.org/abs/2410.22596"><img src="http://img.shields.io/badge/arXiv-2410.22596-B31B1B.svg"/></a>
-    <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"/></a>
-</p>
-<p align="center">
+    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/tests-unit.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/tests-unit.yml/badge.svg"/></a>
+    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/tests-integration.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/tests-integration.yml/badge.svg"/></a>
     <a href="https://github.com/haynec/OpenSCvx/actions/workflows/nightly.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/nightly.yml/badge.svg"/></a>
     <a href="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml/badge.svg"/></a>
+</p>
+<p align="center">
+    <a href="https://arxiv.org/abs/2410.22596"><img src="http://img.shields.io/badge/arXiv-2410.22596-B31B1B.svg"/></a>
+    <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"/></a>
 </p>
 
 <!-- PROJECT LOGO -->
@@ -49,27 +50,27 @@ uv pip install openscvx[gui,cvxpygen]
 <details>
 <summary>Nightly</summary>
 
-To install the latest development version (nightly) without cloning:
+To install the latest development version (nightly):
 
 ```sh
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx
+pip install --pre openscvx
 ```
 
 With optional dependencies:
 
 ```sh
-pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx[gui,cvxpygen]
+pip install --pre openscvx[gui,cvxpygen]
 ```
 
 Or using uv:
 
 ```sh
-uv pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx
+uv pip install --pre openscvx
 # With optional dependencies
-uv pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openscvx[gui,cvxpygen]
+uv pip install --pre openscvx[gui,cvxpygen]
 ```
 
-**Note:** The `--extra-index-url https://pypi.org/simple/` flag is required because TestPyPI doesn't host all dependencies (like cvxpy, jax, etc.), so pip/uv will fetch them from the main PyPI.
+**Note:** The `--pre` flag tells pip/uv to install pre-release versions (e.g., `1.2.4.dev3`) from PyPI.
 
 Alternatively, for local development with the latest source:
 

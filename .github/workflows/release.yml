@@ -11,71 +11,49 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - uses: actions/setup-python@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
-      - name: Install build tools
-        run: pip install --upgrade pip build twine setuptools-scm
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
 
       - name: Build distributions
         env:
-            # on this job only, use "only-version" so on tag vX.Y.Z you get X.Y.Z exactly
-            SETUPTOOLS_SCM_VERSION_SCHEME: only-version
-            SETUPTOOLS_SCM_LOCAL_SCHEME: no-local-version
+          # on this job only, use "only-version" so on tag vX.Y.Z you get X.Y.Z exactly
+          SETUPTOOLS_SCM_VERSION_SCHEME: only-version
+          SETUPTOOLS_SCM_LOCAL_SCHEME: no-local-version
         run: |
           rm -rf dist
-          python -m build
+          uv build
 
       - name: Publish to PyPI
         env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+          UV_PUBLISH_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          UV_PUBLISH_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          twine upload \
-            --non-interactive \
-            --verbose \
-            --skip-existing \
-            dist/*.whl
+          uv publish --check-url https://pypi.org/simple/ dist/*
 
       - name: Upload Release Assets
-        if: ${{ always() }}
+        if: success()
         run: |
           gh release upload "${{ github.event.release.tag_name }}" dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-docs:
-    runs-on: ubuntu-latest
+    name: 📖 Deploy Versioned Docs
     needs: publish
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Configure Git Credentials
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.x
-
-      - name: Install documentation tools
-        run: |
-          pip install mkdocs-material mkdocstrings-python mike
-          pip install mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
-          sudo apt-get update && sudo apt-get install -y pngquant
-
-      - name: Install package
-        run: pip install -e .
-
-      - name: Deploy versioned documentation
-        run: |
-          git fetch origin gh-pages --depth=1 || true
-          VERSION="${{ github.event.release.tag_name }}"
-          mike deploy --push --update-aliases "${VERSION}" latest
-          mike set-default --push latest
+    permissions:
+      contents: write  # Required for mike deploy --push to gh-pages
+    uses: ./.github/workflows/_docs.yml
+    with:
+      version: ${{ github.event.release.tag_name }}

@@ -34,7 +34,30 @@ pip install openscvx
 uv pip install openscvx
 ```
 
-For the latest development version, you can clone the repository and install it in editable mode:
+### Development Version (Nightly)
+
+To install the latest development version (nightly) from PyPI:
+
+```sh
+pip install --pre openscvx[gui,cvxpygen]
+# or with uv
+uv pip install --pre openscvx[gui,cvxpygen]
+```
+
+Or for just the core library:
+
+```sh
+pip install --pre openscvx
+# or with uv
+uv pip install --pre openscvx
+```
+
+!!! note "Pre-release Versions"
+    The `--pre` flag tells pip/uv to install pre-release versions (e.g., `1.2.4.dev3`). These nightly builds contain the latest features and bug fixes but may be less stable than official releases.
+
+### Local Development
+
+For local development, you can clone the repository and install it in editable mode:
 
 ```sh
 # Clone the repo
