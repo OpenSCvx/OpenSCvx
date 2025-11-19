@@ -1,4 +1,5 @@
 ---
+template: home.html
 title: OpenSCvx
 social:
   cards_layout_options:
