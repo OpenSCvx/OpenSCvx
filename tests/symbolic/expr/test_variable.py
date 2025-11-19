@@ -169,7 +169,7 @@ def test_boundary_condition_helpers():
     import numpy as np
 
     import openscvx as ox
-    from openscvx.symbolic.expr import Free, Fixed, Minimize, Maximize, State
+    from openscvx.symbolic.expr import Free, Fixed, Maximize, Minimize, State
 
     # Test that helpers return correct tuples
     assert Free(5.0) == ("free", 5.0)
