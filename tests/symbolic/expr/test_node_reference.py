@@ -17,7 +17,6 @@ from openscvx.symbolic.expr import (
     Variable,
 )
 
-
 # =============================================================================
 # NodeReference Creation and Basic Properties
 # =============================================================================
@@ -168,6 +167,7 @@ def test_node_reference_arithmetic_operations():
 
     # Should create a subtraction expression
     from openscvx.symbolic.expr import Sub
+
     assert isinstance(delta_v, Sub)
 
     # Check that children are the node references
@@ -228,6 +228,7 @@ def test_node_reference_inequality_constraint():
     constraint = (vel_k - vel_k_minus_1) <= max_accel
 
     from openscvx.symbolic.expr import Inequality
+
     assert isinstance(constraint, Inequality)
 
     # Should be able to check shape (constraints return scalar)
@@ -245,6 +246,7 @@ def test_node_reference_equality_constraint():
     constraint = pos_start == pos_end
 
     from openscvx.symbolic.expr import Equality
+
     assert isinstance(constraint, Equality)
     assert constraint.check_shape() == ()
 
@@ -261,6 +263,7 @@ def test_node_reference_with_nodal_constraint():
     constraint = (position.node(10) - position.node(9) <= rate_limit).at(range(1, N))
 
     from openscvx.symbolic.expr import NodalConstraint
+
     assert isinstance(constraint, NodalConstraint)
     assert constraint.nodes == list(range(1, N))
 
@@ -315,6 +318,7 @@ def test_position_rate_constraint():
     # Apply to specific nodes
     nodal_constraint = constraint.at([1, 2, 3, 4, 5])
     from openscvx.symbolic.expr import NodalConstraint
+
     assert isinstance(nodal_constraint, NodalConstraint)
 
 
@@ -381,7 +385,7 @@ def test_multi_step_dependency():
     x_prev = state.node(9)
 
     dt = 0.1
-    accel = (x_next - 2*x_curr + x_prev) / (dt**2)
+    accel = (x_next - 2 * x_curr + x_prev) / (dt**2)
 
     # Should be able to constrain this
     max_accel = 5.0
@@ -401,9 +405,11 @@ def test_boundary_coupling_constraint():
     periodicity_constraint = x_start == x_end
 
     from openscvx.symbolic.expr import Equality
+
     assert isinstance(periodicity_constraint, Equality)
 
     # Apply only at the boundary nodes
     constraint_at_boundary = periodicity_constraint.at([0, 100])
     from openscvx.symbolic.expr import NodalConstraint
+
     assert isinstance(constraint_at_boundary, NodalConstraint)

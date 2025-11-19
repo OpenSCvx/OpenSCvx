@@ -69,7 +69,14 @@ from .arithmetic import Add, Div, MatMul, Mul, Neg, Power, Sub
 from .array import Concat, Hstack, Index, Stack, Vstack
 
 # Specialized constraints
-from .constraint import CTCS, Constraint, Equality, Inequality, NodalConstraint, ctcs
+from .constraint import (
+    CTCS,
+    Constraint,
+    Equality,
+    Inequality,
+    NodalConstraint,
+    ctcs,
+)
 
 # Control
 from .control import Control

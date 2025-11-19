@@ -35,7 +35,7 @@ Example:
         safety_constraint = (distance >= obstacle_radius).over((0, 100))
 """
 
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 
