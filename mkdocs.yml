@@ -97,10 +97,6 @@ plugins:
             docstring_style: google
             filters: ["!^__"]
 
-# Hooks
-hooks:
-  - material/overrides/hooks/shortcodes.py
-  - material/overrides/hooks/translations.py
 
 # Additional configuration
 extra:
