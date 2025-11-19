@@ -107,7 +107,7 @@ from .math import (
 from .spatial import QDCM, SSM, SSMP
 
 # State
-from .state import BoundaryType, State
+from .state import BoundaryType, Fixed, Free, Maximize, Minimize, State
 
 # STL operations
 from .stl import Or
@@ -141,6 +141,10 @@ __all__ = [
     # State
     "State",
     "BoundaryType",
+    "Free",
+    "Fixed",
+    "Minimize",
+    "Maximize",
     # Control
     "Control",
     # Mathematical functions

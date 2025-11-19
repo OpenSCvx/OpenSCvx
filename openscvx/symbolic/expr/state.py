@@ -31,6 +31,121 @@ class BoundaryType(str, Enum):
     MAXIMIZE = "maximize"
 
 
+def Free(guess):
+    """Create a free boundary condition tuple.
+    
+    This is a convenience function that returns a tuple ("free", guess) which
+    can be used to specify free boundary conditions for State or Time objects.
+    
+    Args:
+        guess: Initial guess value for the free variable.
+    
+    Returns:
+        tuple: ("free", guess) tuple suitable for use in State.initial, State.final,
+            or Time.initial, Time.final.
+    
+    Example:
+        ```python
+        pos = ox.State("pos", (3,))
+        pos.final = [ox.Free(5.0), ox.Free(3.0), 10]  # First two free, third fixed
+        
+        time = ox.Time(
+            initial=0.0,
+            final=ox.Free(10.0),
+            min=0.0,
+            max=20.0
+        )
+        ```
+    """
+    return ("free", guess)
+
+
+def Fixed(value):
+    """Create a fixed boundary condition tuple.
+    
+    This is a convenience function that returns a tuple ("fixed", value) which
+    can be used to explicitly specify fixed boundary conditions for State or Time objects.
+    Note that plain numbers default to fixed, so this is mainly for clarity.
+    
+    Args:
+        value: Fixed value for the boundary condition.
+    
+    Returns:
+        tuple: ("fixed", value) tuple suitable for use in State.initial, State.final,
+            or Time.initial, Time.final.
+    
+    Example:
+        ```python
+        pos = ox.State("pos", (3,))
+        pos.final = [ox.Fixed(10.0), ox.Free(5.0), ox.Fixed(2.0)]
+        
+        # Equivalent to:
+        pos.final = [10.0, ox.Free(5.0), 2.0]  # Plain numbers default to fixed
+        ```
+    """
+    return ("fixed", value)
+
+
+def Minimize(guess):
+    """Create a minimize boundary condition tuple.
+    
+    This is a convenience function that returns a tuple ("minimize", guess) which
+    can be used to specify that a boundary value should be minimized in the objective
+    function for State or Time objects.
+    
+    Args:
+        guess: Initial guess value for the variable to be minimized.
+    
+    Returns:
+        tuple: ("minimize", guess) tuple suitable for use in State.initial, State.final,
+            or Time.initial, Time.final.
+    
+    Example:
+        ```python
+        time = ox.Time(
+            initial=0.0,
+            final=ox.Minimize(10.0),  # Minimize final time
+            min=0.0,
+            max=20.0
+        )
+        
+        fuel = ox.State("fuel", (1,))
+        fuel.final = [ox.Minimize(0)]  # Minimize final fuel consumption
+        ```
+    """
+    return ("minimize", guess)
+
+
+def Maximize(guess):
+    """Create a maximize boundary condition tuple.
+    
+    This is a convenience function that returns a tuple ("maximize", guess) which
+    can be used to specify that a boundary value should be maximized in the objective
+    function for State or Time objects.
+    
+    Args:
+        guess: Initial guess value for the variable to be maximized.
+    
+    Returns:
+        tuple: ("maximize", guess) tuple suitable for use in State.initial, State.final,
+            or Time.initial, Time.final.
+    
+    Example:
+        ```python
+        altitude = ox.State("altitude", (1,))
+        altitude.final = [ox.Maximize(100.0)]  # Maximize final altitude
+        
+        time = ox.Time(
+            initial=ox.Maximize(0.0),  # Maximize initial time
+            final=10.0,
+            min=0.0,
+            max=20.0
+        )
+        ```
+    """
+    return ("maximize", guess)
+
+
 class State(Variable):
     """State variable with boundary conditions for trajectory optimization.
 

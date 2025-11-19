@@ -164,6 +164,82 @@ def test_state_boundary_conditions_mixed():
     assert s.final_type[2] == "Free"
 
 
+def test_boundary_condition_helpers():
+    """Test the Free, Fixed, Minimize, Maximize helper functions."""
+    import numpy as np
+
+    import openscvx as ox
+    from openscvx.symbolic.expr import Free, Fixed, Minimize, Maximize, State
+
+    # Test that helpers return correct tuples
+    assert Free(5.0) == ("free", 5.0)
+    assert Fixed(10.0) == ("fixed", 10.0)
+    assert Minimize(3.0) == ("minimize", 3.0)
+    assert Maximize(7.0) == ("maximize", 7.0)
+
+    # Test using helpers with State
+    s = State("x", shape=(3,))
+    s.min = [0.0, 0.0, 0.0]
+    s.max = [10.0, 10.0, 10.0]
+    s.initial = [Fixed(0), Free(1.0), Minimize(2.0)]
+    s.final = [10, Maximize(8.0), Free(5.0)]
+
+    assert np.allclose(s.initial, [0.0, 1.0, 2.0])
+    assert np.allclose(s.final, [10.0, 8.0, 5.0])
+    # Note: Fixed() returns "Fixed" (capitalized), plain numbers return "Fix"
+    assert s.initial_type[0] == "Fixed"
+    assert s.initial_type[1] == "Free"
+    assert s.initial_type[2] == "Minimize"
+    assert s.final_type[0] == "Fix"  # Plain number
+    assert s.final_type[1] == "Maximize"
+    assert s.final_type[2] == "Free"
+
+    # Test using helpers via ox namespace
+    s2 = ox.State("y", shape=(2,))
+    s2.min = [0.0, 0.0]
+    s2.max = [5.0, 5.0]
+    s2.initial = [ox.Free(1.0), ox.Fixed(2.0)]
+    s2.final = [ox.Minimize(3.0), ox.Maximize(4.0)]
+
+    assert np.allclose(s2.initial, [1.0, 2.0])
+    assert np.allclose(s2.final, [3.0, 4.0])
+    assert s2.initial_type[0] == "Free"
+    assert s2.initial_type[1] == "Fixed"  # Fixed() returns "Fixed"
+    assert s2.final_type[0] == "Minimize"
+    assert s2.final_type[1] == "Maximize"
+
+    # Test using helpers with Time
+    # Note: Time doesn't accept "fixed" as a tuple (plain numbers are fixed)
+    from openscvx import Time
+
+    time1 = Time(
+        initial=0.0,  # Plain number for fixed
+        final=ox.Minimize(10.0),
+        min=0.0,
+        max=20.0,
+    )
+    assert time1.initial == 0.0
+    assert time1.final == ox.Minimize(10.0)
+
+    time2 = Time(
+        initial=0.0,  # Plain number still works
+        final=ox.Free(5.0),
+        min=0.0,
+        max=20.0,
+    )
+    assert time2.initial == 0.0
+    assert time2.final == ox.Free(5.0)
+
+    time3 = Time(
+        initial=ox.Maximize(0.0),
+        final=10.0,  # Plain number for fixed
+        min=0.0,
+        max=20.0,
+    )
+    assert time3.initial == ox.Maximize(0.0)
+    assert time3.final == 10.0
+
+
 # --- State: Shape Checking ---
 
 
