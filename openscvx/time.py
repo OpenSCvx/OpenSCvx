@@ -76,3 +76,41 @@ class Time:
         self.max = max
         # Time derivative is always 1.0 internally
         self.derivative = 1.0
+        self._scaling_min = None
+        self._scaling_max = None
+
+    @property
+    def scaling_min(self):
+        """Get the scaling minimum bound for the time variable.
+
+        Returns:
+            Scaling minimum value, or None if not set.
+        """
+        return self._scaling_min
+
+    @scaling_min.setter
+    def scaling_min(self, val):
+        """Set the scaling minimum bound for the time variable.
+
+        Args:
+            val: Scaling minimum value (float or None)
+        """
+        self._scaling_min = float(val) if val is not None else None
+
+    @property
+    def scaling_max(self):
+        """Get the scaling maximum bound for the time variable.
+
+        Returns:
+            Scaling maximum value, or None if not set.
+        """
+        return self._scaling_max
+
+    @scaling_max.setter
+    def scaling_max(self, val):
+        """Set the scaling maximum bound for the time variable.
+
+        Args:
+            val: Scaling maximum value (float or None)
+        """
+        self._scaling_max = float(val) if val is not None else None

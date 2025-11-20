@@ -53,7 +53,7 @@ Example:
         # controls_aug includes original controls + time dilation
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -351,6 +351,8 @@ def augment_with_time_state(
     time_min: float,
     time_max: float,
     N: int,
+    time_scaling_min: Optional[float] = None,
+    time_scaling_max: Optional[float] = None,
 ) -> Tuple[List[State], List[Constraint]]:
     """Augment problem with a time state variable.
 
@@ -431,6 +433,12 @@ def augment_with_time_state(
             else time_state.final[0][1]
         )
         time_state.guess = np.linspace(time_guess_start, time_guess_end, N).reshape(-1, 1)
+
+        # Transfer scaling_min/max from Time object if provided
+        if time_scaling_min is not None:
+            time_state.scaling_min = np.array([time_scaling_min])
+        if time_scaling_max is not None:
+            time_state.scaling_max = np.array([time_scaling_max])
 
         # Add time state to the list
         states_aug.append(time_state)

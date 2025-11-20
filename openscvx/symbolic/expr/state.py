@@ -207,6 +207,8 @@ class State(Variable):
         self.initial_type = None
         self._final = None
         self.final_type = None
+        self._scaling_min = None
+        self._scaling_max = None
 
     @property
     def min(self):
@@ -516,6 +518,60 @@ class State(Variable):
                 )
 
         self._check_bounds_against_initial_final()
+
+    @property
+    def scaling_min(self):
+        """Get the scaling minimum bounds for the state variables.
+
+        Returns:
+            Array of scaling minimum values for each state variable element, or None if not set.
+        """
+        return self._scaling_min
+
+    @scaling_min.setter
+    def scaling_min(self, val):
+        """Set the scaling minimum bounds for the state variables.
+
+        Args:
+            val: Array of scaling minimum values, must match the state shape exactly
+
+        Raises:
+            ValueError: If the shape doesn't match the state shape
+        """
+        if val is None:
+            self._scaling_min = None
+            return
+        val = np.asarray(val)
+        if val.shape != self.shape:
+            raise ValueError(f"Scaling min shape {val.shape} does not match State shape {self.shape}")
+        self._scaling_min = val
+
+    @property
+    def scaling_max(self):
+        """Get the scaling maximum bounds for the state variables.
+
+        Returns:
+            Array of scaling maximum values for each state variable element, or None if not set.
+        """
+        return self._scaling_max
+
+    @scaling_max.setter
+    def scaling_max(self, val):
+        """Set the scaling maximum bounds for the state variables.
+
+        Args:
+            val: Array of scaling maximum values, must match the state shape exactly
+
+        Raises:
+            ValueError: If the shape doesn't match the state shape
+        """
+        if val is None:
+            self._scaling_max = None
+            return
+        val = np.asarray(val)
+        if val.shape != self.shape:
+            raise ValueError(f"Scaling max shape {val.shape} does not match State shape {self.shape}")
+        self._scaling_max = val
 
     def __repr__(self):
         """String representation of the State object.

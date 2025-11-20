@@ -76,6 +76,35 @@ def test_augment_with_time_state_basic():
     assert len(constraints_aug) == 2
 
 
+def test_augment_with_time_state_scaling():
+    """Test that scaling_min/max from Time object is transferred to time State."""
+    x = State("x", (2,))
+    x.initial = np.array([0.0, 0.0])
+    x.final = np.array([10.0, 5.0])
+
+    states = [x]
+    constraints = []
+    N = 10
+
+    states_aug, constraints_aug = augment_with_time_state(
+        states,
+        constraints,
+        time_initial=0.0,
+        time_final=2.0,
+        time_min=0.0,
+        time_max=10.0,
+        N=N,
+        time_scaling_min=1.0,
+        time_scaling_max=8.0,
+    )
+
+    # Check that time state has scaling set
+    time_state = states_aug[1]
+    assert time_state.name == "time"
+    assert np.allclose(time_state.scaling_min, np.array([1.0]))
+    assert np.allclose(time_state.scaling_max, np.array([8.0]))
+
+
 def test_augment_with_time_state_free_initial():
     """Test time augmentation with free initial time."""
     x = State("x", (1,))
