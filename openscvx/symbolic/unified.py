@@ -154,6 +154,8 @@ class UnifiedState:
     _augmented_slice: Optional[slice] = None
     time_slice: Optional[slice] = None  # Slice for time state
     ctcs_slice: Optional[slice] = None  # Slice for CTCS augmented states
+    scaling_min: Optional[np.ndarray] = None  # Scaling minimum bounds for unified state
+    scaling_max: Optional[np.ndarray] = None  # Scaling maximum bounds for unified state
 
     def __post_init__(self):
         """Initialize slices after dataclass creation."""
@@ -501,6 +503,8 @@ class UnifiedControl:
     _true_slice: Optional[slice] = None
     _augmented_slice: Optional[slice] = None
     time_dilation_slice: Optional[slice] = None  # Slice for time dilation control
+    scaling_min: Optional[np.ndarray] = None  # Scaling minimum bounds for unified control
+    scaling_max: Optional[np.ndarray] = None  # Scaling maximum bounds for unified control
 
     def __post_init__(self):
         """Initialize slices after dataclass creation."""
@@ -842,6 +846,42 @@ def unify_states(states: List[State], name: str = "unified_state") -> UnifiedSta
         slice(ctcs_states[0]._slice.start, ctcs_states[-1]._slice.stop) if ctcs_states else None
     )
 
+    # Aggregate scaling_min and scaling_max from individual states
+    # Build full arrays using scaling where available, min/max otherwise
+    unified_scaling_min = None
+    unified_scaling_max = None
+
+    # Check if any state has scaling
+    has_any_scaling = any(
+        state.scaling_min is not None or state.scaling_max is not None for state in sorted_states
+    )
+
+    if has_any_scaling:
+        # Build full scaling arrays
+        scaling_min_list = []
+        scaling_max_list = []
+        for state in sorted_states:
+            if state.scaling_min is not None:
+                scaling_min_list.append(state.scaling_min)
+            else:
+                # Use min as fallback
+                if state.min is not None:
+                    scaling_min_list.append(state.min)
+                else:
+                    scaling_min_list.append(np.full(state.shape[0], -np.inf))
+
+            if state.scaling_max is not None:
+                scaling_max_list.append(state.scaling_max)
+            else:
+                # Use max as fallback
+                if state.max is not None:
+                    scaling_max_list.append(state.max)
+                else:
+                    scaling_max_list.append(np.full(state.shape[0], np.inf))
+
+        unified_scaling_min = np.concatenate(scaling_min_list)
+        unified_scaling_max = np.concatenate(scaling_max_list)
+
     return UnifiedState(
         name=name,
         shape=(total_shape,),
@@ -859,6 +899,8 @@ def unify_states(states: List[State], name: str = "unified_state") -> UnifiedSta
         _augmented_slice=slice(true_dim, total_shape),
         time_slice=time_slice,
         ctcs_slice=ctcs_slice,
+        scaling_min=unified_scaling_min,
+        scaling_max=unified_scaling_max,
     )
 
 
@@ -967,6 +1009,43 @@ def unify_controls(controls: List[Control], name: str = "unified_control") -> Un
     time_dilation_control = next((c for c in sorted_controls if c.name == "_time_dilation"), None)
     time_dilation_slice = time_dilation_control._slice if time_dilation_control else None
 
+    # Aggregate scaling_min and scaling_max from individual controls
+    # Build full arrays using scaling where available, min/max otherwise
+    unified_scaling_min = None
+    unified_scaling_max = None
+
+    # Check if any control has scaling
+    has_any_scaling = any(
+        control.scaling_min is not None or control.scaling_max is not None
+        for control in sorted_controls
+    )
+
+    if has_any_scaling:
+        # Build full scaling arrays
+        scaling_min_list = []
+        scaling_max_list = []
+        for control in sorted_controls:
+            if control.scaling_min is not None:
+                scaling_min_list.append(control.scaling_min)
+            else:
+                # Use min as fallback
+                if control.min is not None:
+                    scaling_min_list.append(control.min)
+                else:
+                    scaling_min_list.append(np.full(control.shape[0], -np.inf))
+
+            if control.scaling_max is not None:
+                scaling_max_list.append(control.scaling_max)
+            else:
+                # Use max as fallback
+                if control.max is not None:
+                    scaling_max_list.append(control.max)
+                else:
+                    scaling_max_list.append(np.full(control.shape[0], np.inf))
+
+        unified_scaling_min = np.concatenate(scaling_min_list)
+        unified_scaling_max = np.concatenate(scaling_max_list)
+
     return UnifiedControl(
         name=name,
         shape=(total_shape,),
@@ -977,4 +1056,6 @@ def unify_controls(controls: List[Control], name: str = "unified_control") -> Un
         _true_slice=slice(0, true_dim),
         _augmented_slice=slice(true_dim, total_shape),
         time_dilation_slice=time_dilation_slice,
+        scaling_min=unified_scaling_min,
+        scaling_max=unified_scaling_max,
     )

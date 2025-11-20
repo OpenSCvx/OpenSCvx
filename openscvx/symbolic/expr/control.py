@@ -1,3 +1,5 @@
+import numpy as np
+
 from .variable import Variable
 
 
@@ -63,6 +65,66 @@ class Control(Variable):
             shape: Shape of the control vector (typically 1D tuple like (3,))
         """
         super().__init__(name, shape)
+        self._scaling_min = None
+        self._scaling_max = None
+
+    @property
+    def scaling_min(self):
+        """Get the scaling minimum bounds for the control variables.
+
+        Returns:
+            Array of scaling minimum values for each control variable element, or None if not set.
+        """
+        return self._scaling_min
+
+    @scaling_min.setter
+    def scaling_min(self, val):
+        """Set the scaling minimum bounds for the control variables.
+
+        Args:
+            val: Array of scaling minimum values, must match the control shape exactly
+
+        Raises:
+            ValueError: If the shape doesn't match the control shape
+        """
+        if val is None:
+            self._scaling_min = None
+            return
+        val = np.asarray(val)
+        if val.shape != self.shape:
+            raise ValueError(
+                f"Scaling min shape {val.shape} does not match Control shape {self.shape}"
+            )
+        self._scaling_min = val
+
+    @property
+    def scaling_max(self):
+        """Get the scaling maximum bounds for the control variables.
+
+        Returns:
+            Array of scaling maximum values for each control variable element, or None if not set.
+        """
+        return self._scaling_max
+
+    @scaling_max.setter
+    def scaling_max(self, val):
+        """Set the scaling maximum bounds for the control variables.
+
+        Args:
+            val: Array of scaling maximum values, must match the control shape exactly
+
+        Raises:
+            ValueError: If the shape doesn't match the control shape
+        """
+        if val is None:
+            self._scaling_max = None
+            return
+        val = np.asarray(val)
+        if val.shape != self.shape:
+            raise ValueError(
+                f"Scaling max shape {val.shape} does not match Control shape {self.shape}"
+            )
+        self._scaling_max = val
 
     def __repr__(self):
         """String representation of the Control object.

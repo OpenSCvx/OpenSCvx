@@ -197,8 +197,6 @@ class SimConfig:
         n_states: Optional[int] = None,
         n_states_prop: Optional[int] = None,
         n_controls: Optional[int] = None,
-        scaling_x_overrides: Optional[list] = None,
-        scaling_u_overrides: Optional[list] = None,
     ):
         """
         Configuration class for simulation settings.
@@ -237,17 +235,11 @@ class SimConfig:
                 variables. Defaults to `None` (inferred from x_prop.max).
             n_controls (int, optional): The number of control variables. Defaults
                 to `None` (inferred from u.max).
-            scaling_x_overrides (list, optional): List of (upper_bound,
-                lower_bound, idx) for custom state scaling. Each can be scalar or
-                array, idx can be int, list, or slice.
-            scaling_u_overrides (list, optional): List of (upper_bound,
-                lower_bound, idx) for custom control scaling. Each can be scalar
-                or array, idx can be int, list, or slice.
 
         Note:
             You can specify custom scaling for specific states/controls using
-            scaling_x_overrides and scaling_u_overrides. Any indices not covered
-            by overrides will use the default min/max bounds.
+            the `scaling_min` and `scaling_max` attributes on State, Control, and Time objects.
+            If not set, the default min/max bounds will be used for scaling.
         """
         # Assign core arguments to self
         self.x = x
@@ -264,8 +256,6 @@ class SimConfig:
         self.n_states = n_states
         self.n_states_prop = n_states_prop
         self.n_controls = n_controls
-        self.scaling_x_overrides = scaling_x_overrides
-        self.scaling_u_overrides = scaling_u_overrides
 
         # Call post init logic
         self.__post_init__()
@@ -274,38 +264,43 @@ class SimConfig:
         self.n_states = len(self.x.max)
         self.n_controls = len(self.u.max)
 
-        # Helper to apply overrides
-        def apply_overrides(size, overrides, min_arr, max_arr):
-            upper = np.array(max_arr, dtype=float)
-            lower = np.array(min_arr, dtype=float)
-            if overrides is not None:
-                for ub, lb, idx in overrides:
-                    if isinstance(idx, int):
-                        idxs = [idx]
-                    elif isinstance(idx, slice):
-                        idxs = list(range(*idx.indices(size)))
-                    else:
-                        idxs = list(idx)
-                    ub_vals = [ub] * len(idxs) if np.isscalar(ub) else ub
-                    lb_vals = [lb] * len(idxs) if np.isscalar(lb) else lb
-                    for i, uval, lval in zip(idxs, ub_vals, lb_vals):
-                        upper[i] = uval
-                        lower[i] = lval
-            return upper, lower
-
         # State scaling
-        min_x = np.array(self.x.min)
-        max_x = np.array(self.x.max)
-        upper_x, lower_x = apply_overrides(self.n_states, self.scaling_x_overrides, min_x, max_x)
+        # Use scaling_min/max if provided, otherwise use regular min/max
+        min_x = np.array(self.x.min, dtype=float)
+        max_x = np.array(self.x.max, dtype=float)
+
+        # UnifiedState now always provides full-size scaling arrays when any state has scaling
+        if self.x.scaling_min is not None:
+            lower_x = np.array(self.x.scaling_min, dtype=float)
+        else:
+            lower_x = min_x
+
+        if self.x.scaling_max is not None:
+            upper_x = np.array(self.x.scaling_max, dtype=float)
+        else:
+            upper_x = max_x
+
         S_x, c_x = get_affine_scaling_matrices(self.n_states, lower_x, upper_x)
         self.S_x = S_x
         self.c_x = c_x
         self.inv_S_x = np.diag(1 / np.diag(self.S_x))
 
         # Control scaling
-        min_u = np.array(self.u.min)
-        max_u = np.array(self.u.max)
-        upper_u, lower_u = apply_overrides(self.n_controls, self.scaling_u_overrides, min_u, max_u)
+        # Use scaling_min/max if provided, otherwise use regular min/max
+        min_u = np.array(self.u.min, dtype=float)
+        max_u = np.array(self.u.max, dtype=float)
+
+        # UnifiedControl now always provides full-size scaling arrays when any control has scaling
+        if self.u.scaling_min is not None:
+            lower_u = np.array(self.u.scaling_min, dtype=float)
+        else:
+            lower_u = min_u
+
+        if self.u.scaling_max is not None:
+            upper_u = np.array(self.u.scaling_max, dtype=float)
+        else:
+            upper_u = max_u
+
         S_u, c_u = get_affine_scaling_matrices(self.n_controls, lower_u, upper_u)
         self.S_u = S_u
         self.c_u = c_u
