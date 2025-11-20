@@ -384,4 +384,3 @@ def test_simconfig_partial_scaling():
     # S_x[2] from regular: max(1, abs(-5-5)/2)=5
     expected_S_diag = np.array([3.0, 2.0, 5.0])
     np.testing.assert_array_almost_equal(np.diag(sim_config.S_x), expected_S_diag)
-

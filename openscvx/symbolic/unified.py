@@ -850,13 +850,12 @@ def unify_states(states: List[State], name: str = "unified_state") -> UnifiedSta
     # Build full arrays using scaling where available, min/max otherwise
     unified_scaling_min = None
     unified_scaling_max = None
-    
+
     # Check if any state has scaling
     has_any_scaling = any(
-        state.scaling_min is not None or state.scaling_max is not None
-        for state in sorted_states
+        state.scaling_min is not None or state.scaling_max is not None for state in sorted_states
     )
-    
+
     if has_any_scaling:
         # Build full scaling arrays
         scaling_min_list = []
@@ -870,7 +869,7 @@ def unify_states(states: List[State], name: str = "unified_state") -> UnifiedSta
                     scaling_min_list.append(state.min)
                 else:
                     scaling_min_list.append(np.full(state.shape[0], -np.inf))
-            
+
             if state.scaling_max is not None:
                 scaling_max_list.append(state.scaling_max)
             else:
@@ -879,7 +878,7 @@ def unify_states(states: List[State], name: str = "unified_state") -> UnifiedSta
                     scaling_max_list.append(state.max)
                 else:
                     scaling_max_list.append(np.full(state.shape[0], np.inf))
-        
+
         unified_scaling_min = np.concatenate(scaling_min_list)
         unified_scaling_max = np.concatenate(scaling_max_list)
 
@@ -1014,13 +1013,13 @@ def unify_controls(controls: List[Control], name: str = "unified_control") -> Un
     # Build full arrays using scaling where available, min/max otherwise
     unified_scaling_min = None
     unified_scaling_max = None
-    
+
     # Check if any control has scaling
     has_any_scaling = any(
         control.scaling_min is not None or control.scaling_max is not None
         for control in sorted_controls
     )
-    
+
     if has_any_scaling:
         # Build full scaling arrays
         scaling_min_list = []
@@ -1034,7 +1033,7 @@ def unify_controls(controls: List[Control], name: str = "unified_control") -> Un
                     scaling_min_list.append(control.min)
                 else:
                     scaling_min_list.append(np.full(control.shape[0], -np.inf))
-            
+
             if control.scaling_max is not None:
                 scaling_max_list.append(control.scaling_max)
             else:
@@ -1043,7 +1042,7 @@ def unify_controls(controls: List[Control], name: str = "unified_control") -> Un
                     scaling_max_list.append(control.max)
                 else:
                     scaling_max_list.append(np.full(control.shape[0], np.inf))
-        
+
         unified_scaling_min = np.concatenate(scaling_min_list)
         unified_scaling_max = np.concatenate(scaling_max_list)
 

@@ -268,18 +268,18 @@ class SimConfig:
         # Use scaling_min/max if provided, otherwise use regular min/max
         min_x = np.array(self.x.min, dtype=float)
         max_x = np.array(self.x.max, dtype=float)
-        
+
         # UnifiedState now always provides full-size scaling arrays when any state has scaling
         if self.x.scaling_min is not None:
             lower_x = np.array(self.x.scaling_min, dtype=float)
         else:
             lower_x = min_x
-        
+
         if self.x.scaling_max is not None:
             upper_x = np.array(self.x.scaling_max, dtype=float)
         else:
             upper_x = max_x
-        
+
         S_x, c_x = get_affine_scaling_matrices(self.n_states, lower_x, upper_x)
         self.S_x = S_x
         self.c_x = c_x
@@ -289,18 +289,18 @@ class SimConfig:
         # Use scaling_min/max if provided, otherwise use regular min/max
         min_u = np.array(self.u.min, dtype=float)
         max_u = np.array(self.u.max, dtype=float)
-        
+
         # UnifiedControl now always provides full-size scaling arrays when any control has scaling
         if self.u.scaling_min is not None:
             lower_u = np.array(self.u.scaling_min, dtype=float)
         else:
             lower_u = min_u
-        
+
         if self.u.scaling_max is not None:
             upper_u = np.array(self.u.scaling_max, dtype=float)
         else:
             upper_u = max_u
-        
+
         S_u, c_u = get_affine_scaling_matrices(self.n_controls, lower_u, upper_u)
         self.S_u = S_u
         self.c_u = c_u
