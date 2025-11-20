@@ -5917,7 +5917,7 @@ Defaults to an empty dictionary.</p>
 
 
 <h4 id="openscvx.config.SimConfig.__init__" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">openscvx</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">SimConfig</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">UnifiedState</span><span class="p">,</span> <span class="n">x_prop</span><span class="p">:</span> <span class="n">UnifiedState</span><span class="p">,</span> <span class="n">u</span><span class="p">:</span> <span class="n">UnifiedControl</span><span class="p">,</span> <span class="n">total_time</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">save_compiled</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">ctcs_node_intervals</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">constraints_ctcs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">constraints_nodal</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">constraints_nodal_convex</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_states</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_states_prop</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_controls</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">scaling_x_overrides</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">scaling_u_overrides</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">openscvx</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">SimConfig</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">UnifiedState</span><span class="p">,</span> <span class="n">x_prop</span><span class="p">:</span> <span class="n">UnifiedState</span><span class="p">,</span> <span class="n">u</span><span class="p">:</span> <span class="n">UnifiedControl</span><span class="p">,</span> <span class="n">total_time</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">save_compiled</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">ctcs_node_intervals</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">constraints_ctcs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">constraints_nodal</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">constraints_nodal_convex</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_states</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_states_prop</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n_controls</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#openscvx.config.SimConfig.__init__" class="headerlink" title="Permanent link">&para;</a></h4>
 
@@ -6254,42 +6254,6 @@ to <code>None</code> (inferred from u.max).</p>
                   <code>None</code>
             </td>
           </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>scaling_x_overrides</code>
-            </td>
-            <td>
-                  <code><span title="list">list</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>List of (upper_bound,
-lower_bound, idx) for custom state scaling. Each can be scalar or
-array, idx can be int, list, or slice.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>scaling_u_overrides</code>
-            </td>
-            <td>
-                  <code><span title="list">list</span></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>List of (upper_bound,
-lower_bound, idx) for custom control scaling. Each can be scalar
-or array, idx can be int, list, or slice.</p>
-              </div>
-            </td>
-            <td>
-                  <code>None</code>
-            </td>
-          </tr>
       </tbody>
     </table>
 
@@ -6297,8 +6261,8 @@ or array, idx can be int, list, or slice.</p>
 <details class="note" open>
   <summary>Note</summary>
   <p>You can specify custom scaling for specific states/controls using
-scaling_x_overrides and scaling_u_overrides. Any indices not covered
-by overrides will use the default min/max bounds.</p>
+the <code>scaling_min</code> and <code>scaling_max</code> attributes on State, Control, and Time objects.
+If not set, the default min/max bounds will be used for scaling.</p>
 </details>
 
     </div>
