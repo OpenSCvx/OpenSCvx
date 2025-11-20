@@ -543,7 +543,9 @@ class State(Variable):
             return
         val = np.asarray(val)
         if val.shape != self.shape:
-            raise ValueError(f"Scaling min shape {val.shape} does not match State shape {self.shape}")
+            raise ValueError(
+                f"Scaling min shape {val.shape} does not match State shape {self.shape}"
+            )
         self._scaling_min = val
 
     @property
@@ -570,7 +572,9 @@ class State(Variable):
             return
         val = np.asarray(val)
         if val.shape != self.shape:
-            raise ValueError(f"Scaling max shape {val.shape} does not match State shape {self.shape}")
+            raise ValueError(
+                f"Scaling max shape {val.shape} does not match State shape {self.shape}"
+            )
         self._scaling_max = val
 
     def __repr__(self):

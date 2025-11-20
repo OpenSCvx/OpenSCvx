@@ -11,7 +11,6 @@ from openscvx.symbolic.expr import Control, State
 from openscvx.symbolic.unified import unify_controls, unify_states
 from openscvx.time import Time
 
-
 # =============================================================================
 # State scaling tests
 # =============================================================================
@@ -283,7 +282,6 @@ def test_unify_controls_scaling_none():
 def test_simconfig_uses_scaling_when_provided():
     """Test that SimConfig uses scaling_min/max when provided, otherwise falls back to min/max."""
     from openscvx.config import SimConfig
-    from openscvx.symbolic.unified import UnifiedState, UnifiedControl
 
     # Create unified state with scaling
     state = State("x", shape=(2,))
@@ -323,7 +321,6 @@ def test_simconfig_uses_scaling_when_provided():
 def test_simconfig_falls_back_to_min_max():
     """Test that SimConfig falls back to min/max when scaling is not provided."""
     from openscvx.config import SimConfig
-    from openscvx.symbolic.unified import UnifiedState, UnifiedControl
 
     # Create unified state without scaling
     state = State("x", shape=(2,))
@@ -353,7 +350,6 @@ def test_simconfig_falls_back_to_min_max():
 def test_simconfig_partial_scaling():
     """Test SimConfig uses scaling where available, min/max elsewhere."""
     from openscvx.config import SimConfig
-    from openscvx.symbolic.unified import UnifiedState, UnifiedControl
 
     # Create states - one with scaling, one without
     state1 = State("pos", shape=(2,))
