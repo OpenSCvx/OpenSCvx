@@ -92,6 +92,7 @@ from .math import (
     Abs,
     Cos,
     Exp,
+    Tan,
     Huber,
     Log,
     LogSumExp,
@@ -150,6 +151,7 @@ __all__ = [
     # Mathematical functions
     "Sin",
     "Cos",
+    "Tan",
     "Sqrt",
     "Abs",
     "PositivePart",

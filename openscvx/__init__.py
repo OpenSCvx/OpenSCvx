@@ -17,6 +17,7 @@ from openscvx.symbolic.expr import (
     Control,
     Cos,
     Div,
+    Tan,
     Equality,
     Exp,
     Expr,
@@ -80,6 +81,7 @@ __all__ = [
     # Mathematical functions
     "Sin",
     "Cos",
+    "Tan",
     "Sqrt",
     "Abs",
     "Exp",

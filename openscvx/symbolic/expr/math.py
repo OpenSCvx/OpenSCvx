@@ -6,7 +6,7 @@ of non-differentiable operations. All functions are element-wise and preserve th
 shape of their inputs.
 
 Function Categories:
-    - **Trigonometric:** `Sin`, `Cos` - Standard trigonometric functions
+    - **Trigonometric:** `Sin`, `Cos`, `Tan` - Standard trigonometric functions
     - **Exponential and Roots:** `Exp`, `Log`, `Sqrt`, `Square` - Exponential, logarithm, square
         root, and squaring operations
     - **Absolute Value:** `Abs` - Element-wise absolute value function
@@ -117,6 +117,49 @@ class Cos(Expr):
 
     def __repr__(self):
         return f"(cos({self.operand!r}))"
+
+
+class Tan(Expr):
+    """Element-wise tangent function for symbolic expressions.
+
+    Computes the tangent of each element in the operand. Preserves the shape
+    of the input expression.
+
+    Attributes:
+        operand: Expression to apply tangent function to
+
+    Example:
+        Define a Tan expression:
+
+            theta = Variable("theta", shape=(3,))
+            tan_theta = Tan(theta)
+
+    Note:
+        Tan is only supported for JAX lowering. CVXPy lowering will raise
+        NotImplementedError since tangent is not DCP-compliant.
+    """
+
+    def __init__(self, operand):
+        """Initialize a tangent operation.
+
+        Args:
+            operand: Expression to apply tangent function to
+        """
+        self.operand = operand
+
+    def children(self):
+        return [self.operand]
+
+    def canonicalize(self) -> "Expr":
+        operand = self.operand.canonicalize()
+        return Tan(operand)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Tan preserves the shape of its operand."""
+        return self.operand.check_shape()
+
+    def __repr__(self):
+        return f"(tan({self.operand!r}))"
 
 
 class Square(Expr):
