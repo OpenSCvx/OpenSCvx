@@ -150,6 +150,7 @@ from openscvx.symbolic.expr import (
     Stack,
     Sub,
     Sum,
+    Tan,
     Transpose,
     Vstack,
 )
@@ -491,6 +492,12 @@ class JaxLowerer:
         """Lower cosine function to JAX function."""
         fO = self.lower(node.operand)
         return lambda x, u, node, params: jnp.cos(fO(x, u, node, params))
+
+    @visitor(Tan)
+    def _visit_tan(self, node: Tan):
+        """Lower tangent function to JAX function."""
+        fO = self.lower(node.operand)
+        return lambda x, u, node, params: jnp.tan(fO(x, u, node, params))
 
     @visitor(Exp)
     def _visit_exp(self, node: Exp):

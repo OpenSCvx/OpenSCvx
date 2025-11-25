@@ -2,7 +2,7 @@
 
 This module tests mathematical function nodes:
 
-- Trigonometric: Sin, Cos
+- Trigonometric: Sin, Cos, Tan
 - Exponential: Exp, Log, Sqrt
 - Nonlinear: Square, PositivePart, Huber, SmoothReLU, Max
 - Absolute value: Abs
@@ -2074,6 +2074,193 @@ def test_cvxpy_cos_not_implemented():
     expr = Cos(x)
 
     with pytest.raises(NotImplementedError, match="Trigonometric functions like Cos"):
+        lowerer.lower(expr)
+
+
+# =============================================================================
+# Tan
+# =============================================================================
+
+
+def test_tan_creation():
+    """Test Tan node creation and properties."""
+    from openscvx.symbolic.expr import Tan
+
+    x = Variable("x", shape=(1,))
+
+    tan_x = Tan(x)
+    assert repr(tan_x) == "(tan(Var('x')))"
+    assert tan_x.children() == [x]
+
+
+# --- Tan: Shape Checking ---
+
+
+def test_tan_shape_preserves_input():
+    """Test that Tan preserves the shape of its input."""
+    from openscvx.symbolic.expr import Tan
+
+    x = Variable("x", shape=(4, 4))
+
+    tan_x = Tan(x)
+    assert tan_x.check_shape() == (4, 4)
+
+
+def test_tan_shape_with_vector():
+    """Test Tan shape with vector input."""
+    from openscvx.symbolic.expr import Tan
+
+    x = Variable("x", shape=(10,))
+
+    tan_x = Tan(x)
+    assert tan_x.check_shape() == (10,)
+
+
+def test_tan_shape_with_scalar():
+    """Test Tan shape with scalar input."""
+    from openscvx.symbolic.expr import Tan
+
+    x = Variable("x", shape=())
+
+    tan_x = Tan(x)
+    assert tan_x.check_shape() == ()
+
+
+# --- Tan: Canonicalization ---
+
+
+def test_tan_canonicalize_preserves_structure():
+    """Test that Tan canonicalization preserves structure."""
+    from openscvx.symbolic.expr import Tan
+
+    x = Variable("x", shape=(3,))
+
+    tan_x = Tan(x)
+    canonical = tan_x.canonicalize()
+
+    assert isinstance(canonical, Tan)
+    assert canonical.operand == x
+
+
+def test_tan_canonicalize_recursively():
+    """Test that Tan canonicalization recurses into operands."""
+    from openscvx.symbolic.expr import Add, Constant, Tan
+
+    x = Variable("x", shape=(3,))
+    # Tan(x + 0) should canonicalize to Tan(x)
+    expr = Tan(Add(x, Constant(0.0)))
+    canonical = expr.canonicalize()
+
+    assert isinstance(canonical, Tan)
+    assert canonical.operand == x
+
+
+# --- Tan: JAX Lowering ---
+
+
+def test_tan_constant():
+    """Test Tan with constant values."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Constant, Tan
+    from openscvx.symbolic.lower import lower_to_jax
+
+    values = np.array([0.0, np.pi / 4, -np.pi / 4, np.pi / 6])
+    expr = Tan(Constant(values))
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    expected = jnp.tan(values)
+    assert jnp.allclose(result, expected, atol=1e-6)
+
+
+def test_tan_state():
+    """Test Tan with state variables."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import State, Tan
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = jnp.array([0.0, np.pi / 6, np.pi / 4, np.pi / 3])
+
+    state = State("s", (4,))
+    state._slice = slice(0, 4)
+    expr = Tan(state)
+
+    fn = lower_to_jax(expr)
+    result = fn(x, None, None, None)
+
+    expected = jnp.tan(x)
+    assert jnp.allclose(result, expected)
+
+
+def test_tan_with_expression():
+    """Test Tan with a composite expression."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Constant, Mul, State, Tan
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = jnp.array([0.0, 1.0, 2.0])
+
+    state = State("s", (3,))
+    state._slice = slice(0, 3)
+
+    # tan(2*x)
+    expr = Tan(Mul(Constant(2.0), state))
+
+    fn = lower_to_jax(expr)
+    result = fn(x, None, None, None)
+
+    expected = jnp.tan(2.0 * x)
+    assert jnp.allclose(result, expected)
+
+
+def test_tan_identity():
+    """Test that tan(x) = sin(x) / cos(x)."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Cos, Div, Sin, State, Tan
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = jnp.array([0.0, np.pi / 6, np.pi / 4, -np.pi / 4])
+
+    state = State("s", (4,))
+    state._slice = slice(0, 4)
+
+    # tan(x)
+    tan_expr = Tan(state)
+    # sin(x) / cos(x)
+    sin_cos_expr = Div(Sin(state), Cos(state))
+
+    tan_fn = lower_to_jax(tan_expr)
+    sin_cos_fn = lower_to_jax(sin_cos_expr)
+
+    tan_result = tan_fn(x, None, None, None)
+    sin_cos_result = sin_cos_fn(x, None, None, None)
+
+    assert jnp.allclose(tan_result, sin_cos_result, atol=1e-6)
+
+
+# --- Tan: CVXPy Lowering ---
+
+
+def test_cvxpy_tan_not_implemented():
+    """Test that Tan raises NotImplementedError"""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State, Tan
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    x = State("x", shape=(3,))
+    expr = Tan(x)
+
+    with pytest.raises(NotImplementedError, match="Trigonometric functions like Tan"):
         lowerer.lower(expr)
 
 

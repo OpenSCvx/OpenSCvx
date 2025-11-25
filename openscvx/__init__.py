@@ -41,6 +41,7 @@ from openscvx.symbolic.expr import (
     State,
     Sub,
     Sum,
+    Tan,
     Variable,
     ctcs,
 )
@@ -80,6 +81,7 @@ __all__ = [
     # Mathematical functions
     "Sin",
     "Cos",
+    "Tan",
     "Sqrt",
     "Abs",
     "Exp",

@@ -101,6 +101,7 @@ from .math import (
     SmoothReLU,
     Sqrt,
     Square,
+    Tan,
 )
 
 # Spatial/3D operations
@@ -150,6 +151,7 @@ __all__ = [
     # Mathematical functions
     "Sin",
     "Cos",
+    "Tan",
     "Sqrt",
     "Abs",
     "PositivePart",

@@ -161,6 +161,7 @@ from openscvx.symbolic.expr import (
     Stack,
     Sub,
     Sum,
+    Tan,
     Transpose,
 )
 from openscvx.symbolic.expr.control import Control
@@ -661,6 +662,29 @@ class CvxpyLowerer:
         """
         raise NotImplementedError(
             "Trigonometric functions like Cos are not DCP-compliant in CVXPy. "
+            "Consider using piecewise-linear approximations or handle these constraints "
+            "in the dynamics (JAX) layer instead."
+        )
+
+    @visitor(Tan)
+    def _visit_tan(self, node: Tan) -> cp.Expression:
+        """Raise NotImplementedError for tangent function.
+
+        Tangent is not DCP-compliant in CVXPy as it is neither convex nor concave.
+
+        Args:
+            node: Tan expression node
+
+        Raises:
+            NotImplementedError: Always raised since tangent is not DCP-compliant
+
+        Note:
+            For constraints involving trigonometric functions:
+            - Use piecewise-linear approximations, or
+            - Handle in the JAX dynamics/constraint layer instead of CVXPy
+        """
+        raise NotImplementedError(
+            "Trigonometric functions like Tan are not DCP-compliant in CVXPy. "
             "Consider using piecewise-linear approximations or handle these constraints "
             "in the dynamics (JAX) layer instead."
         )
