@@ -334,7 +334,7 @@ Here's a complete reference for shapes at each stage, shown with symbolic dimens
 - Use simple symbolic expressions to maximize JIT compilation effectiveness
 - Keep the number of states/controls reasonable (hundreds, not thousands)
 - Parameters should be problem constants, not optimization variables
-- Reuse compiled solvers when possible (they are cached based on problem structure)
+- Reuse compiled solvers when possible (they can be cached based on problem structure)
 
 ## Implementation Files Reference
 
