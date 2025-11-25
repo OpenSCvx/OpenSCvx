@@ -188,3 +188,5 @@ nav:
       - 'Overview/control_parameterization.md'
       - 'Overview/time_dilation.md'
       - 'Overview/discretization.md'
+    - Under the Hood:
+      - 'UnderTheHood/vectorization_and_vmapping.md'

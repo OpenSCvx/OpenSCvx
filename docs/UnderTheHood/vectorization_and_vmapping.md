@@ -377,7 +377,8 @@ for state in problem.states:
 
 ## See Also
 
-- [Basic Problem Setup](basic_problem_setup.md) - How to define problems
-- [API: State](api_state.md) - State class documentation
-- [API: Control](api_control.md) - Control class documentation
-- [API: TrajOptProblem](api_trajoptproblem.md) - Main problem class
+- [Basic Problem Setup](../Usage/basic_problem_setup.md) - How to define problems
+- [API: State](../Usage/api_state.md) - State class documentation
+- [API: Control](../Usage/api_control.md) - Control class documentation
+- [API: TrajOptProblem](../Usage/api_trajoptproblem.md) - Main problem class
+- [Discretization](../Overview/discretization.md) - How discretization works in OpenSCvx
