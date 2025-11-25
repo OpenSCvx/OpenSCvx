@@ -1,140 +1,101 @@
 # Vectorization and Vmapping Across Decision Nodes
 
-This page explains how OpenSCvx processes individual state and control definitions, combines them into unified vectors, and vectorizes computations across decision nodes using JAX's `vmap`. Understanding this pipeline is crucial for performance optimization and debugging.
+This page explains how OpenSCvx internally processes symbolic problem definitions into vectorized JAX computations. After symbolic preprocessing and augmentation (which you've likely seen in basic usage), the library creates unified state/control vectors and applies JAX's `vmap` to evaluate dynamics across all decision nodes in parallel.
 
-## Overview
+## Processing Pipeline
 
-OpenSCvx transforms user-defined dynamics and constraints through several stages:
+The transformation from symbolic expressions to vectorized execution happens in several stages:
 
-1. **User Definition**: Define individual states, controls, and their dynamics symbolically
-2. **Symbolic Preprocessing**: Augment with time state, CTCS augmented states, and time dilation
-3. **Unification**: Combine individual variables into monolithic "unified" vectors
-4. **JAX Lowering**: Convert symbolic expressions to executable JAX functions
-5. **Vectorization**: Apply `vmap` to batch computations across all decision nodes
+1. **Symbolic Preprocessing**: Augmentation with time state, CTCS states, and time dilation (covered in basic usage)
+2. **Unification**: Individual State/Control objects combined into monolithic vectors
+3. **JAX Lowering**: Symbolic expressions compiled to executable JAX functions
+4. **Vectorization**: `vmap` applied to batch computations across decision nodes
 
-This pipeline enables efficient computation by evaluating dynamics and constraints for all nodes simultaneously rather than sequentially.
+Understanding this pipeline is useful for performance optimization, debugging shape mismatches, and extending the library.
 
-## Stage 1: User Definition
+## Stage 1: Symbolic Problem Definition
 
-Users define problems with individual states and controls, each with their own shape:
+Starting from a typical problem definition with individual states and controls:
 
 ```python
 import openscvx as ox
 import numpy as np
 
-# Define individual state components
-position = ox.State("position", shape=(2,))  # 2D position [x, y]
-position.initial = np.array([0.0, 10.0])
-position.final = [10.0, 5.0]
+# Individual state components
+position = ox.State("position", shape=(2,))
+velocity = ox.State("velocity", shape=(1,))
 
-velocity = ox.State("velocity", shape=(1,))  # Scalar speed
-velocity.initial = np.array([0.0])
+# Control
+theta = ox.Control("theta", shape=(1,))
 
-# Define control
-theta = ox.Control("theta", shape=(1,))  # Angle from vertical
-
-# Define dynamics as dictionary mapping state names to derivatives
+# Dynamics per state
 dynamics = {
-    "position": ox.Concat(
-        velocity[0] * ox.Sin(theta[0]),  # x_dot
-        -velocity[0] * ox.Cos(theta[0]),  # y_dot
-    ),
-    "velocity": 9.81 * ox.Cos(theta[0]),  # v_dot
+    "position": ox.Concat(velocity[0] * ox.Sin(theta[0]), -velocity[0] * ox.Cos(theta[0])),
+    "velocity": 9.81 * ox.Cos(theta[0]),
 }
 ```
 
-**Key Points:**
-- Each state/control is defined independently with its own shape
-- Dynamics are specified per-state using symbolic expressions
-- No explicit mention of decision nodes or batching
+At this stage, each state/control is independent with its own shape, and dynamics are symbolic expressions without any notion of batching or decision nodes.
 
-## Stage 2: Symbolic Preprocessing
+## Stage 2: Symbolic Preprocessing and Augmentation
 
-When `TrajOptProblem` is constructed, preprocessing augments the problem:
+During `TrajOptProblem` construction (in `preprocess_symbolic_problem`), the symbolic problem is augmented:
 
 ```python
 problem = TrajOptProblem(
     dynamics=dynamics,
     states=[position, velocity],
     controls=[theta],
-    N=10,  # Number of decision nodes
+    N=10,
     time=ox.Time(initial=0.0, final=2.0),
 )
 ```
 
-**Augmentation Process** (in `openscvx/symbolic/builder.py:preprocess_symbolic_problem`):
+Internally, additional states and controls are added:
+- Time state (if not user-provided)
+- CTCS augmented states for path constraints
+- Time dilation control for time-optimal problems
 
-1. **Time State Added**: If not provided, a `"time"` state is auto-created
-2. **CTCS Augmented States**: For each CTCS constraint, an augmented state is added (e.g., `"_ctcs_aug_0"`)
-3. **Time Dilation Control**: A `"_time_dilation"` control is added for time-optimal problems
-
-**After Augmentation:**
-```python
-# states_aug = [position, velocity, time, _ctcs_aug_0, ...]
-# controls_aug = [theta, _time_dilation]
-```
-
-The augmented dynamics now includes derivatives for all states, including the augmented ones.
+After augmentation: `states_aug = [position, velocity, time, ...]` and `controls_aug = [theta, _time_dilation]`, with corresponding dynamics for all augmented states.
 
 ## Stage 3: Unification
 
-Individual states and controls are combined into single monolithic vectors (in `openscvx/symbolic/lower.py:lower_symbolic_expressions`):
+The augmented states and controls are combined into unified vectors (in `lower_symbolic_expressions`):
 
 ```python
 x_unified: UnifiedState = unify_states(states_aug)
 u_unified: UnifiedControl = unify_controls(controls_aug)
 ```
 
-**Unification Process** (in `openscvx/symbolic/unified.py`):
+The unification process (in `openscvx/symbolic/unified.py`) sorts variables (user-defined first, then augmented), concatenates properties (bounds, guesses, etc.), and assigns each State/Control a slice for indexing into the unified vector.
 
-1. **Sorting**: User-defined variables first, then augmented (starting with `_`)
-2. **Concatenation**: All properties concatenated (min, max, guess, initial, final)
-3. **Slice Assignment**: Each original State/Control gets a slice for indexing
+### Unified Vector Shapes
 
-**Example Unified Shapes:**
-
-In general, for a problem with `N` decision nodes:
+For a problem with `N` decision nodes:
 
 ```python
-# Individual states before unification:
-# position: (2,) at each node
-# velocity: (1,) at each node
-# time: (1,) at each node
-# _ctcs_aug_0: (K,) at each node  # K depends on CTCS constraints
-
-# After unification:
-x_unified.shape = (n_x,)  # Sum of all individual state dimensions
-u_unified.shape = (n_u,)  # Sum of all control dimensions
-
-# Guess trajectories:
-x_unified.guess.shape = (N, n_x)    # States at all N nodes
-u_unified.guess.shape = (N, n_u)    # Controls at all N nodes
+x_unified.shape = (n_x,)          # Sum of all state dimensions
+u_unified.shape = (n_u,)          # Sum of all control dimensions
+x_unified.guess.shape = (N, n_x)  # State trajectory
+u_unified.guess.shape = (N, n_u)  # Control trajectory
 ```
 
-**Concrete Example:** For the brachistochrone problem with `N=10` nodes, `position` (2D), `velocity` (1D), `time` (1D), and `theta` control (1D), `_time_dilation` control (1D):
-
+**Concrete example** (brachistochrone with N=10, no CTCS constraints):
 ```python
-# After unification (no CTCS constraints for simplicity):
 x_unified.shape = (4,)        # position(2) + velocity(1) + time(1)
 u_unified.shape = (2,)        # theta(1) + _time_dilation(1)
-
-# Guess trajectories:
-x_unified.guess.shape = (10, 4)    # States at 10 nodes
-u_unified.guess.shape = (10, 2)    # Controls at 10 nodes
+x_unified.guess.shape = (10, 4)
+u_unified.guess.shape = (10, 2)
 ```
 
-**Accessing Individual Components:**
-
-After unification, each state retains its slice:
-
+Each original State/Control retains a slice for extraction:
 ```python
-# position has ._slice = slice(0, 2)
-# velocity has ._slice = slice(2, 3)
-# time has ._slice = slice(3, 4)
+position._slice = slice(0, 2)
+velocity._slice = slice(2, 3)
+time._slice = slice(3, 4)
 
-# During lowering, extract values like:
-x_unified = jnp.array([...])  # (n_x,) unified state
-position_value = x_unified[position._slice]  # (2,) extract position
+# Extract during evaluation:
+position_value = x_unified[position._slice]  # (2,)
 ```
 
 ## Stage 4: JAX Lowering
