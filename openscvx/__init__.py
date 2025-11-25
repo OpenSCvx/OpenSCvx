@@ -9,6 +9,7 @@ import openscvx.symbolic.expr.spatial as spatial
 import openscvx.symbolic.expr.stl as stl
 from openscvx.symbolic.expr import (
     CTCS,
+    Abs,
     Add,
     Concat,
     Constant,
@@ -19,12 +20,17 @@ from openscvx.symbolic.expr import (
     Equality,
     Exp,
     Expr,
+    Fixed,
+    Free,
     Index,
     Inequality,
     Leaf,
     Log,
+    LogSumExp,
     MatMul,
     Max,
+    Maximize,
+    Minimize,
     Mul,
     Neg,
     NodalConstraint,
@@ -35,6 +41,7 @@ from openscvx.symbolic.expr import (
     State,
     Sub,
     Sum,
+    Tan,
     Variable,
     ctcs,
 )
@@ -53,6 +60,11 @@ __all__ = [
     "Variable",
     "State",
     "Control",
+    # Boundary condition helpers
+    "Free",
+    "Fixed",
+    "Minimize",
+    "Maximize",
     # Basic arithmetic operations
     "Add",
     "Sub",
@@ -69,9 +81,12 @@ __all__ = [
     # Mathematical functions
     "Sin",
     "Cos",
+    "Tan",
     "Sqrt",
+    "Abs",
     "Exp",
     "Log",
+    "LogSumExp",
     "Max",
     # Constraints
     "Constraint",

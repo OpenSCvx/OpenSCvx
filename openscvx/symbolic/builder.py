@@ -242,7 +242,15 @@ def preprocess_symbolic_problem(
     # Augment states with time state if needed (auto-create approach)
     if not has_time_state:
         states, constraints = augment_with_time_state(
-            states, constraints, time_initial, time_final, time_min, time_max, N
+            states,
+            constraints,
+            time_initial,
+            time_final,
+            time_min,
+            time_max,
+            N,
+            time_scaling_min=getattr(time, "scaling_min", None),
+            time_scaling_max=getattr(time, "scaling_max", None),
         )
 
     # Add time derivative to dynamics dict (if not already present)

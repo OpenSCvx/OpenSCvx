@@ -201,4 +201,6 @@ check_lint.py
 
 # MkDocs Material Insiders (installed from GitHub in CI, not committed)
 material/
+# But allow custom overrides to be committed
+!material/overrides/
 src/

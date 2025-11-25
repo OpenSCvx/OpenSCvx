@@ -415,6 +415,9 @@ def test_brachistochrone_parameters():
         min=0.0,
         max=10.0,
     )
+    # Apply custom scaling for time
+    time.scaling_min = 0.0
+    time.scaling_max = 2.0
 
     problem = TrajOptProblem(
         dynamics=dynamics,
@@ -433,14 +436,6 @@ def test_brachistochrone_parameters():
     problem.settings.scp.lam_vc = 1e1
     problem.settings.scp.uniform_time_grid = True
     problem.settings.sim.save_compiled = False
-
-    # Apply scaling override for time state
-    time_slice = problem.settings.sim.time_slice
-    if time_slice is not None:
-        # Use time bounds for scaling override
-        problem.settings.sim.scaling_x_overrides = [
-            (total_time, 0.0, time_slice),
-        ]
 
     # Save original weight values for second problem setup
     original_w_tr = problem.settings.scp.w_tr

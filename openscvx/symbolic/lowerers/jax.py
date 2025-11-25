@@ -109,12 +109,14 @@ from typing import Any, Callable, Dict, Type
 
 import jax.numpy as jnp
 from jax.lax import cond
+from jax.scipy.special import logsumexp
 
 from openscvx.symbolic.expr import (
     CTCS,
     QDCM,
     SSM,
     SSMP,
+    Abs,
     Add,
     Concat,
     Constant,
@@ -130,6 +132,7 @@ from openscvx.symbolic.expr import (
     Index,
     Inequality,
     Log,
+    LogSumExp,
     MatMul,
     Max,
     Mul,
@@ -147,6 +150,7 @@ from openscvx.symbolic.expr import (
     Stack,
     Sub,
     Sum,
+    Tan,
     Transpose,
     Vstack,
 )
@@ -489,6 +493,12 @@ class JaxLowerer:
         fO = self.lower(node.operand)
         return lambda x, u, node, params: jnp.cos(fO(x, u, node, params))
 
+    @visitor(Tan)
+    def _visit_tan(self, node: Tan):
+        """Lower tangent function to JAX function."""
+        fO = self.lower(node.operand)
+        return lambda x, u, node, params: jnp.tan(fO(x, u, node, params))
+
     @visitor(Exp)
     def _visit_exp(self, node: Exp):
         """Lower exponential function to JAX function."""
@@ -500,6 +510,12 @@ class JaxLowerer:
         """Lower natural logarithm to JAX function."""
         fO = self.lower(node.operand)
         return lambda x, u, node, params: jnp.log(fO(x, u, node, params))
+
+    @visitor(Abs)
+    def _visit_abs(self, node: Abs):
+        """Lower absolute value to JAX function."""
+        fO = self.lower(node.operand)
+        return lambda x, u, node, params: jnp.abs(fO(x, u, node, params))
 
     @visitor(Equality)
     @visitor(Inequality)
@@ -683,6 +699,27 @@ class JaxLowerer:
             for val in values[1:]:
                 result = jnp.maximum(result, val)
             return result
+
+        return fn
+
+    @visitor(LogSumExp)
+    def _visit_logsumexp(self, node: LogSumExp):
+        """Lower log-sum-exp to JAX function.
+
+        Computes log(sum(exp(x_i))) for multiple operands, which is a smooth
+        approximation to the maximum function. Uses JAX's numerically stable
+        logsumexp implementation. Performs element-wise log-sum-exp with
+        broadcasting support.
+        """
+        fs = [self.lower(op) for op in node.operands]
+
+        def fn(x, u, node, params):
+            values = [f(x, u, node, params) for f in fs]
+            # Broadcast all values to the same shape, then stack along new axis
+            # and compute logsumexp along that axis for element-wise operation
+            broadcasted = jnp.broadcast_arrays(*values)
+            stacked = jnp.stack(list(broadcasted), axis=0)
+            return logsumexp(stacked, axis=0)
 
         return fn
 
