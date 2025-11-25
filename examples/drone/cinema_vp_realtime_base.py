@@ -218,4 +218,3 @@ if __name__ == "__main__":
     results.update(plotting_dict)
 
     plot_animation(results, problem.settings).show()
-

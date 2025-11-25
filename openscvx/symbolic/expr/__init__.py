@@ -92,7 +92,6 @@ from .math import (
     Abs,
     Cos,
     Exp,
-    Tan,
     Huber,
     Log,
     LogSumExp,
@@ -102,6 +101,7 @@ from .math import (
     SmoothReLU,
     Sqrt,
     Square,
+    Tan,
 )
 
 # Spatial/3D operations

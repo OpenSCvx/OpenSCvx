@@ -17,7 +17,6 @@ from openscvx.symbolic.expr import (
     Control,
     Cos,
     Div,
-    Tan,
     Equality,
     Exp,
     Expr,
@@ -42,6 +41,7 @@ from openscvx.symbolic.expr import (
     State,
     Sub,
     Sum,
+    Tan,
     Variable,
     ctcs,
 )

@@ -124,7 +124,6 @@ from openscvx.symbolic.expr import (
     Cos,
     Diag,
     Div,
-    Tan,
     Equality,
     Exp,
     Expr,
@@ -151,6 +150,7 @@ from openscvx.symbolic.expr import (
     Stack,
     Sub,
     Sum,
+    Tan,
     Transpose,
     Vstack,
 )

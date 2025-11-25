@@ -42,7 +42,8 @@ except ImportError:
     print("PyQtGraph OpenGL not available, falling back to 2D")
     HAS_OPENGL = False
 
-# Import scipy Rotation for quaternion to rotation matrix conversion (matching plot_animation_pyqtgraph)
+# Import scipy Rotation for quaternion to rotation matrix conversion
+# (matching plot_animation_pyqtgraph)
 from scipy.spatial.transform import Rotation as R
 
 running = {"stop": False}
@@ -63,14 +64,10 @@ class CinemaVPPlotWidget(QWidget):
             grid = GLGridItem()
             self.view.addItem(grid)
             # Add trajectory scatter plot
-            self.traj_scatter = GLScatterPlotItem(
-                pos=np.zeros((1, 3)), color=(0, 0, 1, 1), size=5
-            )
+            self.traj_scatter = GLScatterPlotItem(pos=np.zeros((1, 3)), color=(0, 0, 1, 1), size=5)
             self.view.addItem(self.traj_scatter)
             # Add keypoint scatter plot
-            self.kp_scatter = GLScatterPlotItem(
-                pos=np.zeros((1, 3)), color=(1, 0, 0, 1), size=10
-            )
+            self.kp_scatter = GLScatterPlotItem(pos=np.zeros((1, 3)), color=(1, 0, 0, 1), size=10)
             self.view.addItem(self.kp_scatter)
             # Add line-of-sight visualization (line from drone to keypoint)
             self.los_line = GLLinePlotItem(color=(1, 1, 0, 0.5), width=2)
@@ -117,9 +114,7 @@ class CinemaVPPlotWidget(QWidget):
         self.j_vb_label = QLabel("J_vb: 0.00e+00")
         self.j_vc_label = QLabel("J_vc: 0.00e+00")
         self.objective_label = QLabel("Objective: 0.00e+00")
-        self.lam_cost_display_label = QLabel(
-            f"λ_cost: {problem.settings.scp.lam_cost:.2E}"
-        )
+        self.lam_cost_display_label = QLabel(f"λ_cost: {problem.settings.scp.lam_cost:.2E}")
         self.dis_time_label = QLabel("Dis Time: 0.0ms")
         self.solve_time_label = QLabel("Solve Time: 0.0ms")
         self.status_label = QLabel("Status: --")
@@ -147,9 +142,7 @@ class CinemaVPPlotWidget(QWidget):
         lam_cost_input = QLineEdit()
         lam_cost_input.setText(f"{problem.settings.scp.lam_cost:.2E}")
         lam_cost_input.setFixedWidth(80)
-        lam_cost_input.returnPressed.connect(
-            lambda: on_lam_cost_changed(lam_cost_input)
-        )
+        lam_cost_input.returnPressed.connect(lambda: on_lam_cost_changed(lam_cost_input))
         lam_cost_label = QLabel("λ_cost:")
         lam_cost_label.setAlignment(Qt.AlignLeft)
         lam_cost_layout.addWidget(lam_cost_input)
@@ -187,9 +180,7 @@ class CinemaVPPlotWidget(QWidget):
             value_label = QLabel(f"{kp_pose.value[j]:.2f}")
             # Connect slider to update function
             slider.valueChanged.connect(
-                lambda val, axis=j, label=value_label: self.on_slider_changed(
-                    val, axis, label
-                )
+                lambda val, axis=j, label=value_label: self.on_slider_changed(val, axis, label)
             )
             slider_layout.addWidget(label)
             slider_layout.addWidget(slider)
@@ -324,9 +315,7 @@ def update_optimization_metrics(results, labels_dict):
     labels_dict["j_vb_label"].setText(f"J_vb: {j_vb:.2E}")
     labels_dict["j_vc_label"].setText(f"J_vc: {j_vc:.2E}")
     labels_dict["objective_label"].setText(f"Objective: {cost:.2E}")
-    labels_dict["lam_cost_display_label"].setText(
-        f"λ_cost: {problem.settings.scp.lam_cost:.2E}"
-    )
+    labels_dict["lam_cost_display_label"].setText(f"λ_cost: {problem.settings.scp.lam_cost:.2E}")
     labels_dict["dis_time_label"].setText(f"Dis Time: {dis_time:.1f}ms")
     labels_dict["solve_time_label"].setText(f"Solve Time: {solve_time:.1f}ms")
     labels_dict["status_label"].setText(f"Status: {status}")
@@ -336,19 +325,19 @@ def update_viewcone(plot_widget, drone_pos, att, plotting_dict, pos_range=None):
     """Create or update the view cone mesh visualization"""
     if not HAS_OPENGL:
         return
-    
+
     # Get view cone parameters from plotting_dict
     alpha_x = plotting_dict.get("alpha_x", 6.0)
     alpha_y = plotting_dict.get("alpha_y", 8.0)
     R_sb = plotting_dict.get("R_sb", np.eye(3))
     norm_type = plotting_dict.get("norm_type", "inf")
-    
+
     # Create cone mesh data if it doesn't exist
     if not hasattr(plot_widget, "cone_meshdata") or plot_widget.cone_meshdata is None:
         n_cone = 40
         theta = np.linspace(0, 2 * np.pi, n_cone)
         A = np.diag([1 / np.tan(np.pi / alpha_x), 1 / np.tan(np.pi / alpha_y)])
-        
+
         # Calculate cone length based on trajectory range (similar to plot_animation_pyqtgraph)
         if pos_range is not None:
             cone_length = max(pos_range) * 0.3  # 30% of trajectory range
@@ -356,46 +345,46 @@ def update_viewcone(plot_widget, drone_pos, att, plotting_dict, pos_range=None):
             cone_length = min(cone_length, 50.0)  # Maximum 50 units
         else:
             cone_length = 15.0  # Default length
-        
+
         # Create circle in sensor frame
         circle = np.stack([np.cos(theta), np.sin(theta)])
-        
+
         # Calculate z values based on norm type
         if norm_type == "inf" or norm_type == np.inf:
             z = np.linalg.norm(A @ circle, axis=0, ord=np.inf)
         else:
             z = np.linalg.norm(A @ circle, axis=0, ord=norm_type)
-        
+
         # Create cone base points
         X = circle[0] / z
         Y = circle[1] / z
         Z = np.ones_like(X)
         base_points = np.stack([X, Y, Z], axis=1) * cone_length
-        
+
         # Create cone mesh (apex at origin, base at cone_length)
         apex = np.array([[0, 0, 0]])
         vertices = np.vstack([apex, base_points])
-        
+
         # Create faces
         faces = []
         for i in range(1, n_cone):
             faces.append([0, i, i + 1])
         faces.append([0, n_cone, 1])
         faces = np.array(faces)
-        
+
         # Store the mesh data for reuse
         plot_widget.cone_meshdata = MeshData(vertexes=vertices, faces=faces)
-    
+
     # Transform cone from sensor frame to body frame to inertial frame
     # Use scipy Rotation for quaternion conversion (matching plot_animation_pyqtgraph)
     # Quaternion format: [qw, qx, qy, qz] -> scipy expects [qx, qy, qz, qw]
     r = R.from_quat([att[1], att[2], att[3], att[0]])
     rotmat = r.as_matrix()
-    
+
     # Get original vertices and transform them
     verts = plot_widget.cone_meshdata.vertexes()
     verts_tf = (rotmat @ R_sb.T @ verts.T).T + drone_pos
-    
+
     # Create or update mesh
     if plot_widget.viewcone_mesh is None:
         plot_widget.viewcone_mesh = GLMeshItem(
@@ -517,7 +506,8 @@ def plot_thread_func():
                                 if len(x_traj) > 0 and x_traj.shape[1] >= 10:
                                     # Get attitude quaternion [qw, qx, qy, qz] at last node
                                     att = x_traj[-1, 6:10]
-                                    # Convert quaternion to rotation matrix using scipy (matching plot_animation_pyqtgraph)
+                                    # Convert quaternion to rotation matrix using scipy
+                                    # (matching plot_animation_pyqtgraph)
                                     r = R.from_quat([att[1], att[2], att[3], att[0]])
                                     rotmat = r.as_matrix()
                                     # Draw axes (x=red, y=green, z=blue)
@@ -533,7 +523,9 @@ def plot_thread_func():
                                     # Update view cone
                                     # Calculate position range for cone length
                                     if len(full_traj) > 1:
-                                        pos_range = np.max(full_traj, axis=0) - np.min(full_traj, axis=0)
+                                        pos_range = np.max(full_traj, axis=0) - np.min(
+                                            full_traj, axis=0
+                                        )
                                     else:
                                         pos_range = None
                                     update_viewcone(
@@ -547,9 +539,7 @@ def plot_thread_func():
                         # 2D fallback
                         pass
                 # Update optimization metrics display
-                update_optimization_metrics(
-                    latest_results["results"], plot_widget.labels_dict
-                )
+                update_optimization_metrics(latest_results["results"], plot_widget.labels_dict)
             except Exception as e:
                 print(f"Plot update error: {e}")
                 if "x" in latest_results["results"]:
@@ -566,7 +556,8 @@ def plot_thread_func():
                             # Draw axes at last position
                             if x_traj.shape[1] >= 10:
                                 att = x_traj[-1, 6:10]
-                                # Convert quaternion to rotation matrix using scipy (matching plot_animation_pyqtgraph)
+                                # Convert quaternion to rotation matrix using scipy
+                                # (matching plot_animation_pyqtgraph)
                                 r = R.from_quat([att[1], att[2], att[3], att[0]])
                                 rotmat = r.as_matrix()
                                 axes_length = 2.0
@@ -581,7 +572,9 @@ def plot_thread_func():
                                 # Update view cone
                                 # Calculate position range for cone length
                                 if len(x_traj) > 1:
-                                    pos_range = np.max(x_traj[:, :3], axis=0) - np.min(x_traj[:, :3], axis=0)
+                                    pos_range = np.max(x_traj[:, :3], axis=0) - np.min(
+                                        x_traj[:, :3], axis=0
+                                    )
                                 else:
                                     pos_range = None
                                 update_viewcone(
@@ -606,4 +599,3 @@ if __name__ == "__main__":
     opt_thread.start()
     # Start plotting in main thread (this will block and run the Qt event loop)
     plot_thread_func()
-
