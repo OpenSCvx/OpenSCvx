@@ -100,7 +100,7 @@ position_value = x_unified[position._slice]  # (2,)
 
 ## Stage 4: JAX Lowering
 
-Symbolic expressions for dynamics and non-convex constraints are converted to executable JAX functions (in `openscvx/symbolic/lower.py`). Convex constraints remain symbolic and are lowered to CVXPy later.
+Symbolic expressions for dynamics and non-convex constraints are converted to executable JAX functions (in `openscvx/symbolic/lower.py`). Convex constraints are lowered to CVXPy separately.
 
 ### Dynamics Lowering
 
@@ -431,7 +431,7 @@ for state in problem.states:
     print(f"{state.name}: slice {state._slice}")
 ```
 
-## Common Pitfalls
+## Common Developer Pitfalls
 
 1. **Confusing nodes vs intervals**: Discretization operates on N-1 intervals between N nodes, so vmapped dynamics have batch size (N-1, ...), while constraints evaluate at specific nodes (batch size M where M = number of nodes where constraint applies)
 2. **Forgetting augmented dimensions**: `n_x` and `n_u` include auto-added states/controls (time, CTCS augmented states, time dilation)
