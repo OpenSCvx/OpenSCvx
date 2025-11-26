@@ -286,6 +286,20 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
                 constraint.grad_g_u(x.guess, u.guess, 0, param_dict)
             )
 
+    # Update cross-node constraint parameters
+    if settings.sim.constraints_cross_node:
+        for g_id, constraint in enumerate(settings.sim.constraints_cross_node):
+            # Cross-node constraints take (X, U, params) not (x, u, node, params)
+            prob.param_dict["g_cross_" + str(g_id)].value = np.asarray(
+                constraint.func(x.guess, u.guess, param_dict)
+            )
+            prob.param_dict["grad_g_X_cross_" + str(g_id)].value = np.asarray(
+                constraint.grad_g_X(x.guess, u.guess, param_dict)
+            )
+            prob.param_dict["grad_g_U_cross_" + str(g_id)].value = np.asarray(
+                constraint.grad_g_U(x.guess, u.guess, param_dict)
+            )
+
     # Convex constraints are already lowered and handled in the OCP, no action needed here
 
     # Initialize lam_vc as matrix if it's still a scalar in settings
@@ -353,6 +367,13 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
     for constraint in settings.sim.constraints_nodal:
         J_vb_vec += np.maximum(0, prob.var_dict["nu_vb_" + str(id_ncvx)].value)
         id_ncvx += 1
+
+    # Add cross-node constraint violations
+    id_cross = 0
+    for constraint in settings.sim.constraints_cross_node:
+        J_vb_vec += np.maximum(0, prob.var_dict["nu_vb_cross_" + str(id_cross)].value)
+        id_cross += 1
+
     # Convex constraints are already handled in the OCP, no processing needed here
     return (
         x_new_guess,
