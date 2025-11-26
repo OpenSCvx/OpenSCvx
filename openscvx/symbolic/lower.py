@@ -245,21 +245,13 @@ def create_cross_node_wrapper(constraint_fn, referenced_nodes: List[int], eval_n
         residuals = []
 
         for eval_idx in eval_nodes:
-            # Apply offset pattern: map template nodes to actual nodes for this evaluation
-            # E.g., if eval_idx=5 and offsets=[-1, 0], actual nodes are [4, 5]
-            # We need to shift the node indices that NodeReference extracts
-
-            # Create shifted trajectories for this evaluation
-            # This is a bit tricky: we need to make the constraint_fn think it's
-            # evaluating at the template nodes, but actually extract from offset nodes
-
-            # For now, use a simpler approach: extract relevant nodes and pass as batch
-            # TODO: This needs refinement based on how NodeReference actually works
+            # Compute node offset relative to the primary (template) node
+            # E.g., if eval_idx=5 and primary_node=10, offset=-5
+            # Then position.node(10) extracts at 10+(-5)=5, position.node(9) at 9+(-5)=4
             node_offset = eval_idx - primary_node
 
-            # Evaluate the constraint with the full trajectory
-            # NodeReference will extract at template indices, but we need to offset them
-            # This requires modifying the extraction logic in NodeReference
+            # Evaluate the constraint with offset
+            # NodeReference lowerer adds this offset to template indices
             residual = constraint_fn(X, U, node_offset, params)
             residuals.append(residual)
 
