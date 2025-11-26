@@ -56,23 +56,25 @@ def test_node_reference_creation_from_variable():
     assert x_at_k.node_idx == 3
 
 
-def test_node_reference_requires_integer_index():
-    """Test that node index must be an integer."""
+def test_node_reference_accepts_integer_or_string():
+    """Test that node index accepts both integers and strings."""
     position = State("pos", shape=(3,))
 
-    # Valid: integer indices
-    position.node(0)
-    position.node(5)
-    position.node(-1)
+    # Valid: integer indices (absolute)
+    ref_abs = position.node(5)
+    assert ref_abs.node_idx == 5
+    assert not ref_abs.is_relative
 
-    # Invalid: non-integer indices
-    with pytest.raises(TypeError, match="Node index must be an integer"):
+    # Valid: string indices (relative)
+    ref_rel = position.node("k")
+    assert ref_rel.node_idx == "k"
+    assert ref_rel.is_relative
+
+    # Invalid: non-integer, non-string indices
+    with pytest.raises(TypeError, match="Node index must be an integer or string"):
         position.node(1.5)
 
-    with pytest.raises(TypeError, match="Node index must be an integer"):
-        position.node("k")
-
-    with pytest.raises(TypeError, match="Node index must be an integer"):
+    with pytest.raises(TypeError, match="Node index must be an integer or string"):
         position.node([1, 2])
 
 
@@ -413,3 +415,294 @@ def test_boundary_coupling_constraint():
     from openscvx.symbolic.expr import NodalConstraint
 
     assert isinstance(constraint_at_boundary, NodalConstraint)
+
+
+# =============================================================================
+# Relative Indexing Tests (New Feature)
+# =============================================================================
+
+
+def test_relative_node_reference_parsing_basic():
+    """Test parsing of relative node index strings."""
+    position = State("pos", shape=(3,))
+
+    # Test 'k' (offset 0)
+    pos_k = position.node("k")
+    assert pos_k.is_relative
+    assert pos_k.offset == 0
+    assert pos_k.node_idx == "k"
+
+    # Test 'k-1' (offset -1)
+    pos_k_minus_1 = position.node("k-1")
+    assert pos_k_minus_1.is_relative
+    assert pos_k_minus_1.offset == -1
+
+    # Test 'k+2' (offset +2)
+    pos_k_plus_2 = position.node("k+2")
+    assert pos_k_plus_2.is_relative
+    assert pos_k_plus_2.offset == 2
+
+
+def test_relative_node_reference_parsing_various_offsets():
+    """Test parsing various offset patterns."""
+    state = State("x", shape=(1,))
+
+    # Large offsets
+    assert state.node("k-10").offset == -10
+    assert state.node("k+25").offset == 25
+
+    # Single digit
+    assert state.node("k-5").offset == -5
+    assert state.node("k+7").offset == 7
+
+
+def test_relative_node_reference_parsing_with_whitespace():
+    """Test that whitespace is handled correctly."""
+    state = State("x", shape=(1,))
+
+    # Whitespace should be stripped
+    assert state.node("k - 1").offset == -1
+    assert state.node("k + 2").offset == 2
+    assert state.node(" k ").offset == 0
+
+
+def test_relative_node_reference_invalid_format():
+    """Test that invalid relative index formats raise errors."""
+    state = State("x", shape=(1,))
+
+    # Must start with 'k'
+    with pytest.raises(ValueError, match="Relative node index must start with 'k'"):
+        state.node("j")
+
+    with pytest.raises(ValueError, match="Invalid relative node index format"):
+        state.node("k1")  # Missing operator
+
+    with pytest.raises(ValueError, match="Invalid relative node index format"):
+        state.node("k-")  # Missing number
+
+    with pytest.raises(ValueError, match="Invalid relative node index format"):
+        state.node("k+")  # Missing number
+
+    with pytest.raises(ValueError, match="Invalid relative node index format"):
+        state.node("kk")
+
+
+def test_relative_indexing_in_constraint():
+    """Test using relative indexing in constraints."""
+    position = State("pos", shape=(3,))
+
+    # Create rate limit constraint using relative indexing
+    pos_k = position.node("k")
+    pos_k_prev = position.node("k-1")
+
+    rate_constraint = (pos_k - pos_k_prev) <= 0.1
+
+    # Should work with .at()
+    nodal_constraint = rate_constraint.at(range(1, 10))
+
+    from openscvx.symbolic.expr import NodalConstraint
+
+    assert isinstance(nodal_constraint, NodalConstraint)
+    assert nodal_constraint.nodes == list(range(1, 10))
+
+
+def test_absolute_vs_relative_detection():
+    """Test that absolute and relative modes are correctly detected."""
+    state = State("x", shape=(1,))
+
+    # Absolute
+    abs_ref = state.node(5)
+    assert abs_ref.is_absolute()
+    assert not abs_ref.is_relative
+
+    # Relative
+    rel_ref = state.node("k")
+    assert not rel_ref.is_absolute()
+    assert rel_ref.is_relative
+
+
+# =============================================================================
+# Bounds Checking Tests
+# =============================================================================
+
+
+def test_bounds_checking_relative_valid():
+    """Test bounds checking for valid relative indexing."""
+    position = State("pos", shape=(3,))
+    N = 10
+
+    # Valid: k-1 at nodes 1..9 (accesses 0..8)
+    constraint = (position.node("k") - position.node("k-1") <= 0.1).at(range(1, N))
+    constraint.validate_bounds(N)  # Should not raise
+
+
+def test_bounds_checking_relative_too_low():
+    """Test bounds checking catches negative index access."""
+    position = State("pos", shape=(3,))
+    N = 10
+
+    # Invalid: k-1 at node 0 would access node -1
+    constraint = (position.node("k") - position.node("k-1") <= 0.1).at([0])
+
+    with pytest.raises(ValueError, match="accesses invalid node index -1"):
+        constraint.validate_bounds(N)
+
+
+def test_bounds_checking_relative_too_high():
+    """Test bounds checking catches out-of-bounds high access."""
+    position = State("pos", shape=(3,))
+    N = 10
+
+    # Invalid: k+1 at node 9 would access node 10 (>= N)
+    constraint = (position.node("k") - position.node("k+1") <= 0.1).at([9])
+
+    with pytest.raises(ValueError, match="accesses invalid node index 10"):
+        constraint.validate_bounds(N)
+
+
+def test_bounds_checking_relative_multiple_offsets():
+    """Test bounds checking with multiple offsets (like k, k-1, k-2)."""
+    state = State("x", shape=(1,))
+    N = 10
+
+    # Valid: k, k-1, k-2 at nodes 2..9
+    constraint = (
+        state.node("k") - 2 * state.node("k-1") + state.node("k-2") <= 0.1
+    ).at(range(2, N))
+    constraint.validate_bounds(N)  # Should not raise
+
+    # Invalid: same constraint at node 1 (would access k-2 = -1)
+    constraint_invalid = (
+        state.node("k") - 2 * state.node("k-1") + state.node("k-2") <= 0.1
+    ).at([1])
+
+    with pytest.raises(ValueError, match="accesses invalid node index -1"):
+        constraint_invalid.validate_bounds(N)
+
+
+def test_bounds_checking_absolute_valid():
+    """Test bounds checking for valid absolute indexing."""
+    position = State("pos", shape=(3,))
+    N = 10
+
+    # Valid: references to nodes 0 and 9
+    constraint = (position.node(0) == position.node(9)).at([0])
+    constraint.validate_bounds(N)  # Should not raise
+
+
+def test_bounds_checking_absolute_too_high():
+    """Test bounds checking catches absolute index >= N."""
+    position = State("pos", shape=(3,))
+    N = 10
+
+    # Invalid: reference to node 10 (>= N)
+    constraint = (position.node(10) == position.node(0)).at([0])
+
+    with pytest.raises(ValueError, match="invalid absolute node index 10"):
+        constraint.validate_bounds(N)
+
+
+def test_bounds_checking_absolute_negative():
+    """Test bounds checking catches negative absolute indices."""
+    position = State("pos", shape=(3,))
+    N = 10
+
+    # Invalid: negative absolute index
+    constraint = (position.node(-1) == position.node(0)).at([0])
+
+    with pytest.raises(ValueError, match="invalid absolute node index -1"):
+        constraint.validate_bounds(N)
+
+
+def test_bounds_checking_mixed_mode_error():
+    """Test that mixing relative and absolute indexing raises error during collection."""
+    from openscvx.symbolic.lower import collect_node_references
+
+    position = State("pos", shape=(3,))
+
+    # Mix absolute and relative - should raise during analysis
+    constraint_expr = position.node(5) - position.node("k")
+
+    with pytest.raises(ValueError, match="Cannot mix relative.*and absolute"):
+        collect_node_references(constraint_expr)
+
+
+# =============================================================================
+# Cross-Node Constraint Detection
+# =============================================================================
+
+
+def test_contains_node_reference():
+    """Test detection of NodeReference in expressions."""
+    from openscvx.symbolic.lower import contains_node_reference
+
+    position = State("pos", shape=(3,))
+
+    # Regular expression - no NodeReference
+    regular_expr = position + 1.0
+    assert not contains_node_reference(regular_expr)
+
+    # With NodeReference
+    cross_node_expr = position.node("k") - position.node("k-1")
+    assert contains_node_reference(cross_node_expr)
+
+    # Deeply nested
+    nested_expr = (position.node("k") - position.node("k-1")) * 2.0 + 1.0
+    assert contains_node_reference(nested_expr)
+
+
+def test_collect_node_references_relative():
+    """Test collecting node references from relative indexing expressions."""
+    from openscvx.symbolic.lower import collect_node_references
+
+    position = State("pos", shape=(3,))
+
+    # Single reference
+    expr1 = position.node("k")
+    refs, is_relative = collect_node_references(expr1)
+    assert is_relative
+    assert refs == [0]
+
+    # Two references (k, k-1)
+    expr2 = position.node("k") - position.node("k-1")
+    refs, is_relative = collect_node_references(expr2)
+    assert is_relative
+    assert refs == [-1, 0]  # Sorted offsets
+
+    # Three references (k, k-1, k-2)
+    expr3 = position.node("k") - 2 * position.node("k-1") + position.node("k-2")
+    refs, is_relative = collect_node_references(expr3)
+    assert is_relative
+    assert refs == [-2, -1, 0]
+
+
+def test_collect_node_references_absolute():
+    """Test collecting node references from absolute indexing expressions."""
+    from openscvx.symbolic.lower import collect_node_references
+
+    position = State("pos", shape=(3,))
+
+    # Single reference
+    expr1 = position.node(5)
+    refs, is_relative = collect_node_references(expr1)
+    assert not is_relative
+    assert refs == [5]
+
+    # Two references
+    expr2 = position.node(0) - position.node(10)
+    refs, is_relative = collect_node_references(expr2)
+    assert not is_relative
+    assert refs == [0, 10]
+
+
+def test_collect_node_references_no_refs():
+    """Test collecting from expression with no NodeReferences."""
+    from openscvx.symbolic.lower import collect_node_references
+
+    position = State("pos", shape=(3,))
+
+    # No NodeReferences
+    expr = position + 1.0
+    refs, is_relative = collect_node_references(expr)
+    assert not is_relative  # Defaults to False
+    assert refs == []
