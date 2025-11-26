@@ -528,56 +528,126 @@ class NodeReference(Expr):
     - Consistency between consecutive time steps
     - Multi-step dependencies and recurrence relations
 
-    The node index can be a concrete integer or a symbolic reference (though
-    during compilation, it will be resolved to specific node indices based on
-    the constraint's `.at()` specification).
+    The node index can be specified in two ways:
+    - **Relative indexing** (str): Use 'k', 'k-1', 'k+2', etc. for pattern-based constraints
+      that shift across the trajectory. This is the recommended approach for most constraints.
+    - **Absolute indexing** (int): Use concrete integers like 0, 5, N-1 for constraints
+      at specific nodes (e.g., boundary conditions).
 
     Attributes:
         base: The expression (typically a Leaf like State or Control) being referenced
-        node_idx: The trajectory node index (integer or symbolic node reference)
+        node_idx: Trajectory node index (integer for absolute, string for relative)
+        is_relative: True if using relative indexing ('k'-based), False for absolute
+        offset: For relative indexing, the offset from 'k' (e.g., 'k-1' has offset -1)
 
     Example:
-        Basic inter-node constraints:
+        Relative indexing (recommended for most constraints):
 
             position = State("pos", shape=(3,))
 
             # Rate limit: change between consecutive nodes
-            rate_constraint = (position.node(k) - position.node(k-1) <= 0.1).at(range(1, N))
+            rate_constraint = (position.node('k') - position.node('k-1') <= 0.1).at(range(1, N))
+
+        Absolute indexing (for boundary conditions):
+
+            # Initial position constraint
+            initial_constraint = (position.node(0) == [0.0, 10.0]).at([0])
+
+            # Periodic boundary condition
+            periodic = (position.node(0) == position.node(N-1)).at([0])
 
         Multi-step dependencies:
 
             state = State("x", shape=(1,))
 
             # Fibonacci-like recurrence
-            recurrence = (state.node(k) == state.node(k-1) + state.node(k-2)).at(range(2, N))
+            recurrence = (state.node('k') == state.node('k-1') + state.node('k-2')).at(range(2, N))
 
         Combine with spatial indexing:
 
             velocity = State("vel", shape=(3,))
 
             # Rate limit on just the z-component
-            z_rate = (velocity[2].node(k) - velocity[2].node(k-1) <= 0.05)
+            z_rate = (velocity[2].node('k') - velocity[2].node('k-1') <= 0.05)
 
     Note:
         NodeReference is typically created via the `.node(k)` method on Leaf
         expressions rather than constructed directly.
     """
 
-    def __init__(self, base: Expr, node_idx: int):
+    def __init__(self, base: Expr, node_idx):
         """Initialize a NodeReference.
 
         Args:
             base: Expression to reference at a specific node (typically a Leaf)
-            node_idx: Trajectory node index (integer)
+            node_idx: Trajectory node index
+                - int: Absolute node index (e.g., 0, 5, N-1)
+                - str: Relative node expression (e.g., 'k', 'k-1', 'k+2')
 
         Raises:
-            TypeError: If node_idx is not an integer
+            TypeError: If node_idx is not an integer or string
+            ValueError: If string node_idx has invalid format
         """
-        if not isinstance(node_idx, int):
-            raise TypeError(f"Node index must be an integer, got {type(node_idx).__name__}")
+        if isinstance(node_idx, int):
+            self.node_idx = node_idx
+            self.is_relative = False
+            self.offset = 0
+        elif isinstance(node_idx, str):
+            self.node_idx = node_idx
+            self.is_relative = True
+            self.offset = self._parse_relative_index(node_idx)
+        else:
+            raise TypeError(
+                f"Node index must be an integer or string, got {type(node_idx).__name__}"
+            )
 
         self.base = base
-        self.node_idx = node_idx
+
+    @staticmethod
+    def _parse_relative_index(node_str: str) -> int:
+        """Parse a relative node index string to extract the offset.
+
+        Args:
+            node_str: String like 'k', 'k-1', 'k+2', 'k-10'
+
+        Returns:
+            Integer offset from 'k' (e.g., 'k-1' returns -1, 'k+2' returns 2)
+
+        Raises:
+            ValueError: If the string format is invalid
+        """
+        import re
+
+        # Remove all whitespace
+        node_str = node_str.replace(" ", "")
+
+        # Must start with 'k'
+        if not node_str.startswith("k"):
+            raise ValueError(
+                f"Relative node index must start with 'k', got '{node_str}'. "
+                f"Use 'k', 'k-1', 'k+2', etc."
+            )
+
+        # Just 'k' means offset 0
+        if node_str == "k":
+            return 0
+
+        # Match patterns like 'k-1', 'k+2', 'k-10'
+        match = re.match(r"^k([+-]\d+)$", node_str)
+        if not match:
+            raise ValueError(
+                f"Invalid relative node index format '{node_str}'. Use 'k', 'k-1', 'k+2', etc."
+            )
+
+        return int(match.group(1))
+
+    def is_absolute(self) -> bool:
+        """Check if this NodeReference uses absolute indexing.
+
+        Returns:
+            True if using absolute indexing (integer), False if relative (string)
+        """
+        return not self.is_relative
 
     def children(self):
         """Return the base expression as the only child.

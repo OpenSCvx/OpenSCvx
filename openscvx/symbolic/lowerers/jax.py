@@ -938,12 +938,22 @@ class JaxLowerer:
 
     @visitor(NodeReference)
     def _visit_node_reference(self, node: NodeReference):
-        """Lower NodeReference - extracts from trajectory with offset support.
+        """Lower NodeReference - extracts from trajectory with two indexing modes.
 
         NodeReference extracts a state/control value at a specific node from the
-        full trajectory. The node_param argument provides an offset to support
-        pattern-based evaluation (e.g., "current node - previous node" pattern
-        applied at multiple evaluation nodes).
+        full trajectory. Supports two indexing modes:
+
+        **Relative indexing** (node.is_relative = True):
+            - Uses 'k', 'k-1', 'k+2', etc. in the symbolic expression
+            - node_param is the evaluation node index 'k'
+            - Extracts from: node_param + node.offset
+            - Example: position.node('k-1') with node_param=5 extracts from node 4
+
+        **Absolute indexing** (node.is_relative = False):
+            - Uses integer indices like 0, 5, N-1 in the symbolic expression
+            - node_param is an offset to shift the template pattern
+            - Extracts from: node.node_idx + node_param
+            - Example: position.node(10) with node_param=-5 extracts from node 5
 
         Args:
             node: NodeReference expression node with base expression and node_idx
@@ -951,58 +961,85 @@ class JaxLowerer:
         Returns:
             Function (x, u, node_param, params) that extracts from trajectory
                 - x, u: Full trajectories (N, n_x) and (N, n_u)
-                - node_param: Offset to add to template node_idx
+                - node_param: For relative: the 'k' value. For absolute: offset.
                 - params: Problem parameters
-
-        Example:
-            For position.node(10) with node_param=5:
-            - Template index is 10
-            - Offset is 5
-            - Extracts from node 10 + 5 = 15
-            This allows "position.node(k) - position.node(k-1)" pattern to work
-            at different evaluation nodes.
         """
         from openscvx.symbolic.expr.control import Control
         from openscvx.symbolic.expr.state import State
 
-        template_idx = node.node_idx
+        if node.is_relative:
+            # Relative indexing: node_param is 'k', offset is from the string
+            offset = node.offset
 
-        # Special handling for State and Control - they need to extract from trajectories
-        if isinstance(node.base, State):
-            sl = node.base._slice
-            if sl is None:
-                raise ValueError(f"State {node.base.name!r} has no slice assigned")
+            if isinstance(node.base, State):
+                sl = node.base._slice
+                if sl is None:
+                    raise ValueError(f"State {node.base.name!r} has no slice assigned")
 
-            def state_node_fn(x, u, node_offset, params):
-                # x is the full trajectory (N, n_x)
-                # node_offset is added to the template index
-                actual_idx = template_idx + (node_offset if node_offset is not None else 0)
-                return x[actual_idx, sl]
+                def state_node_fn(x, u, k, params):
+                    # k is the evaluation node, offset is from 'k-1', 'k+2', etc.
+                    actual_idx = k + offset
+                    return x[actual_idx, sl]
 
-            return state_node_fn
+                return state_node_fn
 
-        elif isinstance(node.base, Control):
-            sl = node.base._slice
-            if sl is None:
-                raise ValueError(f"Control {node.base.name!r} has no slice assigned")
+            elif isinstance(node.base, Control):
+                sl = node.base._slice
+                if sl is None:
+                    raise ValueError(f"Control {node.base.name!r} has no slice assigned")
 
-            def control_node_fn(x, u, node_offset, params):
-                # u is the full trajectory (N, n_u)
-                actual_idx = template_idx + (node_offset if node_offset is not None else 0)
-                return u[actual_idx, sl]
+                def control_node_fn(x, u, k, params):
+                    actual_idx = k + offset
+                    return u[actual_idx, sl]
 
-            return control_node_fn
+                return control_node_fn
+
+            else:
+                # Compound expression
+                base_fn = self.lower(node.base)
+
+                def compound_node_fn(x, u, k, params):
+                    actual_idx = k + offset
+                    x_single = x[actual_idx] if len(x.shape) > 1 else x
+                    u_single = u[actual_idx] if len(u.shape) > 1 else u
+                    return base_fn(x_single, u_single, actual_idx, params)
+
+                return compound_node_fn
 
         else:
-            # For compound expressions (e.g., position[0].node(k)), lower the base first
-            base_fn = self.lower(node.base)
+            # Absolute indexing: node_param is offset, node.node_idx is template
+            template_idx = node.node_idx
 
-            def compound_node_fn(x, u, node_offset, params):
-                # Extract at the specific node (with offset) and evaluate base expression
-                actual_idx = template_idx + (node_offset if node_offset is not None else 0)
-                # Extract single-node state and control for the base expression
-                x_single = x[actual_idx] if len(x.shape) > 1 else x
-                u_single = u[actual_idx] if len(u.shape) > 1 else u
-                return base_fn(x_single, u_single, actual_idx, params)
+            if isinstance(node.base, State):
+                sl = node.base._slice
+                if sl is None:
+                    raise ValueError(f"State {node.base.name!r} has no slice assigned")
 
-            return compound_node_fn
+                def state_node_fn(x, u, node_offset, params):
+                    actual_idx = template_idx + (node_offset if node_offset is not None else 0)
+                    return x[actual_idx, sl]
+
+                return state_node_fn
+
+            elif isinstance(node.base, Control):
+                sl = node.base._slice
+                if sl is None:
+                    raise ValueError(f"Control {node.base.name!r} has no slice assigned")
+
+                def control_node_fn(x, u, node_offset, params):
+                    actual_idx = template_idx + (node_offset if node_offset is not None else 0)
+                    return u[actual_idx, sl]
+
+                return control_node_fn
+
+            else:
+                # Compound expression
+                base_fn = self.lower(node.base)
+
+                def compound_node_fn(x, u, node_offset, params):
+                    actual_idx = template_idx + (node_offset if node_offset is not None else 0)
+                    x_single = x[actual_idx] if len(x.shape) > 1 else x
+                    u_single = u[actual_idx] if len(u.shape) > 1 else u
+                    return base_fn(x_single, u_single, actual_idx, params)
+
+                return compound_node_fn

@@ -79,19 +79,19 @@ for state in states:
 
 # ==================== CROSS-NODE RATE LIMITING CONSTRAINT ====================
 # This is the key addition: limit the distance between consecutive nodes
-# Using NodeReference to express: ||position[k] - position[k-1]|| <= max_step
+# Using NodeReference with relative indexing: ||position[k] - position[k-1]|| <= max_step
 
-# Create the cross-node constraint expression
-# Note: We use concrete node indices (1, 0) for n=2 problem
-# For larger n, use template indices like (10, 9) with .at(range(1, n))
-pos_k = position.node(1)  # Position at final node
-pos_k_prev = position.node(0)  # Position at initial node
+# Create the cross-node constraint expression using relative indexing
+# 'k' represents the current node, 'k-1' represents the previous node
+pos_k = position.node("k")  # Position at current node
+pos_k_prev = position.node("k-1")  # Position at previous node
 
 # Compute the distance between consecutive nodes
 step_distance = ox.linalg.Norm(pos_k - pos_k_prev, ord=2)
 
 # Create inequality constraint: step_distance <= max_step
 # For n=2, we only have one interval (from node 0 to node 1)
+# The constraint evaluates at node 1, where 'k'=1 and 'k-1'=0
 rate_limit_constraint = (step_distance <= max_step).at([1])
 
 # Add to constraint list

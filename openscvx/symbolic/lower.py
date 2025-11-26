@@ -172,90 +172,116 @@ def contains_node_reference(expr: Expr) -> bool:
     return False
 
 
-def collect_node_references(expr: Expr) -> List[int]:
-    """Collect all unique node indices referenced in a cross-node expression.
+def collect_node_references(expr: Expr) -> Tuple[List, bool]:
+    """Collect all unique node indices/offsets referenced in a cross-node expression.
 
     Args:
         expr: Expression to analyze for NodeReference nodes
 
     Returns:
-        Sorted list of unique node indices referenced in the expression
+        Tuple of (references, is_relative) where:
+        - references: List of node indices (int) or offsets (int for relative)
+        - is_relative: True if using relative indexing ('k'-based), False for absolute
 
     Example:
+        For expression `position.node('k') - position.node('k-1')`:
+        Returns ([0, -1], True)
+
         For expression `position.node(10) - position.node(9)`:
-        Returns [9, 10]
+        Returns ([9, 10], False)
     """
-    indices = set()
+    references = []
+    is_relative = None
 
     def traverse(e: Expr):
+        nonlocal is_relative
         if isinstance(e, NodeReference):
-            indices.add(e.node_idx)
+            if is_relative is None:
+                is_relative = e.is_relative
+            elif is_relative != e.is_relative:
+                raise ValueError(
+                    "Cannot mix relative (e.g., 'k') and absolute (e.g., 0) node references "
+                    "in the same constraint. Use either all relative or all absolute indexing."
+                )
+
+            if e.is_relative:
+                references.append(e.offset)
+            else:
+                references.append(e.node_idx)
+
         for child in e.children():
             traverse(child)
 
     traverse(expr)
-    return sorted(indices)
+
+    # Default to absolute if no NodeReferences found
+    if is_relative is None:
+        is_relative = False
+
+    return (sorted(set(references)), is_relative)
 
 
-def create_cross_node_wrapper(constraint_fn, referenced_nodes: List[int], eval_nodes: List[int]):
+def create_cross_node_wrapper(constraint_fn, references, is_relative: bool, eval_nodes: List[int]):
     """Create a trajectory-level wrapper for cross-node constraint evaluation.
 
     Takes a constraint function lowered with JaxLowerer and wraps it to evaluate
     the constraint pattern at multiple nodes along the trajectory.
 
-    The template node indices (e.g., [9, 10] from position.node(10) - position.node(9))
-    define a *pattern* that gets applied at each evaluation node:
-    - Pattern [9, 10] means offsets [-1, 0] relative to the "primary" node (10)
-    - At eval_node=5: evaluates with nodes [4, 5]
-    - At eval_node=10: evaluates with nodes [9, 10]
+    Supports two modes:
+    - **Relative indexing**: Constraints like position.node('k') - position.node('k-1')
+      evaluate the pattern at each eval_node (e.g., at node 5: position[5] - position[4])
+    - **Absolute indexing**: Constraints like position.node(0) - position.node(N-1)
+      evaluate at the exact specified nodes regardless of eval_nodes
 
     Args:
         constraint_fn: Lowered constraint function with NodeReference handling
-        referenced_nodes: Template node indices from the symbolic expression (e.g., [9, 10])
-        eval_nodes: Nodes where the constraint should be evaluated (e.g., [1, 2, ..., N-1])
+        references: List of node references (offsets for relative, indices for absolute)
+        is_relative: True for relative indexing ('k'-based), False for absolute
+        eval_nodes: Nodes where the constraint should be evaluated
 
     Returns:
         Function with signature (X, U, params) -> residuals (M,)
             where X is (N, n_x), U is (N, n_u), M = len(eval_nodes)
 
     Example:
-        For `position.node(10) - position.node(9) <= 0.1` with eval_nodes=[1,2,...,N-1]:
-        - Template indices [9, 10] define pattern: current and previous node
-        - At eval_node=1: computes position[1] - position[0]
-        - At eval_node=2: computes position[2] - position[1]
-        - Returns: array of (N-1) residuals
+        Relative indexing:
+            `position.node('k') - position.node('k-1') <= 0.1` with eval_nodes=[1,2,3]
+            - At eval_node=1: computes position[1] - position[0]
+            - At eval_node=2: computes position[2] - position[1]
+            - At eval_node=3: computes position[3] - position[2]
+
+        Absolute indexing:
+            `position.node(0) == [0.0, 10.0]` with eval_nodes=[0]
+            - Always evaluates at node 0, regardless of pattern
     """
     import jax.numpy as jnp
 
-    # Compute offset pattern from template indices
-    # E.g., [9, 10] -> offsets [-1, 0] relative to max(referenced_nodes)=10
-    if len(referenced_nodes) > 0:
-        primary_node = max(referenced_nodes)  # The "reference" node
-        offsets = [idx - primary_node for idx in referenced_nodes]
+    if is_relative:
+        # Relative indexing: eval_idx IS the node index to evaluate at
+        def trajectory_constraint(X, U, params):
+            residuals = []
+            for eval_idx in eval_nodes:
+                # Pass eval_idx directly - NodeReference will use it as the base 'k'
+                residual = constraint_fn(X, U, eval_idx, params)
+                residuals.append(residual)
+            return jnp.stack(residuals, axis=0)
+
     else:
-        primary_node = 0
-        offsets = []
+        # Absolute indexing: need to shift template indices to actual nodes
+        # This is the old behavior for backward compatibility
+        if len(references) > 0:
+            primary_node = max(references)
+        else:
+            primary_node = 0
 
-    def trajectory_constraint(X, U, params):
-        """Evaluate cross-node constraint at all evaluation nodes.
-
-        For each evaluation node, applies the offset pattern and extracts the
-        corresponding nodes from the trajectory.
-        """
-        residuals = []
-
-        for eval_idx in eval_nodes:
-            # Compute node offset relative to the primary (template) node
-            # E.g., if eval_idx=5 and primary_node=10, offset=-5
-            # Then position.node(10) extracts at 10+(-5)=5, position.node(9) at 9+(-5)=4
-            node_offset = eval_idx - primary_node
-
-            # Evaluate the constraint with offset
-            # NodeReference lowerer adds this offset to template indices
-            residual = constraint_fn(X, U, node_offset, params)
-            residuals.append(residual)
-
-        return jnp.stack(residuals, axis=0)
+        def trajectory_constraint(X, U, params):
+            residuals = []
+            for eval_idx in eval_nodes:
+                # Compute offset to shift template nodes to eval position
+                node_offset = eval_idx - primary_node
+                residual = constraint_fn(X, U, node_offset, params)
+                residuals.append(residual)
+            return jnp.stack(residuals, axis=0)
 
     return trajectory_constraint
 
@@ -473,12 +499,12 @@ def lower_symbolic_expressions(
         constraint_expr = constraint_nodal.constraint
         constraint_fn = lower_to_jax(constraint_expr)
 
-        # Collect node indices referenced in the constraint (template pattern)
-        referenced_nodes = collect_node_references(constraint_expr)
+        # Collect node references and detect indexing mode
+        references, is_relative = collect_node_references(constraint_expr)
 
-        # Create trajectory-level wrapper with offset support
+        # Create trajectory-level wrapper with proper indexing mode
         wrapped_fn = create_cross_node_wrapper(
-            constraint_fn, referenced_nodes, constraint_nodal.nodes
+            constraint_fn, references, is_relative, constraint_nodal.nodes
         )
 
         # Compute Jacobians for the wrapped trajectory-level function
@@ -486,12 +512,13 @@ def lower_symbolic_expressions(
         grad_g_U = jacfwd(wrapped_fn, argnums=1)  # dg/dU - shape (M, N, n_u)
 
         # Create CrossNodeConstraintLowered object
+        mode_str = "relative" if is_relative else "absolute"
         cross_node_lowered = CrossNodeConstraintLowered(
             func=wrapped_fn,
             grad_g_X=grad_g_X,
             grad_g_U=grad_g_U,
             eval_nodes=constraint_nodal.nodes,
-            reference_pattern=f"nodes {referenced_nodes}",
+            reference_pattern=f"{mode_str}: {references}",
         )
         lowered_cross_node_constraints.append(cross_node_lowered)
 
