@@ -138,6 +138,7 @@ from openscvx.symbolic.expr import (
     Mul,
     Neg,
     NodalConstraint,
+    NodeReference,
     Norm,
     Or,
     Parameter,
@@ -934,3 +935,74 @@ class JaxLowerer:
             return stl_or(x)
 
         return or_fn
+
+    @visitor(NodeReference)
+    def _visit_node_reference(self, node: NodeReference):
+        """Lower NodeReference - extracts from trajectory with offset support.
+
+        NodeReference extracts a state/control value at a specific node from the
+        full trajectory. The node_param argument provides an offset to support
+        pattern-based evaluation (e.g., "current node - previous node" pattern
+        applied at multiple evaluation nodes).
+
+        Args:
+            node: NodeReference expression node with base expression and node_idx
+
+        Returns:
+            Function (x, u, node_param, params) that extracts from trajectory
+                - x, u: Full trajectories (N, n_x) and (N, n_u)
+                - node_param: Offset to add to template node_idx
+                - params: Problem parameters
+
+        Example:
+            For position.node(10) with node_param=5:
+            - Template index is 10
+            - Offset is 5
+            - Extracts from node 10 + 5 = 15
+            This allows "position.node(k) - position.node(k-1)" pattern to work
+            at different evaluation nodes.
+        """
+        from openscvx.symbolic.expr.control import Control
+        from openscvx.symbolic.expr.state import State
+
+        template_idx = node.node_idx
+
+        # Special handling for State and Control - they need to extract from trajectories
+        if isinstance(node.base, State):
+            sl = node.base._slice
+            if sl is None:
+                raise ValueError(f"State {node.base.name!r} has no slice assigned")
+
+            def state_node_fn(x, u, node_offset, params):
+                # x is the full trajectory (N, n_x)
+                # node_offset is added to the template index
+                actual_idx = template_idx + (node_offset if node_offset is not None else 0)
+                return x[actual_idx, sl]
+
+            return state_node_fn
+
+        elif isinstance(node.base, Control):
+            sl = node.base._slice
+            if sl is None:
+                raise ValueError(f"Control {node.base.name!r} has no slice assigned")
+
+            def control_node_fn(x, u, node_offset, params):
+                # u is the full trajectory (N, n_u)
+                actual_idx = template_idx + (node_offset if node_offset is not None else 0)
+                return u[actual_idx, sl]
+
+            return control_node_fn
+
+        else:
+            # For compound expressions (e.g., position[0].node(k)), lower the base first
+            base_fn = self.lower(node.base)
+
+            def compound_node_fn(x, u, node_offset, params):
+                # Extract at the specific node (with offset) and evaluate base expression
+                actual_idx = template_idx + (node_offset if node_offset is not None else 0)
+                # Extract single-node state and control for the base expression
+                x_single = x[actual_idx] if len(x.shape) > 1 else x
+                u_single = u[actual_idx] if len(u.shape) > 1 else u
+                return base_fn(x_single, u_single, actual_idx, params)
+
+            return compound_node_fn
