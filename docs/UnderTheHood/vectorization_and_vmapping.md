@@ -391,13 +391,6 @@ Here's a complete reference for shapes at each stage, shown with symbolic dimens
 3. **Automatic Differentiation**: Jacobians and gradients computed automatically via `jacfwd`
 4. **Reduced Python Overhead**: Single JAX call instead of Python loops for evaluation
 
-**Performance Tips:**
-
-- Use simple symbolic expressions to maximize JIT compilation effectiveness
-- Keep the number of states/controls reasonable (hundreds, not thousands)
-- Parameters should be problem constants, not optimization variables
-- Reuse compiled solvers when possible (they can be cached based on problem structure)
-
 ## Implementation Files Reference
 
 | **File** | **Function/Class** | **Purpose** |
