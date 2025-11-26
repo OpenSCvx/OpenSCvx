@@ -175,6 +175,11 @@ def contains_node_reference(expr: Expr) -> bool:
 def collect_node_references(expr: Expr) -> Tuple[List, bool]:
     """Collect all unique node indices/offsets referenced in a cross-node expression.
 
+    This function analyzes the expression tree to identify all NodeReference nodes
+    and extract their indexing information. The results are used by the lowering
+    pipeline to determine the sparsity pattern and evaluation strategy for cross-node
+    constraints.
+
     Args:
         expr: Expression to analyze for NodeReference nodes
 
@@ -185,10 +190,17 @@ def collect_node_references(expr: Expr) -> Tuple[List, bool]:
 
     Example:
         For expression `position.node('k') - position.node('k-1')`:
-        Returns ([0, -1], True)
+        Returns ([-1, 0], True)
 
         For expression `position.node(10) - position.node(9)`:
         Returns ([9, 10], False)
+
+    Performance Note:
+        The returned references indicate which nodes are coupled by the constraint.
+        For example, references=[-1, 0] means the constraint couples node k with node k-1.
+        This sparsity pattern is currently NOT exploited - Jacobians are always dense
+        (M, N, n_x) arrays regardless of how few nodes are actually coupled. This can
+        result in significant memory overhead for large N.
     """
     references = []
     is_relative = None
@@ -225,7 +237,9 @@ def create_cross_node_wrapper(constraint_fn, references, is_relative: bool, eval
     """Create a trajectory-level wrapper for cross-node constraint evaluation.
 
     Takes a constraint function lowered with JaxLowerer and wraps it to evaluate
-    the constraint pattern at multiple nodes along the trajectory.
+    the constraint pattern at multiple nodes along the trajectory. This wrapper
+    handles the iteration over evaluation nodes and aggregation of constraint
+    residuals.
 
     Supports two modes:
     - **Relative indexing**: Constraints like position.node('k') - position.node('k-1')
@@ -253,18 +267,36 @@ def create_cross_node_wrapper(constraint_fn, references, is_relative: bool, eval
         Absolute indexing:
             `position.node(0) == [0.0, 10.0]` with eval_nodes=[0]
             - Always evaluates at node 0, regardless of pattern
+
+    Performance Warning:
+        The returned function will later have Jacobians computed via jax.jacfwd,
+        producing dense (M, N, n_x) and (M, N, n_u) arrays. For constraints that
+        only couple nearby nodes (indicated by `references`), this results in
+        very sparse Jacobians stored in dense format.
+
+        Future optimization opportunities:
+        - Return sparse Jacobian formats (COO, CSR) instead of dense arrays
+        - Explicitly encode the sparsity pattern from `references`
     """
+    import jax
     import jax.numpy as jnp
+
+    # Convert eval_nodes to JAX array for vmapping
+    eval_nodes_array = jnp.array(eval_nodes)
 
     if is_relative:
         # Relative indexing: eval_idx IS the node index to evaluate at
+        # Create a vmapped version that batches over node indices
+        # in_axes: (None, None, 0, None) means:
+        #   - X: broadcast (same for all evaluations)
+        #   - U: broadcast (same for all evaluations)
+        #   - node_idx: batched (different for each evaluation)
+        #   - params: broadcast (same for all evaluations)
+        vmapped_constraint = jax.vmap(constraint_fn, in_axes=(None, None, 0, None))
+
         def trajectory_constraint(X, U, params):
-            residuals = []
-            for eval_idx in eval_nodes:
-                # Pass eval_idx directly - NodeReference will use it as the base 'k'
-                residual = constraint_fn(X, U, eval_idx, params)
-                residuals.append(residual)
-            return jnp.stack(residuals, axis=0)
+            # Evaluate constraint at all nodes simultaneously
+            return vmapped_constraint(X, U, eval_nodes_array, params)
 
     else:
         # Absolute indexing: need to shift template indices to actual nodes
@@ -274,14 +306,15 @@ def create_cross_node_wrapper(constraint_fn, references, is_relative: bool, eval
         else:
             primary_node = 0
 
+        # Compute all offsets upfront
+        node_offsets = eval_nodes_array - primary_node
+
+        # Vmap over node offsets
+        vmapped_constraint = jax.vmap(constraint_fn, in_axes=(None, None, 0, None))
+
         def trajectory_constraint(X, U, params):
-            residuals = []
-            for eval_idx in eval_nodes:
-                # Compute offset to shift template nodes to eval position
-                node_offset = eval_idx - primary_node
-                residual = constraint_fn(X, U, node_offset, params)
-                residuals.append(residual)
-            return jnp.stack(residuals, axis=0)
+            # Evaluate constraint at all nodes with shifted offsets
+            return vmapped_constraint(X, U, node_offsets, params)
 
     return trajectory_constraint
 
