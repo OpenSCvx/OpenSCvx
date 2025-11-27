@@ -693,10 +693,9 @@ def test_brachistochrone_over():
     # Generate box constraints for all states
     constraint_exprs = []
     for state in states:
-        constraint_exprs.extend([
-            ox.ctcs(state <= state.max).over((0,1)),
-            ox.ctcs(state.min <= state).over((0,1))
-        ])
+        constraint_exprs.extend(
+            [ox.ctcs(state <= state.max).over((0, 1)), ox.ctcs(state.min <= state).over((0, 1))]
+        )
 
     time = ox.Time(
         initial=0.0,
