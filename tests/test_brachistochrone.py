@@ -13,6 +13,8 @@ The analytical solution gives an optimal time of approximately 1.808 seconds.
 """
 
 import jax
+import numpy as np
+import pytest
 
 from tests.brachistochrone_analytical import compare_trajectory_to_analytical
 
@@ -925,6 +927,137 @@ def test_brachistochrone_propagation():
     print(f"  Distance error:        {distance_error_pct:.2f}%")
     print(f"  Straight-line dist:    {straight_line_distance:.4f} m")
     print(f"  Ratio (arc/line):      {analytical_arc_length / straight_line_distance:.4f}")
+
+    # Clean up JAX caches
+    jax.clear_caches()
+
+
+@pytest.mark.parametrize(
+    "max_step,should_converge",
+    [
+        (np.sqrt(125), True),  # At exact limit - should converge
+        (np.sqrt(124.9), False),  # Below limit - should fail
+    ],
+)
+def test_brachistochrone_cross_nodal(max_step, should_converge):
+    """
+    Test brachistochrone with a cross-nodal rate limit constraint
+    """
+    import jax.numpy as jnp
+    import numpy as np
+
+    import openscvx as ox
+    from openscvx import TrajOptProblem
+
+    # Problem parameters
+    n = 2
+    total_time = 2.0
+    g = 9.81
+
+    # Boundary conditions
+    x0, y0 = 0.0, 10.0
+    x1, y1 = 10.0, 5.0
+
+    # Define state components
+    position = ox.State("position", shape=(2,))  # 2D position [x, y]
+    position.max = np.array([10.0, 10.0])
+    position.min = np.array([0.0, 0.0])
+    position.initial = np.array([x0, y0])
+    position.final = [x1, y1]
+    position.guess = np.linspace(position.initial, position.final, n)
+
+    velocity = ox.State("velocity", shape=(1,))  # Scalar speed
+    velocity.max = np.array([10.0])
+    velocity.min = np.array([0.0])
+    velocity.initial = np.array([0.0])
+    velocity.final = [("free", 10.0)]
+    velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
+
+    # Define control
+    theta = ox.Control("theta", shape=(1,))  # Angle from vertical
+    theta.max = np.array([100.5 * jnp.pi / 180])
+    theta.min = np.array([0.0])
+    theta.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1)
+
+    # Define list of all states (needed for TrajOptProblem and constraints)
+    states = [position, velocity]
+    controls = [theta]
+
+    # Define dynamics as dictionary mapping state names to their derivatives
+    dynamics = {
+        "position": ox.Concat(
+            velocity[0] * ox.Sin(theta[0]),  # x_dot
+            -velocity[0] * ox.Cos(theta[0]),  # y_dot
+        ),
+        "velocity": g * ox.Cos(theta[0]),
+    }
+
+    # Generate box constraints for all states
+    constraint_exprs = []
+    for state in states:
+        constraint_exprs.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
+
+    # Rate limit constraint with parameterized max_step
+    pos_k = position.node("k")
+    pos_k_prev = position.node("k-1")
+    rate_limit_constraint = (ox.linalg.Norm(pos_k - pos_k_prev, ord=2) <= max_step).at([1])
+    constraint_exprs.append(rate_limit_constraint)
+
+    time = ox.Time(
+        initial=0.0,
+        final=("minimize", total_time),
+        min=0.0,
+        max=total_time,
+    )
+
+    problem = TrajOptProblem(
+        dynamics=dynamics,
+        states=states,
+        controls=controls,
+        time=time,
+        constraints=constraint_exprs,
+        N=n,
+        licq_max=1e-8,
+    )
+
+    problem.settings.prp.dt = 0.01
+    problem.settings.cvx.solver_args = {"abstol": 1e-6, "reltol": 1e-9}
+    problem.settings.scp.w_tr = 1e1  # Weight on the Trust Region
+    problem.settings.scp.lam_cost = 1e0  # Weight on the Minimal Time Objective
+    problem.settings.scp.lam_vc = 1e1  # Weight on the Virtual Control Objective
+    problem.settings.scp.uniform_time_grid = True
+    problem.settings.sim.save_compiled = False
+    problem.settings.scp.k_max = 50  # Set lower max iterations for non-convergence case
+
+    # Disable printing for cleaner test output
+    if hasattr(problem.settings, "dev"):
+        problem.settings.dev.printing = False
+
+    # Run optimization
+    problem.initialize()
+    result = problem.solve()
+    result = problem.post_process(result)
+
+    # Check convergence based on parameter
+    assert result["converged"] == should_converge, (
+        f"Expected converged={should_converge} with max_step={max_step:.4f}, "
+        f"got converged={result['converged']}"
+    )
+
+    # Compare to analytical solutionif converged
+    if should_converge:
+        comparison = compare_trajectory_to_analytical(
+            result.t_full,
+            result.trajectory["position"],
+            result.trajectory["velocity"],
+            x0,
+            y0,
+            x1,
+            y1,
+            g,
+        )
+        _print_comparison_metrics(comparison, "Brachistochrone Cross-Nodal")
+        _assert_brachistochrone_accuracy(comparison, problem, result)
 
     # Clean up JAX caches
     jax.clear_caches()
