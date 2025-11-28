@@ -237,7 +237,8 @@ class NodalConstraint(Expr):
 
         Note:
             Bounds checking for cross-node constraints (those containing NodeReference)
-            is performed later in the pipeline when N is known, via validate_bounds().
+            is performed later in the pipeline when N is known, via
+            validate_cross_node_constraint_bounds() in preprocessing.py.
         """
         if not isinstance(constraint, Constraint):
             raise TypeError("NodalConstraint must wrap a Constraint")
@@ -256,75 +257,6 @@ class NodalConstraint(Expr):
 
         self.constraint = constraint
         self.nodes = converted_nodes
-
-    def validate_bounds(self, N: int):
-        """Validate that NodeReferences in this constraint don't access out-of-bounds nodes.
-
-        This should be called during problem setup when N (total number of nodes) is known.
-
-        Args:
-            N: Total number of trajectory nodes
-
-        Raises:
-            ValueError: If any NodeReference would access nodes outside [0, N)
-        """
-        from .expr import NodeReference
-
-        # Collect all NodeReferences in the constraint expression
-        node_refs = []
-
-        def collect_refs(expr):
-            if isinstance(expr, NodeReference):
-                node_refs.append(expr)
-            for child in expr.children():
-                collect_refs(child)
-
-        # Traverse both lhs and rhs of constraint
-        collect_refs(self.constraint.lhs)
-        collect_refs(self.constraint.rhs)
-
-        if not node_refs:
-            return  # No NodeReferences to validate
-
-        # Check if using relative or absolute indexing
-        is_relative = node_refs[0].is_relative
-
-        if is_relative:
-            # Relative indexing: check that k + offset stays in bounds
-            offsets = [ref.offset for ref in node_refs]
-            min_offset = min(offsets)
-            max_offset = max(offsets)
-
-            # Check each evaluation node
-            for eval_node in self.nodes:
-                min_accessed = eval_node + min_offset
-                max_accessed = eval_node + max_offset
-
-                if min_accessed < 0:
-                    raise ValueError(
-                        f"Cross-node constraint accesses invalid node index {min_accessed} "
-                        f"when evaluated at node {eval_node} (offset: {min_offset}). "
-                        f"Node indices must be in range [0, {N}). "
-                        f"Constraint: {self.constraint}"
-                    )
-
-                if max_accessed >= N:
-                    raise ValueError(
-                        f"Cross-node constraint accesses invalid node index {max_accessed} "
-                        f"when evaluated at node {eval_node} (offset: {max_offset}). "
-                        f"Node indices must be in range [0, {N}). "
-                        f"Constraint: {self.constraint}"
-                    )
-        else:
-            # Absolute indexing: check that referenced nodes are in bounds
-            for ref in node_refs:
-                if ref.node_idx < 0 or ref.node_idx >= N:
-                    raise ValueError(
-                        f"Cross-node constraint references invalid absolute node index "
-                        f"{ref.node_idx}. "
-                        f"Node indices must be in range [0, {N}). "
-                        f"Constraint: {self.constraint}"
-                    )
 
     def children(self):
         """Return the wrapped constraint as the only child.
