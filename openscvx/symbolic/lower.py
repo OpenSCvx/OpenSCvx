@@ -195,12 +195,10 @@ def collect_node_references(expr: Expr) -> Tuple[List, bool]:
         For expression `position.node(10) - position.node(9)`:
         Returns ([9, 10], False)
 
-    Performance Note:
+    Note:
         The returned references indicate which nodes are coupled by the constraint.
         For example, references=[-1, 0] means the constraint couples node k with node k-1.
-        This sparsity pattern is currently NOT exploited - Jacobians are always dense
-        (M, N, n_x) arrays regardless of how few nodes are actually coupled. This can
-        result in significant memory overhead for large N.
+        This sparsity pattern is currently not exploited in Jacobian storage.
     """
     references = []
     is_relative = None
@@ -269,15 +267,10 @@ def create_cross_node_wrapper(constraint_fn, references, is_relative: bool, eval
             - Always evaluates position[0] - position[5] (same fixed nodes)
             - Returns the same value repeated for each eval_node
 
-    Performance Warning:
-        The returned function will later have Jacobians computed via jax.jacfwd,
-        producing dense (M, N, n_x) and (M, N, n_u) arrays. For constraints that
-        only couple nearby nodes (indicated by `references`), this results in
-        very sparse Jacobians stored in dense format.
-
-        Future optimization opportunities:
-        - Return sparse Jacobian formats (COO, CSR) instead of dense arrays
-        - Explicitly encode the sparsity pattern from `references`
+    Note:
+        The returned function will have Jacobians computed via jax.jacfwd, producing
+        dense (M, N, n_x) and (M, N, n_u) arrays. See CrossNodeConstraintLowered for
+        performance implications.
     """
     import jax
     import jax.numpy as jnp

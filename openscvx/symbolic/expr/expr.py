@@ -246,20 +246,9 @@ class Expr:
                 pos_rate = (position.node(k) - position.node(k-1) <= threshold)
 
         Performance Note:
-            Cross-node constraints produce dense Jacobian matrices of shape (M, N, n_x)
-            and (M, N, n_u), where M is the number of evaluation points and N is the
-            number of trajectory nodes. However, most cross-node constraints (like rate
-            limits) only couple nearby nodes, making these Jacobians very sparse in practice.
-
-            The current implementation does NOT exploit this sparsity, which can lead to:
-            - High memory usage for large N (e.g., N=100 nodes with n_x=10 states
-              results in ~80KB per constraint evaluation point)
-            - Slower autodiff computation due to computing many zero entries
-            - Inefficient constraint evaluation in the SCP solver
-
-            For problems with large N (>50 nodes) and many cross-node constraints,
-            consider using fewer nodes or expect higher memory usage. Future improvements
-            may add sparse Jacobian support.
+            Cross-node constraints use dense Jacobian storage which can be memory-intensive
+            for large N (>100 nodes). See CrossNodeConstraintLowered documentation for
+            details on memory usage and future sparse Jacobian support.
         """
         return NodeReference(self, k)
 
@@ -586,20 +575,9 @@ class NodeReference(Expr):
             # Rate limit on just the z-component
             z_rate = (velocity[2].node('k') - velocity[2].node('k-1') <= 0.05)
 
-    Performance Warning:
-        Cross-node constraints created using NodeReference generate dense Jacobian matrices
-        of shape (M, N, n_x) and (M, N, n_u), where:
-        - M = number of evaluation points (length of nodes list in .at([...]))
-        - N = total number of trajectory nodes
-        - n_x = state dimension, n_u = control dimension
-
-        Most cross-node constraints only couple a few nearby nodes (e.g., k and k-1 for
-        rate limits), making these Jacobians extremely sparse. However, the current
-        implementation stores them as dense arrays, which:
-
-        - Uses O(M * N * n_x) memory instead of O(M * coupling_width * n_x)
-        - Computes gradients for many zero entries during autodiff
-        - Can significantly impact performance for large N (>50 nodes)
+    Performance Note:
+        Cross-node constraints use dense Jacobian storage. For details on memory
+        usage and performance implications, see CrossNodeConstraintLowered documentation.
 
     Note:
         NodeReference is typically created via the `.node(k)` method on Leaf

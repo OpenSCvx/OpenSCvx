@@ -50,7 +50,7 @@ class CrossNodeConstraintLowered:
             eval_nodes = [1, 2, 3, ..., N-1]
             reference_pattern = "rate_limit: x.node(k) - x.node(k-1)"
 
-    Performance Warning:
+    Performance Note - Dense Jacobian Storage:
         The Jacobian matrices grad_g_X and grad_g_U are stored as DENSE arrays with
         shape (M, N, n_x) and (M, N, n_u), but most cross-node constraints only
         couple a small number of nearby nodes, making these matrices extremely sparse.
@@ -59,19 +59,21 @@ class CrossNodeConstraintLowered:
         Jacobian entries at positions [i, k, :] and [i, k-1, :] for each constraint i.
         All other N-2 entries per row are zero but still stored in memory.
 
-        Impact:
-        - High memory usage for large N (>50 nodes)
-        - Slower autodiff due to computing many zero gradients
+        Memory impact for large problems:
+        - A single constraint with M=50 evaluations, N=100 nodes, n_x=10 states
+          requires ~400KB for grad_g_X alone (instead of ~8KB if sparse)
+        - Multiple cross-node constraints multiply this overhead
+        - May cause issues for N > 100 with many constraints
+
+        Performance impact:
+        - Slower autodiff (computes many zero gradients)
         - Inefficient constraint linearization in the SCP solver
         - Potential GPU memory limitations for very large problems
 
         The current implementation prioritizes simplicity and compatibility with
         JAX's autodiff over memory efficiency. Future versions may support sparse
-        Jacobian formats (COO, CSR, or custom sparse representations).
-
-    Note:
-        The Jacobian matrices are dense (M, N, n_x) but typically very sparse.
-        Future optimization could use sparse matrix formats for efficiency.
+        Jacobian formats (COO, CSR, or custom sparse representations) if this
+        becomes a bottleneck in practice.
     """
 
     func: Callable[[jnp.ndarray, jnp.ndarray, dict], jnp.ndarray]
