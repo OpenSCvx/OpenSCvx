@@ -566,15 +566,15 @@ def test_bounds_checking_relative_multiple_offsets():
     N = 10
 
     # Valid: k, k-1, k-2 at nodes 2..9
-    constraint = (
-        state.node("k") - 2 * state.node("k-1") + state.node("k-2") <= 0.1
-    ).at(range(2, N))
+    constraint = (state.node("k") - 2 * state.node("k-1") + state.node("k-2") <= 0.1).at(
+        range(2, N)
+    )
     constraint.validate_bounds(N)  # Should not raise
 
     # Invalid: same constraint at node 1 (would access k-2 = -1)
-    constraint_invalid = (
-        state.node("k") - 2 * state.node("k-1") + state.node("k-2") <= 0.1
-    ).at([1])
+    constraint_invalid = (state.node("k") - 2 * state.node("k-1") + state.node("k-2") <= 0.1).at(
+        [1]
+    )
 
     with pytest.raises(ValueError, match="accesses invalid node index -1"):
         constraint_invalid.validate_bounds(N)
@@ -706,3 +706,91 @@ def test_collect_node_references_no_refs():
     refs, is_relative = collect_node_references(expr)
     assert not is_relative  # Defaults to False
     assert refs == []
+
+
+# =============================================================================
+# Absolute Mode Fixed Reference Semantics Tests
+# =============================================================================
+
+
+def test_absolute_mode_fixed_reference_semantics():
+    """Test that absolute mode always references the same fixed nodes.
+
+    This tests the semantic behavior: position.node(3) should always access
+    node 3, regardless of which eval_node the constraint is evaluated at.
+    """
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.lower import create_cross_node_wrapper, lower_to_jax
+
+    position = State("pos", shape=(2,))
+    position._slice = slice(0, 2)  # Manually assign slice for testing
+
+    # Absolute constraint: position[5] - position[3]
+    expr = position.node(5) - position.node(3)
+
+    # Lower to JAX
+    constraint_fn = lower_to_jax(expr)
+
+    # Create wrapper for evaluation at multiple nodes
+    wrapped_fn = create_cross_node_wrapper(
+        constraint_fn,
+        references=[3, 5],  # Absolute indices
+        is_relative=False,
+        eval_nodes=[0, 1, 2, 10],  # Evaluate at these nodes
+    )
+
+    # Create fake trajectory
+    X = jnp.arange(20).reshape(10, 2).astype(float)  # 10 nodes, 2-dim state
+    U = jnp.zeros((10, 0))
+    params = {}
+
+    # Evaluate wrapped constraint
+    results = wrapped_fn(X, U, params)
+
+    # Expected: should return the same value (X[5] - X[3]) repeated 4 times
+    expected_value = X[5] - X[3]  # [10, 11] - [6, 7] = [4, 4]
+    expected = jnp.tile(expected_value, 4)  # Repeat for 4 eval_nodes
+
+    assert results.shape == (8,)  # 4 eval_nodes * 2-dim state
+    assert jnp.allclose(results, expected)
+
+
+def test_absolute_vs_relative_semantics():
+    """Compare absolute vs relative mode to show semantic difference."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.lower import create_cross_node_wrapper, lower_to_jax
+
+    position = State("pos", shape=(1,))
+    position._slice = slice(0, 1)  # Manually assign slice for testing
+
+    # Create trajectory
+    X = jnp.arange(10).reshape(10, 1).astype(float)  # [0, 1, 2, ..., 9]
+    U = jnp.zeros((10, 0))
+    params = {}
+
+    # Absolute mode: position.node(5) - position.node(3)
+    abs_expr = position.node(5) - position.node(3)
+    abs_fn = lower_to_jax(abs_expr)
+    abs_wrapped = create_cross_node_wrapper(abs_fn, [3, 5], False, [6, 7, 8])
+    abs_results = abs_wrapped(X, U, params)
+
+    # Should always be X[5] - X[3] = 5 - 3 = 2
+    assert jnp.allclose(abs_results, jnp.array([2.0, 2.0, 2.0]))
+
+    # Relative mode: position.node('k') - position.node('k-2')
+    rel_expr = position.node("k") - position.node("k-2")
+    rel_fn = lower_to_jax(rel_expr)
+    rel_wrapped = create_cross_node_wrapper(rel_fn, [-2, 0], True, [6, 7, 8])
+    rel_results = rel_wrapped(X, U, params)
+
+    # Should be X[6]-X[4]=2, X[7]-X[5]=2, X[8]-X[6]=2
+    assert jnp.allclose(rel_results, jnp.array([2.0, 2.0, 2.0]))
+
+    # Different eval nodes in relative mode give different results
+    rel_wrapped2 = create_cross_node_wrapper(rel_fn, [-2, 0], True, [3, 4, 5])
+    rel_results2 = rel_wrapped2(X, U, params)
+
+    # Should be X[3]-X[1]=2, X[4]-X[2]=2, X[5]-X[3]=2
+    assert jnp.allclose(rel_results2, jnp.array([2.0, 2.0, 2.0]))

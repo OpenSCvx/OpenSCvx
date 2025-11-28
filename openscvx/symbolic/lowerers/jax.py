@@ -951,9 +951,9 @@ class JaxLowerer:
 
         **Absolute indexing** (node.is_relative = False):
             - Uses integer indices like 0, 5, N-1 in the symbolic expression
-            - node_param is an offset to shift the template pattern
-            - Extracts from: node.node_idx + node_param
-            - Example: position.node(10) with node_param=-5 extracts from node 5
+            - Always extracts from the exact node specified (fixed reference)
+            - node_param is ignored
+            - Example: position.node(5) always extracts from node 5
 
         Args:
             node: NodeReference expression node with base expression and node_idx
@@ -961,7 +961,7 @@ class JaxLowerer:
         Returns:
             Function (x, u, node_param, params) that extracts from trajectory
                 - x, u: Full trajectories (N, n_x) and (N, n_u)
-                - node_param: For relative: the 'k' value. For absolute: offset.
+                - node_param: For relative: the 'k' value. For absolute: ignored.
                 - params: Problem parameters
         """
         from openscvx.symbolic.expr.control import Control
@@ -1007,17 +1007,18 @@ class JaxLowerer:
                 return compound_node_fn
 
         else:
-            # Absolute indexing: node_param is offset, node.node_idx is template
-            template_idx = node.node_idx
+            # Absolute indexing: always reference the exact node specified
+            # node_param is ignored (not used for absolute references)
+            fixed_idx = node.node_idx
 
             if isinstance(node.base, State):
                 sl = node.base._slice
                 if sl is None:
                     raise ValueError(f"State {node.base.name!r} has no slice assigned")
 
-                def state_node_fn(x, u, node_offset, params):
-                    actual_idx = template_idx + (node_offset if node_offset is not None else 0)
-                    return x[actual_idx, sl]
+                def state_node_fn(x, u, node_param, params):
+                    # Always access the fixed index, ignore node_param
+                    return x[fixed_idx, sl]
 
                 return state_node_fn
 
@@ -1026,9 +1027,9 @@ class JaxLowerer:
                 if sl is None:
                     raise ValueError(f"Control {node.base.name!r} has no slice assigned")
 
-                def control_node_fn(x, u, node_offset, params):
-                    actual_idx = template_idx + (node_offset if node_offset is not None else 0)
-                    return u[actual_idx, sl]
+                def control_node_fn(x, u, node_param, params):
+                    # Always access the fixed index, ignore node_param
+                    return u[fixed_idx, sl]
 
                 return control_node_fn
 
@@ -1036,10 +1037,10 @@ class JaxLowerer:
                 # Compound expression
                 base_fn = self.lower(node.base)
 
-                def compound_node_fn(x, u, node_offset, params):
-                    actual_idx = template_idx + (node_offset if node_offset is not None else 0)
-                    x_single = x[actual_idx] if len(x.shape) > 1 else x
-                    u_single = u[actual_idx] if len(u.shape) > 1 else u
-                    return base_fn(x_single, u_single, actual_idx, params)
+                def compound_node_fn(x, u, node_param, params):
+                    # Always access the fixed index, ignore node_param
+                    x_single = x[fixed_idx] if len(x.shape) > 1 else x
+                    u_single = u[fixed_idx] if len(u.shape) > 1 else u
+                    return base_fn(x_single, u_single, fixed_idx, params)
 
                 return compound_node_fn

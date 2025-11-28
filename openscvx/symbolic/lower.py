@@ -244,8 +244,8 @@ def create_cross_node_wrapper(constraint_fn, references, is_relative: bool, eval
     Supports two modes:
     - **Relative indexing**: Constraints like position.node('k') - position.node('k-1')
       evaluate the pattern at each eval_node (e.g., at node 5: position[5] - position[4])
-    - **Absolute indexing**: Constraints like position.node(0) - position.node(N-1)
-      evaluate at the exact specified nodes regardless of eval_nodes
+    - **Absolute indexing**: Constraints like position.node(3) - position.node(0)
+      always reference the same fixed nodes (e.g., always position[3] - position[0])
 
     Args:
         constraint_fn: Lowered constraint function with NodeReference handling
@@ -265,8 +265,9 @@ def create_cross_node_wrapper(constraint_fn, references, is_relative: bool, eval
             - At eval_node=3: computes position[3] - position[2]
 
         Absolute indexing:
-            `position.node(0) == [0.0, 10.0]` with eval_nodes=[0]
-            - Always evaluates at node 0, regardless of pattern
+            `position.node(0) - position.node(5) <= 0.1` with eval_nodes=[0, 1, 2]
+            - Always evaluates position[0] - position[5] (same fixed nodes)
+            - Returns the same value repeated for each eval_node
 
     Performance Warning:
         The returned function will later have Jacobians computed via jax.jacfwd,
@@ -299,22 +300,17 @@ def create_cross_node_wrapper(constraint_fn, references, is_relative: bool, eval
             return vmapped_constraint(X, U, eval_nodes_array, params)
 
     else:
-        # Absolute indexing: need to shift template indices to actual nodes
-        # This is the old behavior for backward compatibility
-        if len(references) > 0:
-            primary_node = max(references)
-        else:
-            primary_node = 0
+        # Absolute indexing: always reference the same fixed nodes
+        # For example: position.node(3) - position.node(0) always accesses nodes 3 and 0
+        # regardless of which eval_node we're at
 
-        # Compute all offsets upfront
-        node_offsets = eval_nodes_array - primary_node
-
-        # Vmap over node offsets
-        vmapped_constraint = jax.vmap(constraint_fn, in_axes=(None, None, 0, None))
-
+        # Since absolute references don't depend on eval_node, we don't need node_param
+        # Just evaluate the constraint once and repeat for each eval_node
         def trajectory_constraint(X, U, params):
-            # Evaluate constraint at all nodes with shifted offsets
-            return vmapped_constraint(X, U, node_offsets, params)
+            # Evaluate constraint once (node_param unused for absolute indexing)
+            single_result = constraint_fn(X, U, None, params)
+            # Repeat the result for each eval_node
+            return jnp.tile(single_result, len(eval_nodes))
 
     return trajectory_constraint
 
