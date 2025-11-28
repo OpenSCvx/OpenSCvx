@@ -37,7 +37,6 @@ class CrossNodeConstraintLowered:
         grad_g_U: Function (X, U, params) -> (M, N, n_u) Jacobian wrt full control trajectory
             Often zero or very sparse for cross-node state constraints
         eval_nodes: List of node indices where constraint is evaluated (length M)
-        reference_pattern: Human-readable description of the cross-node pattern (for debugging)
 
     Example:
         For rate constraint (x[k] - x[k-1] <= r) at k in 1..N-1:
@@ -48,7 +47,6 @@ class CrossNodeConstraintLowered:
                 and grad_g_X[i, i-1, :] = ∂g_i/∂x[i-1] (derivative wrt previous)
                 all other entries are zero
             eval_nodes = [1, 2, 3, ..., N-1]
-            reference_pattern = "rate_limit: x.node(k) - x.node(k-1)"
 
     Performance Note - Dense Jacobian Storage:
         The Jacobian matrices grad_g_X and grad_g_U are stored as DENSE arrays with
@@ -80,4 +78,3 @@ class CrossNodeConstraintLowered:
     grad_g_X: Callable[[jnp.ndarray, jnp.ndarray, dict], jnp.ndarray]
     grad_g_U: Callable[[jnp.ndarray, jnp.ndarray, dict], jnp.ndarray]
     eval_nodes: List[int]
-    reference_pattern: str

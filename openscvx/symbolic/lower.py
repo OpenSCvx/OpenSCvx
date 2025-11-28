@@ -383,7 +383,6 @@ def lower_symbolic_expressions(
                 - grad_g_X: Jacobian wrt full state trajectory (M, N, n_x)
                 - grad_g_U: Jacobian wrt full control trajectory (M, N, n_u)
                 - eval_nodes: List of node indices where constraint is evaluated
-                - reference_pattern: Description of node reference pattern
             - constraints_nodal_convex (List[NodalConstraint]): Convex constraints
               (unchanged, still symbolic for later CVXPy lowering)
             - x_unified (UnifiedState): Aggregated optimization state interface
@@ -534,13 +533,11 @@ def lower_symbolic_expressions(
         grad_g_U = jacfwd(wrapped_fn, argnums=1)  # dg/dU - shape (M, N, n_u)
 
         # Create CrossNodeConstraintLowered object
-        mode_str = "relative" if is_relative else "absolute"
         cross_node_lowered = CrossNodeConstraintLowered(
             func=wrapped_fn,
             grad_g_X=grad_g_X,
             grad_g_U=grad_g_U,
             eval_nodes=constraint_nodal.nodes,
-            reference_pattern=f"{mode_str}: {references}",
         )
         lowered_cross_node_constraints.append(cross_node_lowered)
 

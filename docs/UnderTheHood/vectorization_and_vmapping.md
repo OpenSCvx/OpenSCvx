@@ -245,7 +245,6 @@ cross_node_lowered = CrossNodeConstraintLowered(
     grad_g_X=grad_g_X,
     grad_g_U=grad_g_U,
     eval_nodes=eval_nodes,  # List of nodes where constraint is evaluated
-    reference_pattern=f"relative: {references}",
 )
 ```
 
