@@ -85,7 +85,7 @@ def _assert_brachistochrone_accuracy(comparison, problem, result):
     )
 
 
-def test_brachistochrone_example():
+def test_example():
     """
     Test the brachistochrone example from examples/abstract/brachistochrone.py.
 
@@ -130,7 +130,7 @@ def test_brachistochrone_example():
     jax.clear_caches()
 
 
-def test_brachistochrone_monolithic():
+def test_monolithic():
     """
     Test brachistochrone with monolithic state representation.
 
@@ -233,7 +233,7 @@ def test_brachistochrone_monolithic():
     jax.clear_caches()
 
 
-def test_brachistochrone_nodal():
+def test_nodal():
     """
     Test brachistochrone with nodal constraints.
     """
@@ -347,7 +347,7 @@ def test_brachistochrone_nodal():
     jax.clear_caches()
 
 
-def test_brachistochrone_convex():
+def test_convex():
     """
     Test brachistochrone with convex constraints.
     """
@@ -461,7 +461,7 @@ def test_brachistochrone_convex():
     jax.clear_caches()
 
 
-def test_brachistochrone_parameters():
+def test_parameters():
     """
     Test brachistochrone with Parameter objects.
 
@@ -639,7 +639,7 @@ def test_brachistochrone_parameters():
     jax.clear_caches()
 
 
-def test_brachistochrone_over():
+def test_over():
     """
     Test brachistochrone with constraints defined over a range of nodes.
     """
@@ -755,7 +755,7 @@ def test_brachistochrone_over():
     jax.clear_caches()
 
 
-def test_brachistochrone_propagation():
+def test_propagation():
     """
     Test brachistochrone with propagation dynamics to track distance travelled.
 
@@ -939,7 +939,7 @@ def test_brachistochrone_propagation():
         (np.sqrt(124.9), False),  # Below limit - should fail
     ],
 )
-def test_brachistochrone_cross_nodal(max_step, should_converge):
+def test_cross_nodal(max_step, should_converge):
     """
     Test brachistochrone with a cross-nodal rate limit constraint
     """
