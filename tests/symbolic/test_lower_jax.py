@@ -430,37 +430,12 @@ def test_contains_node_reference():
     assert not contains_node_reference(regular_expr)
 
     # With NodeReference
-    cross_node_expr = position.node("k") - position.node("k-1")
+    cross_node_expr = position.node(5) - position.node(4)
     assert contains_node_reference(cross_node_expr)
 
     # Deeply nested
-    nested_expr = (position.node("k") - position.node("k-1")) * 2.0 + 1.0
+    nested_expr = (position.node(5) - position.node(4)) * 2.0 + 1.0
     assert contains_node_reference(nested_expr)
-
-
-def test_collect_node_references_relative():
-    """Test collecting node references from relative indexing expressions."""
-    from openscvx.symbolic.lower import _collect_node_references as collect_node_references
-
-    position = State("pos", shape=(3,))
-
-    # Single reference
-    expr1 = position.node("k")
-    refs, is_relative = collect_node_references(expr1)
-    assert is_relative
-    assert refs == [0]
-
-    # Two references (k, k-1)
-    expr2 = position.node("k") - position.node("k-1")
-    refs, is_relative = collect_node_references(expr2)
-    assert is_relative
-    assert refs == [-1, 0]  # Sorted offsets
-
-    # Three references (k, k-1, k-2)
-    expr3 = position.node("k") - 2 * position.node("k-1") + position.node("k-2")
-    refs, is_relative = collect_node_references(expr3)
-    assert is_relative
-    assert refs == [-2, -1, 0]
 
 
 def test_collect_node_references_absolute():
@@ -471,15 +446,18 @@ def test_collect_node_references_absolute():
 
     # Single reference
     expr1 = position.node(5)
-    refs, is_relative = collect_node_references(expr1)
-    assert not is_relative
+    refs = collect_node_references(expr1)
     assert refs == [5]
 
     # Two references
     expr2 = position.node(0) - position.node(10)
-    refs, is_relative = collect_node_references(expr2)
-    assert not is_relative
+    refs = collect_node_references(expr2)
     assert refs == [0, 10]
+
+    # Three references
+    expr3 = position.node(7) - 2 * position.node(5) + position.node(3)
+    refs = collect_node_references(expr3)
+    assert refs == [3, 5, 7]  # Sorted unique indices
 
 
 def test_collect_node_references_no_refs():
@@ -490,30 +468,12 @@ def test_collect_node_references_no_refs():
 
     # No NodeReferences
     expr = position + 1.0
-    refs, is_relative = collect_node_references(expr)
-    assert not is_relative  # Defaults to False
+    refs = collect_node_references(expr)
     assert refs == []
 
 
-def test_collect_node_references_mixed_mode_error():
-    """Test that mixing relative and absolute indexing raises error during collection."""
-    from openscvx.symbolic.lower import _collect_node_references as collect_node_references
-
-    position = State("pos", shape=(3,))
-
-    # Mix absolute and relative - should raise during analysis
-    constraint_expr = position.node(5) - position.node("k")
-
-    with pytest.raises(ValueError, match="Cannot mix relative.*and absolute"):
-        collect_node_references(constraint_expr)
-
-
-def test_absolute_mode_fixed_reference_semantics():
-    """Test that absolute mode always references the same fixed nodes.
-
-    This tests the semantic behavior: position.node(3) should always access
-    node 3, regardless of which eval_node the constraint is evaluated at.
-    """
+def test_absolute_node_reference_semantics():
+    """Test that absolute indexing references the correct trajectory nodes."""
     from openscvx.symbolic.lower import (
         _create_cross_node_wrapper as create_cross_node_wrapper,
     )
@@ -524,18 +484,17 @@ def test_absolute_mode_fixed_reference_semantics():
     position = State("pos", shape=(2,))
     position._slice = slice(0, 2)  # Manually assign slice for testing
 
-    # Absolute constraint: position[5] - position[3]
+    # Constraint: position[5] - position[3]
     expr = position.node(5) - position.node(3)
 
     # Lower to JAX
     constraint_fn = lower_to_jax(expr)
 
-    # Create wrapper for evaluation at multiple nodes
+    # Create wrapper for evaluation at specific nodes
     wrapped_fn = create_cross_node_wrapper(
         constraint_fn,
-        references=[3, 5],  # Absolute indices
-        is_relative=False,
-        eval_nodes=[0, 1, 2, 10],  # Evaluate at these nodes
+        references=[3, 5],  # Node indices referenced
+        eval_nodes=[5],  # Where to evaluate (typical usage)
     )
 
     # Create fake trajectory
@@ -546,52 +505,9 @@ def test_absolute_mode_fixed_reference_semantics():
     # Evaluate wrapped constraint
     results = wrapped_fn(X, U, params)
 
-    # Expected: should return the same value (X[5] - X[3]) repeated 4 times
-    expected_value = X[5] - X[3]  # [10, 11] - [6, 7] = [4, 4]
-    expected = jnp.tile(expected_value, 4)  # Repeat for 4 eval_nodes
+    # Expected: X[5] - X[3] = [10, 11] - [6, 7] = [4, 4]
+    # Shape is (M, n_x) where M=len(eval_nodes)=1, n_x=2
+    expected = jnp.array([[4.0, 4.0]])
 
-    assert results.shape == (8,)  # 4 eval_nodes * 2-dim state
+    assert results.shape == (1, 2)  # 1 eval_node, 2-dim state
     assert jnp.allclose(results, expected)
-
-
-def test_absolute_vs_relative_semantics():
-    """Compare absolute vs relative mode to show semantic difference."""
-    from openscvx.symbolic.lower import (
-        _create_cross_node_wrapper as create_cross_node_wrapper,
-    )
-    from openscvx.symbolic.lower import (
-        lower_to_jax,
-    )
-
-    position = State("pos", shape=(1,))
-    position._slice = slice(0, 1)  # Manually assign slice for testing
-
-    # Create trajectory
-    X = jnp.arange(10).reshape(10, 1).astype(float)  # [0, 1, 2, ..., 9]
-    U = jnp.zeros((10, 0))
-    params = {}
-
-    # Absolute mode: position.node(5) - position.node(3)
-    abs_expr = position.node(5) - position.node(3)
-    abs_fn = lower_to_jax(abs_expr)
-    abs_wrapped = create_cross_node_wrapper(abs_fn, [3, 5], False, [6, 7, 8])
-    abs_results = abs_wrapped(X, U, params)
-
-    # Should always be X[5] - X[3] = 5 - 3 = 2
-    assert jnp.allclose(abs_results, jnp.array([2.0, 2.0, 2.0]))
-
-    # Relative mode: position.node('k') - position.node('k-2')
-    rel_expr = position.node("k") - position.node("k-2")
-    rel_fn = lower_to_jax(rel_expr)
-    rel_wrapped = create_cross_node_wrapper(rel_fn, [-2, 0], True, [6, 7, 8])
-    rel_results = rel_wrapped(X, U, params)
-
-    # Should be X[6]-X[4]=2, X[7]-X[5]=2, X[8]-X[6]=2
-    assert jnp.allclose(rel_results, jnp.array([2.0, 2.0, 2.0]))
-
-    # Different eval nodes in relative mode give different results
-    rel_wrapped2 = create_cross_node_wrapper(rel_fn, [-2, 0], True, [3, 4, 5])
-    rel_results2 = rel_wrapped2(X, U, params)
-
-    # Should be X[3]-X[1]=2, X[4]-X[2]=2, X[5]-X[3]=2
-    assert jnp.allclose(rel_results2, jnp.array([2.0, 2.0, 2.0]))

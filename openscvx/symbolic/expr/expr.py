@@ -222,28 +222,36 @@ class Expr:
         """Reference this expression at a specific trajectory node.
 
         This method enables inter-node constraints where you can reference
-        the value of an expression at different time steps. This works on any
-        expression, not just leaf variables, allowing for flexible constraint
-        definitions like:
-        - Rate limits: velocity.node(k) - velocity.node(k-1) <= max_rate
-        - Indexed node access: position[0].node(k) - position[0].node(k-1) <= threshold
+        the value of an expression at different time steps. Common patterns
+        include rate limits and multi-step dependencies.
 
         Args:
-            k: Node index (integer) in the trajectory
+            k: Absolute node index (integer) in the trajectory.
+               Can be positive (0, 1, 2, ...) or negative (-1 for last node).
 
         Returns:
             NodeReference: An expression representing this expression at node k
 
         Example:
-            Node references on compound expressions:
+            Rate limit constraint (applied across trajectory using a loop):
 
                 position = State("pos", shape=(3,))
 
-                # Node reference on indexed expression
-                x_rate = (position[0].node(k) - position[0].node(k-1) <= 0.1)
+                # Create rate limit for each node
+                constraints = [
+                    (ox.linalg.Norm(position.node(k) - position.node(k-1)) <= 0.1).at([k])
+                    for k in range(1, N)
+                ]
 
-                # Node reference on the full vector
-                pos_rate = (position.node(k) - position.node(k-1) <= threshold)
+            Multi-step dependency:
+
+                state = State("x", shape=(1,))
+
+                # Fibonacci-like recurrence
+                constraints = [
+                    (state.node(k) == state.node(k-1) + state.node(k-2)).at([k])
+                    for k in range(2, N)
+                ]
 
         Performance Note:
             Cross-node constraints use dense Jacobian storage which can be memory-intensive
@@ -530,133 +538,64 @@ class NodeReference(Expr):
     such as:
 
     - Rate limits and smoothness constraints
-    - Consistency between consecutive time steps
     - Multi-step dependencies and recurrence relations
-
-    The node index can be specified in two ways:
-    - **Relative indexing** (str): Use 'k', 'k-1', 'k+2', etc. for pattern-based constraints
-      that shift across the trajectory. This is the recommended approach for most constraints.
-    - **Absolute indexing** (int): Use concrete integers like 0, 5, N-1 for constraints
-      at specific nodes (e.g., boundary conditions).
+    - Constraints coupling specific nodes
 
     Attributes:
         base: The expression (typically a Leaf like State or Control) being referenced
-        node_idx: Trajectory node index (integer for absolute, string for relative)
-        is_relative: True if using relative indexing ('k'-based), False for absolute
-        offset: For relative indexing, the offset from 'k' (e.g., 'k-1' has offset -1)
+        node_idx: Trajectory node index (integer, can be negative for end-indexing)
 
     Example:
-        Relative indexing (recommended for most constraints):
+        Rate limit across trajectory:
 
             position = State("pos", shape=(3,))
 
-            # Rate limit: change between consecutive nodes
-            rate_constraint = (position.node('k') - position.node('k-1') <= 0.1).at(range(1, N))
+            # Create rate limit constraints for all nodes
+            constraints = [
+                (ox.linalg.Norm(position.node(k) - position.node(k-1)) <= 0.1).at([k])
+                for k in range(1, N)
+            ]
 
-        Absolute indexing (for boundary conditions):
-
-            # Initial position constraint
-            initial_constraint = (position.node(0) == [0.0, 10.0]).at([0])
-
-            # Periodic boundary condition
-            periodic = (position.node(0) == position.node(N-1)).at([0])
-
-        Multi-step dependencies:
+        Multi-step dependency:
 
             state = State("x", shape=(1,))
 
-            # Fibonacci-like recurrence
-            recurrence = (state.node('k') == state.node('k-1') + state.node('k-2')).at(range(2, N))
+            # Fibonacci-like recurrence at each node
+            constraints = [
+                (state.node(k) == state.node(k-1) + state.node(k-2)).at([k])
+                for k in range(2, N)
+            ]
 
-        Combine with spatial indexing:
+        Coupling specific nodes:
 
-            velocity = State("vel", shape=(3,))
-
-            # Rate limit on just the z-component
-            z_rate = (velocity[2].node('k') - velocity[2].node('k-1') <= 0.05)
+            # Constrain distance between nodes 5 and 10
+            coupling = (position.node(10) - position.node(5) <= threshold).at([10])
 
     Performance Note:
         Cross-node constraints use dense Jacobian storage. For details on memory
         usage and performance implications, see CrossNodeConstraintLowered documentation.
 
     Note:
-        NodeReference is typically created via the `.node(k)` method on Leaf
-        expressions rather than constructed directly.
+        NodeReference is typically created via the `.node(k)` method on expressions
+        rather than constructed directly.
     """
 
-    def __init__(self, base: Expr, node_idx):
+    def __init__(self, base: Expr, node_idx: int):
         """Initialize a NodeReference.
 
         Args:
             base: Expression to reference at a specific node (typically a Leaf)
-            node_idx: Trajectory node index
-                - int: Absolute node index (e.g., 0, 5, N-1)
-                - str: Relative node expression (e.g., 'k', 'k-1', 'k+2')
+            node_idx: Absolute trajectory node index (integer)
+                     Supports negative indexing (e.g., -1 for last node)
 
         Raises:
-            TypeError: If node_idx is not an integer or string
-            ValueError: If string node_idx has invalid format
+            TypeError: If node_idx is not an integer
         """
-        if isinstance(node_idx, int):
-            self.node_idx = node_idx
-            self.is_relative = False
-            self.offset = 0
-        elif isinstance(node_idx, str):
-            self.node_idx = node_idx
-            self.is_relative = True
-            self.offset = self._parse_relative_index(node_idx)
-        else:
-            raise TypeError(
-                f"Node index must be an integer or string, got {type(node_idx).__name__}"
-            )
+        if not isinstance(node_idx, int):
+            raise TypeError(f"Node index must be an integer, got {type(node_idx).__name__}")
 
+        self.node_idx = node_idx
         self.base = base
-
-    @staticmethod
-    def _parse_relative_index(node_str: str) -> int:
-        """Parse a relative node index string to extract the offset.
-
-        Args:
-            node_str: String like 'k', 'k-1', 'k+2', 'k-10'
-
-        Returns:
-            Integer offset from 'k' (e.g., 'k-1' returns -1, 'k+2' returns 2)
-
-        Raises:
-            ValueError: If the string format is invalid
-        """
-        import re
-
-        # Remove all whitespace
-        node_str = node_str.replace(" ", "")
-
-        # Must start with 'k'
-        if not node_str.startswith("k"):
-            raise ValueError(
-                f"Relative node index must start with 'k', got '{node_str}'. "
-                f"Use 'k', 'k-1', 'k+2', etc."
-            )
-
-        # Just 'k' means offset 0
-        if node_str == "k":
-            return 0
-
-        # Match patterns like 'k-1', 'k+2', 'k-10'
-        match = re.match(r"^k([+-]\d+)$", node_str)
-        if not match:
-            raise ValueError(
-                f"Invalid relative node index format '{node_str}'. Use 'k', 'k-1', 'k+2', etc."
-            )
-
-        return int(match.group(1))
-
-    def is_absolute(self) -> bool:
-        """Check if this NodeReference uses absolute indexing.
-
-        Returns:
-            True if using absolute indexing (integer), False if relative (string)
-        """
-        return not self.is_relative
 
     def children(self):
         """Return the base expression as the only child.

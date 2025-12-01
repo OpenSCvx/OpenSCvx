@@ -606,58 +606,7 @@ def test_convert_dynamics_dict_to_expr_doesnt_mutate_input():
 # =============================================================================
 
 
-def test_validate_cross_node_bounds_relative_valid():
-    """Test bounds checking for valid relative indexing."""
-    position = State("pos", shape=(3,))
-    N = 10
-
-    # Valid: k-1 at nodes 1..9 (accesses 0..8)
-    constraint = (position.node("k") - position.node("k-1") <= 0.1).at(range(1, N))
-    validate_cross_node_constraint_bounds(constraint, N)  # Should not raise
-
-
-def test_validate_cross_node_bounds_relative_too_low():
-    """Test bounds checking catches negative index access."""
-    position = State("pos", shape=(3,))
-    N = 10
-
-    # Invalid: k-1 at node 0 would access node -1
-    constraint = (position.node("k") - position.node("k-1") <= 0.1).at([0])
-
-    with pytest.raises(ValueError, match="accesses invalid node index -1"):
-        validate_cross_node_constraint_bounds(constraint, N)
-
-
-def test_validate_cross_node_bounds_relative_too_high():
-    """Test bounds checking catches out-of-bounds high access."""
-    position = State("pos", shape=(3,))
-    N = 10
-
-    # Invalid: k+1 at node 9 would access node 10 (>= N)
-    constraint = (position.node("k") - position.node("k+1") <= 0.1).at([9])
-
-    with pytest.raises(ValueError, match="accesses invalid node index 10"):
-        validate_cross_node_constraint_bounds(constraint, N)
-
-
-def test_validate_cross_node_bounds_relative_multiple_offsets():
-    """Test bounds checking with multiple offsets (like k, k-1, k-2)."""
-    state = State("x", shape=(1,))
-    N = 10
-
-    # Valid: k, k-1, k-2 at nodes 2..9
-    constraint = (state.node("k") - 2 * state.node("k-1") + state.node("k-2") <= 0.1).at(
-        range(2, N)
-    )
-    validate_cross_node_constraint_bounds(constraint, N)  # Should not raise
-
-    # Invalid: same constraint at node 1 (would access k-2 = -1)
-    constraint_invalid = (state.node("k") - 2 * state.node("k-1") + state.node("k-2") <= 0.1).at(
-        [1]
-    )
-
-    with pytest.raises(ValueError, match="accesses invalid node index -1"):
-        validate_cross_node_constraint_bounds(constraint_invalid, N)
+# Relative indexing tests removed - only absolute indexing is supported
 
 
 def test_validate_cross_node_bounds_absolute_valid():
@@ -678,7 +627,7 @@ def test_validate_cross_node_bounds_absolute_too_high():
     # Invalid: reference to node 10 (>= N)
     constraint = (position.node(10) == position.node(0)).at([0])
 
-    with pytest.raises(ValueError, match="invalid absolute node index 10"):
+    with pytest.raises(ValueError, match="invalid node index 10"):
         validate_cross_node_constraint_bounds(constraint, N)
 
 
@@ -690,7 +639,7 @@ def test_validate_cross_node_bounds_absolute_negative():
     # Invalid: negative absolute index
     constraint = (position.node(-1) == position.node(0)).at([0])
 
-    with pytest.raises(ValueError, match="invalid absolute node index -1"):
+    with pytest.raises(ValueError, match="invalid node index -1"):
         validate_cross_node_constraint_bounds(constraint, N)
 
 

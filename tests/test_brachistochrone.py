@@ -998,10 +998,12 @@ def test_cross_nodal(max_step, should_converge):
         constraint_exprs.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
 
     # Rate limit constraint with parameterized max_step
-    pos_k = position.node("k")
-    pos_k_prev = position.node("k-1")
-    rate_limit_constraint = (ox.linalg.Norm(pos_k - pos_k_prev, ord=2) <= max_step).at([1])
-    constraint_exprs.append(rate_limit_constraint)
+    # Create constraint for each node using absolute indexing
+    for k in range(1, n):
+        rate_limit_constraint = (
+            ox.linalg.Norm(position.node(k) - position.node(k - 1), ord=2) <= max_step
+        ).at([k])
+        constraint_exprs.append(rate_limit_constraint)
 
     time = ox.Time(
         initial=0.0,

@@ -350,41 +350,29 @@ def validate_and_normalize_constraint_nodes(exprs: Union[Expr, list[Expr]], n_no
 def validate_cross_node_constraint_bounds(nodal_constraint: NodalConstraint, n_nodes: int) -> None:
     """Validate that NodeReferences in cross-node constraints don't access out-of-bounds nodes.
 
-    This validation is specific to constraints containing NodeReference expressions,
-    which reference values at different trajectory nodes (e.g., rate limits that
-    compare state[k] to state[k-1]).
-
-    Cross-node constraints can use two indexing modes:
-    - **Relative indexing** (e.g., 'k', 'k-1'): Pattern shifts with evaluation node
-    - **Absolute indexing** (e.g., 0, 5, N-1): Always references the same fixed nodes
+    This validation ensures that all node indices referenced in the constraint are
+    within the valid range [0, n_nodes). Applies to constraints that reference
+    values at specific trajectory nodes (e.g., position.node(5) - position.node(4)).
 
     Args:
         nodal_constraint: The constraint to validate
         n_nodes: Total number of trajectory nodes
 
     Raises:
-        ValueError: If any NodeReference would access nodes outside [0, n_nodes)
+        ValueError: If any NodeReference accesses nodes outside [0, n_nodes)
 
     Example:
-        Relative indexing validation:
+        Valid cross-node constraint:
 
             position = State("pos", shape=(3,))
-
-            # Valid: k-1 at nodes 1..9 accesses nodes 0..8
-            constraint = (position.node('k') - position.node('k-1') <= 0.1).at(range(1, 10))
-            validate_cross_node_constraint_bounds(constraint, n_nodes=10)  # OK
-
-            # Invalid: k-1 at node 0 would access node -1
-            bad_constraint = (position.node('k') - position.node('k-1') <= 0.1).at([0])
-            validate_cross_node_constraint_bounds(bad_constraint, n_nodes=10)  # Raises ValueError
-
-        Absolute indexing validation:
 
             # Valid: references nodes 0 and 9
             boundary = (position.node(0) == position.node(9)).at([0])
             validate_cross_node_constraint_bounds(boundary, n_nodes=10)  # OK
 
-            # Invalid: node 10 is out of bounds
+        Invalid cross-node constraint:
+
+            # Invalid: node 10 is out of bounds for n_nodes=10
             bad_boundary = (position.node(0) == position.node(10)).at([0])
             validate_cross_node_constraint_bounds(bad_boundary, n_nodes=10)  # Raises ValueError
     """
@@ -406,45 +394,15 @@ def validate_cross_node_constraint_bounds(nodal_constraint: NodalConstraint, n_n
     if not node_refs:
         return  # No NodeReferences to validate
 
-    # Check if using relative or absolute indexing
-    is_relative = node_refs[0].is_relative
-
-    if is_relative:
-        # Relative indexing: check that k + offset stays in bounds
-        offsets = [ref.offset for ref in node_refs]
-        min_offset = min(offsets)
-        max_offset = max(offsets)
-
-        # Check each evaluation node
-        for eval_node in nodal_constraint.nodes:
-            min_accessed = eval_node + min_offset
-            max_accessed = eval_node + max_offset
-
-            if min_accessed < 0:
-                raise ValueError(
-                    f"Cross-node constraint accesses invalid node index {min_accessed} "
-                    f"when evaluated at node {eval_node} (offset: {min_offset}). "
-                    f"Node indices must be in range [0, {n_nodes}). "
-                    f"Constraint: {nodal_constraint.constraint}"
-                )
-
-            if max_accessed >= n_nodes:
-                raise ValueError(
-                    f"Cross-node constraint accesses invalid node index {max_accessed} "
-                    f"when evaluated at node {eval_node} (offset: {max_offset}). "
-                    f"Node indices must be in range [0, {n_nodes}). "
-                    f"Constraint: {nodal_constraint.constraint}"
-                )
-    else:
-        # Absolute indexing: check that referenced nodes are in bounds
-        for ref in node_refs:
-            if ref.node_idx < 0 or ref.node_idx >= n_nodes:
-                raise ValueError(
-                    f"Cross-node constraint references invalid absolute node index "
-                    f"{ref.node_idx}. "
-                    f"Node indices must be in range [0, {n_nodes}). "
-                    f"Constraint: {nodal_constraint.constraint}"
-                )
+    # Check that all referenced nodes are in bounds
+    for ref in node_refs:
+        if ref.node_idx < 0 or ref.node_idx >= n_nodes:
+            raise ValueError(
+                f"Cross-node constraint references invalid node index "
+                f"{ref.node_idx}. "
+                f"Node indices must be in range [0, {n_nodes}). "
+                f"Constraint: {nodal_constraint.constraint}"
+            )
 
 
 def validate_dynamics_dimension(

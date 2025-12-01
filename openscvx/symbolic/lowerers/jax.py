@@ -938,109 +938,58 @@ class JaxLowerer:
 
     @visitor(NodeReference)
     def _visit_node_reference(self, node: NodeReference):
-        """Lower NodeReference - extracts from trajectory with two indexing modes.
+        """Lower NodeReference - extract value at a specific trajectory node.
 
         NodeReference extracts a state/control value at a specific node from the
-        full trajectory. Supports two indexing modes:
-
-        **Relative indexing** (node.is_relative = True):
-            - Uses 'k', 'k-1', 'k+2', etc. in the symbolic expression
-            - node_param is the evaluation node index 'k'
-            - Extracts from: node_param + node.offset
-            - Example: position.node('k-1') with node_param=5 extracts from node 4
-
-        **Absolute indexing** (node.is_relative = False):
-            - Uses integer indices like 0, 5, N-1 in the symbolic expression
-            - Always extracts from the exact node specified (fixed reference)
-            - node_param is ignored
-            - Example: position.node(5) always extracts from node 5
+        full trajectory arrays. The node index is baked into the lowered function.
 
         Args:
-            node: NodeReference expression node with base expression and node_idx
+            node: NodeReference expression with base and node_idx (integer)
 
         Returns:
             Function (x, u, node_param, params) that extracts from trajectory
                 - x, u: Full trajectories (N, n_x) and (N, n_u)
-                - node_param: For relative: the 'k' value. For absolute: ignored.
+                - node_param: Unused (kept for signature compatibility)
                 - params: Problem parameters
+
+        Example:
+            position.node(5) lowers to a function that extracts x[5, position_slice]
+            position.node(k-1) where k=7 lowers to extract x[6, position_slice]
         """
         from openscvx.symbolic.expr.control import Control
         from openscvx.symbolic.expr.state import State
 
-        if node.is_relative:
-            # Relative indexing: node_param is 'k', offset is from the string
-            offset = node.offset
+        # Node index is baked into the expression at construction time
+        fixed_idx = node.node_idx
 
-            if isinstance(node.base, State):
-                sl = node.base._slice
-                if sl is None:
-                    raise ValueError(f"State {node.base.name!r} has no slice assigned")
+        if isinstance(node.base, State):
+            sl = node.base._slice
+            if sl is None:
+                raise ValueError(f"State {node.base.name!r} has no slice assigned")
 
-                def state_node_fn(x, u, k, params):
-                    # k is the evaluation node, offset is from 'k-1', 'k+2', etc.
-                    actual_idx = k + offset
-                    return x[actual_idx, sl]
+            def state_node_fn(x, u, node_param, params):
+                return x[fixed_idx, sl]
 
-                return state_node_fn
+            return state_node_fn
 
-            elif isinstance(node.base, Control):
-                sl = node.base._slice
-                if sl is None:
-                    raise ValueError(f"Control {node.base.name!r} has no slice assigned")
+        elif isinstance(node.base, Control):
+            sl = node.base._slice
+            if sl is None:
+                raise ValueError(f"Control {node.base.name!r} has no slice assigned")
 
-                def control_node_fn(x, u, k, params):
-                    actual_idx = k + offset
-                    return u[actual_idx, sl]
+            def control_node_fn(x, u, node_param, params):
+                return u[fixed_idx, sl]
 
-                return control_node_fn
-
-            else:
-                # Compound expression
-                base_fn = self.lower(node.base)
-
-                def compound_node_fn(x, u, k, params):
-                    actual_idx = k + offset
-                    x_single = x[actual_idx] if len(x.shape) > 1 else x
-                    u_single = u[actual_idx] if len(u.shape) > 1 else u
-                    return base_fn(x_single, u_single, actual_idx, params)
-
-                return compound_node_fn
+            return control_node_fn
 
         else:
-            # Absolute indexing: always reference the exact node specified
-            # node_param is ignored (not used for absolute references)
-            fixed_idx = node.node_idx
+            # Compound expression (e.g., position[0].node(5))
+            base_fn = self.lower(node.base)
 
-            if isinstance(node.base, State):
-                sl = node.base._slice
-                if sl is None:
-                    raise ValueError(f"State {node.base.name!r} has no slice assigned")
+            def compound_node_fn(x, u, node_param, params):
+                # Extract single-node slices and evaluate base expression
+                x_single = x[fixed_idx] if len(x.shape) > 1 else x
+                u_single = u[fixed_idx] if len(u.shape) > 1 else u
+                return base_fn(x_single, u_single, fixed_idx, params)
 
-                def state_node_fn(x, u, node_param, params):
-                    # Always access the fixed index, ignore node_param
-                    return x[fixed_idx, sl]
-
-                return state_node_fn
-
-            elif isinstance(node.base, Control):
-                sl = node.base._slice
-                if sl is None:
-                    raise ValueError(f"Control {node.base.name!r} has no slice assigned")
-
-                def control_node_fn(x, u, node_param, params):
-                    # Always access the fixed index, ignore node_param
-                    return u[fixed_idx, sl]
-
-                return control_node_fn
-
-            else:
-                # Compound expression
-                base_fn = self.lower(node.base)
-
-                def compound_node_fn(x, u, node_param, params):
-                    # Always access the fixed index, ignore node_param
-                    x_single = x[fixed_idx] if len(x.shape) > 1 else x
-                    u_single = u[fixed_idx] if len(u.shape) > 1 else u
-                    return base_fn(x_single, u_single, fixed_idx, params)
-
-                return compound_node_fn
+            return compound_node_fn

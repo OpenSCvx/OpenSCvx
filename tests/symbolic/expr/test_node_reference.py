@@ -56,26 +56,23 @@ def test_node_reference_creation_from_variable():
     assert x_at_k.node_idx == 3
 
 
-def test_node_reference_accepts_integer_or_string():
-    """Test that node index accepts both integers and strings."""
+def test_node_reference_accepts_integers_only():
+    """Test that node index only accepts integers."""
     position = State("pos", shape=(3,))
 
-    # Valid: integer indices (absolute)
+    # Valid: integer indices
     ref_abs = position.node(5)
     assert ref_abs.node_idx == 5
-    assert not ref_abs.is_relative
 
-    # Valid: string indices (relative)
-    ref_rel = position.node("k")
-    assert ref_rel.node_idx == "k"
-    assert ref_rel.is_relative
-
-    # Invalid: non-integer, non-string indices
-    with pytest.raises(TypeError, match="Node index must be an integer or string"):
+    # Invalid: non-integer indices
+    with pytest.raises(TypeError, match="Node index must be an integer"):
         position.node(1.5)
 
-    with pytest.raises(TypeError, match="Node index must be an integer or string"):
+    with pytest.raises(TypeError, match="Node index must be an integer"):
         position.node([1, 2])
+
+    with pytest.raises(TypeError, match="Node index must be an integer"):
+        position.node("k")
 
 
 def test_node_reference_allows_negative_indices():
@@ -422,100 +419,4 @@ def test_boundary_coupling_constraint():
 # =============================================================================
 
 
-def test_relative_node_reference_parsing_basic():
-    """Test parsing of relative node index strings."""
-    position = State("pos", shape=(3,))
-
-    # Test 'k' (offset 0)
-    pos_k = position.node("k")
-    assert pos_k.is_relative
-    assert pos_k.offset == 0
-    assert pos_k.node_idx == "k"
-
-    # Test 'k-1' (offset -1)
-    pos_k_minus_1 = position.node("k-1")
-    assert pos_k_minus_1.is_relative
-    assert pos_k_minus_1.offset == -1
-
-    # Test 'k+2' (offset +2)
-    pos_k_plus_2 = position.node("k+2")
-    assert pos_k_plus_2.is_relative
-    assert pos_k_plus_2.offset == 2
-
-
-def test_relative_node_reference_parsing_various_offsets():
-    """Test parsing various offset patterns."""
-    state = State("x", shape=(1,))
-
-    # Large offsets
-    assert state.node("k-10").offset == -10
-    assert state.node("k+25").offset == 25
-
-    # Single digit
-    assert state.node("k-5").offset == -5
-    assert state.node("k+7").offset == 7
-
-
-def test_relative_node_reference_parsing_with_whitespace():
-    """Test that whitespace is handled correctly."""
-    state = State("x", shape=(1,))
-
-    # Whitespace should be stripped
-    assert state.node("k - 1").offset == -1
-    assert state.node("k + 2").offset == 2
-    assert state.node(" k ").offset == 0
-
-
-def test_relative_node_reference_invalid_format():
-    """Test that invalid relative index formats raise errors."""
-    state = State("x", shape=(1,))
-
-    # Must start with 'k'
-    with pytest.raises(ValueError, match="Relative node index must start with 'k'"):
-        state.node("j")
-
-    with pytest.raises(ValueError, match="Invalid relative node index format"):
-        state.node("k1")  # Missing operator
-
-    with pytest.raises(ValueError, match="Invalid relative node index format"):
-        state.node("k-")  # Missing number
-
-    with pytest.raises(ValueError, match="Invalid relative node index format"):
-        state.node("k+")  # Missing number
-
-    with pytest.raises(ValueError, match="Invalid relative node index format"):
-        state.node("kk")
-
-
-def test_relative_indexing_in_constraint():
-    """Test using relative indexing in constraints."""
-    position = State("pos", shape=(3,))
-
-    # Create rate limit constraint using relative indexing
-    pos_k = position.node("k")
-    pos_k_prev = position.node("k-1")
-
-    rate_constraint = (pos_k - pos_k_prev) <= 0.1
-
-    # Should work with .at()
-    nodal_constraint = rate_constraint.at(range(1, 10))
-
-    from openscvx.symbolic.expr import NodalConstraint
-
-    assert isinstance(nodal_constraint, NodalConstraint)
-    assert nodal_constraint.nodes == list(range(1, 10))
-
-
-def test_absolute_vs_relative_detection():
-    """Test that absolute and relative modes are correctly detected."""
-    state = State("x", shape=(1,))
-
-    # Absolute
-    abs_ref = state.node(5)
-    assert abs_ref.is_absolute()
-    assert not abs_ref.is_relative
-
-    # Relative
-    rel_ref = state.node("k")
-    assert not rel_ref.is_absolute()
-    assert rel_ref.is_relative
+# Tests for relative indexing have been removed - only absolute indexing is supported

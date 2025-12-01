@@ -174,87 +174,55 @@ def _contains_node_reference(expr: Expr) -> bool:
     return False
 
 
-def _collect_node_references(expr: Expr) -> Tuple[List, bool]:
-    """Collect all unique node indices/offsets referenced in a cross-node expression.
+def _collect_node_references(expr: Expr) -> List[int]:
+    """Collect all unique node indices referenced in a cross-node expression.
 
-    Internal helper for wrapper creation during lowering.
+    Internal helper for analyzing which nodes are coupled by a constraint.
 
     This function analyzes the expression tree to identify all NodeReference nodes
-    and extract their indexing information. The results are used by the lowering
-    pipeline to determine the sparsity pattern and evaluation strategy for cross-node
-    constraints.
+    and extract their node indices. The results indicate the sparsity pattern
+    (which nodes are coupled), though this is currently not exploited in Jacobian storage.
 
     Args:
         expr: Expression to analyze for NodeReference nodes
 
     Returns:
-        Tuple of (references, is_relative) where:
-        - references: List of node indices (int) or offsets (int for relative)
-        - is_relative: True if using relative indexing ('k'-based), False for absolute
+        Sorted list of unique node indices referenced in the expression
 
     Example:
-        For expression `position.node('k') - position.node('k-1')`:
-        Returns ([-1, 0], True)
+        For expression `position.node(5) - position.node(4)`:
+        Returns [4, 5]
 
-        For expression `position.node(10) - position.node(9)`:
-        Returns ([9, 10], False)
+        For expression `state.node(k) + state.node(k-1) + state.node(k-2)`:
+        Returns [k-2, k-1, k] (whatever the actual integer values are)
 
     Note:
-        The returned references indicate which nodes are coupled by the constraint.
-        For example, references=[-1, 0] means the constraint couples node k with node k-1.
-        This sparsity pattern is currently not exploited in Jacobian storage.
+        The returned indices indicate which nodes are coupled by the constraint.
+        This sparsity pattern could be used for sparse Jacobian storage in the future.
     """
     references = []
-    is_relative = None
 
     def traverse(e: Expr):
-        nonlocal is_relative
         if isinstance(e, NodeReference):
-            if is_relative is None:
-                is_relative = e.is_relative
-            elif is_relative != e.is_relative:
-                raise ValueError(
-                    "Cannot mix relative (e.g., 'k') and absolute (e.g., 0) node references "
-                    "in the same constraint. Use either all relative or all absolute indexing."
-                )
-
-            if e.is_relative:
-                references.append(e.offset)
-            else:
-                references.append(e.node_idx)
-
+            references.append(e.node_idx)
         for child in e.children():
             traverse(child)
 
     traverse(expr)
-
-    # Default to absolute if no NodeReferences found
-    if is_relative is None:
-        is_relative = False
-
-    return (sorted(set(references)), is_relative)
+    return sorted(set(references))
 
 
-def _create_cross_node_wrapper(constraint_fn, references, is_relative: bool, eval_nodes: List[int]):
+def _create_cross_node_wrapper(constraint_fn, references: List[int], eval_nodes: List[int]):
     """Create a trajectory-level wrapper for cross-node constraint evaluation.
 
     Internal helper for generating trajectory-level constraint functions during lowering.
 
     Takes a constraint function lowered with JaxLowerer and wraps it to evaluate
-    the constraint pattern at multiple nodes along the trajectory. This wrapper
-    handles the iteration over evaluation nodes and aggregation of constraint
-    residuals.
-
-    Supports two modes:
-    - **Relative indexing**: Constraints like position.node('k') - position.node('k-1')
-      evaluate the pattern at each eval_node (e.g., at node 5: position[5] - position[4])
-    - **Absolute indexing**: Constraints like position.node(3) - position.node(0)
-      always reference the same fixed nodes (e.g., always position[3] - position[0])
+    the constraint at multiple nodes along the trajectory using vmap.
 
     Args:
-        constraint_fn: Lowered constraint function with NodeReference handling
-        references: List of node references (offsets for relative, indices for absolute)
-        is_relative: True for relative indexing ('k'-based), False for absolute
+        constraint_fn: Lowered constraint function with signature (X, U, node, params)
+        references: List of node indices referenced (for documentation/future sparsity)
         eval_nodes: Nodes where the constraint should be evaluated
 
     Returns:
@@ -262,16 +230,10 @@ def _create_cross_node_wrapper(constraint_fn, references, is_relative: bool, eva
             where X is (N, n_x), U is (N, n_u), M = len(eval_nodes)
 
     Example:
-        Relative indexing:
-            `position.node('k') - position.node('k-1') <= 0.1` with eval_nodes=[1,2,3]
-            - At eval_node=1: computes position[1] - position[0]
-            - At eval_node=2: computes position[2] - position[1]
-            - At eval_node=3: computes position[3] - position[2]
-
-        Absolute indexing:
-            `position.node(0) - position.node(5) <= 0.1` with eval_nodes=[0, 1, 2]
-            - Always evaluates position[0] - position[5] (same fixed nodes)
-            - Returns the same value repeated for each eval_node
+        For constraint `position.node(k) - position.node(k-1) <= 0.1`:
+        - At eval_nodes=[1,2,3,...,N-1]
+        - Evaluates position[k] - position[k-1] for each k in eval_nodes
+        - Returns array of shape (N-1,) with one residual per evaluation
 
     Note:
         The returned function will have Jacobians computed via jax.jacfwd, producing
@@ -284,32 +246,17 @@ def _create_cross_node_wrapper(constraint_fn, references, is_relative: bool, eva
     # Convert eval_nodes to JAX array for vmapping
     eval_nodes_array = jnp.array(eval_nodes)
 
-    if is_relative:
-        # Relative indexing: eval_idx IS the node index to evaluate at
-        # Create a vmapped version that batches over node indices
-        # in_axes: (None, None, 0, None) means:
-        #   - X: broadcast (same for all evaluations)
-        #   - U: broadcast (same for all evaluations)
-        #   - node_idx: batched (different for each evaluation)
-        #   - params: broadcast (same for all evaluations)
-        vmapped_constraint = jax.vmap(constraint_fn, in_axes=(None, None, 0, None))
+    # Create a vmapped version that batches over evaluation nodes
+    # in_axes: (None, None, 0, None) means:
+    #   - X: broadcast (same trajectory for all evaluations)
+    #   - U: broadcast (same trajectory for all evaluations)
+    #   - node: batched (different evaluation node for each)
+    #   - params: broadcast (same parameters for all evaluations)
+    vmapped_constraint = jax.vmap(constraint_fn, in_axes=(None, None, 0, None))
 
-        def trajectory_constraint(X, U, params):
-            # Evaluate constraint at all nodes simultaneously
-            return vmapped_constraint(X, U, eval_nodes_array, params)
-
-    else:
-        # Absolute indexing: always reference the same fixed nodes
-        # For example: position.node(3) - position.node(0) always accesses nodes 3 and 0
-        # regardless of which eval_node we're at
-
-        # Since absolute references don't depend on eval_node, we don't need node_param
-        # Just evaluate the constraint once and repeat for each eval_node
-        def trajectory_constraint(X, U, params):
-            # Evaluate constraint once (node_param unused for absolute indexing)
-            single_result = constraint_fn(X, U, None, params)
-            # Repeat the result for each eval_node
-            return jnp.tile(single_result, len(eval_nodes))
+    def trajectory_constraint(X, U, params):
+        # Evaluate constraint at all specified nodes simultaneously
+        return vmapped_constraint(X, U, eval_nodes_array, params)
 
     return trajectory_constraint
 
@@ -526,13 +473,11 @@ def lower_symbolic_expressions(
         constraint_expr = constraint_nodal.constraint
         constraint_fn = lower_to_jax(constraint_expr)
 
-        # Collect node references and detect indexing mode
-        references, is_relative = _collect_node_references(constraint_expr)
+        # Collect node references (for documentation/future sparsity analysis)
+        references = _collect_node_references(constraint_expr)
 
-        # Create trajectory-level wrapper with proper indexing mode
-        wrapped_fn = _create_cross_node_wrapper(
-            constraint_fn, references, is_relative, constraint_nodal.nodes
-        )
+        # Create trajectory-level wrapper
+        wrapped_fn = _create_cross_node_wrapper(constraint_fn, references, constraint_nodal.nodes)
 
         # Compute Jacobians for the wrapped trajectory-level function
         grad_g_X = jacfwd(wrapped_fn, argnums=0)  # dg/dX - shape (M, N, n_x)
