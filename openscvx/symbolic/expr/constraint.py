@@ -111,6 +111,8 @@ class Constraint(Expr):
         Returns:
             NodalConstraint wrapping this constraint with node specification
         """
+        if isinstance(nodes, int):
+              nodes = [nodes]
         return NodalConstraint(self, list(nodes))
 
     def over(
