@@ -226,8 +226,10 @@ def separate_constraints(
                 if _contains_node_reference(c.constraint):
                     raise ValueError(
                         "Convex constraints with NodeReferences (.at(k)) are not supported yet. "
-                        "Cross-node constraints are currently only supported for non-convex constraints. "
-                        "Please reformulate your constraint as non-convex, or contact the developers "
+                        "Cross-node constraints are currently only supported for the non-convex "
+                        "case. "
+                        "Please reformulate your constraint as non-convex, or contact the "
+                        "developers "
                         "if you need this feature. "
                         f"Constraint: {c.constraint}"
                     )
@@ -247,8 +249,10 @@ def separate_constraints(
                 if _contains_node_reference(c):
                     raise ValueError(
                         "Convex constraints with NodeReferences (.at(k)) are not supported yet. "
-                        "Cross-node constraints are currently only supported for non-convex constraints. "
-                        "Please reformulate your constraint as non-convex, or contact the developers "
+                        "Cross-node constraints are currently only supported for the non-convex "
+                        "case. "
+                        "Please reformulate your constraint as non-convex, or contact the "
+                        "developers "
                         "if you need this feature. "
                         f"Constraint: {c}"
                     )
@@ -263,10 +267,10 @@ def separate_constraints(
 
     # Add nodal constraints from CTCS constraints that have check_nodally=True
     ctcs_nodal_constraints = get_nodal_constraints_from_ctcs(constraints_ctcs)
-    for constraint in ctcs_nodal_constraints:
-        # These also need to be converted to NodalConstraint (apply at all nodes)
-        all_nodes = list(range(n_nodes))
-        nodal_constraint = NodalConstraint(constraint, all_nodes)
+    for constraint, interval in ctcs_nodal_constraints:
+        # Convert CTCS interval (start, end) to list of nodes [start, start+1, ..., end-1]
+        interval_nodes = list(range(interval[0], interval[1]))
+        nodal_constraint = NodalConstraint(constraint, interval_nodes)
 
         # Check if the underlying constraint is convex
         if constraint.is_convex:
@@ -276,7 +280,7 @@ def separate_constraints(
             if _contains_node_reference(constraint):
                 raise ValueError(
                     "Convex constraints with NodeReferences (.at(k)) are not supported yet. "
-                    "Cross-node constraints are currently only supported for non-convex constraints. "
+                    "Cross-node constraints are currently only supported for the non-convex case. "
                     "This constraint was extracted from a CTCS constraint with check_nodally=True. "
                     "Please reformulate your constraint as non-convex, or contact the developers "
                     "if you need this feature. "
@@ -363,32 +367,37 @@ def decompose_vector_nodal_constraints(
     return decomposed_constraints
 
 
-def get_nodal_constraints_from_ctcs(constraints_ctcs: List[CTCS]) -> List[Constraint]:
+def get_nodal_constraints_from_ctcs(
+    constraints_ctcs: List[CTCS],
+) -> List[tuple[Constraint, tuple[int, int]]]:
     """Extract constraints from CTCS wrappers that should be checked nodally.
 
     Some CTCS constraints have the check_nodally flag set, indicating that the
     underlying constraint should be enforced both continuously (via CTCS) and
-    discretely at the nodes. This function extracts those underlying constraints.
+    discretely at the nodes. This function extracts those underlying constraints
+    along with their node intervals.
 
     Args:
         constraints_ctcs: List of CTCS constraint wrappers
 
     Returns:
-        List of underlying Constraint objects from CTCS with check_nodally=True
+        List of tuples (constraint, nodes) where:
+            - constraint: The underlying Constraint object from CTCS with check_nodally=True
+            - nodes: The (start, end) interval from the CTCS wrapper
 
     Example:
         Extract CTCS constraint that should also be checked at nodes:
 
             x = ox.State("x", shape=(3,))
-            constraint = (x <= 5).over((0, 50), check_nodally=True)
+            constraint = (x <= 5).over((10, 50), check_nodally=True)
             nodal = get_nodal_constraints_from_ctcs([constraint])
 
-        Returns [x <= 5] to be enforced at all nodes
+        Returns [(x <= 5, (10, 50))] to be enforced at nodes 10 through 49
     """
     nodal_ctcs = []
     for ctcs in constraints_ctcs:
         if ctcs.check_nodally:
-            nodal_ctcs.append(ctcs.constraint)
+            nodal_ctcs.append((ctcs.constraint, ctcs.nodes))
     return nodal_ctcs
 
 
