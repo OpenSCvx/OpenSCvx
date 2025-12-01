@@ -287,8 +287,8 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
             )
 
     # Update cross-node constraint parameters
-    if settings.sim.constraints_cross_nodal:
-        for g_id, constraint in enumerate(settings.sim.constraints_cross_nodal):
+    if settings.sim.constraints_nodal_cross_node:
+        for g_id, constraint in enumerate(settings.sim.constraints_nodal_cross_node):
             # Cross-node constraints take (X, U, params) not (x, u, node, params)
             prob.param_dict["g_cross_" + str(g_id)].value = np.asarray(
                 constraint.func(x.guess, u.guess, param_dict)
@@ -370,7 +370,7 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
 
     # Add cross-node constraint violations
     id_cross = 0
-    for constraint in settings.sim.constraints_cross_nodal:
+    for constraint in settings.sim.constraints_nodal_cross_node:
         J_vb_vec += np.maximum(0, prob.var_dict["nu_vb_cross_" + str(id_cross)].value)
         id_cross += 1
 

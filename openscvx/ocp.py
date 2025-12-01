@@ -93,8 +93,8 @@ def create_cvxpy_variables(settings: Config) -> Dict:
     grad_g_X_cross = []
     grad_g_U_cross = []
     nu_vb_cross = []
-    if settings.sim.constraints_cross_nodal:
-        for idx_cross, constraint in enumerate(settings.sim.constraints_cross_nodal):
+    if settings.sim.constraints_nodal_cross_node:
+        for idx_cross, constraint in enumerate(settings.sim.constraints_nodal_cross_node):
             M = len(constraint.eval_nodes)  # Number of evaluation points
             g_cross.append(cp.Parameter(M, name="g_cross_" + str(idx_cross)))
             grad_g_X_cross.append(
@@ -332,8 +332,8 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
 
     # Linearized cross-node constraints
     idx_cross = 0
-    if settings.sim.constraints_cross_nodal:
-        for constraint in settings.sim.constraints_cross_nodal:
+    if settings.sim.constraints_nodal_cross_node:
+        for constraint in settings.sim.constraints_nodal_cross_node:
             M = len(constraint.eval_nodes)  # Number of evaluation points
             # For each evaluation point, create linearized constraint
             for m in range(M):
@@ -424,8 +424,8 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
 
     # Virtual slack penalty for cross-node constraints
     idx_cross = 0
-    if settings.sim.constraints_cross_nodal:
-        for constraint in settings.sim.constraints_cross_nodal:
+    if settings.sim.constraints_nodal_cross_node:
+        for constraint in settings.sim.constraints_nodal_cross_node:
             cost += settings.scp.lam_vb * cp.sum(cp.pos(nu_vb_cross[idx_cross]))
             idx_cross += 1
 
