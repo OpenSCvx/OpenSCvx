@@ -519,5 +519,3 @@ def test_absolute_vs_relative_detection():
     rel_ref = state.node("k")
     assert not rel_ref.is_absolute()
     assert rel_ref.is_relative
-
-

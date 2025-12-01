@@ -216,7 +216,7 @@ During lowering (in `openscvx/symbolic/lower.py:464-523`), constraints are separ
 ```python
 # Detect cross-node constraints by presence of NodeReference
 for constraint in constraints_nodal:
-    if contains_node_reference(constraint.constraint):
+    if _contains_node_reference(constraint.constraint):
         cross_node_constraints.append(constraint)
     else:
         regular_constraints.append(constraint)
@@ -232,8 +232,8 @@ For each cross-node constraint, the lowering process:
 # Lower constraint expression
 constraint_fn = lower_to_jax(constraint_expr)
 
-# Create trajectory-level wrapper
-wrapped_fn = create_cross_node_wrapper(constraint_fn, references, is_relative, eval_nodes)
+# Create trajectory-level wrapper (internal helper function)
+wrapped_fn = _create_cross_node_wrapper(constraint_fn, references, is_relative, eval_nodes)
 
 # Compute Jacobians for full trajectory
 grad_g_X = jacfwd(wrapped_fn, argnums=0)  # dg/dX - shape (M, N, n_x)
@@ -430,10 +430,10 @@ Cross-node constraints are **not vmapped** in the traditional sense because they
 
 **Cross-Node Constraint "Vectorization" via Wrapper:**
 
-The `create_cross_node_wrapper` function (in `openscvx/symbolic/lower.py:84-145`) wraps the lowered constraint to evaluate at multiple trajectory nodes:
+The `_create_cross_node_wrapper` function (in `openscvx/symbolic/lower.py:84-145`) is an internal helper that wraps the lowered constraint to evaluate at multiple trajectory nodes:
 
 ```python
-def create_cross_node_wrapper(constraint_fn, references, is_relative, eval_nodes):
+def _create_cross_node_wrapper(constraint_fn, references, is_relative, eval_nodes):
     """Wrap constraint to evaluate at multiple nodes.
 
     For relative indexing (e.g., position.node('k') - position.node('k-1')):
@@ -611,7 +611,7 @@ Here's a complete reference for shapes at each stage, shown with symbolic dimens
 | `openscvx/symbolic/builder.py` | `preprocess_symbolic_problem` | Augments states/controls/dynamics |
 | `openscvx/symbolic/lower.py` | `lower_symbolic_expressions` | Unification and JAX lowering for dynamics/constraints |
 | `openscvx/symbolic/lower.py:464-523` | Cross-node constraint lowering | Separates and lowers cross-node constraints |
-| `openscvx/symbolic/lower.py:84-145` | `create_cross_node_wrapper` | Wraps constraints for trajectory-level evaluation |
+| `openscvx/symbolic/lower.py:84-145` | `_create_cross_node_wrapper` | Wraps constraints for trajectory-level evaluation |
 | `openscvx/symbolic/expr/expr.py:218-313` | `NodeReference` class | Enables `.node('k')` syntax for cross-node refs |
 | `openscvx/symbolic/lowerers/jax.py:938-1044` | `JaxLowerer._visit_node_reference` | Lowers NodeReference to JAX array indexing |
 | `openscvx/constraints/cross_node.py` | `CrossNodeConstraintLowered` | Container for lowered cross-node constraints |

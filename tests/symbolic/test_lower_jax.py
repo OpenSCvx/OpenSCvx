@@ -421,7 +421,7 @@ def test_complex_expression_constant_equivalence():
 
 def test_contains_node_reference():
     """Test detection of NodeReference in expressions."""
-    from openscvx.symbolic.lower import contains_node_reference
+    from openscvx.symbolic.lower import _contains_node_reference as contains_node_reference
 
     position = State("pos", shape=(3,))
 
@@ -440,7 +440,7 @@ def test_contains_node_reference():
 
 def test_collect_node_references_relative():
     """Test collecting node references from relative indexing expressions."""
-    from openscvx.symbolic.lower import collect_node_references
+    from openscvx.symbolic.lower import _collect_node_references as collect_node_references
 
     position = State("pos", shape=(3,))
 
@@ -465,7 +465,7 @@ def test_collect_node_references_relative():
 
 def test_collect_node_references_absolute():
     """Test collecting node references from absolute indexing expressions."""
-    from openscvx.symbolic.lower import collect_node_references
+    from openscvx.symbolic.lower import _collect_node_references as collect_node_references
 
     position = State("pos", shape=(3,))
 
@@ -484,7 +484,7 @@ def test_collect_node_references_absolute():
 
 def test_collect_node_references_no_refs():
     """Test collecting from expression with no NodeReferences."""
-    from openscvx.symbolic.lower import collect_node_references
+    from openscvx.symbolic.lower import _collect_node_references as collect_node_references
 
     position = State("pos", shape=(3,))
 
@@ -497,7 +497,7 @@ def test_collect_node_references_no_refs():
 
 def test_collect_node_references_mixed_mode_error():
     """Test that mixing relative and absolute indexing raises error during collection."""
-    from openscvx.symbolic.lower import collect_node_references
+    from openscvx.symbolic.lower import _collect_node_references as collect_node_references
 
     position = State("pos", shape=(3,))
 
@@ -514,7 +514,12 @@ def test_absolute_mode_fixed_reference_semantics():
     This tests the semantic behavior: position.node(3) should always access
     node 3, regardless of which eval_node the constraint is evaluated at.
     """
-    from openscvx.symbolic.lower import create_cross_node_wrapper, lower_to_jax
+    from openscvx.symbolic.lower import (
+        _create_cross_node_wrapper as create_cross_node_wrapper,
+    )
+    from openscvx.symbolic.lower import (
+        lower_to_jax,
+    )
 
     position = State("pos", shape=(2,))
     position._slice = slice(0, 2)  # Manually assign slice for testing
@@ -551,7 +556,12 @@ def test_absolute_mode_fixed_reference_semantics():
 
 def test_absolute_vs_relative_semantics():
     """Compare absolute vs relative mode to show semantic difference."""
-    from openscvx.symbolic.lower import create_cross_node_wrapper, lower_to_jax
+    from openscvx.symbolic.lower import (
+        _create_cross_node_wrapper as create_cross_node_wrapper,
+    )
+    from openscvx.symbolic.lower import (
+        lower_to_jax,
+    )
 
     position = State("pos", shape=(1,))
     position._slice = slice(0, 1)  # Manually assign slice for testing

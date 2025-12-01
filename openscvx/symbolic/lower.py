@@ -140,8 +140,10 @@ def lower_to_jax(exprs: Union[Expr, Sequence[Expr]]) -> Union[callable, list[cal
     return fns
 
 
-def contains_node_reference(expr: Expr) -> bool:
+def _contains_node_reference(expr: Expr) -> bool:
     """Check if an expression contains any NodeReference nodes.
+
+    Internal helper for routing constraints during lowering.
 
     Recursively traverses the expression tree to detect the presence of
     NodeReference nodes, which indicate cross-node constraints.
@@ -156,24 +158,26 @@ def contains_node_reference(expr: Expr) -> bool:
         position = State("pos", shape=(3,))
 
         # Regular expression - no NodeReference
-        contains_node_reference(position)  # False
+        _contains_node_reference(position)  # False
 
         # Cross-node expression - has NodeReference
-        contains_node_reference(position.node(10) - position.node(9))  # True
+        _contains_node_reference(position.node(10) - position.node(9))  # True
     """
     if isinstance(expr, NodeReference):
         return True
 
     # Recursively check all children
     for child in expr.children():
-        if contains_node_reference(child):
+        if _contains_node_reference(child):
             return True
 
     return False
 
 
-def collect_node_references(expr: Expr) -> Tuple[List, bool]:
+def _collect_node_references(expr: Expr) -> Tuple[List, bool]:
     """Collect all unique node indices/offsets referenced in a cross-node expression.
+
+    Internal helper for wrapper creation during lowering.
 
     This function analyzes the expression tree to identify all NodeReference nodes
     and extract their indexing information. The results are used by the lowering
@@ -231,8 +235,10 @@ def collect_node_references(expr: Expr) -> Tuple[List, bool]:
     return (sorted(set(references)), is_relative)
 
 
-def create_cross_node_wrapper(constraint_fn, references, is_relative: bool, eval_nodes: List[int]):
+def _create_cross_node_wrapper(constraint_fn, references, is_relative: bool, eval_nodes: List[int]):
     """Create a trajectory-level wrapper for cross-node constraint evaluation.
+
+    Internal helper for generating trajectory-level constraint functions during lowering.
 
     Takes a constraint function lowered with JaxLowerer and wraps it to evaluate
     the constraint pattern at multiple nodes along the trajectory. This wrapper
@@ -487,7 +493,7 @@ def lower_symbolic_expressions(
     cross_node_constraints = []
 
     for constraint in constraints_nodal:
-        if contains_node_reference(constraint.constraint):
+        if _contains_node_reference(constraint.constraint):
             cross_node_constraints.append(constraint)
         else:
             regular_constraints.append(constraint)
@@ -521,10 +527,10 @@ def lower_symbolic_expressions(
         constraint_fn = lower_to_jax(constraint_expr)
 
         # Collect node references and detect indexing mode
-        references, is_relative = collect_node_references(constraint_expr)
+        references, is_relative = _collect_node_references(constraint_expr)
 
         # Create trajectory-level wrapper with proper indexing mode
-        wrapped_fn = create_cross_node_wrapper(
+        wrapped_fn = _create_cross_node_wrapper(
             constraint_fn, references, is_relative, constraint_nodal.nodes
         )
 

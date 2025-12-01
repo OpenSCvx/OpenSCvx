@@ -601,8 +601,6 @@ def test_convert_dynamics_dict_to_expr_doesnt_mutate_input():
     assert isinstance(dynamics_converted["x"], Constant)
 
 
-
-
 # =============================================================================
 # Cross-Node Constraint Bounds Validation Tests
 # =============================================================================
