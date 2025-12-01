@@ -11,7 +11,7 @@ sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_animation
-from openscvx import TrajOptProblem
+from openscvx import Problem
 from openscvx.utils import get_kp_pose
 
 n = 12  # Number of Nodes
@@ -87,7 +87,7 @@ norm_type = "inf"
 R_sb = jnp.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]])
 
 
-# Define list of all states (needed for TrajOptProblem and constraints)
+# Define list of all states (needed for Problem and constraints)
 states = [position, velocity, attitude, angular_velocity, fuel, time]
 controls = [thrust_force, torque]
 
@@ -222,7 +222,7 @@ time_config = ox.Time(
     max=total_time,
 )
 
-problem = TrajOptProblem(
+problem = Problem(
     dynamics=dynamics,
     states=states,
     controls=controls,

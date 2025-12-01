@@ -39,10 +39,10 @@ At this stage, each state/control is independent with its own shape, and dynamic
 
 ## Stage 2: Symbolic Preprocessing and Augmentation
 
-During `TrajOptProblem` construction (in `preprocess_symbolic_problem`), the symbolic problem is augmented:
+During `Problem` construction (in `preprocess_symbolic_problem`), the symbolic problem is augmented:
 
 ```python
-problem = TrajOptProblem(
+problem = Problem(
     dynamics=dynamics,
     states=[position, velocity],
     controls=[theta],
@@ -190,7 +190,7 @@ Finally, both dynamics and constraints are vectorized to operate on decision nod
 
 ### Dynamics Vectorization
 
-Dynamics functions are vmapped to process all intervals in parallel (in `openscvx/trajoptproblem.py:356-358`):
+Dynamics functions are vmapped to process all intervals in parallel (in `openscvx/problem.py:356-358`):
 
 ```python
 # Vectorize dynamics functions across decision nodes
@@ -396,12 +396,12 @@ Here's a complete reference for shapes at each stage, shown with symbolic dimens
 | **File** | **Function/Class** | **Purpose** |
 |----------|-------------------|-------------|
 | `examples/abstract/brachistochrone.py` | — | Example problem definition |
-| `openscvx/trajoptproblem.py` | `TrajOptProblem.__init__` | Orchestrates preprocessing pipeline |
+| `openscvx/problem.py` | `Problem.__init__` | Orchestrates preprocessing pipeline |
 | `openscvx/symbolic/builder.py` | `preprocess_symbolic_problem` | Augments states/controls/dynamics |
 | `openscvx/symbolic/lower.py` | `lower_symbolic_expressions` | Unification and JAX lowering for dynamics/constraints |
 | `openscvx/symbolic/lower.py:309-326` | Constraint lowering loop | Lowers non-convex constraints to JAX with vmap |
 | `openscvx/symbolic/unified.py` | `unify_states`, `unify_controls` | Combines individual variables |
-| `openscvx/trajoptproblem.py:356-358` | `initialize` | Applies vmap to dynamics |
+| `openscvx/problem.py:356-358` | `initialize` | Applies vmap to dynamics |
 | `openscvx/discretization.py` | `dVdt`, `calculate_discretization` | Uses vmapped dynamics |
 
 ## Advanced: Accessing Unified Vectors
@@ -409,7 +409,7 @@ Here's a complete reference for shapes at each stage, shown with symbolic dimens
 During problem setup, you can access the unified objects:
 
 ```python
-problem = TrajOptProblem(...)
+problem = Problem(...)
 problem.initialize()
 
 # Access unified state/control objects
@@ -437,5 +437,5 @@ for state in problem.states:
 - [Basic Problem Setup](../Usage/basic_problem_setup.md) - How to define problems
 - [API: State](../Usage/api_state.md) - State class documentation
 - [API: Control](../Usage/api_control.md) - Control class documentation
-- [API: TrajOptProblem](../Usage/api_trajoptproblem.md) - Main problem class
+- [API: Problem](../Usage/api_problem.md) - Main problem class
 - [Discretization](../Overview/discretization.md) - How discretization works in OpenSCvx

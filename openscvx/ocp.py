@@ -301,7 +301,7 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
             ]
             idx_ncvx += 1
 
-    # Convex nodal constraints (already lowered to CVXPy in trajoptproblem)
+    # Convex nodal constraints (already lowered to CVXPy in problem)
     if settings.sim.constraints_nodal_convex:
         constr += settings.sim.constraints_nodal_convex
 

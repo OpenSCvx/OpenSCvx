@@ -10,7 +10,7 @@ sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_dubins_car_disjoint
-from openscvx import TrajOptProblem
+from openscvx import Problem
 
 # NOTE: This example requires the 'stljax' package.
 # You can install it via pip:
@@ -86,7 +86,7 @@ time = ox.Time(
     max=10,
 )
 
-problem = TrajOptProblem(
+problem = Problem(
     dynamics=dynamics,
     states=states,
     controls=controls,

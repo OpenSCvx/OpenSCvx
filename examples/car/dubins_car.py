@@ -10,7 +10,7 @@ sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_dubins_car
-from openscvx import TrajOptProblem
+from openscvx import Problem
 
 n = 8
 total_time = 1.2  # Total simulation time
@@ -76,7 +76,7 @@ time = ox.Time(
     max=20,
 )
 
-problem = TrajOptProblem(
+problem = Problem(
     dynamics=dynamics,
     states=states,
     controls=controls,

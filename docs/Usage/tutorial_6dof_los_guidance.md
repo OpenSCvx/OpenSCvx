@@ -53,7 +53,7 @@ import numpy.linalg as la
 import jax.numpy as jnp
 
 import openscvx as ox
-from openscvx import TrajOptProblem
+from openscvx import Problem
 from openscvx.utils import rot, gen_vertices
 ```
 
@@ -344,10 +344,10 @@ time = ox.Time(
 The `("minimize", total_time)` tuple indicates that final time is a decision variable to be minimized, with `total_time` as the initial guess.
 
 ## Problem Instantiation
-Now we instantiate the `TrajOptProblem` with our symbolic expressions:
+Now we instantiate the `Problem` with our symbolic expressions:
 
 ```python
-problem = TrajOptProblem(
+problem = Problem(
     dynamics=dynamics,
     states=states,
     controls=controls,

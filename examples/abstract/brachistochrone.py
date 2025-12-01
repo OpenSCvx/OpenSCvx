@@ -13,7 +13,7 @@ from examples.plotting import (
     plot_brachistochrone_position,
     plot_brachistochrone_velocity,
 )
-from openscvx import TrajOptProblem
+from openscvx import Problem
 
 n = 2
 total_time = 2.0
@@ -40,7 +40,7 @@ theta.max = np.array([100.5 * jnp.pi / 180])
 theta.min = np.array([0.0])
 theta.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1)
 
-# Define list of all states (needed for TrajOptProblem and constraints)
+# Define list of all states (needed for Problem and constraints)
 states = [position, velocity]
 controls = [theta]
 
@@ -65,7 +65,7 @@ time = ox.Time(
     max=total_time,
 )
 
-problem = TrajOptProblem(
+problem = Problem(
     dynamics=dynamics,
     states=states,
     controls=controls,

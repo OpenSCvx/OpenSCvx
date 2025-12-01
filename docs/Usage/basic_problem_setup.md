@@ -8,7 +8,7 @@ First, import OpenSCvx:
 import numpy as np
 import jax.numpy as jnp
 import openscvx as ox
-from openscvx import TrajOptProblem
+from openscvx import Problem
 ```
 
 ## State Specification
@@ -224,7 +224,7 @@ thrust.guess = np.repeat(
 Instantiate the problem with all components:
 
 ```python
-problem = TrajOptProblem(
+problem = Problem(
     dynamics=dynamics,
     states=states,
     controls=controls,

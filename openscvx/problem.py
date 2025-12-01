@@ -82,7 +82,7 @@ class _ParameterDict(dict):
             self[key] = value
 
 
-class TrajOptProblem:
+class Problem:
     def __init__(
         self,
         dynamics: dict,
@@ -378,7 +378,7 @@ class TrajOptProblem:
         # TODO: Move this CVXPy lowering section to lower_symbolic_expressions()
         # This should happen in __init__ alongside JAX lowering for architectural consistency.
         # Blocked until all SCP weights become CVXPy Parameters (currently lam_vc and lam_vb
-        # are baked into OCP at creation time). See docs/trajoptproblem_preprocessing_analysis.md
+        # are baked into OCP at creation time). See docs/problem_preprocessing_analysis.md
         # "CVXPy Lowering: Current Approach vs. Alternatives" section for details.
 
         # Phase 1: Create CVXPy variables

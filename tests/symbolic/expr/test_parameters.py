@@ -303,9 +303,9 @@ def test_parameter_dynamics_with_jit_and_vmap():
     # Lower to JAX function
     dynamics_fn = lower_to_jax(dynamics)
 
-    # Create function compatible with trajoptproblem.py calling convention
+    # Create function compatible with problem.py calling convention
     def dynamics_with_node(x, u, node, m, g):
-        """Dynamics function with node parameter (similar to trajoptproblem.py structure)."""
+        """Dynamics function with node parameter (similar to problem.py structure)."""
         parameter = dict(m=m, g=g)
         return dynamics_fn(x, u, node, parameter)
 
@@ -323,7 +323,7 @@ def test_parameter_dynamics_with_jit_and_vmap():
     expected = jnp.array([0.5, -0.2, 0.4, -9.21])
     assert jnp.allclose(result_single, expected)
 
-    # Test with vmap for multiple time steps (similar to trajoptproblem.py)
+    # Test with vmap for multiple time steps (similar to problem.py)
     N = 5
     x_batch = jnp.tile(x[None, :], (N, 1))  # (N, 4)
     u_batch = jnp.tile(u[None, :], (N, 1))  # (N, 2)

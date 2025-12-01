@@ -248,7 +248,7 @@ def lower_symbolic_expressions(
 
         **CVXPy Lowering Deferred**: Convex constraints are NOT lowered to CVXPy in
         this function. They remain symbolic and are lowered later in the pipeline
-        during TrajOptProblem.initialize() (see trajoptproblem.py:378-393). This is
+        during Problem.initialize() (see problem.py:378-393). This is
         necessary because:
             1. CVXPy lowering requires CVXPy variables (x, u) which are created during
                initialize() by create_cvxpy_variables()
@@ -267,7 +267,7 @@ def lower_symbolic_expressions(
         - lower_to_jax(): The underlying lowering function for individual expressions
         - JaxLowerer: The visitor-pattern backend that implements JAX lowering
         - lower_convex_constraints(): CVXPy lowering in ocp.py (called during initialize())
-        - TrajOptProblem.initialize(): Where CVXPy lowering actually occurs (trajoptproblem.py)
+        - Problem.initialize(): Where CVXPy lowering actually occurs (problem.py)
         - UnifiedState/UnifiedControl: Aggregation containers in symbolic/unified.py
         - Dynamics: Container for dynamics functions in dynamics.py
         - LoweredNodalConstraint: Container for constraint functions in constraints/lowered.py
@@ -333,7 +333,7 @@ def lower_symbolic_expressions(
     # Once all SCP weights (lam_vc, lam_vb) are CVXPy Parameters instead of
     # being baked into the OCP cost, this function should handle CVXPy lowering
     # alongside JAX lowering for architectural consistency.
-    # See docs/trajoptproblem_preprocessing_analysis.md for full analysis.
+    # See docs/problem_preprocessing_analysis.md for full analysis.
 
     # ==================== RETURN LOWERED OUTPUTS ====================
 

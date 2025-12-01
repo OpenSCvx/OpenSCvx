@@ -29,7 +29,7 @@ Key Features:
 Backend Usage:
     CVXPy lowering is used for convex constraints in the SCP subproblem. Unlike
     JAX lowering (which happens early during problem construction), CVXPy lowering
-    occurs later during TrajOptProblem.initialize() when CVXPy variables are
+    occurs later during Problem.initialize() when CVXPy variables are
     available. See lower_symbolic_expressions() in symbolic/lower.py for details.
 
 CVXPy Variable Mapping:

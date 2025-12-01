@@ -1,6 +1,6 @@
-# TrajOptProblem
+# Problem
 
-::: openscvx.trajoptproblem.TrajOptProblem.__init__
+::: openscvx.problem.Problem.__init__
     options:
       show_source: false
       show_root_heading: true

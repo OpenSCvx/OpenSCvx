@@ -7,7 +7,7 @@ import pytest
 
 from openscvx import Time, ctcs
 from openscvx.symbolic.expr import Concat, Constant, Control, State
-from openscvx.trajoptproblem import TrajOptProblem
+from openscvx.problem import Problem
 
 # Conditionally import cvxpygen to see if it's installed
 try:
@@ -58,7 +58,7 @@ def test_cvxpygen_disabled_by_default():
 
     time = Time(initial=0.0, final=("minimize", 1.0), min=0.0, max=10.0)
 
-    problem = TrajOptProblem(
+    problem = Problem(
         dynamics=dynamics,
         states=[x],
         controls=[u],
@@ -101,7 +101,7 @@ def test_cvxpygen_enabled_raises_error_without_install():
 
     time = Time(initial=0.0, final=("minimize", 1.0), min=0.0, max=10.0)
 
-    problem = TrajOptProblem(
+    problem = Problem(
         dynamics=dynamics,
         states=[x],
         controls=[u],
