@@ -26,6 +26,7 @@ def create_cvxpy_variables(settings: Config) -> Dict:
     w_tr = cp.Parameter(nonneg=True, name="w_tr")
     lam_cost = cp.Parameter(nonneg=True, name="lam_cost")
     lam_vc = cp.Parameter((settings.scp.n - 1, settings.sim.n_states), nonneg=True, name="lam_vc")
+    lam_vb = cp.Parameter(nonneg=True, name="lam_vb")
 
     # State
     x = cp.Variable((settings.scp.n, settings.sim.n_states), name="x")  # Current State
@@ -103,6 +104,7 @@ def create_cvxpy_variables(settings: Config) -> Dict:
         "w_tr": w_tr,
         "lam_cost": lam_cost,
         "lam_vc": lam_vc,
+        "lam_vb": lam_vb,
         "x": x,
         "dx": dx,
         "x_bar": x_bar,
@@ -247,6 +249,7 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     w_tr = ocp_vars["w_tr"]
     lam_cost = ocp_vars["lam_cost"]
     lam_vc = ocp_vars["lam_vc"]
+    lam_vb = ocp_vars["lam_vb"]
     x = ocp_vars["x"]
     dx = ocp_vars["dx"]
     x_bar = ocp_vars["x_bar"]
@@ -275,6 +278,7 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
 
     constr = []
     cost = lam_cost * 0
+    cost += lam_vb * 0
 
     #############
     # CONSTRAINTS
@@ -367,7 +371,7 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     if settings.sim.constraints_nodal:
         for constraint in settings.sim.constraints_nodal:
             # if not constraint.convex:
-            cost += settings.scp.lam_vb * cp.sum(cp.pos(nu_vb[idx_ncvx]))
+            cost += lam_vb * cp.sum(cp.pos(nu_vb[idx_ncvx]))
             idx_ncvx += 1
 
     for idx, nodes in zip(
