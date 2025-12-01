@@ -205,6 +205,15 @@ def separate_constraints(
 
     for c in constraints:
         if isinstance(c, CTCS):
+            # Validate that CTCS constraints don't contain NodeReferences
+            from openscvx.symbolic.lower import _contains_node_reference
+
+            if _contains_node_reference(c.constraint):
+                raise ValueError(
+                    "CTCS constraints cannot contain NodeReferences (.node(k)). "
+                    "Cross-node constraints must use NodalConstraint with .at([nodes]) instead. "
+                    f"Constraint: {c.constraint}"
+                )
             # Normalize None to full horizon
             c.nodes = c.nodes or (0, n_nodes)
             constraints_ctcs.append(c)

@@ -391,6 +391,19 @@ def test_separate_constraints_convex_ctcs_check_nodally():
     assert constraints_nodal_convex[0].constraint.is_convex
 
 
+def test_ctcs_with_node_reference_raises_error():
+    """Test that CTCS constraints cannot contain NodeReferences."""
+    n_nodes = 10
+    x = State("x", (3,))
+
+    # Try to create a CTCS constraint with NodeReference - should fail
+    cross_node_constraint = x.node(5) - x.node(4) <= 1.0
+    ctcs_constraint = ctcs(cross_node_constraint, penalty="squared_relu")
+
+    with pytest.raises(ValueError, match="CTCS constraints cannot contain NodeReferences"):
+        separate_constraints([ctcs_constraint], n_nodes)
+
+
 def test_augment_no_ctcs_constraints():
     """Test augmentation with no constraints."""
     x = State("x", (2,))
