@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 
 from openscvx import Time, ctcs
-from openscvx.symbolic.expr import Concat, Constant, Control, State
 from openscvx.problem import Problem
+from openscvx.symbolic.expr import Concat, Constant, Control, State
 
 # Conditionally import cvxpygen to see if it's installed
 try:
