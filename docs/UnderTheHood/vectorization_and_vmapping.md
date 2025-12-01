@@ -226,31 +226,9 @@ for constraint in constraints_nodal:
 For each cross-node constraint, the lowering process:
 
 1. **Lowers the expression to JAX** using `JaxLowerer` (which handles `NodeReference` nodes)
-2. **Wraps the function** to evaluate at multiple nodes along the trajectory
+2. **Wraps the function** to vmap over evaluation nodes
 3. **Computes trajectory-level Jacobians** using automatic differentiation
-
-```python
-# Lower constraint expression
-constraint_fn = lower_to_jax(constraint_expr)
-
-# Collect referenced nodes (for documentation/future sparsity)
-references = _collect_node_references(constraint_expr)
-
-# Create trajectory-level wrapper (internal helper function)
-wrapped_fn = _create_cross_node_wrapper(constraint_fn, references, eval_nodes)
-
-# Compute Jacobians for full trajectory
-grad_g_X = jacfwd(wrapped_fn, argnums=0)  # dg/dX - shape (M, N, n_x)
-grad_g_U = jacfwd(wrapped_fn, argnums=1)  # dg/dU - shape (M, N, n_u)
-
-# Create CrossNodeConstraintLowered object
-cross_node_lowered = CrossNodeConstraintLowered(
-    func=wrapped_fn,
-    grad_g_X=grad_g_X,
-    grad_g_U=grad_g_U,
-    eval_nodes=eval_nodes,  # List of nodes where constraint is evaluated
-)
-```
+4. **Creates a `CrossNodeConstraintLowered`** object containing the functions and Jacobians
 
 **Cross-Node Constraint Function Signature:**
 
@@ -434,31 +412,9 @@ Cross-node constraints are **not vmapped** in the traditional sense because they
 
 **Cross-Node Constraint "Vectorization" via Wrapper:**
 
-The `_create_cross_node_wrapper` function (in `openscvx/symbolic/lower.py`) is an internal helper that wraps the lowered constraint to evaluate at multiple trajectory nodes using vmap:
+The `_create_cross_node_wrapper` function (in `openscvx/symbolic/lower.py`) is an internal helper that uses `jax.vmap` to batch constraint evaluations over multiple trajectory nodes.
 
-```python
-def _create_cross_node_wrapper(constraint_fn, references, eval_nodes):
-    """Wrap constraint to evaluate at multiple nodes.
-
-    Uses vmap to batch over evaluation nodes. Each constraint has fixed
-    node indices baked in (e.g., position.node(5) - position.node(4)),
-    and the wrapper evaluates this at each node in eval_nodes.
-    """
-    import jax
-    import jax.numpy as jnp
-
-    eval_nodes_array = jnp.array(eval_nodes)
-
-    # Vmap over evaluation nodes
-    vmapped_constraint = jax.vmap(constraint_fn, in_axes=(None, None, 0, None))
-
-    def trajectory_constraint(X, U, params):
-        return vmapped_constraint(X, U, eval_nodes_array, params)
-
-    return trajectory_constraint
-```
-
-**Cross-Node Constraint Signature (No Vmap Applied):**
+**Cross-Node Constraint Signature:**
 
 ```python
 def g_cross(X: Array, U: Array, params: dict) -> Array:
