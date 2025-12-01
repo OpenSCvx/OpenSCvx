@@ -298,8 +298,7 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
     prob.param_dict["w_tr"].value = settings.scp.w_tr
     prob.param_dict["lam_cost"].value = settings.scp.lam_cost
     prob.param_dict["lam_vc"].value = settings.scp.lam_vc
-    if "lam_vb" in prob.param_dict:
-        prob.param_dict["lam_vb"].value = settings.scp.lam_vb
+    prob.param_dict["lam_vb"].value = settings.scp.lam_vb
 
     if settings.cvx.cvxpygen:
         t0 = time.time()

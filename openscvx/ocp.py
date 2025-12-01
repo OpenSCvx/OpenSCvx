@@ -278,6 +278,7 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
 
     constr = []
     cost = lam_cost * 0
+    cost += lam_vb * 0
 
     #############
     # CONSTRAINTS
