@@ -210,7 +210,7 @@ def separate_constraints(
 
             if _contains_node_reference(c.constraint):
                 raise ValueError(
-                    "CTCS constraints cannot contain NodeReferences (.node(k)). "
+                    "CTCS constraints cannot contain NodeReferences (.at(k)). "
                     "Cross-node constraints must use NodalConstraint with .at([nodes]) instead. "
                     f"Constraint: {c.constraint}"
                 )

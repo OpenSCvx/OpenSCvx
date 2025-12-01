@@ -953,8 +953,8 @@ class JaxLowerer:
                 - params: Problem parameters
 
         Example:
-            position.node(5) lowers to a function that extracts x[5, position_slice]
-            position.node(k-1) where k=7 lowers to extract x[6, position_slice]
+            position.at(5) lowers to a function that extracts x[5, position_slice]
+            position.at(k-1) where k=7 lowers to extract x[6, position_slice]
         """
         from openscvx.symbolic.expr.control import Control
         from openscvx.symbolic.expr.state import State
@@ -983,7 +983,7 @@ class JaxLowerer:
             return control_node_fn
 
         else:
-            # Compound expression (e.g., position[0].node(5))
+            # Compound expression (e.g., position[0].at(5))
             base_fn = self.lower(node.base)
 
             def compound_node_fn(x, u, node_param, params):

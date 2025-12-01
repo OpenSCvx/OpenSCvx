@@ -352,7 +352,7 @@ def validate_cross_node_constraint_bounds(nodal_constraint: NodalConstraint, n_n
 
     This validation ensures that all node indices referenced in the constraint are
     within the valid range [0, n_nodes). Applies to constraints that reference
-    values at specific trajectory nodes (e.g., position.node(5) - position.node(4)).
+    values at specific trajectory nodes (e.g., position.at(5) - position.at(4)).
 
     Args:
         nodal_constraint: The constraint to validate
@@ -367,13 +367,13 @@ def validate_cross_node_constraint_bounds(nodal_constraint: NodalConstraint, n_n
             position = State("pos", shape=(3,))
 
             # Valid: references nodes 0 and 9
-            boundary = (position.node(0) == position.node(9)).at([0])
+            boundary = (position.at(0) == position.at(9)).at([0])
             validate_cross_node_constraint_bounds(boundary, n_nodes=10)  # OK
 
         Invalid cross-node constraint:
 
             # Invalid: node 10 is out of bounds for n_nodes=10
-            bad_boundary = (position.node(0) == position.node(10)).at([0])
+            bad_boundary = (position.at(0) == position.at(10)).at([0])
             validate_cross_node_constraint_bounds(bad_boundary, n_nodes=10)  # Raises ValueError
     """
     from openscvx.symbolic.expr import NodeReference

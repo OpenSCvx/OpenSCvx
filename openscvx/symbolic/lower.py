@@ -161,7 +161,7 @@ def _contains_node_reference(expr: Expr) -> bool:
         _contains_node_reference(position)  # False
 
         # Cross-node expression - has NodeReference
-        _contains_node_reference(position.node(10) - position.node(9))  # True
+        _contains_node_reference(position.at(10) - position.at(9))  # True
     """
     if isinstance(expr, NodeReference):
         return True
@@ -190,10 +190,10 @@ def _collect_node_references(expr: Expr) -> List[int]:
         Sorted list of unique node indices referenced in the expression
 
     Example:
-        For expression `position.node(5) - position.node(4)`:
+        For expression `position.at(5) - position.at(4)`:
         Returns [4, 5]
 
-        For expression `state.node(k) + state.node(k-1) + state.node(k-2)`:
+        For expression `state.at(k) + state.at(k-1) + state.at(k-2)`:
         Returns [k-2, k-1, k] (whatever the actual integer values are)
 
     Note:
@@ -230,7 +230,7 @@ def _create_cross_node_wrapper(constraint_fn, references: List[int], eval_nodes:
             where X is (N, n_x), U is (N, n_u), M = len(eval_nodes)
 
     Example:
-        For constraint `position.node(k) - position.node(k-1) <= 0.1`:
+        For constraint `position.at(k) - position.at(k-1) <= 0.1`:
         - At eval_nodes=[1,2,3,...,N-1]
         - Evaluates position[k] - position[k-1] for each k in eval_nodes
         - Returns array of shape (N-1,) with one residual per evaluation

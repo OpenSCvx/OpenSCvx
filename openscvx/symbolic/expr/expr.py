@@ -218,7 +218,7 @@ class Expr:
 
         return Transpose(self)
 
-    def node(self, k: int) -> "NodeReference":
+    def at(self, k: int) -> "NodeReference":
         """Reference this expression at a specific trajectory node.
 
         This method enables inter-node constraints where you can reference
@@ -239,7 +239,7 @@ class Expr:
 
                 # Create rate limit for each node
                 constraints = [
-                    (ox.linalg.Norm(position.node(k) - position.node(k-1)) <= 0.1).at([k])
+                    (ox.linalg.Norm(position.at(k) - position.at(k-1)) <= 0.1).at([k])
                     for k in range(1, N)
                 ]
 
@@ -249,7 +249,7 @@ class Expr:
 
                 # Fibonacci-like recurrence
                 constraints = [
-                    (state.node(k) == state.node(k-1) + state.node(k-2)).at([k])
+                    (state.at(k) == state.at(k-1) + state.at(k-2)).at([k])
                     for k in range(2, N)
                 ]
 
@@ -552,7 +552,7 @@ class NodeReference(Expr):
 
             # Create rate limit constraints for all nodes
             constraints = [
-                (ox.linalg.Norm(position.node(k) - position.node(k-1)) <= 0.1).at([k])
+                (ox.linalg.Norm(position.at(k) - position.at(k-1)) <= 0.1).at([k])
                 for k in range(1, N)
             ]
 
@@ -562,21 +562,21 @@ class NodeReference(Expr):
 
             # Fibonacci-like recurrence at each node
             constraints = [
-                (state.node(k) == state.node(k-1) + state.node(k-2)).at([k])
+                (state.at(k) == state.at(k-1) + state.at(k-2)).at([k])
                 for k in range(2, N)
             ]
 
         Coupling specific nodes:
 
             # Constrain distance between nodes 5 and 10
-            coupling = (position.node(10) - position.node(5) <= threshold).at([10])
+            coupling = (position.at(10) - position.at(5) <= threshold).at([10])
 
     Performance Note:
         Cross-node constraints use dense Jacobian storage. For details on memory
         usage and performance implications, see CrossNodeConstraintLowered documentation.
 
     Note:
-        NodeReference is typically created via the `.node(k)` method on expressions
+        NodeReference is typically created via the `.at(k)` method on expressions
         rather than constructed directly.
     """
 
@@ -631,4 +631,4 @@ class NodeReference(Expr):
         Returns:
             str: String showing the base expression and node index
         """
-        return f"{self.base!r}.node({self.node_idx})"
+        return f"{self.base!r}.at({self.node_idx})"

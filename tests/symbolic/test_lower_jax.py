@@ -430,11 +430,11 @@ def test_contains_node_reference():
     assert not contains_node_reference(regular_expr)
 
     # With NodeReference
-    cross_node_expr = position.node(5) - position.node(4)
+    cross_node_expr = position.at(5) - position.at(4)
     assert contains_node_reference(cross_node_expr)
 
     # Deeply nested
-    nested_expr = (position.node(5) - position.node(4)) * 2.0 + 1.0
+    nested_expr = (position.at(5) - position.at(4)) * 2.0 + 1.0
     assert contains_node_reference(nested_expr)
 
 
@@ -445,17 +445,17 @@ def test_collect_node_references_absolute():
     position = State("pos", shape=(3,))
 
     # Single reference
-    expr1 = position.node(5)
+    expr1 = position.at(5)
     refs = collect_node_references(expr1)
     assert refs == [5]
 
     # Two references
-    expr2 = position.node(0) - position.node(10)
+    expr2 = position.at(0) - position.at(10)
     refs = collect_node_references(expr2)
     assert refs == [0, 10]
 
     # Three references
-    expr3 = position.node(7) - 2 * position.node(5) + position.node(3)
+    expr3 = position.at(7) - 2 * position.at(5) + position.at(3)
     refs = collect_node_references(expr3)
     assert refs == [3, 5, 7]  # Sorted unique indices
 
@@ -485,7 +485,7 @@ def test_absolute_node_reference_semantics():
     position._slice = slice(0, 2)  # Manually assign slice for testing
 
     # Constraint: position[5] - position[3]
-    expr = position.node(5) - position.node(3)
+    expr = position.at(5) - position.at(3)
 
     # Lower to JAX
     constraint_fn = lower_to_jax(expr)

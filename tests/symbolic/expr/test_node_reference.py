@@ -2,8 +2,8 @@
 
 This module tests the NodeReference expression class which enables users to define
 constraints across different trajectory nodes, such as:
-- Rate limits: (position.node(k) - position.node(k-1)) <= threshold
-- Multi-step dependencies: state.node(k) == 2*state.node(k-1) - state.node(k-2)
+- Rate limits: (position.at(k) - position.at(k-1)) <= threshold
+- Multi-step dependencies: state.at(k) == 2*state.at(k-1) - state.at(k-2)
 """
 
 import pytest
@@ -27,9 +27,9 @@ def test_node_reference_creation():
     position = State("pos", shape=(3,))
     thrust = Control("thrust", shape=(2,))
 
-    # Create node references using .node() method
-    pos_ref = position.node(5)
-    thrust_ref = thrust.node(10)
+    # Create node references using .at() method
+    pos_ref = position.at(5)
+    thrust_ref = thrust.at(10)
 
     assert isinstance(pos_ref, NodeReference)
     assert pos_ref.base is position
@@ -45,45 +45,45 @@ def test_node_reference_type_validation():
     position = State("pos", shape=(3,))
 
     # Valid: positive integers
-    ref_positive = position.node(5)
+    ref_positive = position.at(5)
     assert ref_positive.node_idx == 5
 
     # Valid: negative integers (for end-indexing)
-    ref_negative = position.node(-1)
+    ref_negative = position.at(-1)
     assert ref_negative.node_idx == -1
 
     # Invalid: non-integer types
     with pytest.raises(TypeError, match="Node index must be an integer"):
-        position.node(1.5)
+        position.at(1.5)
 
     with pytest.raises(TypeError, match="Node index must be an integer"):
-        position.node("k")
+        position.at("k")
 
     with pytest.raises(TypeError, match="Node index must be an integer"):
-        position.node([1, 2])
+        position.at([1, 2])
 
 
 def test_node_reference_shape_preservation():
     """Test that NodeReference preserves the shape of its base expression."""
     # Vector state
     vector_state = State("pos", shape=(3,))
-    assert vector_state.node(5).check_shape() == (3,)
+    assert vector_state.at(5).check_shape() == (3,)
 
     # Scalar state
     scalar_state = State("x", shape=(1,))
-    assert scalar_state.node(0).check_shape() == (1,)
+    assert scalar_state.at(0).check_shape() == (1,)
 
     # NodeReference on spatially-indexed expression
     position = State("pos", shape=(3,))
     x_component = position[0]  # Shape () - scalar
-    x_at_k = x_component.node(5)
+    x_at_k = x_component.at(5)
     assert x_at_k.check_shape() == ()
 
 
 def test_node_reference_tree_structure():
     """Test that NodeReference correctly reports its base as a child."""
     state = State("x", shape=(2,))
-    ref = state.node(3)
+    ref = state.at(3)
 
     children = ref.children()
     assert len(children) == 1
@@ -101,8 +101,8 @@ def test_node_reference_in_arithmetic():
     state = State("x", shape=(1,))
 
     # Simple subtraction (rate limit pattern)
-    vel_k = velocity.node(10)
-    vel_k_minus_1 = velocity.node(9)
+    vel_k = velocity.at(10)
+    vel_k_minus_1 = velocity.at(9)
     delta_v = vel_k - vel_k_minus_1
 
     from openscvx.symbolic.expr import Sub
@@ -113,9 +113,9 @@ def test_node_reference_in_arithmetic():
     assert isinstance(delta_v.right, NodeReference)
 
     # Multi-step expression (Fibonacci-like)
-    x_k = state.node(10)
-    x_k_minus_1 = state.node(9)
-    x_k_minus_2 = state.node(8)
+    x_k = state.at(10)
+    x_k_minus_1 = state.at(9)
+    x_k_minus_2 = state.at(8)
     recurrence = x_k - x_k_minus_1 - x_k_minus_2
 
     assert recurrence.check_shape() == (1,)
@@ -127,8 +127,8 @@ def test_node_reference_in_constraints():
     position = State("pos", shape=(2,))
 
     # Inequality constraint
-    vel_k = velocity.node(10)
-    vel_k_minus_1 = velocity.node(9)
+    vel_k = velocity.at(10)
+    vel_k_minus_1 = velocity.at(9)
     max_accel = 0.5
     inequality = (vel_k - vel_k_minus_1) <= max_accel
 
@@ -136,8 +136,8 @@ def test_node_reference_in_constraints():
     assert inequality.check_shape() == ()
 
     # Equality constraint
-    pos_start = position.node(0)
-    pos_end = position.node(100)
+    pos_start = position.at(0)
+    pos_end = position.at(100)
     equality = pos_start == pos_end
 
     assert isinstance(equality, Equality)
@@ -166,8 +166,8 @@ def test_rate_limit_pattern():
 
     # Typical usage: create constraint for each node in a loop
     # Here we test one instance of the pattern
-    pos_k = position.node(10)
-    pos_k_prev = position.node(9)
+    pos_k = position.at(10)
+    pos_k_prev = position.at(9)
 
     constraint = (pos_k - pos_k_prev) <= max_step
     assert constraint.check_shape() == ()
@@ -186,9 +186,9 @@ def test_multi_step_dependencies():
     state = State("x", shape=(1,))
 
     # Second-order finite difference (acceleration)
-    x_next = state.node(11)
-    x_curr = state.node(10)
-    x_prev = state.node(9)
+    x_next = state.at(11)
+    x_curr = state.at(10)
+    x_prev = state.at(9)
 
     dt = 0.1
     accel = (x_next - 2 * x_curr + x_prev) / (dt**2)
@@ -209,8 +209,8 @@ def test_spatial_and_temporal_indexing():
     velocity = State("vel", shape=(3,))
 
     # Rate limit only on z-component (index 2)
-    z_k = velocity[2].node(10)
-    z_k_prev = velocity[2].node(9)
+    z_k = velocity[2].at(10)
+    z_k_prev = velocity[2].at(9)
 
     max_z_rate = 0.05
     constraint = (z_k - z_k_prev) <= max_z_rate
@@ -228,8 +228,8 @@ def test_boundary_coupling():
     state = State("x", shape=(2,))
 
     # Periodic boundary condition: state at end equals state at start
-    x_start = state.node(0)
-    x_end = state.node(100)
+    x_start = state.at(0)
+    x_end = state.at(100)
 
     periodicity_constraint = x_start == x_end
 
@@ -254,7 +254,7 @@ def test_loop_pattern_for_trajectory_constraints():
     # Recommended pattern: use a Python loop
     constraints = []
     for k in range(1, N):
-        rate_limit = (position.node(k) - position.node(k - 1) <= max_step).at([k])
+        rate_limit = (position.at(k) - position.at(k - 1) <= max_step).at([k])
         constraints.append(rate_limit)
 
     # Should have N-1 constraints
@@ -267,7 +267,7 @@ def test_loop_pattern_for_trajectory_constraints():
 
     # List comprehension also works
     constraints_v2 = [
-        (position.node(k) - position.node(k - 1) <= max_step).at([k]) for k in range(1, N)
+        (position.at(k) - position.at(k - 1) <= max_step).at([k]) for k in range(1, N)
     ]
 
     assert len(constraints_v2) == N - 1

@@ -397,7 +397,7 @@ def test_ctcs_with_node_reference_raises_error():
     x = State("x", (3,))
 
     # Try to create a CTCS constraint with NodeReference - should fail
-    cross_node_constraint = x.node(5) - x.node(4) <= 1.0
+    cross_node_constraint = x.at(5) - x.at(4) <= 1.0
     ctcs_constraint = ctcs(cross_node_constraint, penalty="squared_relu")
 
     with pytest.raises(ValueError, match="CTCS constraints cannot contain NodeReferences"):

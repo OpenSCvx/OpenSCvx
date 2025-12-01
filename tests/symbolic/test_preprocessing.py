@@ -615,7 +615,7 @@ def test_validate_cross_node_bounds_absolute_valid():
     N = 10
 
     # Valid: references to nodes 0 and 9
-    constraint = (position.node(0) == position.node(9)).at([0])
+    constraint = (position.at(0) == position.at(9)).at([0])
     validate_cross_node_constraint_bounds(constraint, N)  # Should not raise
 
 
@@ -625,7 +625,7 @@ def test_validate_cross_node_bounds_absolute_too_high():
     N = 10
 
     # Invalid: reference to node 10 (>= N)
-    constraint = (position.node(10) == position.node(0)).at([0])
+    constraint = (position.at(10) == position.at(0)).at([0])
 
     with pytest.raises(ValueError, match="invalid node index 10"):
         validate_cross_node_constraint_bounds(constraint, N)
@@ -637,7 +637,7 @@ def test_validate_cross_node_bounds_absolute_negative():
     N = 10
 
     # Invalid: negative absolute index
-    constraint = (position.node(-1) == position.node(0)).at([0])
+    constraint = (position.at(-1) == position.at(0)).at([0])
 
     with pytest.raises(ValueError, match="invalid node index -1"):
         validate_cross_node_constraint_bounds(constraint, N)
