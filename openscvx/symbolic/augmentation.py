@@ -220,19 +220,8 @@ def separate_constraints(
         elif isinstance(c, NodalConstraint):
             # Check if the underlying constraint is convex
             if c.constraint.is_convex:
-                # Validate that convex constraints don't contain NodeReferences
-                from openscvx.symbolic.lower import _contains_node_reference
-
-                if _contains_node_reference(c.constraint):
-                    raise ValueError(
-                        "Convex constraints with NodeReferences (.at(k)) are not supported yet. "
-                        "Cross-node constraints are currently only supported for the non-convex "
-                        "case. "
-                        "Please reformulate your constraint as non-convex, or contact the "
-                        "developers "
-                        "if you need this feature. "
-                        f"Constraint: {c.constraint}"
-                    )
+                # Convex cross-node constraints are now supported!
+                # They are handled in lower_convex_constraints in ocp.py
                 constraints_nodal_convex.append(c)
             else:
                 constraints_nodal.append(c)
@@ -243,19 +232,8 @@ def separate_constraints(
 
             # Check if the constraint is convex
             if c.is_convex:
-                # Validate that convex constraints don't contain NodeReferences
-                from openscvx.symbolic.lower import _contains_node_reference
-
-                if _contains_node_reference(c):
-                    raise ValueError(
-                        "Convex constraints with NodeReferences (.at(k)) are not supported yet. "
-                        "Cross-node constraints are currently only supported for the non-convex "
-                        "case. "
-                        "Please reformulate your constraint as non-convex, or contact the "
-                        "developers "
-                        "if you need this feature. "
-                        f"Constraint: {c}"
-                    )
+                # Convex cross-node constraints are now supported!
+                # They are handled in lower_convex_constraints in ocp.py
                 constraints_nodal_convex.append(nodal_constraint)
             else:
                 constraints_nodal.append(nodal_constraint)
@@ -274,18 +252,8 @@ def separate_constraints(
 
         # Check if the underlying constraint is convex
         if constraint.is_convex:
-            # Validate that convex constraints don't contain NodeReferences
-            from openscvx.symbolic.lower import _contains_node_reference
-
-            if _contains_node_reference(constraint):
-                raise ValueError(
-                    "Convex constraints with NodeReferences (.at(k)) are not supported yet. "
-                    "Cross-node constraints are currently only supported for the non-convex case. "
-                    "This constraint was extracted from a CTCS constraint with check_nodally=True. "
-                    "Please reformulate your constraint as non-convex, or contact the developers "
-                    "if you need this feature. "
-                    f"Constraint: {constraint}"
-                )
+            # Convex cross-node constraints are now supported!
+            # They are handled in lower_convex_constraints in ocp.py
             constraints_nodal_convex.append(nodal_constraint)
         else:
             constraints_nodal.append(nodal_constraint)
