@@ -1283,10 +1283,11 @@ def test_convex_nodal_constraint_with_node_reference_accepted():
     position = State("pos", shape=(3,))
 
     # Create a convex cross-node constraint (linear inequality marked as convex)
-    cross_node_constraint = (position.at(5) - position.at(4) <= 0.1).convex().at([5])
+    # No outer .at([...]) needed - auto-detected as cross-node
+    cross_node_constraint = (position.at(5) - position.at(4) <= 0.1).convex()
 
     # The constraint itself is convex (explicitly marked)
-    assert cross_node_constraint.constraint.is_convex
+    assert cross_node_constraint.is_convex
 
     # Should successfully separate constraints without raising
     ctcs, nodal, nodal_convex = separate_constraints([cross_node_constraint], n_nodes=n_nodes)

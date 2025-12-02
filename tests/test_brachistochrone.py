@@ -1006,9 +1006,11 @@ def test_cross_nodal(max_step, should_converge, is_convex):
     # Rate limit constraint with parameterized max_step
     # Create constraint for each node using absolute indexing
     for k in range(1, n):
+        # Cross-node constraints don't need outer .at(k) - they're auto-detected
+        # and converted to single constraints (not replicated to all nodes)
         rate_limit_constraint = (
             ox.linalg.Norm(position.at(k) - position.at(k - 1), ord=2) <= max_step
-        ).at(k)
+        )
 
         # Mark as convex if requested
         if is_convex:

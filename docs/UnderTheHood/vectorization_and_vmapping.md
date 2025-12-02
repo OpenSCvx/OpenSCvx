@@ -194,7 +194,9 @@ Cross-node constraints relate variables across multiple trajectory nodes (e.g., 
 - **Non-convex**: Lowered to JAX with automatic differentiation for SCP linearization
 - **Convex**: Lowered to CVXPy and solved directly by the convex solver (more efficient)
 
-Cross-node constraints are defined using the `.at()` method with **absolute indexing**. The node indices are baked into the constraint at construction time, creating a single constraint that couples specific trajectory nodes:
+Cross-node constraints are defined using the `.at()` method with **absolute indexing**. The node indices are baked into the constraint at construction time, creating a single constraint that couples specific trajectory nodes.
+
+**Key Feature**: Cross-node constraints are automatically detected (by the presence of `.at(k)` node references) and treated as single constraints - they are NOT replicated to all trajectory nodes like regular constraints.
 
 ```python
 import openscvx as ox
@@ -206,19 +208,20 @@ position = ox.State("position", shape=(2,))
 for k in range(1, N):
     # Non-convex formulation (default)
     # This creates a single constraint: ||position[k] - position[k-1]|| <= max_step
+    # No outer .at(k) needed - auto-detected as cross-node constraint
     rate_limit = (
         ox.linalg.Norm(position.at(k) - position.at(k-1), ord=2) <= max_step
-    ).at(k)
+    )
 
     # Or mark as convex for direct CVXPy solving
     rate_limit_convex = (
         ox.linalg.Norm(position.at(k) - position.at(k-1), ord=2) <= max_step
-    ).at(k).convex()
+    ).convex()
 
     constraint_exprs.append(rate_limit)
 ```
 
-**Note**: The outer `.at(k)` wrapper is required to prevent the constraint from being auto-applied at all nodes. It specifies that this is a single constraint (not to be replicated), though the specific index value is not semantically meaningful since the node references are already fixed inside the constraint expression.
+**Note**: You can optionally use `.at([0])` as a dummy wrapper if you prefer explicit syntax, but it's not required. Using `.at([multiple, nodes])` on a cross-node constraint will raise an error since the nodes are already specified inside the expression.
 
 The `.at(k)` method accepts integer indices:
 - `position.at(5)` - Position at node 5
@@ -631,7 +634,7 @@ for state in problem.states:
 6. **Cross-node constraint signature confusion**: Regular nodal constraints use `(x, u, node, params)` while cross-node constraints use `(X, U, params)` - don't mix them up
 7. **Cross-node Jacobian sparsity**: Cross-node Jacobians have shape `(N, n_x)` but are typically very sparse (e.g., rate limits only couple 2 nodes). Be aware of memory usage for large N
 8. **Forgetting Python loops for patterns**: Cross-node constraints use `.at(k)` with integer indices - use Python loops to apply patterns across nodes (e.g., `for k in range(1, N): ... position.at(k) - position.at(k-1) ...`)
-9. **Forgetting the outer `.at()` wrapper**: Cross-node constraints need an outer `.at(k)` to prevent auto-expansion to all nodes. Without it, a bare constraint like `position.at(5) - position.at(4) <= r` would be applied at every trajectory node, creating N copies of the same constraint
+9. **Manually wrapping cross-node constraints**: Cross-node constraints are auto-detected and don't need (and shouldn't use) `.at([...])` wrappers. The system automatically detects `.at(k)` node references and treats the constraint as a single constraint rather than replicating it to all nodes
 
 ## See Also
 
