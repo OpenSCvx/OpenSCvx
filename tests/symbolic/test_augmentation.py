@@ -1277,28 +1277,28 @@ def test_ctcs_check_nodally_node_interval_preserved():
 # Tests for cross-node constraint validation
 
 
-def test_convex_nodal_constraint_with_node_reference_rejected():
-    """Test that convex NodalConstraint with NodeReference is rejected."""
+def test_convex_nodal_constraint_with_node_reference_accepted():
+    """Test that convex NodalConstraint with NodeReference is now supported."""
     n_nodes = 10
     position = State("pos", shape=(3,))
 
     # Create a convex cross-node constraint (linear inequality marked as convex)
-    # This should be rejected since cross-node constraints are only supported for non-convex
     cross_node_constraint = (position.at(5) - position.at(4) <= 0.1).convex().at([5])
 
     # The constraint itself is convex (explicitly marked)
     assert cross_node_constraint.constraint.is_convex
 
-    # Should raise error when separating constraints
-    with pytest.raises(
-        ValueError,
-        match=r"Convex constraints with NodeReferences \(\.at\(k\)\) are not supported yet",
-    ):
-        separate_constraints([cross_node_constraint], n_nodes=n_nodes)
+    # Should successfully separate constraints without raising
+    ctcs, nodal, nodal_convex = separate_constraints([cross_node_constraint], n_nodes=n_nodes)
+
+    # Should be classified as convex nodal constraint
+    assert len(nodal_convex) == 1
+    assert len(nodal) == 0
+    assert len(ctcs) == 0
 
 
-def test_convex_bare_constraint_with_node_reference_rejected():
-    """Test that bare convex constraint with NodeReference is rejected."""
+def test_convex_bare_constraint_with_node_reference_accepted():
+    """Test that bare convex constraint with NodeReference is now supported."""
     n_nodes = 10
     position = State("pos", shape=(3,))
 
@@ -1309,12 +1309,13 @@ def test_convex_bare_constraint_with_node_reference_rejected():
     # The constraint itself is convex (explicitly marked)
     assert cross_node_constraint.is_convex
 
-    # Should raise error when separating constraints
-    with pytest.raises(
-        ValueError,
-        match=r"Convex constraints with NodeReferences \(\.at\(k\)\) are not supported yet",
-    ):
-        separate_constraints([cross_node_constraint], n_nodes=n_nodes)
+    # Should successfully separate constraints without raising
+    ctcs, nodal, nodal_convex = separate_constraints([cross_node_constraint], n_nodes=n_nodes)
+
+    # Should be classified as convex nodal constraint
+    assert len(nodal_convex) == 1
+    assert len(nodal) == 0
+    assert len(ctcs) == 0
 
 
 def test_nonconvex_cross_node_constraint_accepted():

@@ -194,7 +194,7 @@ Cross-node constraints relate variables across multiple trajectory nodes (e.g., 
 - **Non-convex**: Lowered to JAX with automatic differentiation for SCP linearization
 - **Convex**: Lowered to CVXPy and solved directly by the convex solver (more efficient)
 
-Cross-node constraints are defined using the `.at()` method with **absolute indexing**:
+Cross-node constraints are defined using the `.at()` method with **absolute indexing**. The node indices are baked into the constraint at construction time, creating a single constraint that couples specific trajectory nodes:
 
 ```python
 import openscvx as ox
@@ -205,6 +205,7 @@ position = ox.State("position", shape=(2,))
 # Create one constraint per node using a Python loop
 for k in range(1, N):
     # Non-convex formulation (default)
+    # This creates a single constraint: ||position[k] - position[k-1]|| <= max_step
     rate_limit = (
         ox.linalg.Norm(position.at(k) - position.at(k-1), ord=2) <= max_step
     ).at(k)
@@ -216,6 +217,8 @@ for k in range(1, N):
 
     constraint_exprs.append(rate_limit)
 ```
+
+**Note**: The outer `.at(k)` wrapper is required to prevent the constraint from being auto-applied at all nodes. It specifies that this is a single constraint (not to be replicated), though the specific index value is not semantically meaningful since the node references are already fixed inside the constraint expression.
 
 The `.at(k)` method accepts integer indices:
 - `position.at(5)` - Position at node 5
@@ -237,15 +240,15 @@ for constraint in constraints_nodal:
 For each cross-node constraint, the lowering process:
 
 1. **Lowers the expression to JAX** using `JaxLowerer` (which handles `NodeReference` nodes)
-2. **Wraps the function** to vmap over evaluation nodes
+2. **Wraps the function** to provide clean `(X, U, params)` signature
 3. **Computes trajectory-level Jacobians** using automatic differentiation
 4. **Creates a `CrossNodeConstraintLowered`** object containing the functions and Jacobians
 
 **Cross-Node Constraint Function Signature:**
 
 ```python
-def g_cross(X: Array, U: Array, params: dict) -> Array:
-    """Evaluate cross-node constraint at multiple nodes simultaneously.
+def g_cross(X: Array, U: Array, params: dict) -> scalar:
+    """Evaluate single cross-node constraint.
 
     Args:
         X: Full state trajectory, shape (N, n_x)
@@ -253,7 +256,7 @@ def g_cross(X: Array, U: Array, params: dict) -> Array:
         params: Dictionary of problem parameters
 
     Returns:
-        Constraint residuals, shape (M,) where M = len(eval_nodes)
+        Scalar constraint residual
     """
     ...
 ```
@@ -261,25 +264,24 @@ def g_cross(X: Array, U: Array, params: dict) -> Array:
 **Cross-Node Constraint Jacobians:**
 
 ```python
-grad_g_X(X, U, params) -> Array[M, N, n_x]  # dg/dX - Jacobian wrt all states
-grad_g_U(X, U, params) -> Array[M, N, n_u]  # dg/dU - Jacobian wrt all controls
+grad_g_X(X, U, params) -> Array[N, n_x]  # dg/dX - Jacobian wrt all states
+grad_g_U(X, U, params) -> Array[N, n_u]  # dg/dU - Jacobian wrt all controls
 ```
 
 The Jacobian shapes deserve special attention:
-- **M**: Number of evaluation points (e.g., for rate limit at nodes [1, 2, ..., N-1], M = N-1)
 - **N**: Total number of trajectory nodes
 - **Sparsity**: These Jacobians are dense arrays but typically very sparse. For a rate limit `x[k] - x[k-1]`, only 2 out of N nodes have non-zero derivatives.
 
 **Example: Rate Limit Jacobian Structure**
 
-For constraint `||position.at(5) - position.at(4)|| <= r` evaluated at node k=5:
+For constraint `||position.at(5) - position.at(4)|| <= r`:
 
 ```python
-grad_g_X[0, :, :]  # Jacobian for this constraint evaluation
+grad_g_X[:, :]  # Jacobian for this constraint, shape (N, n_x)
 # Only non-zero at:
-#   grad_g_X[0, 5, :] = ∂g/∂position[5]    # Derivative wrt node 5
-#   grad_g_X[0, 4, :] = ∂g/∂position[4]    # Derivative wrt node 4
-# All other grad_g_X[0, j, :] for j ≠ 4,5 are zero
+#   grad_g_X[5, :] = ∂g/∂position[5]    # Derivative wrt node 5
+#   grad_g_X[4, :] = ∂g/∂position[4]    # Derivative wrt node 4
+# All other grad_g_X[j, :] for j ≠ 4,5 are zero
 ```
 
 ## Stage 5: Vectorization with Vmap
@@ -563,10 +565,10 @@ Here's a complete reference for shapes at each stage, shown with symbolic dimens
 | | `grad_g_u(x, u, node, params)` | Output: `(M, n_u)` | Output: `(3, 2)` - Gradients at M nodes |
 | | **Cross-Node Constraints:** | | |
 | | `g_cross(X, U, params)` | Input: `(N, n_x), (N, n_u), dict` | Input: `(10, 4), (10, 2), dict` |
-| | | Output: `(M,)` | Output: `(9,)` - Rate limit at N-1 nodes |
-| | `grad_g_X(X, U, params)` | Output: `(M, N, n_x)` | Output: `(9, 10, 4)` - Trajectory Jacobian |
-| | `grad_g_U(X, U, params)` | Output: `(M, N, n_u)` | Output: `(9, 10, 2)` - Trajectory Jacobian |
-| | | **Note:** Jacobians are dense but sparse | **Sparsity:** Only 2 nodes per row non-zero |
+| | | Output: `scalar` | Output: `scalar` - Single constraint |
+| | `grad_g_X(X, U, params)` | Output: `(N, n_x)` | Output: `(10, 4)` - Trajectory Jacobian |
+| | `grad_g_U(X, U, params)` | Output: `(N, n_u)` | Output: `(10, 2)` - Trajectory Jacobian |
+| | | **Note:** Jacobians are dense but sparse | **Sparsity:** Typically only 2-3 rows non-zero |
 
 ## Performance Implications
 
@@ -627,9 +629,9 @@ for state in problem.states:
 4. **Node index usage**: The `node` parameter enables time-varying behavior (e.g., time-dependent constraints), not for indexing into trajectory arrays
 5. **Constraint vs dynamics vmap axes**: Constraints use `in_axes=(0, 0, None, None)` (node not batched), while dynamics use `in_axes=(0, 0, 0, None)` (node batched across intervals)
 6. **Cross-node constraint signature confusion**: Regular nodal constraints use `(x, u, node, params)` while cross-node constraints use `(X, U, params)` - don't mix them up
-7. **Cross-node Jacobian sparsity**: Cross-node Jacobians have shape `(M, N, n_x)` but are typically very sparse (e.g., rate limits only couple 2 nodes). Be aware of memory usage for large N
+7. **Cross-node Jacobian sparsity**: Cross-node Jacobians have shape `(N, n_x)` but are typically very sparse (e.g., rate limits only couple 2 nodes). Be aware of memory usage for large N
 8. **Forgetting Python loops for patterns**: Cross-node constraints use `.at(k)` with integer indices - use Python loops to apply patterns across nodes (e.g., `for k in range(1, N): ... position.at(k) - position.at(k-1) ...`)
-9. **Multi-node evaluation of cross-node constraints**: Cross-node constraints must be evaluated at exactly one node (e.g., `.at(k)` not `.at([k, k+1, k+2])`). The referenced nodes are fixed at construction time, so evaluating at multiple nodes would create duplicate constraints. Use a Python loop instead: `for k in range(1, N): constraint = (expr.at(k) - expr.at(k-1) <= limit).at(k)`
+9. **Forgetting the outer `.at()` wrapper**: Cross-node constraints need an outer `.at(k)` to prevent auto-expansion to all nodes. Without it, a bare constraint like `position.at(5) - position.at(4) <= r` would be applied at every trajectory node, creating N copies of the same constraint
 
 ## See Also
 

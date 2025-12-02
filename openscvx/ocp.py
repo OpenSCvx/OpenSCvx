@@ -96,22 +96,22 @@ def create_cvxpy_variables(settings: Config) -> Dict:
     nu_vb_cross = []
     if settings.sim.constraints_nodal_cross_node:
         for idx_cross, constraint in enumerate(settings.sim.constraints_nodal_cross_node):
-            M = len(constraint.eval_nodes)  # Number of evaluation points
-            g_cross.append(cp.Parameter(M, name="g_cross_" + str(idx_cross)))
+            # Cross-node constraints are single constraints with fixed node references
+            g_cross.append(cp.Parameter(name="g_cross_" + str(idx_cross)))
             grad_g_X_cross.append(
                 cp.Parameter(
-                    (M, settings.scp.n, settings.sim.n_states),
+                    (settings.scp.n, settings.sim.n_states),
                     name="grad_g_X_cross_" + str(idx_cross),
                 )
             )
             grad_g_U_cross.append(
                 cp.Parameter(
-                    (M, settings.scp.n, settings.sim.n_controls),
+                    (settings.scp.n, settings.sim.n_controls),
                     name="grad_g_U_cross_" + str(idx_cross),
                 )
             )
             nu_vb_cross.append(
-                cp.Variable(M, name="nu_vb_cross_" + str(idx_cross))
+                cp.Variable(name="nu_vb_cross_" + str(idx_cross))
             )  # Virtual Control for VB
 
     # Applying the affine scaling to state and control
@@ -385,19 +385,16 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     idx_cross = 0
     if settings.sim.constraints_nodal_cross_node:
         for constraint in settings.sim.constraints_nodal_cross_node:
-            M = len(constraint.eval_nodes)  # Number of evaluation points
-            # For each evaluation point, create linearized constraint
-            for m in range(M):
-                # Linearization: g(X_bar, U_bar) + ∇g_X @ dX + ∇g_U @ dU == nu_vb
-                # Sum over all trajectory nodes to couple multiple nodes
-                residual = g_cross[idx_cross][m]
-                for k in range(settings.scp.n):
-                    # Contribution from state at node k
-                    residual += grad_g_X_cross[idx_cross][m, k, :] @ dx[k]
-                    # Contribution from control at node k
-                    residual += grad_g_U_cross[idx_cross][m, k, :] @ du[k]
-                # Add constraint: residual == slack variable
-                constr += [residual == nu_vb_cross[idx_cross][m]]
+            # Linearization: g(X_bar, U_bar) + ∇g_X @ dX + ∇g_U @ dU == nu_vb
+            # Sum over all trajectory nodes to couple multiple nodes
+            residual = g_cross[idx_cross]
+            for k in range(settings.scp.n):
+                # Contribution from state at node k
+                residual += grad_g_X_cross[idx_cross][k, :] @ dx[k]
+                # Contribution from control at node k
+                residual += grad_g_U_cross[idx_cross][k, :] @ du[k]
+            # Add constraint: residual == slack variable
+            constr += [residual == nu_vb_cross[idx_cross]]
             idx_cross += 1
 
     # Convex nodal constraints (already lowered to CVXPy in trajoptproblem)
@@ -477,7 +474,7 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     idx_cross = 0
     if settings.sim.constraints_nodal_cross_node:
         for constraint in settings.sim.constraints_nodal_cross_node:
-            cost += settings.scp.lam_vb * cp.sum(cp.pos(nu_vb_cross[idx_cross]))
+            cost += settings.scp.lam_vb * cp.pos(nu_vb_cross[idx_cross])
             idx_cross += 1
 
     for idx, nodes in zip(

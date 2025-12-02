@@ -212,51 +212,43 @@ def _collect_node_references(expr: Expr) -> List[int]:
     return sorted(set(references))
 
 
-def _create_cross_node_wrapper(constraint_fn, references: List[int], eval_nodes: List[int]):
+def _create_cross_node_wrapper(constraint_fn, references: List[int]):
     """Create a trajectory-level wrapper for cross-node constraint evaluation.
 
     Internal helper for generating trajectory-level constraint functions during lowering.
 
-    Takes a constraint function lowered with JaxLowerer and wraps it to evaluate
-    the constraint at multiple nodes along the trajectory using vmap.
+    Takes a constraint function lowered with JaxLowerer and wraps it to have the
+    correct signature for cross-node constraints. The lowered function has signature
+    (X, U, node, params), but cross-node constraints don't use the `node` parameter
+    (they reference fixed nodes via NodeReference). This wrapper provides a clean
+    (X, U, params) -> scalar signature.
 
     Args:
         constraint_fn: Lowered constraint function with signature (X, U, node, params)
+                      The `node` parameter is ignored for cross-node constraints
         references: List of node indices referenced (for documentation/future sparsity)
-        eval_nodes: Nodes where the constraint should be evaluated
 
     Returns:
-        Function with signature (X, U, params) -> residuals (M,)
-            where X is (N, n_x), U is (N, n_u), M = len(eval_nodes)
+        Function with signature (X, U, params) -> scalar residual
+            where X is (N, n_x), U is (N, n_u)
 
     Example:
-        For constraint `position.at(k) - position.at(k-1) <= 0.1`:
-        - At eval_nodes=[1,2,3,...,N-1]
-        - Evaluates position[k] - position[k-1] for each k in eval_nodes
-        - Returns array of shape (N-1,) with one residual per evaluation
+        For constraint `position.at(5) - position.at(4) <= 0.1`:
+        - References nodes 4 and 5 (fixed at construction time)
+        - Evaluates position[5] - position[4] - 0.1
+        - Returns scalar residual
 
     Note:
         The returned function will have Jacobians computed via jax.jacfwd, producing
-        dense (M, N, n_x) and (M, N, n_u) arrays. See CrossNodeConstraintLowered for
+        dense (N, n_x) and (N, n_u) arrays. See CrossNodeConstraintLowered for
         performance implications.
     """
-    import jax
-    import jax.numpy as jnp
-
-    # Convert eval_nodes to JAX array for vmapping
-    eval_nodes_array = jnp.array(eval_nodes)
-
-    # Create a vmapped version that batches over evaluation nodes
-    # in_axes: (None, None, 0, None) means:
-    #   - X: broadcast (same trajectory for all evaluations)
-    #   - U: broadcast (same trajectory for all evaluations)
-    #   - node: batched (different evaluation node for each)
-    #   - params: broadcast (same parameters for all evaluations)
-    vmapped_constraint = jax.vmap(constraint_fn, in_axes=(None, None, 0, None))
 
     def trajectory_constraint(X, U, params):
-        # Evaluate constraint at all specified nodes simultaneously
-        return vmapped_constraint(X, U, eval_nodes_array, params)
+        # Evaluate constraint once
+        # The node parameter is ignored by cross-node constraints (they use fixed indices)
+        # Pass 0 as a dummy value to satisfy the signature
+        return constraint_fn(X, U, 0, params)
 
     return trajectory_constraint
 
@@ -477,18 +469,17 @@ def lower_symbolic_expressions(
         references = _collect_node_references(constraint_expr)
 
         # Create trajectory-level wrapper
-        wrapped_fn = _create_cross_node_wrapper(constraint_fn, references, constraint_nodal.nodes)
+        wrapped_fn = _create_cross_node_wrapper(constraint_fn, references)
 
         # Compute Jacobians for the wrapped trajectory-level function
-        grad_g_X = jacfwd(wrapped_fn, argnums=0)  # dg/dX - shape (M, N, n_x)
-        grad_g_U = jacfwd(wrapped_fn, argnums=1)  # dg/dU - shape (M, N, n_u)
+        grad_g_X = jacfwd(wrapped_fn, argnums=0)  # dg/dX - shape (N, n_x)
+        grad_g_U = jacfwd(wrapped_fn, argnums=1)  # dg/dU - shape (N, n_u)
 
         # Create CrossNodeConstraintLowered object
         cross_node_lowered = CrossNodeConstraintLowered(
             func=wrapped_fn,
             grad_g_X=grad_g_X,
             grad_g_U=grad_g_U,
-            eval_nodes=constraint_nodal.nodes,
         )
         lowered_cross_node_constraints.append(cross_node_lowered)
 

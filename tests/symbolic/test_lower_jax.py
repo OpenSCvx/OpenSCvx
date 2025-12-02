@@ -490,11 +490,10 @@ def test_absolute_node_reference_semantics():
     # Lower to JAX
     constraint_fn = lower_to_jax(expr)
 
-    # Create wrapper for evaluation at specific nodes
+    # Create wrapper - no eval_nodes parameter anymore (always returns scalar/vector)
     wrapped_fn = create_cross_node_wrapper(
         constraint_fn,
         references=[3, 5],  # Node indices referenced
-        eval_nodes=[5],  # Where to evaluate (typical usage)
     )
 
     # Create fake trajectory
@@ -506,8 +505,8 @@ def test_absolute_node_reference_semantics():
     results = wrapped_fn(X, U, params)
 
     # Expected: X[5] - X[3] = [10, 11] - [6, 7] = [4, 4]
-    # Shape is (M, n_x) where M=len(eval_nodes)=1, n_x=2
-    expected = jnp.array([[4.0, 4.0]])
+    # Shape is (n_x,) = (2,) since constraint evaluates once
+    expected = jnp.array([4.0, 4.0])
 
-    assert results.shape == (1, 2)  # 1 eval_node, 2-dim state
+    assert results.shape == (2,)  # 2-dim state (single evaluation)
     assert jnp.allclose(results, expected)
