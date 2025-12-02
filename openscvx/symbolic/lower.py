@@ -174,44 +174,6 @@ def _contains_node_reference(expr: Expr) -> bool:
     return False
 
 
-def _collect_node_references(expr: Expr) -> List[int]:
-    """Collect all unique node indices referenced in a cross-node expression.
-
-    Internal helper for analyzing which nodes are coupled by a constraint.
-
-    This function analyzes the expression tree to identify all NodeReference nodes
-    and extract their node indices. The results indicate the sparsity pattern
-    (which nodes are coupled), though this is currently not exploited in Jacobian storage.
-
-    Args:
-        expr: Expression to analyze for NodeReference nodes
-
-    Returns:
-        Sorted list of unique node indices referenced in the expression
-
-    Example:
-        For expression `position.at(5) - position.at(4)`:
-        Returns [4, 5]
-
-        For expression `state.at(k) + state.at(k-1) + state.at(k-2)`:
-        Returns [k-2, k-1, k] (whatever the actual integer values are)
-
-    Note:
-        The returned indices indicate which nodes are coupled by the constraint.
-        This sparsity pattern could be used for sparse Jacobian storage in the future.
-    """
-    references = []
-
-    def traverse(e: Expr):
-        if isinstance(e, NodeReference):
-            references.append(e.node_idx)
-        for child in e.children():
-            traverse(child)
-
-    traverse(expr)
-    return sorted(set(references))
-
-
 def lower_symbolic_expressions(
     dynamics_aug,
     states_aug: List,

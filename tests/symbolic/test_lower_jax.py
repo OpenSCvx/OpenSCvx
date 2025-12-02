@@ -438,40 +438,6 @@ def test_contains_node_reference():
     assert contains_node_reference(nested_expr)
 
 
-def test_collect_node_references_absolute():
-    """Test collecting node references from absolute indexing expressions."""
-    from openscvx.symbolic.lower import _collect_node_references as collect_node_references
-
-    position = State("pos", shape=(3,))
-
-    # Single reference
-    expr1 = position.at(5)
-    refs = collect_node_references(expr1)
-    assert refs == [5]
-
-    # Two references
-    expr2 = position.at(0) - position.at(10)
-    refs = collect_node_references(expr2)
-    assert refs == [0, 10]
-
-    # Three references
-    expr3 = position.at(7) - 2 * position.at(5) + position.at(3)
-    refs = collect_node_references(expr3)
-    assert refs == [3, 5, 7]  # Sorted unique indices
-
-
-def test_collect_node_references_no_refs():
-    """Test collecting from expression with no NodeReferences."""
-    from openscvx.symbolic.lower import _collect_node_references as collect_node_references
-
-    position = State("pos", shape=(3,))
-
-    # No NodeReferences
-    expr = position + 1.0
-    refs = collect_node_references(expr)
-    assert refs == []
-
-
 def test_absolute_node_reference_semantics():
     """Test that absolute indexing references the correct trajectory nodes.
 
