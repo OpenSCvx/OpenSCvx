@@ -1328,10 +1328,11 @@ def test_nonconvex_cross_node_constraint_accepted():
     from openscvx.symbolic.expr import linalg
 
     # Create a non-convex cross-node constraint (norm inequality)
-    cross_node_constraint = (linalg.Norm(position.at(5) - position.at(4), ord=2) <= 0.1).at([5])
+    # No outer .at([...]) needed - auto-detected as cross-node
+    cross_node_constraint = linalg.Norm(position.at(5) - position.at(4), ord=2) <= 0.1
 
     # The constraint itself is non-convex (norm)
-    assert not cross_node_constraint.constraint.is_convex
+    assert not cross_node_constraint.is_convex
 
     # Should NOT raise error
     constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
@@ -1342,6 +1343,25 @@ def test_nonconvex_cross_node_constraint_accepted():
     assert len(constraints_nodal) == 1
     assert len(constraints_nodal_convex) == 0
     assert len(constraints_ctcs) == 0
+
+
+def test_cross_node_constraint_with_at_wrapper_rejected():
+    """Test that cross-node constraints with .at([...]) wrapper are rejected."""
+    n_nodes = 10
+    position = State("pos", shape=(3,))
+
+    # Import linalg for Norm
+    from openscvx.symbolic.expr import linalg
+
+    # Create a cross-node constraint WITH .at([...]) wrapper - should be rejected
+    cross_node_constraint = (linalg.Norm(position.at(5) - position.at(4), ord=2) <= 0.1).at([5])
+
+    # Should raise error because .at([...]) is not allowed on cross-node constraints
+    with pytest.raises(
+        ValueError,
+        match=r"Cross-node constraints should not use \.at\(\[\.\.\.\]\) wrapper",
+    ):
+        separate_constraints([cross_node_constraint], n_nodes=n_nodes)
 
 
 def test_regular_convex_constraint_without_node_reference_accepted():

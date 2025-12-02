@@ -222,16 +222,14 @@ def separate_constraints(
             from openscvx.symbolic.lower import _contains_node_reference
 
             if _contains_node_reference(c.constraint):
-                # Cross-node constraint: user should NOT specify multiple eval nodes
+                # Cross-node constraint: user should NOT use .at([...]) wrapper at all
                 # The nodes are already fixed inside via NodeReference
-                if len(c.nodes) != 1:
-                    raise ValueError(
-                        f"Cross-node constraints should not specify multiple evaluation nodes "
-                        f"using .at([...]). The constraint already references specific nodes via "
-                        f".at(k) inside the expression. Got {len(c.nodes)} nodes: {c.nodes}. "
-                        f"Remove the outer .at([...]) wrapper or use .at([0]) as a dummy value. "
-                        f"Constraint: {c.constraint}"
-                    )
+                raise ValueError(
+                    f"Cross-node constraints should not use .at([...]) wrapper. "
+                    f"The constraint already references specific nodes via .at(k) inside the "
+                    f"expression. Remove the outer .at([...]) wrapper. "
+                    f"Constraint: {c.constraint}"
+                )
 
             # Check if the underlying constraint is convex
             if c.constraint.is_convex:

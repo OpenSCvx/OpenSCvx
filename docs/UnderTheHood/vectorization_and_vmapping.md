@@ -221,7 +221,7 @@ for k in range(1, N):
     constraint_exprs.append(rate_limit)
 ```
 
-**Note**: You can optionally use `.at([0])` as a dummy wrapper if you prefer explicit syntax, but it's not required. Using `.at([multiple, nodes])` on a cross-node constraint will raise an error since the nodes are already specified inside the expression.
+**Important**: Cross-node constraints should NOT use the `.at([...])` wrapper. The nodes are already specified via `.at(k)` inside the expression, and adding an outer `.at([...])` will raise an error.
 
 The `.at(k)` method accepts integer indices:
 - `position.at(5)` - Position at node 5
@@ -634,7 +634,7 @@ for state in problem.states:
 6. **Cross-node constraint signature confusion**: Regular nodal constraints use `(x, u, node, params)` while cross-node constraints use `(X, U, params)` - don't mix them up
 7. **Cross-node Jacobian sparsity**: Cross-node Jacobians have shape `(N, n_x)` but are typically very sparse (e.g., rate limits only couple 2 nodes). Be aware of memory usage for large N
 8. **Forgetting Python loops for patterns**: Cross-node constraints use `.at(k)` with integer indices - use Python loops to apply patterns across nodes (e.g., `for k in range(1, N): ... position.at(k) - position.at(k-1) ...`)
-9. **Manually wrapping cross-node constraints**: Cross-node constraints are auto-detected and don't need (and shouldn't use) `.at([...])` wrappers. The system automatically detects `.at(k)` node references and treats the constraint as a single constraint rather than replicating it to all nodes
+9. **Manually wrapping cross-node constraints**: Cross-node constraints are auto-detected and must NOT use `.at([...])` wrappers - doing so will raise an error. The system automatically detects `.at(k)` node references and treats the constraint as a single constraint rather than replicating it to all nodes
 
 ## See Also
 

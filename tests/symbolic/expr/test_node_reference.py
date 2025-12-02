@@ -12,7 +12,6 @@ from openscvx.symbolic.expr import (
     Control,
     Equality,
     Inequality,
-    NodalConstraint,
     NodeReference,
     State,
 )
@@ -143,10 +142,10 @@ def test_node_reference_in_constraints():
     assert isinstance(equality, Equality)
     assert equality.check_shape() == ()
 
-    # Nodal constraint with .at()
-    nodal = inequality.at([1, 2, 3, 4, 5])
-    assert isinstance(nodal, NodalConstraint)
-    assert nodal.nodes == [1, 2, 3, 4, 5]
+    # Note: Cross-node constraints should NOT use .at([...]) wrapper
+    # The constraint is auto-detected as cross-node due to NodeReferences
+    # Just use the bare constraint:
+    assert isinstance(inequality, Inequality)
 
 
 # =============================================================================
@@ -162,9 +161,8 @@ def test_rate_limit_pattern():
     """
     position = State("pos", shape=(3,))
     max_step = 0.1
-    N = 100
 
-    # Typical usage: create constraint for each node in a loop
+    # Cross-node constraints reference specific trajectory nodes
     # Here we test one instance of the pattern
     pos_k = position.at(10)
     pos_k_prev = position.at(9)
@@ -172,10 +170,9 @@ def test_rate_limit_pattern():
     constraint = (pos_k - pos_k_prev) <= max_step
     assert constraint.check_shape() == ()
 
-    # Apply to multiple nodes
-    nodal_constraint = constraint.at(list(range(1, N)))
-    assert isinstance(nodal_constraint, NodalConstraint)
-    assert len(nodal_constraint.nodes) == N - 1
+    # Cross-node constraints are auto-detected - no .at([...]) wrapper needed
+    # The constraint is a bare Constraint object
+    assert isinstance(constraint, Inequality)
 
 
 def test_multi_step_dependencies():
@@ -236,9 +233,9 @@ def test_boundary_coupling():
     assert isinstance(periodicity_constraint, Equality)
     assert periodicity_constraint.check_shape() == ()
 
-    # Can apply at specific nodes
-    constraint_at_boundary = periodicity_constraint.at([0])
-    assert isinstance(constraint_at_boundary, NodalConstraint)
+    # Cross-node constraints are auto-detected - no .at([...]) wrapper needed
+    # Just use the bare constraint directly
+    assert isinstance(periodicity_constraint, Equality)
 
 
 def test_loop_pattern_for_trajectory_constraints():
@@ -251,23 +248,21 @@ def test_loop_pattern_for_trajectory_constraints():
     max_step = 0.1
     N = 50
 
-    # Recommended pattern: use a Python loop
+    # Recommended pattern: use a Python loop to create cross-node constraints
+    # No .at([...]) wrapper needed - constraints are auto-detected as cross-node
     constraints = []
     for k in range(1, N):
-        rate_limit = (position.at(k) - position.at(k - 1) <= max_step).at([k])
+        rate_limit = position.at(k) - position.at(k - 1) <= max_step
         constraints.append(rate_limit)
 
     # Should have N-1 constraints
     assert len(constraints) == N - 1
 
-    # Each should be a NodalConstraint
+    # Each should be a bare Constraint (Inequality)
     for constraint in constraints:
-        assert isinstance(constraint, NodalConstraint)
-        assert len(constraint.nodes) == 1  # Applied at single node
+        assert isinstance(constraint, Inequality)
 
     # List comprehension also works
-    constraints_v2 = [
-        (position.at(k) - position.at(k - 1) <= max_step).at([k]) for k in range(1, N)
-    ]
+    constraints_v2 = [position.at(k) - position.at(k - 1) <= max_step for k in range(1, N)]
 
     assert len(constraints_v2) == N - 1
