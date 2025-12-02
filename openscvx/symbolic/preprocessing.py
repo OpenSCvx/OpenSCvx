@@ -50,6 +50,7 @@ from openscvx.symbolic.expr import (
     Constant,
     Constraint,
     Control,
+    CrossNodeConstraint,
     Expr,
     NodalConstraint,
     State,
@@ -238,9 +239,10 @@ def _traverse_with_depth(expr: Expr, visit: Callable[[Expr, int], None], depth: 
 def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
     """Validate that constraints only appear at the root level of expression trees.
 
-    Constraints and constraint wrappers (CTCS, NodalConstraint) must only appear as
-    top-level expressions, not nested within other expressions. However, constraints
-    inside constraint wrappers are allowed (e.g., the constraint inside CTCS(x <= 5)).
+    Constraints and constraint wrappers (CTCS, NodalConstraint, CrossNodeConstraint)
+    must only appear as top-level expressions, not nested within other expressions.
+    However, constraints inside constraint wrappers are allowed (e.g., the constraint
+    inside CTCS(x <= 5)).
 
     This ensures constraints are properly processed during problem compilation and
     prevents ambiguous constraint specifications.
@@ -261,7 +263,7 @@ def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
     """
 
     # Define constraint wrappers that must also be at root level
-    CONSTRAINT_WRAPPERS = (CTCS, NodalConstraint)
+    CONSTRAINT_WRAPPERS = (CTCS, NodalConstraint, CrossNodeConstraint)
 
     # normalize to list
     expr_list = exprs if isinstance(exprs, (list, tuple)) else [exprs]

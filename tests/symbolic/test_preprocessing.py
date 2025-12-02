@@ -234,6 +234,29 @@ def test_nested_ctcs_wrapper_raises():
     assert "constraint wrappers must only appear as top-level roots" in msg
 
 
+def test_nested_cross_node_constraint_wrapper_raises():
+    """Add(a, CrossNodeConstraint(...)) should raise error because CrossNodeConstraint is nested"""
+    a = Constant(np.array([1.0]))
+    x = State("x", (1,))
+    cross_node = CrossNodeConstraint(x.at(5) - x.at(4) <= 0.1)
+    nested = Add(a, cross_node)
+
+    with pytest.raises(ValueError) as exc:
+        validate_constraints_at_root(nested)
+    msg = str(exc.value)
+    assert "Nested constraint wrapper found at depth 1" in msg
+    assert "constraint wrappers must only appear as top-level roots" in msg
+
+
+def test_cross_node_constraint_at_root_passes():
+    """CrossNodeConstraint at root level should pass validation"""
+    x = State("x", (2,))
+    cross_node = CrossNodeConstraint(x.at(5) - x.at(4) <= 0.1)
+
+    # Should not raise
+    validate_constraints_at_root(cross_node)
+
+
 def test_single_dynamics_single_state_passes():
     """Test single dynamics expression with single state - valid case"""
     x = State("pos", (2,))
