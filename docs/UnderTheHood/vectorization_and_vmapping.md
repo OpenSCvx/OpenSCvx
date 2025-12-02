@@ -146,10 +146,10 @@ B(x, u, node, params) -> Array[n_x, n_u]  # df/du
 Non-convex nodal constraints that are to be lowered to JAX follow the same pattern:
 
 ```python
-# Convert symbolic constraint expressions to JAX functions (lower.py:312)
+# Convert symbolic constraint expressions to JAX functions
 constraints_nodal_fns = lower_to_jax(constraints_nodal)
 
-# Create LoweredNodalConstraint objects with Jacobians (lower.py:315-326)
+# Create LoweredNodalConstraint objects with Jacobians
 for i, fn in enumerate(constraints_nodal_fns):
     constraint = LoweredNodalConstraint(
         func=fn,                          # Constraint function
@@ -229,7 +229,7 @@ Finally, both dynamics and constraints are vectorized to operate on decision nod
 
 ### Dynamics Vectorization
 
-Dynamics functions are vmapped to process all intervals in parallel (in `openscvx/trajoptproblem.py:356-358`):
+Dynamics functions are vmapped to process all intervals in parallel (in `TrajOptProblem.initialize`):
 
 ```python
 # Vectorize dynamics functions across decision nodes
@@ -291,7 +291,7 @@ This is why vmapped dynamics process batches of size `(N-1, ...)` rather than `(
 
 ### Constraint Vectorization
 
-Non-convex nodal constraints are also vectorized, but with a key difference (in `openscvx/symbolic/lower.py:320-323`):
+Non-convex nodal constraints are also vectorized, but with a key difference (in `lower_symbolic_expressions`):
 
 ```python
 # Vectorize constraint functions (during JAX lowering)
@@ -375,7 +375,7 @@ The Jacobians are dense arrays but exhibit sparsity patterns determined by which
 
 ## Usage in Discretization
 
-The vmapped dynamics functions are called during discretization (in `openscvx/discretization.py:73-86`):
+The vmapped dynamics functions are called during discretization (in `calculate_discretization`):
 
 ```python
 # Setup batch inputs
