@@ -6,7 +6,7 @@ multi-step dependencies.
 """
 
 from dataclasses import dataclass
-from typing import Callable, List
+from typing import Callable
 
 import jax.numpy as jnp
 
