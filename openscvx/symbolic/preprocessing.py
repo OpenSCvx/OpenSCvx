@@ -350,9 +350,12 @@ def validate_and_normalize_constraint_nodes(exprs: Union[Expr, list[Expr]], n_no
 def validate_cross_node_constraint_bounds(nodal_constraint: NodalConstraint, n_nodes: int) -> None:
     """Validate that NodeReferences in cross-node constraints don't access out-of-bounds nodes.
 
-    This validation ensures that all node indices referenced in the constraint are
-    within the valid range [0, n_nodes). Applies to constraints that reference
-    values at specific trajectory nodes (e.g., position.at(5) - position.at(4)).
+    This validation ensures that:
+    1. All node indices referenced in the constraint are within [0, n_nodes)
+    2. Cross-node constraints are evaluated at exactly one node (not multiple)
+
+    Cross-node constraints reference fixed trajectory nodes (e.g., position.at(5) - position.at(4)),
+    so evaluating at multiple nodes would create duplicate constraints with the same fixed indices.
 
     Args:
         nodal_constraint: The constraint to validate
@@ -360,21 +363,26 @@ def validate_cross_node_constraint_bounds(nodal_constraint: NodalConstraint, n_n
 
     Raises:
         ValueError: If any NodeReference accesses nodes outside [0, n_nodes)
+        ValueError: If cross-node constraint is evaluated at multiple nodes
 
     Example:
         Valid cross-node constraint:
 
             position = State("pos", shape=(3,))
 
-            # Valid: references nodes 0 and 9
+            # Valid: references nodes 0 and 9, evaluated at single node
             boundary = (position.at(0) == position.at(9)).at([0])
             validate_cross_node_constraint_bounds(boundary, n_nodes=10)  # OK
 
-        Invalid cross-node constraint:
+        Invalid cross-node constraints:
 
             # Invalid: node 10 is out of bounds for n_nodes=10
             bad_boundary = (position.at(0) == position.at(10)).at([0])
             validate_cross_node_constraint_bounds(bad_boundary, n_nodes=10)  # Raises ValueError
+
+            # Invalid: cross-node constraint evaluated at multiple nodes
+            multi_eval = (position.at(5) == position.at(4)).at([5, 6, 7])
+            validate_cross_node_constraint_bounds(multi_eval, n_nodes=10)  # Raises ValueError
     """
     from openscvx.symbolic.expr import NodeReference
 
@@ -393,6 +401,19 @@ def validate_cross_node_constraint_bounds(nodal_constraint: NodalConstraint, n_n
 
     if not node_refs:
         return  # No NodeReferences to validate
+
+    # Validate that cross-node constraints are evaluated at exactly one node
+    if len(nodal_constraint.nodes) > 1:
+        raise ValueError(
+            f"Cross-node constraints must be evaluated at exactly one node, "
+            f"but got {len(nodal_constraint.nodes)} evaluation nodes: {nodal_constraint.nodes}. "
+            f"Cross-node constraints reference fixed trajectory nodes (e.g., position.at(5)), "
+            f"so evaluating at multiple nodes would create duplicate constraints. "
+            f"Use a Python loop to create separate constraints for each evaluation node:\n"
+            f"  for k in range(1, N):\n"
+            f"      constraint = (expr.at(k) - expr.at(k-1) <= limit).at(k)\n"
+            f"Constraint: {nodal_constraint.constraint}"
+        )
 
     # Check that all referenced nodes are in bounds
     for ref in node_refs:

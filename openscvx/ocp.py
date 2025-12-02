@@ -266,14 +266,12 @@ def lower_convex_constraints(
                     )
 
             # Lower the constraint once - NodeReference handles node indexing internally
-            # The constraint is still evaluated at each node in the nodes list
+            # Cross-node constraints must be evaluated at exactly one node (enforced by validation)
             cvxpy_constraint = lower_to_cvxpy(constraint.constraint, variable_map)
 
-            # Apply the constraint at each evaluation node
-            # Even though the expression references multiple nodes, the constraint
-            # itself is evaluated at each node
-            for node in nodes:
-                cvxpy_constraints.append(cvxpy_constraint)
+            # Validation ensures len(nodes) == 1 for cross-node constraints
+            # Add the constraint once (not len(nodes) times to avoid duplicates)
+            cvxpy_constraints.append(cvxpy_constraint)
 
         else:
             # Regular nodal constraint: provide single node (existing behavior)

@@ -653,3 +653,27 @@ def test_validate_cross_node_bounds_no_node_references():
 
     # Should pass without error
     validate_cross_node_constraint_bounds(constraint, N)
+
+
+def test_validate_cross_node_multi_eval_nodes_raises():
+    """Test that cross-node constraints with multiple evaluation nodes are rejected."""
+    position = State("pos", shape=(3,))
+    N = 10
+
+    # Invalid: cross-node constraint evaluated at multiple nodes
+    constraint = (position.at(5) == position.at(4)).at([5, 6, 7])
+
+    with pytest.raises(ValueError, match="must be evaluated at exactly one node"):
+        validate_cross_node_constraint_bounds(constraint, N)
+
+
+def test_validate_cross_node_single_eval_node_passes():
+    """Test that cross-node constraints with single evaluation node are accepted."""
+    position = State("pos", shape=(3,))
+    N = 10
+
+    # Valid: cross-node constraint evaluated at single node
+    constraint = (position.at(5) == position.at(4)).at([5])
+
+    # Should not raise
+    validate_cross_node_constraint_bounds(constraint, N)

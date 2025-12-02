@@ -190,6 +190,10 @@ Cross-node constraints relate variables across multiple trajectory nodes (e.g., 
 
 **Key Difference**: Regular nodal constraints have signature `(x, u, node, params)` and are vmapped across nodes. Cross-node constraints have signature `(X, U, params)` where `X` and `U` are full trajectories.
 
+**Convex and Non-Convex Support**: Cross-node constraints support both convex and non-convex formulations:
+- **Non-convex**: Lowered to JAX with automatic differentiation for SCP linearization
+- **Convex**: Lowered to CVXPy and solved directly by the convex solver (more efficient)
+
 Cross-node constraints are defined using the `.at()` method with **absolute indexing**:
 
 ```python
@@ -200,9 +204,16 @@ position = ox.State("position", shape=(2,))
 # Rate limit: distance between consecutive nodes
 # Create one constraint per node using a Python loop
 for k in range(1, N):
+    # Non-convex formulation (default)
     rate_limit = (
         ox.linalg.Norm(position.at(k) - position.at(k-1), ord=2) <= max_step
-    ).at([k])
+    ).at(k)
+
+    # Or mark as convex for direct CVXPy solving
+    rate_limit_convex = (
+        ox.linalg.Norm(position.at(k) - position.at(k-1), ord=2) <= max_step
+    ).at(k).convex()
+
     constraint_exprs.append(rate_limit)
 ```
 
@@ -618,6 +629,7 @@ for state in problem.states:
 6. **Cross-node constraint signature confusion**: Regular nodal constraints use `(x, u, node, params)` while cross-node constraints use `(X, U, params)` - don't mix them up
 7. **Cross-node Jacobian sparsity**: Cross-node Jacobians have shape `(M, N, n_x)` but are typically very sparse (e.g., rate limits only couple 2 nodes). Be aware of memory usage for large N
 8. **Forgetting Python loops for patterns**: Cross-node constraints use `.at(k)` with integer indices - use Python loops to apply patterns across nodes (e.g., `for k in range(1, N): ... position.at(k) - position.at(k-1) ...`)
+9. **Multi-node evaluation of cross-node constraints**: Cross-node constraints must be evaluated at exactly one node (e.g., `.at(k)` not `.at([k, k+1, k+2])`). The referenced nodes are fixed at construction time, so evaluating at multiple nodes would create duplicate constraints. Use a Python loop instead: `for k in range(1, N): constraint = (expr.at(k) - expr.at(k-1) <= limit).at(k)`
 
 ## See Also
 
