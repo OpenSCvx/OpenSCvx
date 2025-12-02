@@ -281,11 +281,11 @@ def separate_constraints(
         else:
             constraints_nodal.append(nodal_constraint)
 
-    # Validate bounds for all cross-node constraints (those containing NodeReferences)
-    from openscvx.symbolic.preprocessing import validate_cross_node_constraint_bounds
+    # Validate cross-node constraints (bounds and variable consistency)
+    from openscvx.symbolic.preprocessing import validate_cross_node_constraint
 
     for nodal_constraint in constraints_nodal + constraints_nodal_convex:
-        validate_cross_node_constraint_bounds(nodal_constraint, n_nodes)
+        validate_cross_node_constraint(nodal_constraint, n_nodes)
 
     return constraints_ctcs, constraints_nodal, constraints_nodal_convex
 

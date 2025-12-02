@@ -7,7 +7,7 @@ from openscvx.symbolic.preprocessing import (
     collect_and_assign_slices,
     convert_dynamics_dict_to_expr,
     validate_constraints_at_root,
-    validate_cross_node_constraint_bounds,
+    validate_cross_node_constraint,
     validate_dynamics_dict,
     validate_dynamics_dict_dimensions,
     validate_dynamics_dimension,
@@ -602,24 +602,41 @@ def test_convert_dynamics_dict_to_expr_doesnt_mutate_input():
 
 
 # =============================================================================
-# Cross-Node Constraint Bounds Validation Tests
+# Cross-Node Constraint Validation Tests (bounds + variable consistency)
 # =============================================================================
 
 
-# Relative indexing tests removed - only absolute indexing is supported
-
-
-def test_validate_cross_node_bounds_absolute_valid():
-    """Test bounds checking for valid absolute indexing."""
+def test_cross_node_constraint_valid():
+    """Test that valid cross-node constraints pass validation."""
     position = State("pos", shape=(3,))
+    velocity = State("vel", shape=(3,))
+    N = 100
+
+    # Valid: all variables use .at(), indices in bounds
+    constraint = (position.at(5) - position.at(4) <= 0.1).at([5])
+    validate_cross_node_constraint(constraint, N)  # Should not raise
+
+    # Multiple variables, all with .at()
+    constraint2 = (position.at(10) - velocity.at(9) <= 0.5).at([10])
+    validate_cross_node_constraint(constraint2, N)  # Should not raise
+
+
+def test_cross_node_constraint_no_node_references():
+    """Test that regular constraints without NodeReferences pass validation."""
+    position = State("pos", shape=(3,))
+    velocity = State("vel", shape=(3,))
     N = 10
 
-    # Valid: references to nodes 0 and 9
-    constraint = (position.at(0) == position.at(9)).at([0])
-    validate_cross_node_constraint_bounds(constraint, N)  # Should not raise
+    # No variables use .at() - regular constraint, should be valid
+    constraint = (position - velocity <= 0.1).at([1, 2, 3])
+    validate_cross_node_constraint(constraint, N)  # Should not raise
+
+    # Single variable without .at()
+    constraint2 = (position <= 5.0).at([0, 1, 2])
+    validate_cross_node_constraint(constraint2, N)  # Should not raise
 
 
-def test_validate_cross_node_bounds_absolute_too_high():
+def test_cross_node_constraint_bounds_too_high():
     """Test bounds checking catches absolute index >= N."""
     position = State("pos", shape=(3,))
     N = 10
@@ -628,28 +645,140 @@ def test_validate_cross_node_bounds_absolute_too_high():
     constraint = (position.at(10) == position.at(0)).at([0])
 
     with pytest.raises(ValueError, match="invalid node index 10"):
-        validate_cross_node_constraint_bounds(constraint, N)
+        validate_cross_node_constraint(constraint, N)
 
 
-def test_validate_cross_node_bounds_absolute_negative():
-    """Test bounds checking catches negative absolute indices."""
+def test_cross_node_constraint_bounds_negative_valid():
+    """Test that negative indices are normalized and validated correctly."""
     position = State("pos", shape=(3,))
     N = 10
 
-    # Invalid: negative absolute index
+    # Valid: -1 normalizes to 9, which is in bounds
     constraint = (position.at(-1) == position.at(0)).at([0])
+    validate_cross_node_constraint(constraint, N)  # Should not raise
 
-    with pytest.raises(ValueError, match="invalid node index -1"):
-        validate_cross_node_constraint_bounds(constraint, N)
+    # Valid: -10 normalizes to 0
+    constraint2 = (position.at(-10) == position.at(5)).at([0])
+    validate_cross_node_constraint(constraint2, N)  # Should not raise
 
 
-def test_validate_cross_node_bounds_no_node_references():
-    """Test that validation passes silently for constraints without NodeReferences."""
+def test_cross_node_constraint_bounds_negative_too_low():
+    """Test bounds checking catches negative indices that are too low."""
     position = State("pos", shape=(3,))
     N = 10
 
-    # Regular constraint without NodeReferences
-    constraint = (position <= 5.0).at([0, 1, 2])
+    # Invalid: -11 normalizes to -1, which is out of bounds
+    constraint = (position.at(-11) == position.at(0)).at([0])
 
-    # Should pass without error
-    validate_cross_node_constraint_bounds(constraint, N)
+    with pytest.raises(ValueError, match="invalid node index -11"):
+        validate_cross_node_constraint(constraint, N)
+
+
+def test_cross_node_constraint_mixed_variables_raises():
+    """Test that mixing .at() and non-.at() variables raises an error."""
+    position = State("pos", shape=(3,))
+    velocity = State("vel", shape=(3,))
+    N = 100
+
+    # One variable with .at(), one without - should raise
+    constraint = (position.at(5) - velocity <= 0.1).at([5])
+
+    with pytest.raises(ValueError, match="NodeReferences.*without .at\\(\\).*vel"):
+        validate_cross_node_constraint(constraint, N)
+
+
+def test_cross_node_constraint_mixed_multiple_unwrapped():
+    """Test error message lists all unwrapped variables."""
+    position = State("pos", shape=(3,))
+    velocity = State("vel", shape=(3,))
+    acceleration = State("accel", shape=(3,))
+    N = 100
+
+    # One variable with .at(), two without
+    constraint = (position.at(5) - velocity - acceleration <= 0.1).at([5])
+
+    with pytest.raises(ValueError, match="without .at\\(\\):.*vel.*accel") as exc_info:
+        validate_cross_node_constraint(constraint, N)
+
+    # Check both unwrapped variables are mentioned
+    assert "vel" in str(exc_info.value)
+    assert "accel" in str(exc_info.value)
+
+
+def test_cross_node_constraint_with_controls():
+    """Test validation works with control variables."""
+    position = State("pos", shape=(3,))
+    thrust = Control("thrust", shape=(2,))
+    N = 100
+
+    # Valid: both use .at()
+    constraint = (position.at(10) + thrust.at(10) <= 1.0).at([10])
+    validate_cross_node_constraint(constraint, N)  # Should not raise
+
+    # Invalid: state with .at(), control without
+    bad_constraint = (position.at(10) + thrust <= 1.0).at([10])
+    with pytest.raises(ValueError, match="without .at\\(\\).*thrust"):
+        validate_cross_node_constraint(bad_constraint, N)
+
+
+def test_cross_node_constraint_complex_expression():
+    """Test validation on complex expressions with multiple operations."""
+    position = State("pos", shape=(3,))
+    velocity = State("vel", shape=(3,))
+    N = 100
+
+    # Valid: complex expression, all variables with .at()
+    constraint = (
+        (position.at(5) - 2 * position.at(4) + position.at(3) - velocity.at(5)) <= 0.1
+    ).at([5])
+    validate_cross_node_constraint(constraint, N)  # Should not raise
+
+    # Invalid: complex expression, one variable missing .at()
+    bad_constraint = ((position.at(5) - 2 * position.at(4) + position.at(3) - velocity) <= 0.1).at(
+        [5]
+    )
+    with pytest.raises(ValueError, match="without .at\\(\\).*vel"):
+        validate_cross_node_constraint(bad_constraint, N)
+
+
+def test_cross_node_constraint_spatial_indexing():
+    """Test validation with spatial indexing combined with node references."""
+    velocity = State("vel", shape=(3,))
+    N = 100
+
+    # Valid: spatial indexing followed by .at() on both sides
+    constraint = (velocity[2].at(10) - velocity[2].at(9) <= 0.05).at([10])
+    validate_cross_node_constraint(constraint, N)  # Should not raise
+
+    # Invalid: one with .at(), one without
+    bad_constraint = (velocity[2].at(10) - velocity[2] <= 0.05).at([10])
+    with pytest.raises(ValueError, match="without .at\\(\\)"):
+        validate_cross_node_constraint(bad_constraint, N)
+
+
+def test_cross_node_constraint_equality():
+    """Test validation works for equality constraints."""
+    position = State("pos", shape=(2,))
+    N = 100
+
+    # Valid: periodic boundary condition
+    constraint = (position.at(0) == position.at(99)).at([0])
+    validate_cross_node_constraint(constraint, N)  # Should not raise
+
+
+def test_cross_node_constraint_both_sides():
+    """Test validation checks both LHS and RHS of constraint."""
+    position = State("pos", shape=(3,))
+    velocity = State("vel", shape=(3,))
+    max_val = State("max_val", shape=(3,))
+    N = 100
+
+    # Invalid: LHS has .at(), RHS doesn't
+    constraint = (position.at(5) <= max_val).at([5])
+    with pytest.raises(ValueError, match="without .at\\(\\).*max_val"):
+        validate_cross_node_constraint(constraint, N)
+
+    # Invalid: RHS has .at(), LHS doesn't
+    constraint2 = (velocity <= position.at(5)).at([5])
+    with pytest.raises(ValueError, match="without .at\\(\\).*vel"):
+        validate_cross_node_constraint(constraint2, N)

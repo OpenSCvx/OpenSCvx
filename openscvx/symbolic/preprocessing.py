@@ -347,13 +347,21 @@ def validate_and_normalize_constraint_nodes(exprs: Union[Expr, list[Expr]], n_no
                     raise ValueError(f"NodalConstraint node {node} is out of range [0, {n_nodes})")
 
 
-def validate_cross_node_constraint_bounds(nodal_constraint: NodalConstraint, n_nodes: int) -> None:
-    """Validate that NodeReferences in cross-node constraints don't access out-of-bounds nodes.
+def validate_cross_node_constraint(nodal_constraint: NodalConstraint, n_nodes: int) -> None:
+    """Validate cross-node constraint bounds and variable consistency.
 
-    This validation ensures that all node indices referenced in cross-node constraints
-    are within the valid range [0, n_nodes). Cross-node constraints reference fixed
-    trajectory nodes (e.g., position.at(5) - position.at(4)), and this function ensures
-    those fixed indices are valid.
+    This function performs two validations in a single tree traversal:
+
+    1. **Bounds checking**: Ensures all NodeReference indices are within [0, n_nodes).
+       Cross-node constraints reference fixed trajectory nodes (e.g., position.at(5)),
+       and this validates those indices are valid. Negative indices are normalized
+       (e.g., -1 becomes n_nodes-1) before checking.
+
+    2. **Variable consistency**: Ensures that if ANY variable uses .at(), then ALL
+       state/control variables must use .at(). Mixing causes shape mismatches during
+       lowering because:
+       - Variables with .at(k) extract single-node values: X[k, :] → shape (n_x,)
+       - Variables without .at() expect full trajectory: X[:, :] → shape (N, n_x)
 
     Args:
         nodal_constraint: The constraint to validate
@@ -361,49 +369,78 @@ def validate_cross_node_constraint_bounds(nodal_constraint: NodalConstraint, n_n
 
     Raises:
         ValueError: If any NodeReference accesses nodes outside [0, n_nodes)
+        ValueError: If constraint mixes .at() and non-.at() variables
 
     Example:
         Valid cross-node constraint:
 
             position = State("pos", shape=(3,))
 
-            # Valid: references nodes 0 and 9
-            boundary = (position.at(0) == position.at(9)).at([0])
-            validate_cross_node_constraint_bounds(boundary, n_nodes=10)  # OK
+            # Valid: all variables use .at(), indices in bounds
+            constraint = (position.at(5) - position.at(4) <= 0.1).at([5])
+            validate_cross_node_constraint(constraint, n_nodes=10)  # OK
 
-        Invalid cross-node constraint:
+        Invalid - out of bounds:
 
             # Invalid: node 10 is out of bounds for n_nodes=10
-            bad_boundary = (position.at(0) == position.at(10)).at([0])
-            validate_cross_node_constraint_bounds(bad_boundary, n_nodes=10)  # Raises ValueError
+            bad_bounds = (position.at(0) == position.at(10)).at([0])
+            validate_cross_node_constraint(bad_bounds, n_nodes=10)  # Raises ValueError
+
+        Invalid - mixed .at() usage:
+
+            velocity = State("vel", shape=(3,))
+            # Invalid: position uses .at(), velocity doesn't
+            bad_mixed = (position.at(5) - velocity <= 0.1).at([5])
+            validate_cross_node_constraint(bad_mixed, n_nodes=10)  # Raises ValueError
     """
-    from openscvx.symbolic.expr import NodeReference
+    from openscvx.symbolic.expr import Control, NodeReference, State
 
-    # Collect all NodeReferences in the constraint expression
-    node_refs = []
+    # Collect information in a single traversal
+    node_refs = []  # List of (node_idx, normalized_idx) tuples
+    unwrapped_vars = []  # List of variable names without .at()
 
-    def collect_refs(expr):
+    def traverse(expr):
         if isinstance(expr, NodeReference):
-            node_refs.append(expr)
+            # Normalize negative indices
+            idx = expr.node_idx
+            normalized_idx = idx if idx >= 0 else n_nodes + idx
+            node_refs.append((idx, normalized_idx))
+            # Don't traverse into children - NodeReference wraps the variable
+            return
+
+        if isinstance(expr, (State, Control)):
+            # Found a bare State/Control not wrapped in NodeReference
+            unwrapped_vars.append(expr.name)
+            return
+
+        # Recurse on children
         for child in expr.children():
-            collect_refs(child)
+            traverse(child)
 
-    # Traverse both lhs and rhs of constraint
-    collect_refs(nodal_constraint.constraint.lhs)
-    collect_refs(nodal_constraint.constraint.rhs)
+    # Traverse the constraint expression (both sides)
+    traverse(nodal_constraint.constraint.lhs)
+    traverse(nodal_constraint.constraint.rhs)
 
-    if not node_refs:
-        return  # No NodeReferences to validate
-
-    # Check that all referenced nodes are in bounds
-    for ref in node_refs:
-        if ref.node_idx < 0 or ref.node_idx >= n_nodes:
+    # Check 1: Bounds validation
+    for orig_idx, normalized_idx in node_refs:
+        if normalized_idx < 0 or normalized_idx >= n_nodes:
             raise ValueError(
-                f"Cross-node constraint references invalid node index "
-                f"{ref.node_idx}. "
-                f"Node indices must be in range [0, {n_nodes}). "
+                f"Cross-node constraint references invalid node index {orig_idx}. "
+                f"Node indices must be in range [0, {n_nodes}) "
+                f"(or negative indices in range [-{n_nodes}, -1]). "
                 f"Constraint: {nodal_constraint.constraint}"
             )
+
+    # Check 2: Variable consistency - if we have NodeReferences, all vars must use .at()
+    if node_refs and unwrapped_vars:
+        raise ValueError(
+            f"Cross-node constraint contains NodeReferences (variables with .at(k)) "
+            f"but also has variables without .at(): {unwrapped_vars}. "
+            f"All state/control variables in cross-node constraints must use .at(k). "
+            f"For example, if you use 'position.at(5)', you must also use 'velocity.at(4)' "
+            f"instead of just 'velocity'. "
+            f"Constraint: {nodal_constraint.constraint}"
+        )
 
 
 def validate_dynamics_dimension(
