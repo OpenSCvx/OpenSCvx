@@ -367,6 +367,163 @@ def test_constraint_types(constraint_type):
     jax.clear_caches()
 
 
+@pytest.mark.parametrize(
+    "max_step,should_converge,is_convex",
+    [
+        # Non-convex tests
+        (np.sqrt(125), True, False),  # At exact limit - should converge
+        (np.sqrt(124.9), False, False),  # Below limit - should fail
+        # Convex tests
+        (np.sqrt(125), True, True),  # At exact limit - should converge (convex)
+        (np.sqrt(124.9), False, True),  # Below limit - should fail (convex)
+    ],
+)
+def test_cross_nodal(max_step, should_converge, is_convex):
+    """
+    Test brachistochrone with a cross-nodal rate limit constraint.
+
+    Tests both convex and non-convex formulations of the cross-node constraint.
+    """
+    import jax.numpy as jnp
+    import numpy as np
+
+    import openscvx as ox
+    from openscvx import TrajOptProblem
+
+    # Problem parameters
+    n = 2
+    total_time = 2.0
+    g = 9.81
+
+    # Boundary conditions
+    x0, y0 = 0.0, 10.0
+    x1, y1 = 10.0, 5.0
+
+    # Define state components
+    position = ox.State("position", shape=(2,))  # 2D position [x, y]
+    position.max = np.array([10.0, 10.0])
+    position.min = np.array([0.0, 0.0])
+    position.initial = np.array([x0, y0])
+    position.final = [x1, y1]
+    position.guess = np.linspace(position.initial, position.final, n)
+
+    velocity = ox.State("velocity", shape=(1,))  # Scalar speed
+    velocity.max = np.array([10.0])
+    velocity.min = np.array([0.0])
+    velocity.initial = np.array([0.0])
+    velocity.final = [("free", 10.0)]
+    velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
+
+    # Define control
+    theta = ox.Control("theta", shape=(1,))  # Angle from vertical
+    theta.max = np.array([100.5 * jnp.pi / 180])
+    theta.min = np.array([0.0])
+    theta.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1)
+
+    # Define list of all states (needed for TrajOptProblem and constraints)
+    states = [position, velocity]
+    controls = [theta]
+
+    # Define dynamics as dictionary mapping state names to their derivatives
+    dynamics = {
+        "position": ox.Concat(
+            velocity[0] * ox.Sin(theta[0]),  # x_dot
+            -velocity[0] * ox.Cos(theta[0]),  # y_dot
+        ),
+        "velocity": g * ox.Cos(theta[0]),
+    }
+
+    # Generate box constraints for all states
+    constraint_exprs = []
+    for state in states:
+        constraint_exprs.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
+
+    # Rate limit constraint with parameterized max_step
+    # Create constraint for each node using absolute indexing
+    for k in range(1, n):
+        # Cross-node constraints don't need outer .at(k) - they're auto-detected
+        # and converted to single constraints (not replicated to all nodes)
+        rate_limit_constraint = (
+            ox.linalg.Norm(position.at(k) - position.at(k - 1), ord=2) <= max_step
+        )
+
+        # Mark as convex if requested
+        if is_convex:
+            rate_limit_constraint = rate_limit_constraint.convex()
+
+        constraint_exprs.append(rate_limit_constraint)
+
+    time = ox.Time(
+        initial=0.0,
+        final=("minimize", total_time),
+        min=0.0,
+        max=total_time,
+    )
+
+    problem = TrajOptProblem(
+        dynamics=dynamics,
+        states=states,
+        controls=controls,
+        time=time,
+        constraints=constraint_exprs,
+        N=n,
+        licq_max=1e-8,
+    )
+
+    problem.settings.prp.dt = 0.01
+    problem.settings.cvx.solver_args = {"abstol": 1e-6, "reltol": 1e-9}
+    problem.settings.scp.w_tr = 1e1  # Weight on the Trust Region
+    problem.settings.scp.lam_cost = 1e0  # Weight on the Minimal Time Objective
+    problem.settings.scp.lam_vc = 1e1  # Weight on the Virtual Control Objective
+    problem.settings.scp.uniform_time_grid = True
+    problem.settings.sim.save_compiled = False
+    problem.settings.scp.k_max = 50  # Set lower max iterations for non-convergence case
+
+    # Disable printing for cleaner test output
+    if hasattr(problem.settings, "dev"):
+        problem.settings.dev.printing = False
+
+    # Run optimization
+    # For infeasible convex problems, the solver will raise an error during initialization
+    # For infeasible non-convex problems, SCP will fail to converge
+    if is_convex and not should_converge:
+        # Convex infeasible case: expect SolverError from CVXPy during initialization
+        import cvxpy as cp
+
+        with pytest.raises(cp.error.SolverError):
+            problem.initialize()
+            result = problem.solve()
+    else:
+        # Solvable or non-convex infeasible case
+        problem.initialize()
+        result = problem.solve()
+        result = problem.post_process(result)
+
+        # Check convergence based on parameter
+        assert result["converged"] == should_converge, (
+            f"Expected converged={should_converge} with max_step={max_step:.4f}, "
+            f"is_convex={is_convex}, got converged={result['converged']}"
+        )
+
+        # Compare to analytical solution if converged
+        if should_converge:
+            comparison = compare_trajectory_to_analytical(
+                result.t_full,
+                result.trajectory["position"],
+                result.trajectory["velocity"],
+                x0,
+                y0,
+                x1,
+                y1,
+                g,
+            )
+            _print_comparison_metrics(comparison, "Brachistochrone Cross-Nodal")
+            _assert_brachistochrone_accuracy(comparison, problem, result)
+
+    # Clean up JAX caches
+    jax.clear_caches()
+
+
 def test_parameters():
     """
     Test brachistochrone with Parameter objects.
@@ -717,163 +874,6 @@ def test_propagation():
     print(f"  Distance error:        {distance_error_pct:.2f}%")
     print(f"  Straight-line dist:    {straight_line_distance:.4f} m")
     print(f"  Ratio (arc/line):      {analytical_arc_length / straight_line_distance:.4f}")
-
-    # Clean up JAX caches
-    jax.clear_caches()
-
-
-@pytest.mark.parametrize(
-    "max_step,should_converge,is_convex",
-    [
-        # Non-convex tests
-        (np.sqrt(125), True, False),  # At exact limit - should converge
-        (np.sqrt(124.9), False, False),  # Below limit - should fail
-        # Convex tests
-        (np.sqrt(125), True, True),  # At exact limit - should converge (convex)
-        (np.sqrt(124.9), False, True),  # Below limit - should fail (convex)
-    ],
-)
-def test_cross_nodal(max_step, should_converge, is_convex):
-    """
-    Test brachistochrone with a cross-nodal rate limit constraint.
-
-    Tests both convex and non-convex formulations of the cross-node constraint.
-    """
-    import jax.numpy as jnp
-    import numpy as np
-
-    import openscvx as ox
-    from openscvx import TrajOptProblem
-
-    # Problem parameters
-    n = 2
-    total_time = 2.0
-    g = 9.81
-
-    # Boundary conditions
-    x0, y0 = 0.0, 10.0
-    x1, y1 = 10.0, 5.0
-
-    # Define state components
-    position = ox.State("position", shape=(2,))  # 2D position [x, y]
-    position.max = np.array([10.0, 10.0])
-    position.min = np.array([0.0, 0.0])
-    position.initial = np.array([x0, y0])
-    position.final = [x1, y1]
-    position.guess = np.linspace(position.initial, position.final, n)
-
-    velocity = ox.State("velocity", shape=(1,))  # Scalar speed
-    velocity.max = np.array([10.0])
-    velocity.min = np.array([0.0])
-    velocity.initial = np.array([0.0])
-    velocity.final = [("free", 10.0)]
-    velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
-
-    # Define control
-    theta = ox.Control("theta", shape=(1,))  # Angle from vertical
-    theta.max = np.array([100.5 * jnp.pi / 180])
-    theta.min = np.array([0.0])
-    theta.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1)
-
-    # Define list of all states (needed for TrajOptProblem and constraints)
-    states = [position, velocity]
-    controls = [theta]
-
-    # Define dynamics as dictionary mapping state names to their derivatives
-    dynamics = {
-        "position": ox.Concat(
-            velocity[0] * ox.Sin(theta[0]),  # x_dot
-            -velocity[0] * ox.Cos(theta[0]),  # y_dot
-        ),
-        "velocity": g * ox.Cos(theta[0]),
-    }
-
-    # Generate box constraints for all states
-    constraint_exprs = []
-    for state in states:
-        constraint_exprs.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
-
-    # Rate limit constraint with parameterized max_step
-    # Create constraint for each node using absolute indexing
-    for k in range(1, n):
-        # Cross-node constraints don't need outer .at(k) - they're auto-detected
-        # and converted to single constraints (not replicated to all nodes)
-        rate_limit_constraint = (
-            ox.linalg.Norm(position.at(k) - position.at(k - 1), ord=2) <= max_step
-        )
-
-        # Mark as convex if requested
-        if is_convex:
-            rate_limit_constraint = rate_limit_constraint.convex()
-
-        constraint_exprs.append(rate_limit_constraint)
-
-    time = ox.Time(
-        initial=0.0,
-        final=("minimize", total_time),
-        min=0.0,
-        max=total_time,
-    )
-
-    problem = TrajOptProblem(
-        dynamics=dynamics,
-        states=states,
-        controls=controls,
-        time=time,
-        constraints=constraint_exprs,
-        N=n,
-        licq_max=1e-8,
-    )
-
-    problem.settings.prp.dt = 0.01
-    problem.settings.cvx.solver_args = {"abstol": 1e-6, "reltol": 1e-9}
-    problem.settings.scp.w_tr = 1e1  # Weight on the Trust Region
-    problem.settings.scp.lam_cost = 1e0  # Weight on the Minimal Time Objective
-    problem.settings.scp.lam_vc = 1e1  # Weight on the Virtual Control Objective
-    problem.settings.scp.uniform_time_grid = True
-    problem.settings.sim.save_compiled = False
-    problem.settings.scp.k_max = 50  # Set lower max iterations for non-convergence case
-
-    # Disable printing for cleaner test output
-    if hasattr(problem.settings, "dev"):
-        problem.settings.dev.printing = False
-
-    # Run optimization
-    # For infeasible convex problems, the solver will raise an error during initialization
-    # For infeasible non-convex problems, SCP will fail to converge
-    if is_convex and not should_converge:
-        # Convex infeasible case: expect SolverError from CVXPy during initialization
-        import cvxpy as cp
-
-        with pytest.raises(cp.error.SolverError):
-            problem.initialize()
-            result = problem.solve()
-    else:
-        # Solvable or non-convex infeasible case
-        problem.initialize()
-        result = problem.solve()
-        result = problem.post_process(result)
-
-        # Check convergence based on parameter
-        assert result["converged"] == should_converge, (
-            f"Expected converged={should_converge} with max_step={max_step:.4f}, "
-            f"is_convex={is_convex}, got converged={result['converged']}"
-        )
-
-        # Compare to analytical solution if converged
-        if should_converge:
-            comparison = compare_trajectory_to_analytical(
-                result.t_full,
-                result.trajectory["position"],
-                result.trajectory["velocity"],
-                x0,
-                y0,
-                x1,
-                y1,
-                g,
-            )
-            _print_comparison_metrics(comparison, "Brachistochrone Cross-Nodal")
-            _assert_brachistochrone_accuracy(comparison, problem, result)
 
     # Clean up JAX caches
     jax.clear_caches()
