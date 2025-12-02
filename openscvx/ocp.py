@@ -94,8 +94,8 @@ def create_cvxpy_variables(settings: Config) -> Dict:
     grad_g_X_cross = []
     grad_g_U_cross = []
     nu_vb_cross = []
-    if settings.sim.constraints_nodal_cross_node:
-        for idx_cross, constraint in enumerate(settings.sim.constraints_nodal_cross_node):
+    if settings.sim.constraints_cross_node:
+        for idx_cross, constraint in enumerate(settings.sim.constraints_cross_node):
             # Cross-node constraints are single constraints with fixed node references
             g_cross.append(cp.Parameter(name="g_cross_" + str(idx_cross)))
             grad_g_X_cross.append(
@@ -395,8 +395,8 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
 
     # Linearized cross-node constraints
     idx_cross = 0
-    if settings.sim.constraints_nodal_cross_node:
-        for constraint in settings.sim.constraints_nodal_cross_node:
+    if settings.sim.constraints_cross_node:
+        for constraint in settings.sim.constraints_cross_node:
             # Linearization: g(X_bar, U_bar) + ∇g_X @ dX + ∇g_U @ dU == nu_vb
             # Sum over all trajectory nodes to couple multiple nodes
             residual = g_cross[idx_cross]
@@ -484,8 +484,8 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
 
     # Virtual slack penalty for cross-node constraints
     idx_cross = 0
-    if settings.sim.constraints_nodal_cross_node:
-        for constraint in settings.sim.constraints_nodal_cross_node:
+    if settings.sim.constraints_cross_node:
+        for constraint in settings.sim.constraints_cross_node:
             cost += settings.scp.lam_vb * cp.pos(nu_vb_cross[idx_cross])
             idx_cross += 1
 

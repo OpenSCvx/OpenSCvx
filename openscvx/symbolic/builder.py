@@ -168,10 +168,9 @@ def preprocess_symbolic_problem(
             3. constraints_ctcs (List[CTCS]): CTCS constraints (remain symbolic)
             4. constraints_nodal (List[NodalConstraint]): Non-convex nodal constraints
             5. constraints_nodal_convex (List[NodalConstraint]): Convex nodal constraints
-            6. constraints_nodal_cross_node (List[CrossNodeConstraint]): Non-convex nodal cross-node
+            6. constraints_cross_node (List[CrossNodeConstraint]): Non-convex cross-node constraints
+            7. constraints_cross_node_convex (List[CrossNodeConstraint]): Convex cross-node
                 constraints
-            7. constraints_nodal_cross_node_convex (List[CrossNodeConstraint]): Convex nodal
-                cross-node constraints
             8. parameters (Dict[str, np.ndarray]): Parameter values extracted from expressions
             9. node_intervals (List[Tuple[int, int]]): Time intervals for CTCS constraints
             10. dynamics_prop (Expr): Propagation dynamics (includes extra states if provided)

@@ -267,9 +267,9 @@ class TrajOptProblem:
         # Store constraints in SimConfig
         sim.constraints_ctcs = constraints_ctcs
         sim.constraints_nodal = lowered_constraints_nodal
-        sim.constraints_nodal_cross_node = lowered_cross_node_constraints
+        sim.constraints_cross_node = lowered_cross_node_constraints
         sim.constraints_nodal_convex = constraints_nodal_convex
-        sim.constraints_nodal_cross_node_convex = constraints_cross_node_convex
+        sim.constraints_cross_node_convex = constraints_cross_node_convex
 
         self.settings = Config(
             sim=sim,
@@ -376,7 +376,7 @@ class TrajOptProblem:
             constraint.grad_g_u = jax.jit(constraint.grad_g_u)
 
         # JIT compile cross-node constraints
-        for constraint in self.settings.sim.constraints_nodal_cross_node:
+        for constraint in self.settings.sim.constraints_cross_node:
             constraint.func = jax.jit(constraint.func)
             constraint.grad_g_X = jax.jit(constraint.grad_g_X)
             constraint.grad_g_U = jax.jit(constraint.grad_g_U)
@@ -401,7 +401,7 @@ class TrajOptProblem:
         # Phase 2: Lower convex constraints to CVXPy
         lowered_convex_constraints, self.cvxpy_params = lower_convex_constraints(
             self.settings.sim.constraints_nodal_convex,
-            self.settings.sim.constraints_nodal_cross_node_convex,
+            self.settings.sim.constraints_cross_node_convex,
             ocp_vars,
             self._parameters,
         )
@@ -416,7 +416,7 @@ class TrajOptProblem:
         functions_to_hash = [self.dynamics_augmented.f, self.dynamics_augmented_prop.f]
         for constraint in self.settings.sim.constraints_nodal:
             functions_to_hash.append(constraint.func)
-        for constraint in self.settings.sim.constraints_nodal_cross_node:
+        for constraint in self.settings.sim.constraints_cross_node:
             functions_to_hash.append(constraint.func)
         # Note: CTCS constraints are already included in dynamics_augmented.f,
         # so we don't need to add them separately
