@@ -473,38 +473,34 @@ def test_collect_node_references_no_refs():
 
 
 def test_absolute_node_reference_semantics():
-    """Test that absolute indexing references the correct trajectory nodes."""
-    from openscvx.symbolic.lower import (
-        _create_cross_node_wrapper as create_cross_node_wrapper,
-    )
-    from openscvx.symbolic.lower import (
-        lower_to_jax,
-    )
+    """Test that absolute indexing references the correct trajectory nodes.
+
+    Tests that CrossNodeConstraint lowering produces a function with
+    trajectory-level signature (X, U, params) -> result.
+    """
+    from openscvx.symbolic.expr import CrossNodeConstraint
+    from openscvx.symbolic.lower import lower_to_jax
 
     position = State("pos", shape=(2,))
     position._slice = slice(0, 2)  # Manually assign slice for testing
 
-    # Constraint: position[5] - position[3]
+    # Expression: position[5] - position[3]
     expr = position.at(5) - position.at(3)
 
-    # Lower to JAX
-    constraint_fn = lower_to_jax(expr)
-
-    # Create wrapper - no eval_nodes parameter anymore (always returns scalar/vector)
-    wrapped_fn = create_cross_node_wrapper(
-        constraint_fn,
-        references=[3, 5],  # Node indices referenced
-    )
+    # Wrap in CrossNodeConstraint and lower - visitor handles wrapping
+    cross_node = CrossNodeConstraint(expr <= 0)  # Need a constraint for CrossNodeConstraint
+    constraint_fn = lower_to_jax(cross_node)
 
     # Create fake trajectory
     X = jnp.arange(20).reshape(10, 2).astype(float)  # 10 nodes, 2-dim state
     U = jnp.zeros((10, 0))
     params = {}
 
-    # Evaluate wrapped constraint
-    results = wrapped_fn(X, U, params)
+    # Evaluate - CrossNodeConstraint visitor provides (X, U, params) signature
+    results = constraint_fn(X, U, params)
 
-    # Expected: X[5] - X[3] = [10, 11] - [6, 7] = [4, 4]
+    # Expected: X[5] - X[3] - 0 = [10, 11] - [6, 7] = [4, 4]
+    # Inequality lowers to lhs - rhs, so result is position[5] - position[3] - 0
     # Shape is (n_x,) = (2,) since constraint evaluates once
     expected = jnp.array([4.0, 4.0])
 

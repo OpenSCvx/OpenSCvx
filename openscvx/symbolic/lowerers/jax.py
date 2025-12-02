@@ -122,6 +122,7 @@ from openscvx.symbolic.expr import (
     Constant,
     Constraint,
     Cos,
+    CrossNodeConstraint,
     Diag,
     Div,
     Equality,
@@ -993,3 +994,49 @@ class JaxLowerer:
                 return base_fn(x_single, u_single, fixed_idx, params)
 
             return compound_node_fn
+
+    @visitor(CrossNodeConstraint)
+    def _visit_cross_node_constraint(self, node: CrossNodeConstraint):
+        """Lower CrossNodeConstraint to trajectory-level function.
+
+        CrossNodeConstraint wraps constraints that reference multiple trajectory
+        nodes via NodeReference (e.g., rate limits like x.at(k) - x.at(k-1) <= r).
+
+        Unlike regular nodal constraints which have signature (x, u, node, params)
+        and are vmapped across nodes, cross-node constraints operate on full
+        trajectory arrays and return a scalar residual.
+
+        Args:
+            node: CrossNodeConstraint expression wrapping the inner constraint
+
+        Returns:
+            Function with signature (X, U, params) -> scalar residual
+                - X: Full state trajectory, shape (N, n_x)
+                - U: Full control trajectory, shape (N, n_u)
+                - params: Dictionary of problem parameters
+                - Returns: Scalar constraint residual (g <= 0 convention)
+
+        Note:
+            The inner constraint is lowered first (producing a function with the
+            standard (x, u, node, params) signature), then wrapped to provide the
+            trajectory-level (X, U, params) signature. The `node` parameter is
+            unused since NodeReference nodes have fixed indices baked in.
+
+        Example:
+            For constraint: position.at(5) - position.at(4) <= max_step
+
+            The lowered function evaluates:
+                X[5, pos_slice] - X[4, pos_slice] - max_step
+
+            And returns a scalar residual.
+        """
+        # Lower the inner constraint expression
+        inner_fn = self.lower(node.constraint)
+
+        # Wrap to provide trajectory-level signature
+        # The `node` parameter is unused for cross-node constraints since
+        # NodeReference nodes have fixed indices baked in at construction time
+        def trajectory_constraint(X, U, params):
+            return inner_fn(X, U, 0, params)
+
+        return trajectory_constraint

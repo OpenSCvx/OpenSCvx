@@ -137,6 +137,7 @@ from openscvx.symbolic.expr import (
     Concat,
     Constant,
     Cos,
+    CrossNodeConstraint,
     Div,
     Equality,
     Exp,
@@ -485,6 +486,42 @@ class CvxpyLowerer:
                 f"Base expression type: {type(node.base).__name__}. "
                 "Only State and Control NodeReferences are currently supported."
             )
+
+    @visitor(CrossNodeConstraint)
+    def _visit_cross_node_constraint(self, node: CrossNodeConstraint) -> cp.Constraint:
+        """Lower CrossNodeConstraint to CVXPy constraint.
+
+        CrossNodeConstraint wraps constraints that reference multiple trajectory
+        nodes via NodeReference (e.g., rate limits like x.at(k) - x.at(k-1) <= r).
+
+        For CVXPy lowering, this simply lowers the inner constraint. The NodeReference
+        nodes within the constraint will handle extracting values from the full
+        trajectory arrays (which must be provided in variable_map as "x" and "u").
+
+        Args:
+            node: CrossNodeConstraint expression wrapping the inner constraint
+
+        Returns:
+            CVXPy constraint object
+
+        Note:
+            The variable_map must contain full trajectory arrays:
+                - "x": (N, n_x) CVXPy expression (e.g., cp.vstack(x_nonscaled))
+                - "u": (N, n_u) CVXPy expression (e.g., cp.vstack(u_nonscaled))
+
+            NodeReference visitors will index into these arrays using the fixed
+            node indices baked into the expression.
+
+        Example:
+            For constraint: position.at(5) - position.at(4) <= max_step
+
+            With variable_map = {"x": cp.vstack([x[k] for k in range(N)])}
+
+            The lowered constraint evaluates:
+                x[5, pos_slice] - x[4, pos_slice] <= max_step
+        """
+        # Simply lower the inner constraint - NodeReference handles indexing
+        return self.lower(node.constraint)
 
     @visitor(Parameter)
     def _visit_parameter(self, node: Parameter) -> cp.Expression:

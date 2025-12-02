@@ -212,47 +212,6 @@ def _collect_node_references(expr: Expr) -> List[int]:
     return sorted(set(references))
 
 
-def _create_cross_node_wrapper(constraint_fn, references: List[int]):
-    """Create a trajectory-level wrapper for cross-node constraint evaluation.
-
-    Internal helper for generating trajectory-level constraint functions during lowering.
-
-    Takes a constraint function lowered with JaxLowerer and wraps it to have the
-    correct signature for cross-node constraints. The lowered function has signature
-    (X, U, node, params), but cross-node constraints don't use the `node` parameter
-    (they reference fixed nodes via NodeReference). This wrapper provides a clean
-    (X, U, params) -> scalar signature.
-
-    Args:
-        constraint_fn: Lowered constraint function with signature (X, U, node, params)
-                      The `node` parameter is ignored for cross-node constraints
-        references: List of node indices referenced (for documentation/future sparsity)
-
-    Returns:
-        Function with signature (X, U, params) -> scalar residual
-            where X is (N, n_x), U is (N, n_u)
-
-    Example:
-        For constraint `position.at(5) - position.at(4) <= 0.1`:
-        - References nodes 4 and 5 (fixed at construction time)
-        - Evaluates position[5] - position[4] - 0.1
-        - Returns scalar residual
-
-    Note:
-        The returned function will have Jacobians computed via jax.jacfwd, producing
-        dense (N, n_x) and (N, n_u) arrays. See CrossNodeConstraintLowered for
-        performance implications.
-    """
-
-    def trajectory_constraint(X, U, params):
-        # Evaluate constraint once
-        # The node parameter is ignored by cross-node constraints (they use fixed indices)
-        # Pass 0 as a dummy value to satisfy the signature
-        return constraint_fn(X, U, 0, params)
-
-    return trajectory_constraint
-
-
 def lower_symbolic_expressions(
     dynamics_aug,
     states_aug: List,
@@ -456,27 +415,22 @@ def lower_symbolic_expressions(
             lowered_constraints_nodal.append(constraint)
 
     # Lower cross-node constraints (trajectory-level path)
-    # CrossNodeConstraint objects contain the constraint expression directly
+    # The CrossNodeConstraint visitor in lowerers/jax.py handles wrapping the
+    # inner constraint to provide trajectory-level signature (X, U, params) -> scalar
     lowered_cross_node_constraints = []
 
     for cross_node_constraint in constraints_cross_node:
-        # Lower the constraint expression to JAX
-        constraint_expr = cross_node_constraint.constraint
-        constraint_fn = lower_to_jax(constraint_expr)
+        # Lower the CrossNodeConstraint directly - visitor handles wrapping
+        # Returns function with signature (X, U, params) -> scalar
+        constraint_fn = lower_to_jax(cross_node_constraint)
 
-        # Collect node references (for documentation/future sparsity analysis)
-        references = _collect_node_references(constraint_expr)
-
-        # Create trajectory-level wrapper
-        wrapped_fn = _create_cross_node_wrapper(constraint_fn, references)
-
-        # Compute Jacobians for the wrapped trajectory-level function
-        grad_g_X = jacfwd(wrapped_fn, argnums=0)  # dg/dX - shape (N, n_x)
-        grad_g_U = jacfwd(wrapped_fn, argnums=1)  # dg/dU - shape (N, n_u)
+        # Compute Jacobians for the trajectory-level function
+        grad_g_X = jacfwd(constraint_fn, argnums=0)  # dg/dX - shape (N, n_x)
+        grad_g_U = jacfwd(constraint_fn, argnums=1)  # dg/dU - shape (N, n_u)
 
         # Create CrossNodeConstraintLowered object
         cross_node_lowered = CrossNodeConstraintLowered(
-            func=wrapped_fn,
+            func=constraint_fn,
             grad_g_X=grad_g_X,
             grad_g_U=grad_g_U,
         )
