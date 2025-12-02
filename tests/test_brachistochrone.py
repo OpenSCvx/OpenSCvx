@@ -233,123 +233,14 @@ def test_monolithic():
     jax.clear_caches()
 
 
-def test_nodal():
+@pytest.mark.parametrize("constraint_type", ["ctcs", "nodal", "convex", "over", "at"])
+def test_constraint_types(constraint_type):
     """
-    Test brachistochrone with nodal constraints.
-    """
-    import jax.numpy as jnp
-    import numpy as np
+    Test brachistochrone with different constraint types.
 
-    import openscvx as ox
-    from openscvx import TrajOptProblem
-
-    # Problem parameters
-    n = 2
-    total_time = 2.0
-    g = 9.81
-
-    # Boundary conditions
-    x0, y0 = 0.0, 10.0
-    x1, y1 = 10.0, 5.0
-
-    # Define state components
-    position = ox.State("position", shape=(2,))  # 2D position [x, y]
-    position.max = np.array([10.0, 10.0])
-    position.min = np.array([0.0, 0.0])
-    position.initial = np.array([x0, y0])
-    position.final = [x1, y1]
-    position.guess = np.linspace(position.initial, position.final, n)
-
-    velocity = ox.State("velocity", shape=(1,))  # Scalar speed
-    velocity.max = np.array([10.0])
-    velocity.min = np.array([0.0])
-    velocity.initial = np.array([0.0])
-    velocity.final = [("free", 10.0)]
-    velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
-
-    # Define control
-    theta = ox.Control("theta", shape=(1,))  # Angle from vertical
-    theta.max = np.array([100.5 * jnp.pi / 180])
-    theta.min = np.array([0.0])
-    theta.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1)
-
-    # Define list of all states (needed for TrajOptProblem and constraints)
-    states = [position, velocity]
-    controls = [theta]
-
-    # Define dynamics as dictionary mapping state names to their derivatives
-    dynamics = {
-        "position": ox.Concat(
-            velocity[0] * ox.Sin(theta[0]),  # x_dot
-            -velocity[0] * ox.Cos(theta[0]),  # y_dot
-        ),
-        "velocity": g * ox.Cos(theta[0]),
-    }
-
-    # Generate box constraints for all states
-    constraint_exprs = []
-    for state in states:
-        constraint_exprs.extend([state <= state.max, state.min <= state])
-
-    time = ox.Time(
-        initial=0.0,
-        final=("minimize", total_time),
-        min=0.0,
-        max=total_time,
-    )
-
-    problem = TrajOptProblem(
-        dynamics=dynamics,
-        states=states,
-        controls=controls,
-        time=time,
-        constraints=constraint_exprs,
-        N=n,
-        licq_max=1e-8,
-    )
-
-    problem.settings.prp.dt = 0.01
-    problem.settings.cvx.solver_args = {"abstol": 1e-6, "reltol": 1e-9}
-    problem.settings.scp.w_tr = 1e1  # Weight on the Trust Region
-    problem.settings.scp.lam_cost = 1e0  # Weight on the Minimal Time Objective
-    problem.settings.scp.lam_vc = 1e1  # Weight on the Virtual Control Objective
-    problem.settings.scp.uniform_time_grid = True
-    problem.settings.sim.save_compiled = False
-
-    # Disable printing for cleaner test output
-    if hasattr(problem.settings, "dev"):
-        problem.settings.dev.printing = False
-
-    # Run optimization
-    problem.initialize()
-    result = problem.solve()
-    result = problem.post_process(result)
-
-    # Check convergence
-    assert result["converged"], "Problem failed to converge"
-
-    # Compare to analytical solution
-    comparison = compare_trajectory_to_analytical(
-        result.t_full,
-        result.trajectory["position"],
-        result.trajectory["velocity"],
-        x0,
-        y0,
-        x1,
-        y1,
-        g,
-    )
-
-    _print_comparison_metrics(comparison, "Brachistochrone Nodal")
-    _assert_brachistochrone_accuracy(comparison, problem, result)
-
-    # Clean up JAX caches
-    jax.clear_caches()
-
-
-def test_convex():
-    """
-    Test brachistochrone with convex constraints.
+    Args:
+        constraint_type: One of "nodal", "convex", or "over" to specify how
+            constraints are defined.
     """
     import jax.numpy as jnp
     import numpy as np
@@ -400,10 +291,25 @@ def test_convex():
         "velocity": g * ox.Cos(theta[0]),
     }
 
-    # Generate box constraints for all states
+    # Generate box constraints for all states based on constraint_type
     constraint_exprs = []
     for state in states:
-        constraint_exprs.extend([(state <= state.max).convex(), (state.min <= state).convex()])
+        if constraint_type == "ctcs":
+            constraint_exprs.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
+        elif constraint_type == "nodal":
+            constraint_exprs.extend([state <= state.max, state.min <= state])
+        elif constraint_type == "convex":
+            constraint_exprs.extend([(state <= state.max).convex(), (state.min <= state).convex()])
+        elif constraint_type == "over":
+            constraint_exprs.extend(
+                [
+                    ox.ctcs(state <= state.max).over((0, 1)),
+                    ox.ctcs(state.min <= state).over((0, 1)),
+                ]
+            )
+        elif constraint_type == "at":
+            for k in range(n):
+                constraint_exprs.extend([(state <= state.max).at(k), (state.min <= state).at(k)])
 
     time = ox.Time(
         initial=0.0,
@@ -454,7 +360,7 @@ def test_convex():
         g,
     )
 
-    _print_comparison_metrics(comparison, "Brachistochrone Convex")
+    _print_comparison_metrics(comparison, f"Brachistochrone {constraint_type.capitalize()}")
     _assert_brachistochrone_accuracy(comparison, problem, result)
 
     # Clean up JAX caches
@@ -634,122 +540,6 @@ def test_parameters():
         f"for gravity scaling"
     )
     print(f"  Time ratio (Moon/Earth): {time_ratio:.2f} (expected: {expected_ratio:.2f})")
-
-    # Clean up JAX caches
-    jax.clear_caches()
-
-
-def test_over():
-    """
-    Test brachistochrone with constraints defined over a range of nodes.
-    """
-    import jax.numpy as jnp
-    import numpy as np
-
-    import openscvx as ox
-    from openscvx import TrajOptProblem
-
-    # Problem parameters
-    n = 2
-    total_time = 2.0
-    g = 9.81
-
-    # Boundary conditions
-    x0, y0 = 0.0, 10.0
-    x1, y1 = 10.0, 5.0
-
-    # Define state components
-    position = ox.State("position", shape=(2,))  # 2D position [x, y]
-    position.max = np.array([10.0, 10.0])
-    position.min = np.array([0.0, 0.0])
-    position.initial = np.array([x0, y0])
-    position.final = [x1, y1]
-    position.guess = np.linspace(position.initial, position.final, n)
-
-    velocity = ox.State("velocity", shape=(1,))  # Scalar speed
-    velocity.max = np.array([10.0])
-    velocity.min = np.array([0.0])
-    velocity.initial = np.array([0.0])
-    velocity.final = [("free", 10.0)]
-    velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
-
-    # Define control
-    theta = ox.Control("theta", shape=(1,))  # Angle from vertical
-    theta.max = np.array([100.5 * jnp.pi / 180])
-    theta.min = np.array([0.0])
-    theta.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1)
-
-    # Define list of all states (needed for TrajOptProblem and constraints)
-    states = [position, velocity]
-    controls = [theta]
-
-    # Define dynamics as dictionary mapping state names to their derivatives
-    dynamics = {
-        "position": ox.Concat(
-            velocity[0] * ox.Sin(theta[0]),  # x_dot
-            -velocity[0] * ox.Cos(theta[0]),  # y_dot
-        ),
-        "velocity": g * ox.Cos(theta[0]),
-    }
-
-    # Generate box constraints for all states
-    constraint_exprs = []
-    for state in states:
-        constraint_exprs.extend(
-            [ox.ctcs(state <= state.max).over((0, 1)), ox.ctcs(state.min <= state).over((0, 1))]
-        )
-
-    time = ox.Time(
-        initial=0.0,
-        final=("minimize", total_time),
-        min=0.0,
-        max=total_time,
-    )
-
-    problem = TrajOptProblem(
-        dynamics=dynamics,
-        states=states,
-        controls=controls,
-        time=time,
-        constraints=constraint_exprs,
-        N=n,
-        licq_max=1e-8,
-    )
-
-    problem.settings.prp.dt = 0.01
-    problem.settings.cvx.solver_args = {"abstol": 1e-6, "reltol": 1e-9}
-    problem.settings.scp.w_tr = 1e1  # Weight on the Trust Region
-    problem.settings.scp.lam_cost = 1e0  # Weight on the Minimal Time Objective
-    problem.settings.scp.lam_vc = 1e1  # Weight on the Virtual Control Objective
-    problem.settings.scp.uniform_time_grid = True
-    problem.settings.sim.save_compiled = False
-
-    # Disable printing for cleaner test output
-    if hasattr(problem.settings, "dev"):
-        problem.settings.dev.printing = False
-
-    # Run optimization
-    problem.initialize()
-    result = problem.solve()
-    result = problem.post_process(result)
-
-    # Check convergence
-    assert result["converged"], "Problem failed to converge"
-
-    # Compare to analytical solution
-    comparison = compare_trajectory_to_analytical(
-        result.t_full,
-        result.trajectory["position"],
-        result.trajectory["velocity"],
-        x0,
-        y0,
-        x1,
-        y1,
-        g,
-    )
-
-    _print_comparison_metrics(comparison, "Brachistochrone Over")
-    _assert_brachistochrone_accuracy(comparison, problem, result)
 
     # Clean up JAX caches
     jax.clear_caches()
