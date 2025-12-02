@@ -933,15 +933,21 @@ def test_propagation():
 
 
 @pytest.mark.parametrize(
-    "max_step,should_converge",
+    "max_step,should_converge,is_convex",
     [
-        (np.sqrt(125), True),  # At exact limit - should converge
-        (np.sqrt(124.9), False),  # Below limit - should fail
+        # Non-convex tests
+        (np.sqrt(125), True, False),  # At exact limit - should converge
+        (np.sqrt(124.9), False, False),  # Below limit - should fail
+        # Convex tests
+        (np.sqrt(125), True, True),  # At exact limit - should converge (convex)
+        (np.sqrt(124.9), False, True),  # Below limit - should fail (convex)
     ],
 )
-def test_cross_nodal(max_step, should_converge):
+def test_cross_nodal(max_step, should_converge, is_convex):
     """
-    Test brachistochrone with a cross-nodal rate limit constraint
+    Test brachistochrone with a cross-nodal rate limit constraint.
+
+    Tests both convex and non-convex formulations of the cross-node constraint.
     """
     import jax.numpy as jnp
     import numpy as np
@@ -1003,6 +1009,11 @@ def test_cross_nodal(max_step, should_converge):
         rate_limit_constraint = (
             ox.linalg.Norm(position.at(k) - position.at(k - 1), ord=2) <= max_step
         ).at(k)
+
+        # Mark as convex if requested
+        if is_convex:
+            rate_limit_constraint = rate_limit_constraint.convex()
+
         constraint_exprs.append(rate_limit_constraint)
 
     time = ox.Time(
@@ -1036,30 +1047,41 @@ def test_cross_nodal(max_step, should_converge):
         problem.settings.dev.printing = False
 
     # Run optimization
-    problem.initialize()
-    result = problem.solve()
-    result = problem.post_process(result)
+    # For infeasible convex problems, the solver will raise an error during initialization
+    # For infeasible non-convex problems, SCP will fail to converge
+    if is_convex and not should_converge:
+        # Convex infeasible case: expect SolverError from CVXPy during initialization
+        import cvxpy as cp
 
-    # Check convergence based on parameter
-    assert result["converged"] == should_converge, (
-        f"Expected converged={should_converge} with max_step={max_step:.4f}, "
-        f"got converged={result['converged']}"
-    )
+        with pytest.raises(cp.error.SolverError):
+            problem.initialize()
+            result = problem.solve()
+    else:
+        # Solvable or non-convex infeasible case
+        problem.initialize()
+        result = problem.solve()
+        result = problem.post_process(result)
 
-    # Compare to analytical solutionif converged
-    if should_converge:
-        comparison = compare_trajectory_to_analytical(
-            result.t_full,
-            result.trajectory["position"],
-            result.trajectory["velocity"],
-            x0,
-            y0,
-            x1,
-            y1,
-            g,
+        # Check convergence based on parameter
+        assert result["converged"] == should_converge, (
+            f"Expected converged={should_converge} with max_step={max_step:.4f}, "
+            f"is_convex={is_convex}, got converged={result['converged']}"
         )
-        _print_comparison_metrics(comparison, "Brachistochrone Cross-Nodal")
-        _assert_brachistochrone_accuracy(comparison, problem, result)
+
+        # Compare to analytical solution if converged
+        if should_converge:
+            comparison = compare_trajectory_to_analytical(
+                result.t_full,
+                result.trajectory["position"],
+                result.trajectory["velocity"],
+                x0,
+                y0,
+                x1,
+                y1,
+                g,
+            )
+            _print_comparison_metrics(comparison, "Brachistochrone Cross-Nodal")
+            _assert_brachistochrone_accuracy(comparison, problem, result)
 
     # Clean up JAX caches
     jax.clear_caches()
