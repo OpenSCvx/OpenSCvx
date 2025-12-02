@@ -72,6 +72,7 @@ from .array import Concat, Hstack, Index, Stack, Vstack
 from .constraint import (
     CTCS,
     Constraint,
+    CrossNodeConstraint,
     Equality,
     Inequality,
     NodalConstraint,
@@ -184,6 +185,7 @@ __all__ = [
     "SSM",
     # Specialized constraints
     "NodalConstraint",
+    "CrossNodeConstraint",
     "CTCS",
     "ctcs",
     # STL operations

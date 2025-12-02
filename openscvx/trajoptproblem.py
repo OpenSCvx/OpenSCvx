@@ -155,6 +155,8 @@ class TrajOptProblem:
             constraints_ctcs,
             constraints_nodal,
             constraints_nodal_convex,
+            constraints_cross_node,
+            constraints_cross_node_convex,
             parameters,
             node_intervals,
             dynamics_prop_aug,
@@ -186,6 +188,7 @@ class TrajOptProblem:
             lowered_constraints_nodal,
             lowered_cross_node_constraints,
             constraints_nodal_convex,
+            constraints_cross_node_convex,
             x_unified,
             u_unified,
             dynamics_augmented_prop,
@@ -196,6 +199,8 @@ class TrajOptProblem:
             controls_aug=u_aug,
             constraints_nodal=constraints_nodal,
             constraints_nodal_convex=constraints_nodal_convex,
+            constraints_cross_node=constraints_cross_node,
+            constraints_cross_node_convex=constraints_cross_node_convex,
             parameters=parameters,
             dynamics_prop=dynamics_prop_aug,
             states_prop=x_prop_aug,
@@ -264,6 +269,7 @@ class TrajOptProblem:
         sim.constraints_nodal = lowered_constraints_nodal
         sim.constraints_nodal_cross_node = lowered_cross_node_constraints
         sim.constraints_nodal_convex = constraints_nodal_convex
+        sim.constraints_nodal_cross_node_convex = constraints_cross_node_convex
 
         self.settings = Config(
             sim=sim,
@@ -394,7 +400,10 @@ class TrajOptProblem:
 
         # Phase 2: Lower convex constraints to CVXPy
         lowered_convex_constraints, self.cvxpy_params = lower_convex_constraints(
-            self.settings.sim.constraints_nodal_convex, ocp_vars, self._parameters
+            self.settings.sim.constraints_nodal_convex,
+            self.settings.sim.constraints_nodal_cross_node_convex,
+            ocp_vars,
+            self._parameters,
         )
 
         # Store lowered constraints back in settings for Phase 3

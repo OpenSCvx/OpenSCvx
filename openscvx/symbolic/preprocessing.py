@@ -347,7 +347,7 @@ def validate_and_normalize_constraint_nodes(exprs: Union[Expr, list[Expr]], n_no
                     raise ValueError(f"NodalConstraint node {node} is out of range [0, {n_nodes})")
 
 
-def validate_cross_node_constraint(nodal_constraint: NodalConstraint, n_nodes: int) -> None:
+def validate_cross_node_constraint(cross_node_constraint, n_nodes: int) -> None:
     """Validate cross-node constraint bounds and variable consistency.
 
     This function performs two validations in a single tree traversal:
@@ -364,7 +364,7 @@ def validate_cross_node_constraint(nodal_constraint: NodalConstraint, n_nodes: i
        - Variables without .at() expect full trajectory: X[:, :] → shape (N, n_x)
 
     Args:
-        nodal_constraint: The constraint to validate
+        cross_node_constraint: The CrossNodeConstraint to validate
         n_nodes: Total number of trajectory nodes
 
     Raises:
@@ -374,26 +374,37 @@ def validate_cross_node_constraint(nodal_constraint: NodalConstraint, n_nodes: i
     Example:
         Valid cross-node constraint:
 
+            from openscvx.symbolic.expr import CrossNodeConstraint
+
             position = State("pos", shape=(3,))
 
             # Valid: all variables use .at(), indices in bounds
-            constraint = (position.at(5) - position.at(4) <= 0.1).at([5])
+            constraint = CrossNodeConstraint(position.at(5) - position.at(4) <= 0.1)
             validate_cross_node_constraint(constraint, n_nodes=10)  # OK
 
         Invalid - out of bounds:
 
             # Invalid: node 10 is out of bounds for n_nodes=10
-            bad_bounds = (position.at(0) == position.at(10)).at([0])
+            bad_bounds = CrossNodeConstraint(position.at(0) == position.at(10))
             validate_cross_node_constraint(bad_bounds, n_nodes=10)  # Raises ValueError
 
         Invalid - mixed .at() usage:
 
             velocity = State("vel", shape=(3,))
             # Invalid: position uses .at(), velocity doesn't
-            bad_mixed = (position.at(5) - velocity <= 0.1).at([5])
+            bad_mixed = CrossNodeConstraint(position.at(5) - velocity <= 0.1)
             validate_cross_node_constraint(bad_mixed, n_nodes=10)  # Raises ValueError
     """
-    from openscvx.symbolic.expr import Control, NodeReference, State
+    from openscvx.symbolic.expr import Control, CrossNodeConstraint, NodeReference, State
+
+    if not isinstance(cross_node_constraint, CrossNodeConstraint):
+        raise TypeError(
+            f"Expected CrossNodeConstraint, got {type(cross_node_constraint).__name__}. "
+            f"Bare constraints with NodeReferences should be wrapped in CrossNodeConstraint "
+            f"by separate_constraints() before validation."
+        )
+
+    constraint = cross_node_constraint.constraint
 
     # Collect information in a single traversal
     node_refs = []  # List of (node_idx, normalized_idx) tuples
@@ -418,8 +429,8 @@ def validate_cross_node_constraint(nodal_constraint: NodalConstraint, n_nodes: i
             traverse(child)
 
     # Traverse the constraint expression (both sides)
-    traverse(nodal_constraint.constraint.lhs)
-    traverse(nodal_constraint.constraint.rhs)
+    traverse(constraint.lhs)
+    traverse(constraint.rhs)
 
     # Check 1: Bounds validation
     for orig_idx, normalized_idx in node_refs:
@@ -428,7 +439,7 @@ def validate_cross_node_constraint(nodal_constraint: NodalConstraint, n_nodes: i
                 f"Cross-node constraint references invalid node index {orig_idx}. "
                 f"Node indices must be in range [0, {n_nodes}) "
                 f"(or negative indices in range [-{n_nodes}, -1]). "
-                f"Constraint: {nodal_constraint.constraint}"
+                f"Constraint: {constraint}"
             )
 
     # Check 2: Variable consistency - if we have NodeReferences, all vars must use .at()
@@ -439,7 +450,7 @@ def validate_cross_node_constraint(nodal_constraint: NodalConstraint, n_nodes: i
             f"All state/control variables in cross-node constraints must use .at(k). "
             f"For example, if you use 'position.at(5)', you must also use 'velocity.at(4)' "
             f"instead of just 'velocity'. "
-            f"Constraint: {nodal_constraint.constraint}"
+            f"Constraint: {constraint}"
         )
 
 
