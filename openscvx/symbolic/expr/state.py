@@ -247,7 +247,7 @@ class State(Variable):
                 pos.min = [0, 0, 10]
                 pos.initial = [0, 5, 15]  # Must satisfy: 0>=0, 5>=0, 15>=10
         """
-        val = np.asarray(val)
+        val = np.asarray(val, dtype=float)
         if val.shape != self.shape:
             raise ValueError(f"Min shape {val.shape} does not match State shape {self.shape}")
         self._min = val
@@ -290,7 +290,7 @@ class State(Variable):
                 vel.max = [10, 10, 5]
                 vel.final = [8, 9, 4]  # Must satisfy: 8<=10, 9<=10, 4<=5
         """
-        val = np.asarray(val)
+        val = np.asarray(val, dtype=float)
         if val.shape != self.shape:
             raise ValueError(f"Max shape {val.shape} does not match State shape {self.shape}")
         self._max = val
@@ -541,7 +541,7 @@ class State(Variable):
         if val is None:
             self._scaling_min = None
             return
-        val = np.asarray(val)
+        val = np.asarray(val, dtype=float)
         if val.shape != self.shape:
             raise ValueError(
                 f"Scaling min shape {val.shape} does not match State shape {self.shape}"
@@ -570,7 +570,7 @@ class State(Variable):
         if val is None:
             self._scaling_max = None
             return
-        val = np.asarray(val)
+        val = np.asarray(val, dtype=float)
         if val.shape != self.shape:
             raise ValueError(
                 f"Scaling max shape {val.shape} does not match State shape {self.shape}"
