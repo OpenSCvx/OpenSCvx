@@ -98,8 +98,6 @@ time_config = ox.Time(
 
 constraints.append((time.at(5) - time.at(3) == 1.23).convex())
 
-constraints.append((time.at(5) - time.at(3) == 1.23).convex())
-
 problem = Problem(
     dynamics=dynamics,
     states=states,
