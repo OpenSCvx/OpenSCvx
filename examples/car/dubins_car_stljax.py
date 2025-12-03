@@ -51,7 +51,7 @@ time.min = np.array([0.0])
 time.initial = np.array([0.0])
 time.final = [ox.Minimize(total_time)]
 time.guess = np.linspace(0.0, total_time, n).reshape(-1, 1)
-    
+
 
 # Define list of all states and controls
 states = [position, theta, time]

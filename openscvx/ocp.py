@@ -186,7 +186,6 @@ def lower_convex_constraints(
     Returns:
         Tuple of (list of CVXPy constraints, dict of CVXPy Parameter objects)
     """
-    from openscvx.constraints import ConstraintSet
     from openscvx.symbolic.expr import Parameter, traverse
     from openscvx.symbolic.expr.control import Control
     from openscvx.symbolic.expr.state import State

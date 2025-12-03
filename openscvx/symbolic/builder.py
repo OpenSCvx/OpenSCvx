@@ -86,7 +86,6 @@ Example:
 
 from typing import Dict, List, Tuple, Union
 
-from openscvx.constraints import ConstraintSet
 from openscvx.symbolic.augmentation import (
     augment_dynamics_with_ctcs,
     augment_with_time_state,
