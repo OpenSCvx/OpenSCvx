@@ -146,10 +146,10 @@ B(x, u, node, params) -> Array[n_x, n_u]  # df/du
 Non-convex nodal constraints that are to be lowered to JAX follow the same pattern:
 
 ```python
-# Convert symbolic constraint expressions to JAX functions (lower.py:312)
+# Convert symbolic constraint expressions to JAX functions
 constraints_nodal_fns = lower_to_jax(constraints_nodal)
 
-# Create LoweredNodalConstraint objects with Jacobians (lower.py:315-326)
+# Create LoweredNodalConstraint objects with Jacobians
 for i, fn in enumerate(constraints_nodal_fns):
     constraint = LoweredNodalConstraint(
         func=fn,                          # Constraint function
@@ -184,13 +184,52 @@ grad_g_x(x, u, node, params) -> Array[n_x]  # dg/dx
 grad_g_u(x, u, node, params) -> Array[n_u]  # dg/du
 ```
 
+### Cross-Node Constraint Lowering
+
+Cross-node constraints couple variables across multiple trajectory nodes. Unlike regular nodal constraints that evaluate at single nodes, cross-node constraints require access to the full trajectory.
+
+**Key Signature Difference:**
+
+| Constraint Type | Signature | Vectorization |
+|-----------------|-----------|---------------|
+| Regular Nodal | `(x, u, node, params) → scalar` | vmapped across nodes |
+| Cross-Node | `(X, U, params) → scalar` | operates on full trajectory |
+
+Cross-node constraints are represented by the `CrossNodeConstraint` expression type and lowered via a dedicated visitor (`JaxLowerer._visit_cross_node_constraint` in `openscvx/symbolic/lowerers/jax.py`). The visitor wraps the inner constraint to provide the trajectory-level signature.
+
+**Cross-Node Constraint Function Signature:**
+
+```python
+def g_cross(X: Array, U: Array, params: dict) -> scalar:
+    """Evaluate single cross-node constraint.
+
+    Args:
+        X: Full state trajectory, shape (N, n_x)
+        U: Full control trajectory, shape (N, n_u)
+        params: Dictionary of problem parameters
+
+    Returns:
+        Scalar constraint residual
+    """
+    ...
+```
+
+**Cross-Node Constraint Jacobians:**
+
+```python
+grad_g_X(X, U, params) -> Array[N, n_x]  # dg/dX - Jacobian wrt all states
+grad_g_U(X, U, params) -> Array[N, n_u]  # dg/dU - Jacobian wrt all controls
+```
+
+**Jacobian Sparsity:** These Jacobians are stored as dense `(N, n_x)` and `(N, n_u)` arrays but are typically very sparse. A constraint coupling nodes `k` and `k-1` only has non-zero derivatives at rows `k` and `k-1`; all other rows are zero.
+
 ## Stage 5: Vectorization with Vmap
 
 Finally, both dynamics and constraints are vectorized to operate on decision nodes simultaneously. This enables efficient parallel evaluation on GPU/TPU hardware.
 
 ### Dynamics Vectorization
 
-Dynamics functions are vmapped to process all intervals in parallel (in `openscvx/problem.py:356-358`):
+Dynamics functions are vmapped to process all intervals in parallel (in `Problem.initialize`):
 
 ```python
 # Vectorize dynamics functions across decision nodes
@@ -252,7 +291,7 @@ This is why vmapped dynamics process batches of size `(N-1, ...)` rather than `(
 
 ### Constraint Vectorization
 
-Non-convex nodal constraints are also vectorized, but with a key difference (in `openscvx/symbolic/lower.py:320-323`):
+Non-convex nodal constraints are also vectorized, but with a key difference (in `lower_symbolic_expressions`):
 
 ```python
 # Vectorize constraint functions (during JAX lowering)
@@ -310,9 +349,33 @@ u_batch = u[constraint.nodes]  # Shape: (len(nodes), n_u)
 g_values = constraint.func(x_batch, u_batch, node_idx, params)  # Shape: (len(nodes),)
 ```
 
+### Cross-Node Constraint Vectorization
+
+Cross-node constraints are **not vmapped** because they already operate on full trajectory arrays. Each `CrossNodeConstraint` is a single constraint with fixed node indices baked into the expression via `NodeReference` nodes.
+
+**Key Difference from Regular Constraints:**
+
+| Aspect | Regular Nodal Constraints | Cross-Node Constraints |
+|--------|--------------------------|------------------------|
+| **Input Shape** | Single-node vectors `(n_x,)`, `(n_u,)` | Full trajectories `(N, n_x)`, `(N, n_u)` |
+| **Vectorization** | `jax.vmap` with `in_axes=(0, 0, None, None)` | No vmap (already trajectory-level) |
+| **Output** | Scalar per evaluation | Scalar per constraint |
+| **Jacobian Shape** | `(n_x,)`, `(n_u,)` per node | `(N, n_x)`, `(N, n_u)` per constraint |
+
+**Evaluation:** During SCP iterations, each cross-node constraint receives the full trajectory arrays and returns a scalar residual:
+
+```python
+# Each CrossNodeConstraintLowered operates on full trajectories
+residual = constraint.func(X, U, params)      # scalar
+grad_X = constraint.grad_g_X(X, U, params)    # (N, n_x) - sparse, mostly zeros
+grad_U = constraint.grad_g_U(X, U, params)    # (N, n_u) - sparse, mostly zeros
+```
+
+The Jacobians are dense arrays but exhibit sparsity patterns determined by which nodes the constraint couples.
+
 ## Usage in Discretization
 
-The vmapped dynamics functions are called during discretization (in `openscvx/discretization.py:73-86`):
+The vmapped dynamics functions are called during discretization (in `calculate_discretization`):
 
 ```python
 # Setup batch inputs
@@ -381,6 +444,12 @@ Here's a complete reference for shapes at each stage, shown with symbolic dimens
 | | | Output: `(M,)` | Output: `(3,)` - M=3 constraint evaluations |
 | | `grad_g_x(x, u, node, params)` | Output: `(M, n_x)` | Output: `(3, 4)` - Gradients at M nodes |
 | | `grad_g_u(x, u, node, params)` | Output: `(M, n_u)` | Output: `(3, 2)` - Gradients at M nodes |
+| | **Cross-Node Constraints:** | | |
+| | `g_cross(X, U, params)` | Input: `(N, n_x), (N, n_u), dict` | Input: `(10, 4), (10, 2), dict` |
+| | | Output: `scalar` | Output: `scalar` - Single constraint |
+| | `grad_g_X(X, U, params)` | Output: `(N, n_x)` | Output: `(10, 4)` - Trajectory Jacobian |
+| | `grad_g_U(X, U, params)` | Output: `(N, n_u)` | Output: `(10, 2)` - Trajectory Jacobian |
+| | | **Note:** Jacobians are dense but sparse | **Sparsity:** Typically only 2-3 rows non-zero |
 
 ## Performance Implications
 
@@ -395,14 +464,20 @@ Here's a complete reference for shapes at each stage, shown with symbolic dimens
 
 | **File** | **Function/Class** | **Purpose** |
 |----------|-------------------|-------------|
-| `examples/abstract/brachistochrone.py` | — | Example problem definition |
 | `openscvx/problem.py` | `Problem.__init__` | Orchestrates preprocessing pipeline |
 | `openscvx/symbolic/builder.py` | `preprocess_symbolic_problem` | Augments states/controls/dynamics |
 | `openscvx/symbolic/lower.py` | `lower_symbolic_expressions` | Unification and JAX lowering for dynamics/constraints |
-| `openscvx/symbolic/lower.py:309-326` | Constraint lowering loop | Lowers non-convex constraints to JAX with vmap |
-| `openscvx/symbolic/unified.py` | `unify_states`, `unify_controls` | Combines individual variables |
-| `openscvx/problem.py:356-358` | `initialize` | Applies vmap to dynamics |
+| `openscvx/symbolic/unified.py` | `unify_states`, `unify_controls` | Combines individual variables into unified vectors |
+| `openscvx/problem.py` | `initialize` | Applies vmap to dynamics |
 | `openscvx/discretization.py` | `dVdt`, `calculate_discretization` | Uses vmapped dynamics |
+| `openscvx/constraints/lowered.py` | `LoweredNodalConstraint` | Container for vmapped nodal constraints |
+| `openscvx/constraints/cross_node.py` | `CrossNodeConstraintLowered` | Container for trajectory-level cross-node constraints |
+| `openscvx/symbolic/expr/constraint.py` | `CrossNodeConstraint` | Expression type for cross-node constraints |
+| `openscvx/symbolic/expr/expr.py` | `NodeReference` | Expression for referencing specific trajectory nodes |
+| `openscvx/symbolic/lowerers/jax.py` | `JaxLowerer._visit_cross_node_constraint` | Lowers CrossNodeConstraint to trajectory-level function |
+| `openscvx/symbolic/lowerers/jax.py` | `JaxLowerer._visit_node_reference` | Lowers NodeReference to JAX array indexing |
+| `openscvx/ocp.py` | `create_cvxpy_variables` | Creates CVXPy variables including cross-node parameters |
+| `openscvx/ptr.py` | `PTR_subproblem` | Updates constraint parameters during SCP iterations |
 
 ## Advanced: Accessing Unified Vectors
 
@@ -426,11 +501,13 @@ for state in problem.states:
 
 ## Common Developer Pitfalls
 
-1. **Confusing nodes vs intervals**: Discretization operates on N-1 intervals between N nodes, so vmapped dynamics have batch size (N-1, ...), while constraints evaluate at specific nodes (batch size M where M = number of nodes where constraint applies)
+1. **Confusing nodes vs intervals**: Discretization operates on N-1 intervals between N nodes, so vmapped dynamics have batch size `(N-1, ...)`, while constraints evaluate at specific nodes (batch size M where M = number of nodes where constraint applies)
 2. **Forgetting augmented dimensions**: `n_x` and `n_u` include auto-added states/controls (time, CTCS augmented states, time dilation)
 3. **Parameter mutability**: The `params` dict is shared across all evaluations - don't modify it during dynamics or constraint evaluation
 4. **Node index usage**: The `node` parameter enables time-varying behavior (e.g., time-dependent constraints), not for indexing into trajectory arrays
 5. **Constraint vs dynamics vmap axes**: Constraints use `in_axes=(0, 0, None, None)` (node not batched), while dynamics use `in_axes=(0, 0, 0, None)` (node batched across intervals)
+6. **Cross-node constraint signature**: Regular nodal constraints use `(x, u, node, params)` while cross-node constraints use `(X, U, params)` with full trajectory inputs
+7. **Cross-node Jacobian memory**: Cross-node Jacobians have shape `(N, n_x)` stored densely but are typically very sparse (most rows are zero). Be aware of memory usage for large N
 
 ## See Also
 

@@ -69,7 +69,15 @@ from .arithmetic import Add, Div, MatMul, Mul, Neg, Power, Sub
 from .array import Concat, Hstack, Index, Stack, Vstack
 
 # Specialized constraints
-from .constraint import CTCS, Constraint, Equality, Inequality, NodalConstraint, ctcs
+from .constraint import (
+    CTCS,
+    Constraint,
+    CrossNodeConstraint,
+    Equality,
+    Inequality,
+    NodalConstraint,
+    ctcs,
+)
 
 # Control
 from .control import Control
@@ -79,6 +87,7 @@ from .expr import (
     Constant,
     Expr,
     Leaf,
+    NodeReference,
     Parameter,
     to_expr,
     traverse,
@@ -120,6 +129,7 @@ __all__ = [
     # Core base classes and fundamental operations
     "Expr",
     "Leaf",
+    "NodeReference",
     "Parameter",
     "to_expr",
     "traverse",
@@ -175,6 +185,7 @@ __all__ = [
     "SSM",
     # Specialized constraints
     "NodalConstraint",
+    "CrossNodeConstraint",
     "CTCS",
     "ctcs",
     # STL operations

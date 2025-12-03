@@ -5,6 +5,7 @@ import cvxpy as cp
 import numpy as np
 
 from openscvx.config import Config
+from openscvx.constraints import ConstraintSet
 
 # Optional cvxpygen import
 try:
@@ -72,8 +73,8 @@ def create_cvxpy_variables(settings: Config) -> Dict:
     grad_g_x = []
     grad_g_u = []
     nu_vb = []
-    if settings.sim.constraints_nodal:
-        for idx_ncvx, constraint in enumerate(settings.sim.constraints_nodal):
+    if settings.sim.constraints.nodal:
+        for idx_ncvx, constraint in enumerate(settings.sim.constraints.nodal):
             g.append(cp.Parameter(settings.scp.n, name="g_" + str(idx_ncvx)))
             grad_g_x.append(
                 cp.Parameter(
@@ -87,6 +88,31 @@ def create_cvxpy_variables(settings: Config) -> Dict:
             )
             nu_vb.append(
                 cp.Variable(settings.scp.n, name="nu_vb_" + str(idx_ncvx))
+            )  # Virtual Control for VB
+
+    # Linearized Cross-Node Constraints
+    g_cross = []
+    grad_g_X_cross = []
+    grad_g_U_cross = []
+    nu_vb_cross = []
+    if settings.sim.constraints.cross_node:
+        for idx_cross, constraint in enumerate(settings.sim.constraints.cross_node):
+            # Cross-node constraints are single constraints with fixed node references
+            g_cross.append(cp.Parameter(name="g_cross_" + str(idx_cross)))
+            grad_g_X_cross.append(
+                cp.Parameter(
+                    (settings.scp.n, settings.sim.n_states),
+                    name="grad_g_X_cross_" + str(idx_cross),
+                )
+            )
+            grad_g_U_cross.append(
+                cp.Parameter(
+                    (settings.scp.n, settings.sim.n_controls),
+                    name="grad_g_U_cross_" + str(idx_cross),
+                )
+            )
+            nu_vb_cross.append(
+                cp.Variable(name="nu_vb_cross_" + str(idx_cross))
             )  # Virtual Control for VB
 
     # Applying the affine scaling to state and control
@@ -122,6 +148,10 @@ def create_cvxpy_variables(settings: Config) -> Dict:
         "grad_g_x": grad_g_x,
         "grad_g_u": grad_g_u,
         "nu_vb": nu_vb,
+        "g_cross": g_cross,
+        "grad_g_X_cross": grad_g_X_cross,
+        "grad_g_U_cross": grad_g_U_cross,
+        "nu_vb_cross": nu_vb_cross,
         "S_x": S_x,
         "inv_S_x": inv_S_x,
         "c_x": c_x,
@@ -136,16 +166,19 @@ def create_cvxpy_variables(settings: Config) -> Dict:
 
 
 def lower_convex_constraints(
-    constraints_nodal_convex, ocp_vars: Dict, params: Dict = None
+    constraints: "ConstraintSet",
+    ocp_vars: Dict,
+    params: Dict = None,
 ) -> tuple[List[cp.Constraint], Dict[str, cp.Parameter]]:
     """Phase 2: Lower symbolic convex constraints to CVXPy constraints with node-awareness.
 
-    Note: One symbolic constraint applied at N nodes becomes N CVXPy constraints.
-    The CVXPy variables x and u are already (n_nodes, n_states/n_controls) shaped,
-    so we apply constraints at specific nodes using x[k] and u[k].
+    This function handles both regular nodal constraints and cross-node constraints:
+    - Regular nodal (NodalConstraint): One symbolic constraint at N nodes → N CVXPy constraints
+    - Cross-node (CrossNodeConstraint): Constraint with NodeReferences → Applied using full
+        trajectory
 
     Args:
-        constraints_nodal_convex: List of convex constraints to lower
+        constraints: ConstraintSet (only nodal_convex and cross_node_convex fields are used)
         ocp_vars: Dictionary of CVXPy variables
         params: Optional dictionary of parameter values to override the defaults
 
@@ -157,7 +190,9 @@ def lower_convex_constraints(
     from openscvx.symbolic.expr.state import State
     from openscvx.symbolic.lowerers.cvxpy import lower_to_cvxpy
 
-    if not constraints_nodal_convex:
+    all_constraints = list(constraints.nodal_convex) + list(constraints.cross_node_convex)
+
+    if not all_constraints:
         return [], {}
 
     # Get the full trajectory CVXPy variables (n_nodes, n_states/n_controls)
@@ -180,12 +215,13 @@ def lower_convex_constraints(
                 all_params[expr.name] = cvx_param
 
     # Collect all parameters from all constraints
-    for constraint in constraints_nodal_convex:
+    for constraint in all_constraints:
         traverse(constraint.constraint, collect_params)
 
     cvxpy_constraints = []
 
-    for constraint in constraints_nodal_convex:
+    # Process nodal constraints
+    for constraint in constraints.nodal_convex:
         # nodes should already be validated and normalized in preprocessing
         nodes = constraint.nodes
 
@@ -201,6 +237,7 @@ def lower_convex_constraints(
 
         traverse(constraint.constraint, collect_vars)
 
+        # Regular nodal constraint: provide single node
         # Apply the constraint at each specified node
         for node in nodes:
             # Create simplified variable map for this specific node
@@ -224,7 +261,8 @@ def lower_convex_constraints(
                     raise ValueError(
                         f"State variable '{state_name}' has no slice assigned. "
                         f"This indicates a bug in the preprocessing pipeline - "
-                        f"collect_and_assign_slices should have assigned slices to all variables."
+                        f"collect_and_assign_slices should have assigned slices to all "
+                        f"variables."
                     )
 
             for control_name, control_var in control_vars.items():
@@ -232,13 +270,62 @@ def lower_convex_constraints(
                     raise ValueError(
                         f"Control variable '{control_name}' has no slice assigned. "
                         f"This indicates a bug in the preprocessing pipeline - "
-                        f"collect_and_assign_slices should have assigned slices to all variables."
+                        f"collect_and_assign_slices should have assigned slices to all "
+                        f"variables."
                     )
 
             # Lower the constraint to CVXPy using existing infrastructure
             # This creates one CVXPy constraint for this specific node
             cvxpy_constraint = lower_to_cvxpy(constraint.constraint, variable_map)
             cvxpy_constraints.append(cvxpy_constraint)
+
+    # Process cross-node constraints
+    for constraint in constraints.cross_node_convex:
+        # Collect all State and Control variables referenced in the constraint
+        state_vars = {}
+        control_vars = {}
+
+        def collect_vars(expr):
+            if isinstance(expr, State):
+                state_vars[expr.name] = expr
+            elif isinstance(expr, Control):
+                control_vars[expr.name] = expr
+
+        traverse(constraint.constraint, collect_vars)
+
+        # Cross-node constraint: provide full trajectory
+        variable_map = {}
+
+        # Stack all nodes into (N, n_x) and (N, n_u) matrices
+        if state_vars:
+            variable_map["x"] = cp.vstack(x_nonscaled)
+
+        if control_vars:
+            variable_map["u"] = cp.vstack(u_nonscaled)
+
+        # Add all CVXPy Parameter objects to the variable map
+        variable_map.update(all_params)
+
+        # Verify all variables have slices (should be guaranteed by preprocessing)
+        for state_name, state_var in state_vars.items():
+            if state_var._slice is None:
+                raise ValueError(
+                    f"State variable '{state_name}' has no slice assigned. "
+                    f"This indicates a bug in the preprocessing pipeline - "
+                    f"collect_and_assign_slices should have assigned slices to all variables."
+                )
+
+        for control_name, control_var in control_vars.items():
+            if control_var._slice is None:
+                raise ValueError(
+                    f"Control variable '{control_name}' has no slice assigned. "
+                    f"This indicates a bug in the preprocessing pipeline - "
+                    f"collect_and_assign_slices should have assigned slices to all variables."
+                )
+
+        # Lower the constraint once - NodeReference handles node indexing internally
+        cvxpy_constraint = lower_to_cvxpy(constraint.constraint, variable_map)
+        cvxpy_constraints.append(cvxpy_constraint)
 
     return cvxpy_constraints, all_params
 
@@ -267,6 +354,10 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     grad_g_x = ocp_vars["grad_g_x"]
     grad_g_u = ocp_vars["grad_g_u"]
     nu_vb = ocp_vars["nu_vb"]
+    g_cross = ocp_vars["g_cross"]
+    grad_g_X_cross = ocp_vars["grad_g_X_cross"]
+    grad_g_U_cross = ocp_vars["grad_g_U_cross"]
+    nu_vb_cross = ocp_vars["nu_vb_cross"]
     S_x = ocp_vars["S_x"]
     c_x = ocp_vars["c_x"]
     S_u = ocp_vars["S_u"]
@@ -286,8 +377,8 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
 
     # Linearized nodal constraints
     idx_ncvx = 0
-    if settings.sim.constraints_nodal:
-        for constraint in settings.sim.constraints_nodal:
+    if settings.sim.constraints.nodal:
+        for constraint in settings.sim.constraints.nodal:
             # nodes should already be validated and normalized in preprocessing
             nodes = constraint.nodes
             constr += [
@@ -301,9 +392,25 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
             ]
             idx_ncvx += 1
 
+    # Linearized cross-node constraints
+    idx_cross = 0
+    if settings.sim.constraints.cross_node:
+        for constraint in settings.sim.constraints.cross_node:
+            # Linearization: g(X_bar, U_bar) + ∇g_X @ dX + ∇g_U @ dU == nu_vb
+            # Sum over all trajectory nodes to couple multiple nodes
+            residual = g_cross[idx_cross]
+            for k in range(settings.scp.n):
+                # Contribution from state at node k
+                residual += grad_g_X_cross[idx_cross][k, :] @ dx[k]
+                # Contribution from control at node k
+                residual += grad_g_U_cross[idx_cross][k, :] @ du[k]
+            # Add constraint: residual == slack variable
+            constr += [residual == nu_vb_cross[idx_cross]]
+            idx_cross += 1
+
     # Convex nodal constraints (already lowered to CVXPy in problem)
-    if settings.sim.constraints_nodal_convex:
-        constr += settings.sim.constraints_nodal_convex
+    if settings.sim.constraints.nodal_convex:
+        constr += settings.sim.constraints.nodal_convex
 
     for i in range(settings.sim.true_state_slice.start, settings.sim.true_state_slice.stop):
         if settings.sim.x.initial_type[i] == "Fix":
@@ -368,11 +475,18 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     )  # Virtual Control Slack
 
     idx_ncvx = 0
-    if settings.sim.constraints_nodal:
-        for constraint in settings.sim.constraints_nodal:
+    if settings.sim.constraints.nodal:
+        for constraint in settings.sim.constraints.nodal:
             # if not constraint.convex:
             cost += lam_vb * cp.sum(cp.pos(nu_vb[idx_ncvx]))
             idx_ncvx += 1
+
+    # Virtual slack penalty for cross-node constraints
+    idx_cross = 0
+    if settings.sim.constraints.cross_node:
+        for constraint in settings.sim.constraints.cross_node:
+            cost += settings.scp.lam_vb * cp.pos(nu_vb_cross[idx_cross])
+            idx_cross += 1
 
     for idx, nodes in zip(
         np.arange(settings.sim.ctcs_slice.start, settings.sim.ctcs_slice.stop),

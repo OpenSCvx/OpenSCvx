@@ -218,6 +218,48 @@ class Expr:
 
         return Transpose(self)
 
+    def at(self, k: int) -> "NodeReference":
+        """Reference this expression at a specific trajectory node.
+
+        This method enables inter-node constraints where you can reference
+        the value of an expression at different time steps. Common patterns
+        include rate limits and multi-step dependencies.
+
+        Args:
+            k: Absolute node index (integer) in the trajectory.
+               Can be positive (0, 1, 2, ...) or negative (-1 for last node).
+
+        Returns:
+            NodeReference: An expression representing this expression at node k
+
+        Example:
+            Rate limit constraint (applied across trajectory using a loop):
+
+                position = State("pos", shape=(3,))
+
+                # Create rate limit for each node
+                constraints = [
+                    (ox.linalg.Norm(position.at(k) - position.at(k-1)) <= 0.1).at([k])
+                    for k in range(1, N)
+                ]
+
+            Multi-step dependency:
+
+                state = State("x", shape=(1,))
+
+                # Fibonacci-like recurrence
+                constraints = [
+                    (state.at(k) == state.at(k-1) + state.at(k-2)).at([k])
+                    for k in range(2, N)
+                ]
+
+        Performance Note:
+            Cross-node constraints use dense Jacobian storage which can be memory-intensive
+            for large N (>100 nodes). See CrossNodeConstraintLowered documentation for
+            details on memory usage and future sparse Jacobian support.
+        """
+        return NodeReference(self, k)
+
     def children(self):
         """Return the child expressions of this node.
 
@@ -485,3 +527,108 @@ class Constant(Expr):
         else:
             # Array: show as Python list for readability
             return f"Const({self.value.tolist()!r})"
+
+
+class NodeReference(Expr):
+    """Reference to a variable at a specific trajectory node.
+
+    NodeReference enables inter-node constraints by allowing you to reference
+    the value of a state or control variable at a specific discrete time point
+    (node) in the trajectory. This is essential for expressing temporal relationships
+    such as:
+
+    - Rate limits and smoothness constraints
+    - Multi-step dependencies and recurrence relations
+    - Constraints coupling specific nodes
+
+    Attributes:
+        base: The expression (typically a Leaf like State or Control) being referenced
+        node_idx: Trajectory node index (integer, can be negative for end-indexing)
+
+    Example:
+        Rate limit across trajectory:
+
+            position = State("pos", shape=(3,))
+
+            # Create rate limit constraints for all nodes
+            constraints = [
+                (ox.linalg.Norm(position.at(k) - position.at(k-1)) <= 0.1).at([k])
+                for k in range(1, N)
+            ]
+
+        Multi-step dependency:
+
+            state = State("x", shape=(1,))
+
+            # Fibonacci-like recurrence at each node
+            constraints = [
+                (state.at(k) == state.at(k-1) + state.at(k-2)).at([k])
+                for k in range(2, N)
+            ]
+
+        Coupling specific nodes:
+
+            # Constrain distance between nodes 5 and 10
+            coupling = (position.at(10) - position.at(5) <= threshold).at([10])
+
+    Performance Note:
+        Cross-node constraints use dense Jacobian storage. For details on memory
+        usage and performance implications, see CrossNodeConstraintLowered documentation.
+
+    Note:
+        NodeReference is typically created via the `.at(k)` method on expressions
+        rather than constructed directly.
+    """
+
+    def __init__(self, base: Expr, node_idx: int):
+        """Initialize a NodeReference.
+
+        Args:
+            base: Expression to reference at a specific node (typically a Leaf)
+            node_idx: Absolute trajectory node index (integer)
+                     Supports negative indexing (e.g., -1 for last node)
+
+        Raises:
+            TypeError: If node_idx is not an integer
+        """
+        if not isinstance(node_idx, int):
+            raise TypeError(f"Node index must be an integer, got {type(node_idx).__name__}")
+
+        self.node_idx = node_idx
+        self.base = base
+
+    def children(self):
+        """Return the base expression as the only child.
+
+        Returns:
+            list: Single-element list containing the base expression
+        """
+        return [self.base]
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize by canonicalizing the base expression.
+
+        Returns:
+            NodeReference: A new NodeReference with canonicalized base
+        """
+        canon_base = self.base.canonicalize()
+        return NodeReference(canon_base, self.node_idx)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Return the shape of the base expression.
+
+        NodeReference doesn't change the shape of the underlying expression,
+        it just references it at a specific time point.
+
+        Returns:
+            tuple: The shape of the base expression
+        """
+        return self.base.check_shape()
+
+    def __repr__(self):
+        """String representation of the NodeReference.
+
+        Returns:
+            str: String showing the base expression and node index
+        """
+        return f"{self.base!r}.at({self.node_idx})"

@@ -412,3 +412,63 @@ def test_complex_expression_constant_equivalence():
     assert jnp.allclose(result_explicit, expected)
     assert jnp.allclose(result_mixed, expected)
     assert jnp.allclose(result_implicit, expected)
+
+
+# =============================================================================
+# Cross-Node Constraint Lowering Tests
+# =============================================================================
+
+
+def test_contains_node_reference():
+    """Test detection of NodeReference in expressions."""
+    from openscvx.symbolic.lower import _contains_node_reference as contains_node_reference
+
+    position = State("pos", shape=(3,))
+
+    # Regular expression - no NodeReference
+    regular_expr = position + 1.0
+    assert not contains_node_reference(regular_expr)
+
+    # With NodeReference
+    cross_node_expr = position.at(5) - position.at(4)
+    assert contains_node_reference(cross_node_expr)
+
+    # Deeply nested
+    nested_expr = (position.at(5) - position.at(4)) * 2.0 + 1.0
+    assert contains_node_reference(nested_expr)
+
+
+def test_absolute_node_reference_semantics():
+    """Test that absolute indexing references the correct trajectory nodes.
+
+    Tests that CrossNodeConstraint lowering produces a function with
+    trajectory-level signature (X, U, params) -> result.
+    """
+    from openscvx.symbolic.expr import CrossNodeConstraint
+    from openscvx.symbolic.lower import lower_to_jax
+
+    position = State("pos", shape=(2,))
+    position._slice = slice(0, 2)  # Manually assign slice for testing
+
+    # Expression: position[5] - position[3]
+    expr = position.at(5) - position.at(3)
+
+    # Wrap in CrossNodeConstraint and lower - visitor handles wrapping
+    cross_node = CrossNodeConstraint(expr <= 0)  # Need a constraint for CrossNodeConstraint
+    constraint_fn = lower_to_jax(cross_node)
+
+    # Create fake trajectory
+    X = jnp.arange(20).reshape(10, 2).astype(float)  # 10 nodes, 2-dim state
+    U = jnp.zeros((10, 0))
+    params = {}
+
+    # Evaluate - CrossNodeConstraint visitor provides (X, U, params) signature
+    results = constraint_fn(X, U, params)
+
+    # Expected: X[5] - X[3] - 0 = [10, 11] - [6, 7] = [4, 4]
+    # Inequality lowers to lhs - rhs, so result is position[5] - position[3] - 0
+    # Shape is (n_x,) = (2,) since constraint evaluates once
+    expected = jnp.array([4.0, 4.0])
+
+    assert results.shape == (2,)  # 2-dim state (single evaluation)
+    assert jnp.allclose(results, expected)
