@@ -80,8 +80,9 @@ class _ParameterDict(dict):
         # Sync to internal dict for JAX
         self._internal_dict[key] = value
         # Sync to CVXPy if it exists
-        if self._problem.cvxpy_params is not None and key in self._problem.cvxpy_params:
-            self._problem.cvxpy_params[key].value = value
+        cvxpy_params = getattr(self._problem, "cvxpy_params", None)
+        if cvxpy_params is not None and key in cvxpy_params:
+            cvxpy_params[key].value = value
 
     def update(self, other=None, **kwargs):
         """Update multiple parameters and sync to internal dict and CVXPy."""
