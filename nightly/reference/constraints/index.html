@@ -18,7 +18,7 @@
         <link rel="prev" href="../config/">
       
       
-        <link rel="next" href="lowered/">
+        <link rel="next" href="cross_node/">
       
       
         
@@ -2677,6 +2677,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#openscvx.constraints.CrossNodeConstraintLowered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CrossNodeConstraintLowered
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#openscvx.constraints.LoweredNodalConstraint" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2747,6 +2758,285 @@
 
 
 
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="openscvx.constraints.CrossNodeConstraintLowered" class="doc doc-heading">
+            <code>CrossNodeConstraintLowered</code>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#openscvx.constraints.CrossNodeConstraintLowered" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Lowered cross-node constraint with trajectory-level evaluation.</p>
+<p>Unlike regular LoweredNodalConstraint which operates on single-node vectors
+and is vmapped across the trajectory, CrossNodeConstraintLowered operates
+on full trajectory arrays to relate multiple nodes simultaneously.</p>
+<p>This is necessary for constraints like:
+- Rate limits: x[k] - x[k-1] &lt;= max_rate
+- Multi-step dependencies: x[k] = 2*x[k-1] - x[k-2]
+- Periodic boundaries: x[0] = x[N-1]</p>
+<p>The function signatures differ from LoweredNodalConstraint:
+- Regular: f(x, u, node, params) -&gt; scalar (vmapped to handle (N, n_x))
+- Cross-node: f(X, U, params) -&gt; scalar (single constraint with fixed node indices)</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="openscvx.constraints.CrossNodeConstraintLowered.func">func</span></code></td>
+            <td>
+                  <code><span title="typing.Callable">Callable</span>[[<span title="jax.numpy.ndarray">ndarray</span>, <span title="jax.numpy.ndarray">ndarray</span>, <span title="dict">dict</span>], <span title="jax.numpy.ndarray">ndarray</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Function (X, U, params) -&gt; scalar residual
+where X: (N, n_x), U: (N, n_u)
+Returns constraint residual following g(X, U) &lt;= 0 convention
+The constraint references fixed trajectory nodes (e.g., X[5] - X[4])</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="openscvx.constraints.CrossNodeConstraintLowered.grad_g_X">grad_g_X</span></code></td>
+            <td>
+                  <code><span title="typing.Callable">Callable</span>[[<span title="jax.numpy.ndarray">ndarray</span>, <span title="jax.numpy.ndarray">ndarray</span>, <span title="dict">dict</span>], <span title="jax.numpy.ndarray">ndarray</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Function (X, U, params) -&gt; (N, n_x) Jacobian wrt full state trajectory
+This is typically sparse - most constraints only couple nearby nodes</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="openscvx.constraints.CrossNodeConstraintLowered.grad_g_U">grad_g_U</span></code></td>
+            <td>
+                  <code><span title="typing.Callable">Callable</span>[[<span title="jax.numpy.ndarray">ndarray</span>, <span title="jax.numpy.ndarray">ndarray</span>, <span title="dict">dict</span>], <span title="jax.numpy.ndarray">ndarray</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Function (X, U, params) -&gt; (N, n_u) Jacobian wrt full control trajectory
+Often zero or very sparse for cross-node state constraints</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <p>For rate constraint x[5] - x[4] &lt;= r:</p>
+<div class="language-python highlight"><pre><span></span><code><span class="n">func</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">U</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">scalar</span> <span class="n">residual</span>
+<span class="n">grad_g_X</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">U</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">n_x</span><span class="p">)</span> <span class="n">sparse</span> <span class="n">Jacobian</span>
+    <span class="n">where</span> <span class="n">grad_g_X</span><span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="err">∂</span><span class="n">g</span><span class="o">/</span><span class="err">∂</span><span class="n">x</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span> <span class="p">(</span><span class="n">derivative</span> <span class="n">wrt</span> <span class="n">node</span> <span class="mi">5</span><span class="p">)</span>
+    <span class="ow">and</span> <span class="n">grad_g_X</span><span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="err">∂</span><span class="n">g</span><span class="o">/</span><span class="err">∂</span><span class="n">x</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="p">(</span><span class="n">derivative</span> <span class="n">wrt</span> <span class="n">node</span> <span class="mi">4</span><span class="p">)</span>
+    <span class="nb">all</span> <span class="n">other</span> <span class="n">entries</span> <span class="n">are</span> <span class="n">zero</span>
+</code></pre></div>
+</details>
+
+<details class="performance-note---dense-jacobian-storage" open>
+  <summary>Performance Note - Dense Jacobian Storage</summary>
+  <p>The Jacobian matrices grad_g_X and grad_g_U are stored as DENSE arrays with
+shape (N, n_x) and (N, n_u), but most cross-node constraints only couple a
+small number of nearby nodes, making these matrices extremely sparse.</p>
+<p>For example, a rate limit constraint x[k] - x[k-1] &lt;= r only has non-zero
+Jacobian entries at positions [k, :] and [k-1, :]. All other N-2 rows are
+zero but still stored in memory.</p>
+<p>Memory impact for large problems:
+- A single constraint with N=100 nodes, n_x=10 states requires ~8KB for
+  grad_g_X (compared to ~160 bytes if sparse with 2 non-zero rows)
+- Multiple cross-node constraints multiply this overhead
+- May cause issues for N &gt; 1000 with many constraints</p>
+<p>Performance impact:
+- Slower autodiff (computes many zero gradients)
+- Inefficient constraint linearization in the SCP solver
+- Potential GPU memory limitations for very large problems</p>
+<p>The current implementation prioritizes simplicity and compatibility with
+JAX's autodiff over memory efficiency. Future versions may support sparse
+Jacobian formats (COO, CSR, or custom sparse representations) if this
+becomes a bottleneck in practice.</p>
+</details>
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>openscvx/constraints/cross_node.py</code></summary>
+                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-14">14</a></span>
+<span class="normal"><a href="#__codelineno-0-15">15</a></span>
+<span class="normal"><a href="#__codelineno-0-16">16</a></span>
+<span class="normal"><a href="#__codelineno-0-17">17</a></span>
+<span class="normal"><a href="#__codelineno-0-18">18</a></span>
+<span class="normal"><a href="#__codelineno-0-19">19</a></span>
+<span class="normal"><a href="#__codelineno-0-20">20</a></span>
+<span class="normal"><a href="#__codelineno-0-21">21</a></span>
+<span class="normal"><a href="#__codelineno-0-22">22</a></span>
+<span class="normal"><a href="#__codelineno-0-23">23</a></span>
+<span class="normal"><a href="#__codelineno-0-24">24</a></span>
+<span class="normal"><a href="#__codelineno-0-25">25</a></span>
+<span class="normal"><a href="#__codelineno-0-26">26</a></span>
+<span class="normal"><a href="#__codelineno-0-27">27</a></span>
+<span class="normal"><a href="#__codelineno-0-28">28</a></span>
+<span class="normal"><a href="#__codelineno-0-29">29</a></span>
+<span class="normal"><a href="#__codelineno-0-30">30</a></span>
+<span class="normal"><a href="#__codelineno-0-31">31</a></span>
+<span class="normal"><a href="#__codelineno-0-32">32</a></span>
+<span class="normal"><a href="#__codelineno-0-33">33</a></span>
+<span class="normal"><a href="#__codelineno-0-34">34</a></span>
+<span class="normal"><a href="#__codelineno-0-35">35</a></span>
+<span class="normal"><a href="#__codelineno-0-36">36</a></span>
+<span class="normal"><a href="#__codelineno-0-37">37</a></span>
+<span class="normal"><a href="#__codelineno-0-38">38</a></span>
+<span class="normal"><a href="#__codelineno-0-39">39</a></span>
+<span class="normal"><a href="#__codelineno-0-40">40</a></span>
+<span class="normal"><a href="#__codelineno-0-41">41</a></span>
+<span class="normal"><a href="#__codelineno-0-42">42</a></span>
+<span class="normal"><a href="#__codelineno-0-43">43</a></span>
+<span class="normal"><a href="#__codelineno-0-44">44</a></span>
+<span class="normal"><a href="#__codelineno-0-45">45</a></span>
+<span class="normal"><a href="#__codelineno-0-46">46</a></span>
+<span class="normal"><a href="#__codelineno-0-47">47</a></span>
+<span class="normal"><a href="#__codelineno-0-48">48</a></span>
+<span class="normal"><a href="#__codelineno-0-49">49</a></span>
+<span class="normal"><a href="#__codelineno-0-50">50</a></span>
+<span class="normal"><a href="#__codelineno-0-51">51</a></span>
+<span class="normal"><a href="#__codelineno-0-52">52</a></span>
+<span class="normal"><a href="#__codelineno-0-53">53</a></span>
+<span class="normal"><a href="#__codelineno-0-54">54</a></span>
+<span class="normal"><a href="#__codelineno-0-55">55</a></span>
+<span class="normal"><a href="#__codelineno-0-56">56</a></span>
+<span class="normal"><a href="#__codelineno-0-57">57</a></span>
+<span class="normal"><a href="#__codelineno-0-58">58</a></span>
+<span class="normal"><a href="#__codelineno-0-59">59</a></span>
+<span class="normal"><a href="#__codelineno-0-60">60</a></span>
+<span class="normal"><a href="#__codelineno-0-61">61</a></span>
+<span class="normal"><a href="#__codelineno-0-62">62</a></span>
+<span class="normal"><a href="#__codelineno-0-63">63</a></span>
+<span class="normal"><a href="#__codelineno-0-64">64</a></span>
+<span class="normal"><a href="#__codelineno-0-65">65</a></span>
+<span class="normal"><a href="#__codelineno-0-66">66</a></span>
+<span class="normal"><a href="#__codelineno-0-67">67</a></span>
+<span class="normal"><a href="#__codelineno-0-68">68</a></span>
+<span class="normal"><a href="#__codelineno-0-69">69</a></span>
+<span class="normal"><a href="#__codelineno-0-70">70</a></span>
+<span class="normal"><a href="#__codelineno-0-71">71</a></span>
+<span class="normal"><a href="#__codelineno-0-72">72</a></span>
+<span class="normal"><a href="#__codelineno-0-73">73</a></span>
+<span class="normal"><a href="#__codelineno-0-74">74</a></span>
+<span class="normal"><a href="#__codelineno-0-75">75</a></span>
+<span class="normal"><a href="#__codelineno-0-76">76</a></span>
+<span class="normal"><a href="#__codelineno-0-77">77</a></span>
+<span class="normal"><a href="#__codelineno-0-78">78</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14"></a><span class="nd">@dataclass</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15"></a><span class="k">class</span><span class="w"> </span><span class="nc">CrossNodeConstraintLowered</span><span class="p">:</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Lowered cross-node constraint with trajectory-level evaluation.</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17"></a>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18"></a><span class="sd">    Unlike regular LoweredNodalConstraint which operates on single-node vectors</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19"></a><span class="sd">    and is vmapped across the trajectory, CrossNodeConstraintLowered operates</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20"></a><span class="sd">    on full trajectory arrays to relate multiple nodes simultaneously.</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21"></a>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22"></a><span class="sd">    This is necessary for constraints like:</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23"></a><span class="sd">    - Rate limits: x[k] - x[k-1] &lt;= max_rate</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24"></a><span class="sd">    - Multi-step dependencies: x[k] = 2*x[k-1] - x[k-2]</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25"></a><span class="sd">    - Periodic boundaries: x[0] = x[N-1]</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26"></a>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27"></a><span class="sd">    The function signatures differ from LoweredNodalConstraint:</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28"></a><span class="sd">    - Regular: f(x, u, node, params) -&gt; scalar (vmapped to handle (N, n_x))</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29"></a><span class="sd">    - Cross-node: f(X, U, params) -&gt; scalar (single constraint with fixed node indices)</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30"></a>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31"></a><span class="sd">    Attributes:</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32"></a><span class="sd">        func: Function (X, U, params) -&gt; scalar residual</span>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33"></a><span class="sd">            where X: (N, n_x), U: (N, n_u)</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34"></a><span class="sd">            Returns constraint residual following g(X, U) &lt;= 0 convention</span>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35"></a><span class="sd">            The constraint references fixed trajectory nodes (e.g., X[5] - X[4])</span>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36"></a><span class="sd">        grad_g_X: Function (X, U, params) -&gt; (N, n_x) Jacobian wrt full state trajectory</span>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37"></a><span class="sd">            This is typically sparse - most constraints only couple nearby nodes</span>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38"></a><span class="sd">        grad_g_U: Function (X, U, params) -&gt; (N, n_u) Jacobian wrt full control trajectory</span>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39"></a><span class="sd">            Often zero or very sparse for cross-node state constraints</span>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40"></a>
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="sd">    Example:</span>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42"></a><span class="sd">        For rate constraint x[5] - x[4] &lt;= r:</span>
+</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43"></a>
+</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44"></a><span class="sd">            func(X, U, params) -&gt; scalar residual</span>
+</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45"></a><span class="sd">            grad_g_X(X, U, params) -&gt; (N, n_x) sparse Jacobian</span>
+</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46"></a><span class="sd">                where grad_g_X[5, :] = ∂g/∂x[5] (derivative wrt node 5)</span>
+</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47"></a><span class="sd">                and grad_g_X[4, :] = ∂g/∂x[4] (derivative wrt node 4)</span>
+</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48"></a><span class="sd">                all other entries are zero</span>
+</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49"></a>
+</span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50"></a><span class="sd">    Performance Note - Dense Jacobian Storage:</span>
+</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51"></a><span class="sd">        The Jacobian matrices grad_g_X and grad_g_U are stored as DENSE arrays with</span>
+</span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52"></a><span class="sd">        shape (N, n_x) and (N, n_u), but most cross-node constraints only couple a</span>
+</span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53"></a><span class="sd">        small number of nearby nodes, making these matrices extremely sparse.</span>
+</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54"></a>
+</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55"></a><span class="sd">        For example, a rate limit constraint x[k] - x[k-1] &lt;= r only has non-zero</span>
+</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56"></a><span class="sd">        Jacobian entries at positions [k, :] and [k-1, :]. All other N-2 rows are</span>
+</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57"></a><span class="sd">        zero but still stored in memory.</span>
+</span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58"></a>
+</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59"></a><span class="sd">        Memory impact for large problems:</span>
+</span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60"></a><span class="sd">        - A single constraint with N=100 nodes, n_x=10 states requires ~8KB for</span>
+</span><span id="__span-0-61"><a id="__codelineno-0-61" name="__codelineno-0-61"></a><span class="sd">          grad_g_X (compared to ~160 bytes if sparse with 2 non-zero rows)</span>
+</span><span id="__span-0-62"><a id="__codelineno-0-62" name="__codelineno-0-62"></a><span class="sd">        - Multiple cross-node constraints multiply this overhead</span>
+</span><span id="__span-0-63"><a id="__codelineno-0-63" name="__codelineno-0-63"></a><span class="sd">        - May cause issues for N &gt; 1000 with many constraints</span>
+</span><span id="__span-0-64"><a id="__codelineno-0-64" name="__codelineno-0-64"></a>
+</span><span id="__span-0-65"><a id="__codelineno-0-65" name="__codelineno-0-65"></a><span class="sd">        Performance impact:</span>
+</span><span id="__span-0-66"><a id="__codelineno-0-66" name="__codelineno-0-66"></a><span class="sd">        - Slower autodiff (computes many zero gradients)</span>
+</span><span id="__span-0-67"><a id="__codelineno-0-67" name="__codelineno-0-67"></a><span class="sd">        - Inefficient constraint linearization in the SCP solver</span>
+</span><span id="__span-0-68"><a id="__codelineno-0-68" name="__codelineno-0-68"></a><span class="sd">        - Potential GPU memory limitations for very large problems</span>
+</span><span id="__span-0-69"><a id="__codelineno-0-69" name="__codelineno-0-69"></a>
+</span><span id="__span-0-70"><a id="__codelineno-0-70" name="__codelineno-0-70"></a><span class="sd">        The current implementation prioritizes simplicity and compatibility with</span>
+</span><span id="__span-0-71"><a id="__codelineno-0-71" name="__codelineno-0-71"></a><span class="sd">        JAX&#39;s autodiff over memory efficiency. Future versions may support sparse</span>
+</span><span id="__span-0-72"><a id="__codelineno-0-72" name="__codelineno-0-72"></a><span class="sd">        Jacobian formats (COO, CSR, or custom sparse representations) if this</span>
+</span><span id="__span-0-73"><a id="__codelineno-0-73" name="__codelineno-0-73"></a><span class="sd">        becomes a bottleneck in practice.</span>
+</span><span id="__span-0-74"><a id="__codelineno-0-74" name="__codelineno-0-74"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-75"><a id="__codelineno-0-75" name="__codelineno-0-75"></a>
+</span><span id="__span-0-76"><a id="__codelineno-0-76" name="__codelineno-0-76"></a>    <span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">dict</span><span class="p">],</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
+</span><span id="__span-0-77"><a id="__codelineno-0-77" name="__codelineno-0-77"></a>    <span class="n">grad_g_X</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">dict</span><span class="p">],</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
+</span><span id="__span-0-78"><a id="__codelineno-0-78" name="__codelineno-0-78"></a>    <span class="n">grad_g_U</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">dict</span><span class="p">],</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
+</span></code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-class">
 
@@ -3018,13 +3308,13 @@ Set after lowering from NodalConstraint.</p>
         
         
           
-          <a href="lowered/" class="md-footer__link md-footer__link--next" aria-label="Next: lowered">
+          <a href="cross_node/" class="md-footer__link md-footer__link--next" aria-label="Next: cross_node">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                lowered
+                cross_node
               </div>
             </div>
             <div class="md-footer__button md-icon">
