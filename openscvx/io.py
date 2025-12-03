@@ -72,16 +72,18 @@ def print_problem_summary(settings):
     n_augmented = settings.sim.n_states - settings.sim.true_state_slice.stop
 
     # Count CVXPy variables, parameters, and constraints
-    from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables, lower_convex_constraints
+    from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables
+    from openscvx.symbolic.lower import lower_cvxpy_constraints
 
     try:
         # Phase 1: Create CVXPy variables
         ocp_vars = create_cvxpy_variables(settings)
 
         # Phase 2: Lower convex constraints to CVXPy (needed for problem construction)
-        lowered_convex_constraints, _ = lower_convex_constraints(
+        lowered_convex_constraints, _ = lower_cvxpy_constraints(
             settings.sim.constraints,
-            ocp_vars,
+            ocp_vars["x_nonscaled"],
+            ocp_vars["u_nonscaled"],
             None,
         )
 

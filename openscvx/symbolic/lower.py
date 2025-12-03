@@ -140,6 +140,181 @@ def lower_to_jax(exprs: Union[Expr, Sequence[Expr]]) -> Union[callable, list[cal
     return fns
 
 
+def lower_cvxpy_constraints(
+    constraints: ConstraintSet,
+    x_cvxpy: List,
+    u_cvxpy: List,
+    parameters: dict = None,
+) -> Tuple[List, dict]:
+    """Lower symbolic convex constraints to CVXPy constraints.
+
+    Converts symbolic convex constraint expressions to CVXPy constraint objects
+    that can be used in the optimal control problem. This function handles both
+    nodal constraints (applied at specific trajectory nodes) and cross-node
+    constraints (relating multiple nodes).
+
+    Args:
+        constraints: ConstraintSet containing nodal_convex and cross_node_convex
+        x_cvxpy: List of CVXPy expressions for state at each node (length N).
+            Typically the x_nonscaled list from create_cvxpy_variables().
+        u_cvxpy: List of CVXPy expressions for control at each node (length N).
+            Typically the u_nonscaled list from create_cvxpy_variables().
+        parameters: Optional dict of parameter values to use for any Parameter
+            expressions in the constraints. If None, uses Parameter default values.
+
+    Returns:
+        Tuple of:
+        - List of CVXPy constraint objects ready for the OCP
+        - Dict mapping parameter names to their CVXPy Parameter objects
+
+    Example:
+        After creating CVXPy variables::
+
+            ocp_vars = create_cvxpy_variables(settings)
+            cvxpy_constraints, cvxpy_params = lower_cvxpy_constraints(
+                constraint_set,
+                ocp_vars["x_nonscaled"],
+                ocp_vars["u_nonscaled"],
+                parameters,
+            )
+
+    Note:
+        This function only processes convex constraints (nodal_convex and
+        cross_node_convex). Non-convex constraints are lowered to JAX in
+        lower_symbolic_expressions() and handled via linearization in the SCP.
+    """
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Parameter, traverse
+    from openscvx.symbolic.expr.control import Control
+    from openscvx.symbolic.expr.state import State
+    from openscvx.symbolic.lowerers.cvxpy import lower_to_cvxpy
+
+    all_constraints = list(constraints.nodal_convex) + list(constraints.cross_node_convex)
+
+    if not all_constraints:
+        return [], {}
+
+    # Collect all unique Parameters across all constraints and create cp.Parameter objects
+    all_params = {}
+
+    def collect_params(expr):
+        if isinstance(expr, Parameter):
+            if expr.name not in all_params:
+                # Use value from params dict if provided, otherwise use Parameter's initial value
+                if parameters and expr.name in parameters:
+                    param_value = parameters[expr.name]
+                else:
+                    param_value = expr.value
+
+                cvx_param = cp.Parameter(expr.shape, value=param_value, name=expr.name)
+                all_params[expr.name] = cvx_param
+
+    # Collect all parameters from all constraints
+    for constraint in all_constraints:
+        traverse(constraint.constraint, collect_params)
+
+    cvxpy_constraints = []
+
+    # Process nodal constraints
+    for constraint in constraints.nodal_convex:
+        # nodes should already be validated and normalized in preprocessing
+        nodes = constraint.nodes
+
+        # Collect all State and Control variables referenced in the constraint
+        state_vars = {}
+        control_vars = {}
+
+        def collect_vars(expr):
+            if isinstance(expr, State):
+                state_vars[expr.name] = expr
+            elif isinstance(expr, Control):
+                control_vars[expr.name] = expr
+
+        traverse(constraint.constraint, collect_vars)
+
+        # Regular nodal constraint: apply at each specified node
+        for node in nodes:
+            # Create variable map for this specific node
+            variable_map = {}
+
+            if state_vars:
+                variable_map["x"] = x_cvxpy[node]
+
+            if control_vars:
+                variable_map["u"] = u_cvxpy[node]
+
+            # Add all CVXPy Parameter objects to the variable map
+            variable_map.update(all_params)
+
+            # Verify all variables have slices (should be guaranteed by preprocessing)
+            for state_name, state_var in state_vars.items():
+                if state_var._slice is None:
+                    raise ValueError(
+                        f"State variable '{state_name}' has no slice assigned. "
+                        f"This indicates a bug in the preprocessing pipeline."
+                    )
+
+            for control_name, control_var in control_vars.items():
+                if control_var._slice is None:
+                    raise ValueError(
+                        f"Control variable '{control_name}' has no slice assigned. "
+                        f"This indicates a bug in the preprocessing pipeline."
+                    )
+
+            # Lower the constraint to CVXPy
+            cvxpy_constraint = lower_to_cvxpy(constraint.constraint, variable_map)
+            cvxpy_constraints.append(cvxpy_constraint)
+
+    # Process cross-node constraints
+    for constraint in constraints.cross_node_convex:
+        # Collect all State and Control variables referenced in the constraint
+        state_vars = {}
+        control_vars = {}
+
+        def collect_vars(expr):
+            if isinstance(expr, State):
+                state_vars[expr.name] = expr
+            elif isinstance(expr, Control):
+                control_vars[expr.name] = expr
+
+        traverse(constraint.constraint, collect_vars)
+
+        # Cross-node constraint: provide full trajectory
+        variable_map = {}
+
+        # Stack all nodes into (N, n_x) and (N, n_u) matrices
+        if state_vars:
+            variable_map["x"] = cp.vstack(x_cvxpy)
+
+        if control_vars:
+            variable_map["u"] = cp.vstack(u_cvxpy)
+
+        # Add all CVXPy Parameter objects to the variable map
+        variable_map.update(all_params)
+
+        # Verify all variables have slices
+        for state_name, state_var in state_vars.items():
+            if state_var._slice is None:
+                raise ValueError(
+                    f"State variable '{state_name}' has no slice assigned. "
+                    f"This indicates a bug in the preprocessing pipeline."
+                )
+
+        for control_name, control_var in control_vars.items():
+            if control_var._slice is None:
+                raise ValueError(
+                    f"Control variable '{control_name}' has no slice assigned. "
+                    f"This indicates a bug in the preprocessing pipeline."
+                )
+
+        # Lower the constraint once - NodeReference handles node indexing internally
+        cvxpy_constraint = lower_to_cvxpy(constraint.constraint, variable_map)
+        cvxpy_constraints.append(cvxpy_constraint)
+
+    return cvxpy_constraints, all_params
+
+
 def _contains_node_reference(expr: Expr) -> bool:
     """Check if an expression contains any NodeReference nodes.
 
@@ -284,14 +459,14 @@ def lower_symbolic_expressions(
 
         **CVXPy Lowering**: Convex constraints are NOT lowered to CVXPy in this
         function. They remain symbolic and are lowered immediately after in
-        Problem.__init__ using create_cvxpy_variables() and lower_convex_constraints()
-        from ocp.py. This keeps JAX and CVXPy lowering as separate steps while
-        ensuring both happen during problem construction.
+        Problem.__init__ using create_cvxpy_variables() and lower_cvxpy_constraints().
+        This keeps JAX and CVXPy lowering as separate steps while ensuring both
+        happen during problem construction.
 
     See Also:
         - lower_to_jax(): The underlying lowering function for individual expressions
         - JaxLowerer: The visitor-pattern backend that implements JAX lowering
-        - lower_convex_constraints(): CVXPy lowering in ocp.py
+        - lower_cvxpy_constraints(): CVXPy constraint lowering in this module
         - UnifiedState/UnifiedControl: Aggregation containers in symbolic/unified.py
         - Dynamics: Container for dynamics functions in dynamics.py
         - LoweredNodalConstraint: Container for constraint functions in constraints/lowered.py
@@ -384,7 +559,7 @@ def lower_symbolic_expressions(
 
     # Convex constraints (nodal_convex, cross_node_convex) remain symbolic here.
     # They are lowered to CVXPy in Problem.__init__ immediately after this function
-    # is called, using create_cvxpy_variables() and lower_convex_constraints().
+    # is called, using create_cvxpy_variables() and lower_cvxpy_constraints().
 
     # ==================== RETURN LOWERED OUTPUTS ====================
 

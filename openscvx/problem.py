@@ -26,11 +26,7 @@ from openscvx.config import (
     SimConfig,
 )
 from openscvx.discretization import get_discretization_solver
-from openscvx.ocp import (
-    OptimalControlProblem,
-    create_cvxpy_variables,
-    lower_convex_constraints,
-)
+from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
 from openscvx.ptr import PTR_init, PTR_step, format_result
@@ -39,7 +35,7 @@ from openscvx.symbolic.builder import preprocess_symbolic_problem
 from openscvx.symbolic.expr import CTCS, Constraint
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
-from openscvx.symbolic.lower import lower_symbolic_expressions
+from openscvx.symbolic.lower import lower_cvxpy_constraints, lower_symbolic_expressions
 from openscvx.time import Time
 
 if TYPE_CHECKING:
@@ -281,9 +277,10 @@ class Problem:
         self._ocp_vars = create_cvxpy_variables(self.settings)
 
         # Lower convex constraints to CVXPy
-        lowered_convex_constraints, self.cvxpy_params = lower_convex_constraints(
+        lowered_convex_constraints, self.cvxpy_params = lower_cvxpy_constraints(
             self.settings.sim.constraints,
-            self._ocp_vars,
+            self._ocp_vars["x_nonscaled"],
+            self._ocp_vars["u_nonscaled"],
             self._parameters,
         )
 
