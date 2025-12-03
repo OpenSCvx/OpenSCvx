@@ -315,6 +315,81 @@ def lower_cvxpy_constraints(
     return cvxpy_constraints, all_params
 
 
+def _create_cvxpy_trajectory_variables(
+    N: int,
+    x_unified: UnifiedState,
+    u_unified: UnifiedControl,
+) -> dict:
+    """Create CVXPy trajectory variables for constraint lowering.
+
+    Creates the minimal CVXPy variables needed to lower convex constraints:
+    x, u and their non-scaled versions. This is called during lowering before
+    the full OCP variable setup.
+
+    Args:
+        N: Number of discretization nodes
+        x_unified: Unified state with bounds for scaling
+        u_unified: Unified control with bounds for scaling
+
+    Returns:
+        Dict with keys: x, u, x_nonscaled, u_nonscaled, S_x, c_x, S_u, c_u
+    """
+    import cvxpy as cp
+    import numpy as np
+
+    from openscvx.config import get_affine_scaling_matrices
+
+    n_states = len(x_unified.max)
+    n_controls = len(u_unified.max)
+
+    # Compute scaling matrices from unified object bounds
+    # Use scaling_min/max if provided, otherwise use regular min/max
+    if x_unified.scaling_min is not None:
+        lower_x = np.array(x_unified.scaling_min, dtype=float)
+    else:
+        lower_x = np.array(x_unified.min, dtype=float)
+
+    if x_unified.scaling_max is not None:
+        upper_x = np.array(x_unified.scaling_max, dtype=float)
+    else:
+        upper_x = np.array(x_unified.max, dtype=float)
+
+    S_x, c_x = get_affine_scaling_matrices(n_states, lower_x, upper_x)
+
+    if u_unified.scaling_min is not None:
+        lower_u = np.array(u_unified.scaling_min, dtype=float)
+    else:
+        lower_u = np.array(u_unified.min, dtype=float)
+
+    if u_unified.scaling_max is not None:
+        upper_u = np.array(u_unified.scaling_max, dtype=float)
+    else:
+        upper_u = np.array(u_unified.max, dtype=float)
+
+    S_u, c_u = get_affine_scaling_matrices(n_controls, lower_u, upper_u)
+
+    # Create CVXPy variables
+    x = cp.Variable((N, n_states), name="x")
+    u = cp.Variable((N, n_controls), name="u")
+
+    # Create non-scaled versions (affine transformation)
+    x_nonscaled = [S_x @ x[k] + c_x for k in range(N)]
+    u_nonscaled = [S_u @ u[k] + c_u for k in range(N)]
+
+    return {
+        "x": x,
+        "u": u,
+        "x_nonscaled": x_nonscaled,
+        "u_nonscaled": u_nonscaled,
+        "S_x": S_x,
+        "c_x": c_x,
+        "S_u": S_u,
+        "c_u": c_u,
+        "n_states": n_states,
+        "n_controls": n_controls,
+    }
+
+
 def _contains_node_reference(expr: Expr) -> bool:
     """Check if an expression contains any NodeReference nodes.
 
@@ -355,16 +430,17 @@ def lower_symbolic_expressions(
     controls_aug: List,
     constraints: ConstraintSet,
     parameters: dict,
+    N: int,
     dynamics_prop=None,
     states_prop: List = None,
     controls_prop: List = None,
 ) -> Tuple:
-    """Lower symbolic expressions to executable JAX functions.
+    """Lower symbolic expressions to executable JAX and CVXPy code.
 
     This is the main orchestrator for converting symbolic problem specifications
     into executable numerical code. It coordinates the lowering of dynamics,
     constraints, and state/control interfaces from symbolic AST representations
-    to JAX functions with automatic differentiation.
+    to JAX functions (with automatic differentiation) and CVXPy constraints.
 
     The function handles two separate dynamics systems:
         1. Optimization dynamics: Used in the SCP subproblem for trajectory optimization
@@ -375,11 +451,12 @@ def lower_symbolic_expressions(
            multiple state/control variables into single vectors for efficient computation
         2. **Dynamics Lowering**: Converts symbolic dynamics to JAX functions and
            computes Jacobians A = df/dx and B = df/du using automatic differentiation
-        3. **Constraint Lowering**: Separates convex and non-convex constraints:
-           - Non-convex: Lowered to JAX with gradients for penalty-based handling
-           - Convex: Kept symbolic for later CVXPy lowering (see Note below)
+        3. **Non-Convex Constraint Lowering**: Lowers non-convex constraints to JAX
+           with gradients for penalty-based handling in SCP
         4. **Propagation Setup**: Also lowers propagation dynamics (may differ from
            optimization dynamics if using different augmentation strategies)
+        5. **CVXPy Lowering**: Creates CVXPy trajectory variables and lowers convex
+           constraints to CVXPy constraint objects for the OCP
 
     This is pure translation - no validation, shape checking, or augmentation occurs
     here. Those steps happen earlier during problem construction.
@@ -400,6 +477,7 @@ def lower_symbolic_expressions(
             - cross_node_convex: Convex cross-node constraints (kept symbolic)
         parameters: Dictionary mapping parameter names to numpy arrays. Used to
             provide parameter values during function evaluation.
+        N: Number of discretization nodes. Used for creating CVXPy variables.
         dynamics_prop: Symbolic propagation dynamics expression. May be the same as
             dynamics_aug or may include additional states for error tracking.
         states_prop: List of State objects for propagation. May include extras beyond
@@ -408,7 +486,7 @@ def lower_symbolic_expressions(
             controls_aug.
 
     Returns:
-        Tuple containing 6 elements:
+        Tuple containing 9 elements:
             - dynamics_augmented (Dynamics): Optimization dynamics with fields:
                 - f: JAX function (x, u, node, params) -> dx/dt
                 - A: JAX function (x, u, node, params) -> df/dx Jacobian
@@ -416,13 +494,18 @@ def lower_symbolic_expressions(
             - lowered_constraints (ConstraintSet): Constraints with non-convex lowered to JAX:
                 - ctcs: Unchanged (CTCS constraints)
                 - nodal: LoweredNodalConstraint objects with JAX functions and gradients
-                - nodal_convex: Unchanged (symbolic for CVXPy)
+                - nodal_convex: Lowered CVXPy constraints (list of cp.Constraint)
                 - cross_node: CrossNodeConstraintLowered objects with JAX functions
-                - cross_node_convex: Unchanged (symbolic for CVXPy)
+                - cross_node_convex: Lowered CVXPy constraints (included in nodal_convex)
             - x_unified (UnifiedState): Aggregated optimization state interface
             - u_unified (UnifiedControl): Aggregated optimization control interface
             - dynamics_augmented_prop (Dynamics): Propagation dynamics with f, A, B
             - x_prop_unified (UnifiedState): Aggregated propagation state interface
+            - cvxpy_trajectory_vars (dict): CVXPy variables for OCP construction:
+                - x, u: CVXPy Variable objects
+                - x_nonscaled, u_nonscaled: Affine-transformed trajectory lists
+                - S_x, c_x, S_u, c_u: Scaling matrices
+            - cvxpy_params (dict): CVXPy Parameter objects for user parameters
 
     Example:
         Basic usage after problem construction::
@@ -457,16 +540,15 @@ def lower_symbolic_expressions(
         The node parameter allows for time-varying behavior (e.g., nodal constraints).
         The params dictionary provides runtime parameter updates without recompilation.
 
-        **CVXPy Lowering**: Convex constraints are NOT lowered to CVXPy in this
-        function. They remain symbolic and are lowered immediately after in
-        Problem.__init__ using create_cvxpy_variables() and lower_cvxpy_constraints().
-        This keeps JAX and CVXPy lowering as separate steps while ensuring both
-        happen during problem construction.
+        **CVXPy Trajectory Variables**: This function creates CVXPy variables (x, u)
+        and their affine-scaled versions (x_nonscaled, u_nonscaled) which are used
+        both for constraint lowering and later for OCP construction. The scaling
+        matrices are computed from the unified state/control bounds.
 
     See Also:
         - lower_to_jax(): The underlying lowering function for individual expressions
         - JaxLowerer: The visitor-pattern backend that implements JAX lowering
-        - lower_cvxpy_constraints(): CVXPy constraint lowering in this module
+        - lower_cvxpy_constraints(): CVXPy constraint lowering helper
         - UnifiedState/UnifiedControl: Aggregation containers in symbolic/unified.py
         - Dynamics: Container for dynamics functions in dynamics.py
         - LoweredNodalConstraint: Container for constraint functions in constraints/lowered.py
@@ -555,11 +637,21 @@ def lower_symbolic_expressions(
         )
         lowered_constraints.cross_node.append(cross_node_lowered)
 
-    # ==================== CONVEX CONSTRAINTS REMAIN SYMBOLIC ====================
+    # ==================== LOWER CONVEX CONSTRAINTS TO CVXPY ====================
 
-    # Convex constraints (nodal_convex, cross_node_convex) remain symbolic here.
-    # They are lowered to CVXPy in Problem.__init__ immediately after this function
-    # is called, using create_cvxpy_variables() and lower_cvxpy_constraints().
+    # Create CVXPy trajectory variables from unified objects
+    cvxpy_traj_vars = _create_cvxpy_trajectory_variables(N, x_unified, u_unified)
+
+    # Lower convex constraints to CVXPy
+    lowered_cvxpy_constraints, cvxpy_params = lower_cvxpy_constraints(
+        lowered_constraints,
+        cvxpy_traj_vars["x_nonscaled"],
+        cvxpy_traj_vars["u_nonscaled"],
+        parameters,
+    )
+
+    # Store lowered CVXPy constraints in the ConstraintSet
+    lowered_constraints.nodal_convex = lowered_cvxpy_constraints
 
     # ==================== RETURN LOWERED OUTPUTS ====================
 
@@ -570,4 +662,6 @@ def lower_symbolic_expressions(
         u_unified,
         dynamics_augmented_prop,
         x_prop_unified,
+        cvxpy_traj_vars,
+        cvxpy_params,
     )

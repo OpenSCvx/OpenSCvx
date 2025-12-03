@@ -184,7 +184,7 @@ class Problem:
             states_prop_extra=states_prop,
         )
 
-        # Step 2: Lower to JAX
+        # Step 2: Lower to JAX and CVXPy
         (
             dynamics_augmented,
             lowered_constraint_set,
@@ -192,12 +192,15 @@ class Problem:
             u_unified,
             dynamics_augmented_prop,
             x_prop_unified,
+            cvxpy_traj_vars,
+            cvxpy_params,
         ) = lower_symbolic_expressions(
             dynamics_aug=dynamics_aug,
             states_aug=x_aug,
             controls_aug=u_aug,
             constraints=constraint_set,
             parameters=parameters,
+            N=N,
             dynamics_prop=dynamics_prop_aug,
             states_prop=x_prop_aug,
             controls_prop=u_prop_aug,
