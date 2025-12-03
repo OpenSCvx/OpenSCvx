@@ -5,6 +5,7 @@ import time
 from typing import TYPE_CHECKING, List, Optional, Union
 
 import jax
+import numpy as np
 
 os.environ["EQX_ON_ERROR"] = "nan"
 
@@ -59,9 +60,22 @@ class _ParameterDict(dict):
     def __init__(self, problem, internal_dict, *args, **kwargs):
         self._problem = problem
         self._internal_dict = internal_dict  # Reference to plain dict for JAX
-        super().__init__(*args, **kwargs)
+        super().__init__()
+        # Initialize with float enforcement by using __setitem__
+        if args:
+            other = args[0]
+            if hasattr(other, "items"):
+                for key, value in other.items():
+                    self[key] = value
+            else:
+                for key, value in other:
+                    self[key] = value
+        for key, value in kwargs.items():
+            self[key] = value
 
     def __setitem__(self, key, value):
+        # Enforce float dtype to prevent int/float mismatch bugs
+        value = np.asarray(value, dtype=float)
         super().__setitem__(key, value)
         # Sync to internal dict for JAX
         self._internal_dict[key] = value
