@@ -1,9 +1,12 @@
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 
 from openscvx.symbolic.unified import UnifiedControl, UnifiedState
+
+if TYPE_CHECKING:
+    from openscvx.constraints import ConstraintSet
 
 
 def get_affine_scaling_matrices(n, minimum, maximum):
@@ -191,11 +194,7 @@ class SimConfig:
         total_time: float,
         save_compiled: bool = False,
         ctcs_node_intervals: Optional[list] = None,
-        constraints_ctcs: Optional[list[Callable]] = None,
-        constraints_nodal: Optional[list[Callable]] = None,
-        constraints_nodal_convex: Optional[list[Callable]] = None,
-        constraints_cross_node: Optional[list[Callable]] = None,
-        constraints_cross_node_convex: Optional[list[Callable]] = None,
+        constraints: Optional["ConstraintSet"] = None,
         n_states: Optional[int] = None,
         n_states_prop: Optional[int] = None,
         n_controls: Optional[int] = None,
@@ -228,11 +227,7 @@ class SimConfig:
                 functions. Defaults to False.
             ctcs_node_intervals (list, optional): Node intervals for CTCS
                 constraints.
-            constraints_ctcs (list, optional): List of CTCS constraints.
-            constraints_nodal (list, optional): List of nodal constraints.
-            constraints_nodal_convex (list, optional): List of convex nodal constraints.
-            constraints_cross_node (list, optional): List of non-convex cross-node constraints.
-            constraints_cross_node_convex (list, optional): List of convex cross-node constraints.
+            constraints (ConstraintSet, optional): Container for all constraint types
             n_states (int, optional): The number of state variables. Defaults to
                 `None` (inferred from x.max).
             n_states_prop (int, optional): The number of propagation state
@@ -245,6 +240,9 @@ class SimConfig:
             the `scaling_min` and `scaling_max` attributes on State, Control, and Time objects.
             If not set, the default min/max bounds will be used for scaling.
         """
+        # Import here to avoid circular imports
+        from openscvx.constraints import ConstraintSet
+
         # Assign core arguments to self
         self.x = x
         self.x_prop = x_prop
@@ -252,17 +250,7 @@ class SimConfig:
         self.total_time = total_time
         self.save_compiled = save_compiled
         self.ctcs_node_intervals = ctcs_node_intervals
-        self.constraints_ctcs = constraints_ctcs if constraints_ctcs is not None else []
-        self.constraints_nodal = constraints_nodal if constraints_nodal is not None else []
-        self.constraints_nodal_convex = (
-            constraints_nodal_convex if constraints_nodal_convex is not None else []
-        )
-        self.constraints_cross_node = (
-            constraints_cross_node if constraints_cross_node is not None else []
-        )
-        self.constraints_cross_node_convex = (
-            constraints_cross_node_convex if constraints_cross_node_convex is not None else []
-        )
+        self.constraints = constraints if constraints is not None else ConstraintSet()
         self.n_states = n_states
         self.n_states_prop = n_states_prop
         self.n_controls = n_controls

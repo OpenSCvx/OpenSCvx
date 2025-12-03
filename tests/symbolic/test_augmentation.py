@@ -233,19 +233,13 @@ def test_augment_with_time_state_multiple_states():
 def test_separate_constraints_empty():
     """Test separate_constraints with no constraints."""
     n_nodes = 10
-    (
-        constraints_ctcs,
-        constraints_nodal,
-        constraints_nodal_convex,
-        constraints_cross,
-        constraints_cross_convex,
-    ) = separate_constraints([], n_nodes)
+    result = separate_constraints([], n_nodes)
 
-    assert constraints_ctcs == []
-    assert constraints_nodal == []
-    assert constraints_nodal_convex == []
-    assert constraints_cross == []
-    assert constraints_cross_convex == []
+    assert result.ctcs == []
+    assert result.nodal == []
+    assert result.nodal_convex == []
+    assert result.cross_node == []
+    assert result.cross_node_convex == []
 
 
 def test_separate_constraints_only_ctcs():
@@ -255,20 +249,14 @@ def test_separate_constraints_only_ctcs():
     c1 = ctcs(x <= 1.0, penalty="squared_relu")
     c2 = ctcs(x >= 0.0, penalty="huber", check_nodally=True)
 
-    (
-        constraints_ctcs,
-        constraints_nodal,
-        constraints_nodal_convex,
-        _,
-        _,
-    ) = separate_constraints([c1, c2], n_nodes)
+    result = separate_constraints([c1, c2], n_nodes)
 
-    assert constraints_ctcs == [c1, c2]
-    assert len(constraints_nodal) == 1  # Only c2 should be in nodal (check_nodally=True)
-    assert len(constraints_nodal_convex) == 0  # No convex constraints
+    assert result.ctcs == [c1, c2]
+    assert len(result.nodal) == 1  # Only c2 should be in nodal (check_nodally=True)
+    assert len(result.nodal_convex) == 0  # No convex constraints
     # Should be converted to NodalConstraint
-    assert hasattr(constraints_nodal[0], "constraint")
-    assert constraints_nodal[0].constraint == c2.constraint
+    assert hasattr(result.nodal[0], "constraint")
+    assert result.nodal[0].constraint == c2.constraint
 
 
 def test_separate_constraints_only_nodal():
@@ -278,22 +266,16 @@ def test_separate_constraints_only_nodal():
     c1 = x <= 1.0
     c2 = x >= 0.0
 
-    (
-        constraints_ctcs,
-        constraints_nodal,
-        constraints_nodal_convex,
-        _,
-        _,
-    ) = separate_constraints([c1, c2], n_nodes)
+    result = separate_constraints([c1, c2], n_nodes)
 
-    assert constraints_ctcs == []
-    assert len(constraints_nodal) == 2
-    assert len(constraints_nodal_convex) == 0  # No convex constraints
+    assert result.ctcs == []
+    assert len(result.nodal) == 2
+    assert len(result.nodal_convex) == 0  # No convex constraints
     # Should be converted to NodalConstraint objects
-    assert hasattr(constraints_nodal[0], "constraint")
-    assert hasattr(constraints_nodal[1], "constraint")
-    assert constraints_nodal[0].constraint == c1
-    assert constraints_nodal[1].constraint == c2
+    assert hasattr(result.nodal[0], "constraint")
+    assert hasattr(result.nodal[1], "constraint")
+    assert result.nodal[0].constraint == c1
+    assert result.nodal[1].constraint == c2
 
 
 def test_separate_constraints_mixed():
@@ -304,20 +286,14 @@ def test_separate_constraints_mixed():
     c2 = x >= 0.0  # Regular constraint
     c3 = ctcs(x <= 2.0, penalty="huber", check_nodally=True)
 
-    (
-        constraints_ctcs,
-        constraints_nodal,
-        constraints_nodal_convex,
-        _,
-        _,
-    ) = separate_constraints([c1, c2, c3], n_nodes)
+    result = separate_constraints([c1, c2, c3], n_nodes)
 
-    assert constraints_ctcs == [c1, c3]
-    assert len(constraints_nodal) == 2  # c2 + c3's underlying constraint
-    assert len(constraints_nodal_convex) == 0  # No convex constraints
+    assert result.ctcs == [c1, c3]
+    assert len(result.nodal) == 2  # c2 + c3's underlying constraint
+    assert len(result.nodal_convex) == 0  # No convex constraints
     # Should be converted to NodalConstraint objects
-    assert constraints_nodal[0].constraint == c2
-    assert constraints_nodal[1].constraint == c3.constraint
+    assert result.nodal[0].constraint == c2
+    assert result.nodal[1].constraint == c3.constraint
 
 
 def test_separate_constraints_invalid_type():
@@ -342,27 +318,21 @@ def test_separate_constraints_convex_constraints():
     c2 = x >= 0.0  # Non-convex constraint
     c3 = (x <= 2.0).convex()  # Another convex constraint
 
-    (
-        constraints_ctcs,
-        constraints_nodal,
-        constraints_nodal_convex,
-        _,
-        _,
-    ) = separate_constraints([c1, c2, c3], n_nodes)
+    result = separate_constraints([c1, c2, c3], n_nodes)
 
-    assert constraints_ctcs == []
-    assert len(constraints_nodal) == 1  # Only c2 (non-convex)
-    assert len(constraints_nodal_convex) == 2  # c1 and c3 (convex)
+    assert result.ctcs == []
+    assert len(result.nodal) == 1  # Only c2 (non-convex)
+    assert len(result.nodal_convex) == 2  # c1 and c3 (convex)
 
     # Verify non-convex constraint
-    assert constraints_nodal[0].constraint == c2
-    assert not constraints_nodal[0].constraint.is_convex
+    assert result.nodal[0].constraint == c2
+    assert not result.nodal[0].constraint.is_convex
 
     # Verify convex constraints
-    assert constraints_nodal_convex[0].constraint == c1
-    assert constraints_nodal_convex[0].constraint.is_convex
-    assert constraints_nodal_convex[1].constraint == c3
-    assert constraints_nodal_convex[1].constraint.is_convex
+    assert result.nodal_convex[0].constraint == c1
+    assert result.nodal_convex[0].constraint.is_convex
+    assert result.nodal_convex[1].constraint == c3
+    assert result.nodal_convex[1].constraint.is_convex
 
 
 def test_separate_constraints_convex_nodal_constraints():
@@ -376,21 +346,15 @@ def test_separate_constraints_convex_nodal_constraints():
     nodal1 = NodalConstraint(c1, [0, 1, 2])  # Convex
     nodal2 = NodalConstraint(c2, [1, 2, 3])  # Non-convex
 
-    (
-        constraints_ctcs,
-        constraints_nodal,
-        constraints_nodal_convex,
-        _,
-        _,
-    ) = separate_constraints([nodal1, nodal2], n_nodes)
+    result = separate_constraints([nodal1, nodal2], n_nodes)
 
-    assert constraints_ctcs == []
-    assert len(constraints_nodal) == 1  # nodal2 (non-convex)
-    assert len(constraints_nodal_convex) == 1  # nodal1 (convex)
+    assert result.ctcs == []
+    assert len(result.nodal) == 1  # nodal2 (non-convex)
+    assert len(result.nodal_convex) == 1  # nodal1 (convex)
 
     # Verify the NodalConstraint objects are preserved
-    assert constraints_nodal[0] is nodal2
-    assert constraints_nodal_convex[0] is nodal1
+    assert result.nodal[0] is nodal2
+    assert result.nodal_convex[0] is nodal1
 
 
 def test_separate_constraints_convex_ctcs_check_nodally():
@@ -402,23 +366,17 @@ def test_separate_constraints_convex_ctcs_check_nodally():
     c1 = ctcs((x <= 1.0).convex(), penalty="squared_relu", check_nodally=True)
     c2 = ctcs(x >= 0.0, penalty="huber", check_nodally=True)  # Non-convex
 
-    (
-        constraints_ctcs,
-        constraints_nodal,
-        constraints_nodal_convex,
-        _,
-        _,
-    ) = separate_constraints([c1, c2], n_nodes)
+    result = separate_constraints([c1, c2], n_nodes)
 
-    assert constraints_ctcs == [c1, c2]
-    assert len(constraints_nodal) == 1  # c2's underlying constraint (non-convex)
-    assert len(constraints_nodal_convex) == 1  # c1's underlying constraint (convex)
+    assert result.ctcs == [c1, c2]
+    assert len(result.nodal) == 1  # c2's underlying constraint (non-convex)
+    assert len(result.nodal_convex) == 1  # c1's underlying constraint (convex)
 
     # Verify the underlying constraints from CTCS are correctly separated
-    assert constraints_nodal[0].constraint == c2.constraint
-    assert not constraints_nodal[0].constraint.is_convex
-    assert constraints_nodal_convex[0].constraint == c1.constraint
-    assert constraints_nodal_convex[0].constraint.is_convex
+    assert result.nodal[0].constraint == c2.constraint
+    assert not result.nodal[0].constraint.is_convex
+    assert result.nodal_convex[0].constraint == c1.constraint
+    assert result.nodal_convex[0].constraint.is_convex
 
 
 def test_ctcs_with_node_reference_raises_error():
@@ -1285,23 +1243,17 @@ def test_ctcs_check_nodally_node_interval_preserved():
     # Create a CTCS constraint with check_nodally over a specific interval
     c1 = ctcs(x <= 1.0, nodes=(10, 30), penalty="squared_relu", check_nodally=True)
 
-    (
-        constraints_ctcs,
-        constraints_nodal,
-        _,
-        _,
-        _,
-    ) = separate_constraints([c1], n_nodes=n_nodes)
+    result = separate_constraints([c1], n_nodes=n_nodes)
 
     # Should have the CTCS constraint
-    assert len(constraints_ctcs) == 1
-    assert constraints_ctcs[0] is c1
+    assert len(result.ctcs) == 1
+    assert result.ctcs[0] is c1
 
     # Should also have a nodal constraint extracted from CTCS
-    assert len(constraints_nodal) == 1
+    assert len(result.nodal) == 1
 
     # The nodal constraint should only apply to nodes [10, 11, ..., 29]
-    nodal_from_ctcs = constraints_nodal[0]
+    nodal_from_ctcs = result.nodal[0]
     expected_nodes = list(range(10, 30))
     assert nodal_from_ctcs.nodes == expected_nodes, (
         f"Expected nodes {expected_nodes}, got {nodal_from_ctcs.nodes}"
@@ -1324,20 +1276,14 @@ def test_convex_nodal_constraint_with_node_reference_accepted():
     assert cross_node_constraint.is_convex
 
     # Should successfully separate constraints without raising
-    (
-        constraints_ctcs,
-        constraints_nodal,
-        constraints_nodal_convex,
-        constraints_cross,
-        constraints_cross_convex,
-    ) = separate_constraints([cross_node_constraint], n_nodes=n_nodes)
+    result = separate_constraints([cross_node_constraint], n_nodes=n_nodes)
 
     # Should be classified as convex cross-node constraint
-    assert len(constraints_cross_convex) == 1
-    assert len(constraints_cross) == 0
-    assert len(constraints_nodal_convex) == 0
-    assert len(constraints_nodal) == 0
-    assert len(constraints_ctcs) == 0
+    assert len(result.cross_node_convex) == 1
+    assert len(result.cross_node) == 0
+    assert len(result.nodal_convex) == 0
+    assert len(result.nodal) == 0
+    assert len(result.ctcs) == 0
 
 
 def test_convex_bare_constraint_with_node_reference_accepted():
@@ -1353,20 +1299,14 @@ def test_convex_bare_constraint_with_node_reference_accepted():
     assert cross_node_constraint.is_convex
 
     # Should successfully separate constraints without raising
-    (
-        constraints_ctcs,
-        constraints_nodal,
-        constraints_nodal_convex,
-        constraints_cross,
-        constraints_cross_convex,
-    ) = separate_constraints([cross_node_constraint], n_nodes=n_nodes)
+    result = separate_constraints([cross_node_constraint], n_nodes=n_nodes)
 
     # Should be classified as convex cross-node constraint
-    assert len(constraints_cross_convex) == 1
-    assert len(constraints_cross) == 0
-    assert len(constraints_nodal_convex) == 0
-    assert len(constraints_nodal) == 0
-    assert len(constraints_ctcs) == 0
+    assert len(result.cross_node_convex) == 1
+    assert len(result.cross_node) == 0
+    assert len(result.nodal_convex) == 0
+    assert len(result.nodal) == 0
+    assert len(result.ctcs) == 0
 
 
 def test_nonconvex_cross_node_constraint_accepted():
@@ -1385,20 +1325,14 @@ def test_nonconvex_cross_node_constraint_accepted():
     assert not cross_node_constraint.is_convex
 
     # Should NOT raise error
-    (
-        constraints_ctcs,
-        constraints_nodal,
-        constraints_nodal_convex,
-        constraints_cross,
-        constraints_cross_convex,
-    ) = separate_constraints([cross_node_constraint], n_nodes=n_nodes)
+    result = separate_constraints([cross_node_constraint], n_nodes=n_nodes)
 
     # Should be in the non-convex cross-node constraints
-    assert len(constraints_cross) == 1
-    assert len(constraints_cross_convex) == 0
-    assert len(constraints_nodal) == 0
-    assert len(constraints_nodal_convex) == 0
-    assert len(constraints_ctcs) == 0
+    assert len(result.cross_node) == 1
+    assert len(result.cross_node_convex) == 0
+    assert len(result.nodal) == 0
+    assert len(result.nodal_convex) == 0
+    assert len(result.ctcs) == 0
 
 
 def test_cross_node_constraint_with_at_wrapper_rejected():
@@ -1432,17 +1366,11 @@ def test_regular_convex_constraint_without_node_reference_accepted():
     assert regular_constraint.constraint.is_convex
 
     # Should NOT raise error
-    (
-        constraints_ctcs,
-        constraints_nodal,
-        constraints_nodal_convex,
-        constraints_cross,
-        constraints_cross_convex,
-    ) = separate_constraints([regular_constraint], n_nodes=n_nodes)
+    result = separate_constraints([regular_constraint], n_nodes=n_nodes)
 
     # Should be in convex nodal constraints
-    assert len(constraints_nodal_convex) == 1
-    assert len(constraints_nodal) == 0
-    assert len(constraints_cross) == 0
-    assert len(constraints_cross_convex) == 0
-    assert len(constraints_ctcs) == 0
+    assert len(result.nodal_convex) == 1
+    assert len(result.nodal) == 0
+    assert len(result.cross_node) == 0
+    assert len(result.cross_node_convex) == 0
+    assert len(result.ctcs) == 0

@@ -161,21 +161,16 @@ def preprocess_symbolic_problem(
             (default: None)
 
     Returns:
-        Tuple containing 13 elements:
+        Tuple containing 9 elements:
             0. dynamics_aug (Expr): Augmented dynamics = user dynamics + time + CTCS penalties
             1. states_aug (List[State]): User states + time + CTCS augmented states
             2. controls_aug (List[Control]): User controls + time dilation
-            3. constraints_ctcs (List[CTCS]): CTCS constraints (remain symbolic)
-            4. constraints_nodal (List[NodalConstraint]): Non-convex nodal constraints
-            5. constraints_nodal_convex (List[NodalConstraint]): Convex nodal constraints
-            6. constraints_cross_node (List[CrossNodeConstraint]): Non-convex cross-node constraints
-            7. constraints_cross_node_convex (List[CrossNodeConstraint]): Convex cross-node
-                constraints
-            8. parameters (Dict[str, np.ndarray]): Parameter values extracted from expressions
-            9. node_intervals (List[Tuple[int, int]]): Time intervals for CTCS constraints
-            10. dynamics_prop (Expr): Propagation dynamics (includes extra states if provided)
-            11. states_prop (List[State]): Propagation states (includes extra states if provided)
-            12. controls_prop (List[Control]): Propagation controls (same as controls_aug)
+            3. constraints (ConstraintSet): All categorized constraints
+            4. parameters (Dict[str, np.ndarray]): Parameter values extracted from expressions
+            5. node_intervals (List[Tuple[int, int]]): Time intervals for CTCS constraints
+            6. dynamics_prop (Expr): Propagation dynamics (includes extra states if provided)
+            7. states_prop (List[State]): Propagation states (includes extra states if provided)
+            8. controls_prop (List[Control]): Propagation controls (same as controls_aug)
 
     Raises:
         ValueError: If validation fails at any stage
@@ -304,27 +299,21 @@ def preprocess_symbolic_problem(
     # ==================== PHASE 4: Constraint Separation & Augmentation ====================
 
     # Sort and separate constraints by type
-    (
-        constraints_ctcs,
-        constraints_nodal,
-        constraints_nodal_convex,
-        constraints_cross_node,
-        constraints_cross_node_convex,
-    ) = separate_constraints(constraints, N)
+    constraint_set = separate_constraints(constraints, N)
 
     # Decompose vector-valued nodal constraints into scalar constraints
     # This is necessary for non-convex nodal constraints that get lowered to JAX
-    constraints_nodal = decompose_vector_nodal_constraints(constraints_nodal)
+    constraint_set.nodal = decompose_vector_nodal_constraints(constraint_set.nodal)
 
     # Sort CTCS constraints by their idx to get node_intervals
-    constraints_ctcs, node_intervals, _ = sort_ctcs_constraints(constraints_ctcs)
+    constraint_set.ctcs, node_intervals, _ = sort_ctcs_constraints(constraint_set.ctcs)
 
     # Augment dynamics, states, and controls with CTCS constraints, time dilation
     dynamics_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
         dynamics_concat,
         states,
         controls,
-        constraints_ctcs,
+        constraint_set.ctcs,
         N,
         licq_min=licq_min,
         licq_max=licq_max,
@@ -367,11 +356,7 @@ def preprocess_symbolic_problem(
         dynamics_aug,
         states_aug,
         controls_aug,
-        constraints_ctcs,
-        constraints_nodal,
-        constraints_nodal_convex,
-        constraints_cross_node,
-        constraints_cross_node_convex,
+        constraint_set,
         parameters,
         node_intervals,
         dynamics_prop,

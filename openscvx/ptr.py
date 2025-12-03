@@ -274,8 +274,8 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
     dis_time = time.time() - t0
 
     # TODO: (norrisg) investigate why we are passing `0` for the node here
-    if settings.sim.constraints_nodal:
-        for g_id, constraint in enumerate(settings.sim.constraints_nodal):
+    if settings.sim.constraints.nodal:
+        for g_id, constraint in enumerate(settings.sim.constraints.nodal):
             prob.param_dict["g_" + str(g_id)].value = np.asarray(
                 constraint.func(x.guess, u.guess, 0, param_dict)
             )
@@ -287,8 +287,8 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
             )
 
     # Update cross-node constraint parameters
-    if settings.sim.constraints_cross_node:
-        for g_id, constraint in enumerate(settings.sim.constraints_cross_node):
+    if settings.sim.constraints.cross_node:
+        for g_id, constraint in enumerate(settings.sim.constraints.cross_node):
             # Cross-node constraints take (X, U, params) not (x, u, node, params)
             prob.param_dict["g_cross_" + str(g_id)].value = np.asarray(
                 constraint.func(x.guess, u.guess, param_dict)
@@ -365,15 +365,17 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
 
     id_ncvx = 0
     J_vb_vec = 0
-    for constraint in settings.sim.constraints_nodal:
-        J_vb_vec += np.maximum(0, prob.var_dict["nu_vb_" + str(id_ncvx)].value)
-        id_ncvx += 1
+    if settings.sim.constraints.nodal:
+        for constraint in settings.sim.constraints.nodal:
+            J_vb_vec += np.maximum(0, prob.var_dict["nu_vb_" + str(id_ncvx)].value)
+            id_ncvx += 1
 
     # Add cross-node constraint violations
     id_cross = 0
-    for constraint in settings.sim.constraints_cross_node:
-        J_vb_vec += np.maximum(0, prob.var_dict["nu_vb_cross_" + str(id_cross)].value)
-        id_cross += 1
+    if settings.sim.constraints.cross_node:
+        for constraint in settings.sim.constraints.cross_node:
+            J_vb_vec += np.maximum(0, prob.var_dict["nu_vb_cross_" + str(id_cross)].value)
+            id_cross += 1
 
     # Convex constraints are already handled in the OCP, no processing needed here
     return (
