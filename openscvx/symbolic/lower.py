@@ -55,7 +55,7 @@ from typing import Any, List, Sequence, Tuple, Union
 import jax
 from jax import jacfwd
 
-from openscvx.constraints import CrossNodeConstraintLowered, LoweredNodalConstraint
+from openscvx.constraints import ConstraintSet, CrossNodeConstraintLowered, LoweredNodalConstraint
 from openscvx.dynamics import Dynamics
 from openscvx.symbolic.expr import Expr, NodeReference
 from openscvx.symbolic.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
@@ -178,10 +178,7 @@ def lower_symbolic_expressions(
     dynamics_aug,
     states_aug: List,
     controls_aug: List,
-    constraints_nodal: List,
-    constraints_nodal_convex: List,
-    constraints_cross_node: List,
-    constraints_cross_node_convex: List,
+    constraints: ConstraintSet,
     parameters: dict,
     dynamics_prop=None,
     states_prop: List = None,
@@ -220,15 +217,12 @@ def lower_symbolic_expressions(
             states plus any augmentation states (e.g., from CTCS).
         controls_aug: List of Control objects used in optimization. Includes original
             controls plus any virtual controls (e.g., from CTCS).
-        constraints_nodal: List of NodalConstraint objects with non-convex constraint
-            expressions. These will be lowered to JAX with gradients for SCP.
-        constraints_nodal_convex: List of NodalConstraint objects with convex
-            constraint expressions. These remain symbolic for CVXPy lowering.
-        constraints_cross_node: List of CrossNodeConstraint objects with non-convex
-            cross-node constraints. These couple multiple trajectory nodes and are
-            lowered to JAX with trajectory-level Jacobians.
-        constraints_cross_node_convex: List of CrossNodeConstraint objects with convex
-            cross-node constraints. These remain symbolic for CVXPy lowering.
+        constraints: ConstraintSet containing all constraint categories:
+            - ctcs: CTCS (continuous-time) constraints
+            - nodal: Non-convex nodal constraints (lowered to JAX)
+            - nodal_convex: Convex nodal constraints (kept symbolic for CVXPy)
+            - cross_node: Non-convex cross-node constraints (lowered to JAX)
+            - cross_node_convex: Convex cross-node constraints (kept symbolic)
         parameters: Dictionary mapping parameter names to numpy arrays. Used to
             provide parameter values during function evaluation.
         dynamics_prop: Symbolic propagation dynamics expression. May be the same as
@@ -239,26 +233,17 @@ def lower_symbolic_expressions(
             controls_aug.
 
     Returns:
-        Tuple containing 9 elements:
+        Tuple containing 6 elements:
             - dynamics_augmented (Dynamics): Optimization dynamics with fields:
                 - f: JAX function (x, u, node, params) -> dx/dt
                 - A: JAX function (x, u, node, params) -> df/dx Jacobian
                 - B: JAX function (x, u, node, params) -> df/du Jacobian
-            - lowered_constraints_nodal (List[LoweredNodalConstraint]): Regular non-convex
-              constraints as JAX functions with gradients:
-                - func: Vectorized constraint evaluation (x_batch, u_batch, node, params)
-                - grad_g_x: Jacobian wrt state
-                - grad_g_u: Jacobian wrt control
-                - nodes: List of node indices where constraint applies
-            - lowered_cross_node_constraints (List[CrossNodeConstraintLowered]): Non-convex
-              cross-node constraints that relate multiple trajectory nodes:
-                - func: Trajectory-level function (X, U, params) -> scalar residual
-                - grad_g_X: Jacobian wrt full state trajectory (N, n_x)
-                - grad_g_U: Jacobian wrt full control trajectory (N, n_u)
-            - constraints_nodal_convex (List[NodalConstraint]): Convex nodal constraints
-              (unchanged, still symbolic for later CVXPy lowering)
-            - constraints_cross_node_convex (List[CrossNodeConstraint]): Convex cross-node
-              constraints (unchanged, still symbolic for later CVXPy lowering)
+            - lowered_constraints (ConstraintSet): Constraints with non-convex lowered to JAX:
+                - ctcs: Unchanged (CTCS constraints)
+                - nodal: LoweredNodalConstraint objects with JAX functions and gradients
+                - nodal_convex: Unchanged (symbolic for CVXPy)
+                - cross_node: CrossNodeConstraintLowered objects with JAX functions
+                - cross_node_convex: Unchanged (symbolic for CVXPy)
             - x_unified (UnifiedState): Aggregated optimization state interface
             - u_unified (UnifiedControl): Aggregated optimization control interface
             - dynamics_augmented_prop (Dynamics): Propagation dynamics with f, A, B
@@ -272,8 +257,7 @@ def lower_symbolic_expressions(
                 dynamics_aug=augmented_dynamics,
                 states_aug=[x, y, z, ctcs_state],
                 controls_aug=[u, ctcs_virtual],
-                constraints_nodal=nonconvex_constraints,
-                constraints_nodal_convex=convex_constraints,
+                constraints=constraint_set,  # ConstraintSet from separate_constraints
                 parameters={"obs_center": np.array([1.0, 0.0, 0.0])},
                 dynamics_prop=augmented_dynamics_prop,
                 states_prop=[x, y, z, ctcs_state],
@@ -281,8 +265,12 @@ def lower_symbolic_expressions(
             )
 
             # Unpack the results
-            (dynamics_opt, constraints_lowered, cross_node_constraints, constraints_cvx,
+            (dynamics_opt, lowered_constraints,
              x_unified, u_unified, dynamics_prop, x_prop) = result
+
+            # Access lowered constraints via ConstraintSet
+            for c in lowered_constraints.nodal:
+                residual = c.func(x_batch, u_batch, node, params)
 
             # Now can evaluate dynamics at a specific point
             dx = dynamics_opt.f(x_val, u_val, node=0, params={...})
@@ -356,12 +344,20 @@ def lower_symbolic_expressions(
 
     # ==================== LOWER NON-CONVEX CONSTRAINTS TO JAX ====================
 
-    # Lower regular nodal constraints (standard path)
-    lowered_constraints_nodal = []
+    # Create result ConstraintSet - will hold lowered non-convex and original convex
+    lowered_constraints = ConstraintSet()
 
-    if len(constraints_nodal) > 0:
+    # Copy CTCS constraints unchanged
+    lowered_constraints.ctcs = constraints.ctcs
+
+    # Copy convex constraints unchanged (will be lowered to CVXPy later)
+    lowered_constraints.nodal_convex = constraints.nodal_convex
+    lowered_constraints.cross_node_convex = constraints.cross_node_convex
+
+    # Lower regular nodal constraints (standard path)
+    if len(constraints.nodal) > 0:
         # Convert symbolic constraint expressions to JAX functions
-        constraints_nodal_fns = lower_to_jax(constraints_nodal)
+        constraints_nodal_fns = lower_to_jax(constraints.nodal)
 
         # Create LoweredConstraint objects with Jacobians computed automatically
         for i, fn in enumerate(constraints_nodal_fns):
@@ -372,16 +368,14 @@ def lower_symbolic_expressions(
                 func=jax.vmap(fn, in_axes=(0, 0, None, None)),
                 grad_g_x=jax.vmap(jacfwd(fn, argnums=0), in_axes=(0, 0, None, None)),
                 grad_g_u=jax.vmap(jacfwd(fn, argnums=1), in_axes=(0, 0, None, None)),
-                nodes=constraints_nodal[i].nodes,
+                nodes=constraints.nodal[i].nodes,
             )
-            lowered_constraints_nodal.append(constraint)
+            lowered_constraints.nodal.append(constraint)
 
     # Lower cross-node constraints (trajectory-level path)
     # The CrossNodeConstraint visitor in lowerers/jax.py handles wrapping the
     # inner constraint to provide trajectory-level signature (X, U, params) -> scalar
-    lowered_cross_node_constraints = []
-
-    for cross_node_constraint in constraints_cross_node:
+    for cross_node_constraint in constraints.cross_node:
         # Lower the CrossNodeConstraint directly - visitor handles wrapping
         # Returns function with signature (X, U, params) -> scalar
         constraint_fn = lower_to_jax(cross_node_constraint)
@@ -396,7 +390,7 @@ def lower_symbolic_expressions(
             grad_g_X=grad_g_X,
             grad_g_U=grad_g_U,
         )
-        lowered_cross_node_constraints.append(cross_node_lowered)
+        lowered_constraints.cross_node.append(cross_node_lowered)
 
     # ==================== KEEP CONVEX CONSTRAINTS SYMBOLIC ====================
 
@@ -412,10 +406,7 @@ def lower_symbolic_expressions(
 
     return (
         dynamics_augmented,
-        lowered_constraints_nodal,
-        lowered_cross_node_constraints,
-        constraints_nodal_convex,
-        constraints_cross_node_convex,
+        lowered_constraints,
         x_unified,
         u_unified,
         dynamics_augmented_prop,

@@ -57,6 +57,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
+from openscvx.constraints import ConstraintSet
 from openscvx.symbolic.expr import (
     CTCS,
     Add,
@@ -160,24 +161,18 @@ def sort_ctcs_constraints(
     return constraints_ctcs, node_intervals, num_augmented_states
 
 
-def separate_constraints(
-    constraints: List[Expr], n_nodes: int
-) -> Tuple[
-    List[CTCS],
-    List[NodalConstraint],
-    List[NodalConstraint],
-    List[CrossNodeConstraint],
-    List[CrossNodeConstraint],
-]:
+def separate_constraints(constraints: List[Expr], n_nodes: int) -> ConstraintSet:
     """Separate and categorize constraints by type and convexity.
 
-    Separates constraints into five categories:
+    Separates constraints into five categories stored in a ConstraintSet:
 
-    1. CTCS (continuous-time) constraints
-    2. Non-convex nodal constraints (regular constraints applied at specific nodes)
-    3. Convex nodal constraints (regular constraints applied at specific nodes)
-    4. Non-convex cross-node constraints (constraints coupling specific trajectory nodes)
-    5. Convex cross-node constraints (constraints coupling specific trajectory nodes)
+    1. ctcs: CTCS (continuous-time) constraints
+    2. nodal: Non-convex nodal constraints (regular constraints applied at specific nodes)
+    3. nodal_convex: Convex nodal constraints (regular constraints applied at specific nodes)
+    4. cross_node: Non-convex cross-node constraints (constraints coupling specific trajectory
+        nodes)
+    5. cross_node_convex: Convex cross-node constraints (constraints coupling specific trajectory
+        nodes)
 
     Bare Constraint objects are automatically categorized:
     - If they contain NodeReferences (from .at(k) calls), they become CrossNodeConstraint
@@ -191,12 +186,7 @@ def separate_constraints(
         n_nodes: Total number of nodes in the trajectory
 
     Returns:
-        Tuple of:
-            - List of CTCS constraints (continuous-time constraints)
-            - List of non-convex NodalConstraint objects
-            - List of convex NodalConstraint objects
-            - List of non-convex CrossNodeConstraint objects
-            - List of convex CrossNodeConstraint objects
+        ConstraintSet containing all categorized constraints
 
     Raises:
         ValueError: If a constraint is not one of the expected types
@@ -211,18 +201,15 @@ def separate_constraints(
             nodal_constraint = (x >= 0).at([0, 10, 20])
             bare_constraint = ox.Norm(x) <= 1  # Will apply at all nodes
             cross_node = x.at(5) - x.at(4) <= 0.1  # Auto-detected as cross-node
-            ctcs, nodal, nodal_cvx, cross, cross_cvx = separate_constraints(
+            result = separate_constraints(
                 [ctcs_constraint, nodal_constraint, bare_constraint, cross_node],
                 n_nodes=50
             )
+            # Access via: result.ctcs, result.nodal, result.nodal_convex, etc.
     """
     from openscvx.symbolic.lower import _contains_node_reference
 
-    constraints_ctcs: List[CTCS] = []
-    constraints_nodal: List[NodalConstraint] = []
-    constraints_nodal_convex: List[NodalConstraint] = []
-    constraints_cross_node: List[CrossNodeConstraint] = []
-    constraints_cross_node_convex: List[CrossNodeConstraint] = []
+    result = ConstraintSet()
 
     for c in constraints:
         if isinstance(c, CTCS):
@@ -235,7 +222,7 @@ def separate_constraints(
                 )
             # Normalize None to full horizon
             c.nodes = c.nodes or (0, n_nodes)
-            constraints_ctcs.append(c)
+            result.ctcs.append(c)
 
         elif isinstance(c, NodalConstraint):
             # NodalConstraint means user explicitly called .at([...])
@@ -251,9 +238,9 @@ def separate_constraints(
 
             # Regular nodal constraint - categorize by convexity
             if c.constraint.is_convex:
-                constraints_nodal_convex.append(c)
+                result.nodal_convex.append(c)
             else:
-                constraints_nodal.append(c)
+                result.nodal.append(c)
 
         elif isinstance(c, Constraint):
             # Bare constraint - check if it's a cross-node constraint
@@ -261,17 +248,17 @@ def separate_constraints(
                 # Cross-node constraint: wrap in CrossNodeConstraint
                 cross_node = CrossNodeConstraint(c)
                 if c.is_convex:
-                    constraints_cross_node_convex.append(cross_node)
+                    result.cross_node_convex.append(cross_node)
                 else:
-                    constraints_cross_node.append(cross_node)
+                    result.cross_node.append(cross_node)
             else:
                 # Regular constraint: apply at all nodes
                 all_nodes = list(range(n_nodes))
                 nodal_constraint = NodalConstraint(c, all_nodes)
                 if c.is_convex:
-                    constraints_nodal_convex.append(nodal_constraint)
+                    result.nodal_convex.append(nodal_constraint)
                 else:
-                    constraints_nodal.append(nodal_constraint)
+                    result.nodal.append(nodal_constraint)
 
         else:
             raise ValueError(
@@ -280,7 +267,7 @@ def separate_constraints(
             )
 
     # Add nodal constraints from CTCS constraints that have check_nodally=True
-    ctcs_nodal_constraints = get_nodal_constraints_from_ctcs(constraints_ctcs)
+    ctcs_nodal_constraints = get_nodal_constraints_from_ctcs(result.ctcs)
     for constraint, interval in ctcs_nodal_constraints:
         # CTCS check_nodally constraints cannot have NodeReferences (validated above)
         # Convert CTCS interval (start, end) to list of nodes [start, start+1, ..., end-1]
@@ -288,23 +275,17 @@ def separate_constraints(
         nodal_constraint = NodalConstraint(constraint, interval_nodes)
 
         if constraint.is_convex:
-            constraints_nodal_convex.append(nodal_constraint)
+            result.nodal_convex.append(nodal_constraint)
         else:
-            constraints_nodal.append(nodal_constraint)
+            result.nodal.append(nodal_constraint)
 
     # Validate cross-node constraints (bounds and variable consistency)
     from openscvx.symbolic.preprocessing import validate_cross_node_constraint
 
-    for cross_node_constraint in constraints_cross_node + constraints_cross_node_convex:
+    for cross_node_constraint in result.cross_node + result.cross_node_convex:
         validate_cross_node_constraint(cross_node_constraint, n_nodes)
 
-    return (
-        constraints_ctcs,
-        constraints_nodal,
-        constraints_nodal_convex,
-        constraints_cross_node,
-        constraints_cross_node_convex,
-    )
+    return result
 
 
 def decompose_vector_nodal_constraints(

@@ -5,6 +5,7 @@ import cvxpy as cp
 import numpy as np
 
 from openscvx.config import Config
+from openscvx.constraints import ConstraintSet
 
 # Optional cvxpygen import
 try:
@@ -72,8 +73,8 @@ def create_cvxpy_variables(settings: Config) -> Dict:
     grad_g_x = []
     grad_g_u = []
     nu_vb = []
-    if settings.sim.constraints_nodal:
-        for idx_ncvx, constraint in enumerate(settings.sim.constraints_nodal):
+    if settings.sim.constraints.nodal:
+        for idx_ncvx, constraint in enumerate(settings.sim.constraints.nodal):
             g.append(cp.Parameter(settings.scp.n, name="g_" + str(idx_ncvx)))
             grad_g_x.append(
                 cp.Parameter(
@@ -94,8 +95,8 @@ def create_cvxpy_variables(settings: Config) -> Dict:
     grad_g_X_cross = []
     grad_g_U_cross = []
     nu_vb_cross = []
-    if settings.sim.constraints_cross_node:
-        for idx_cross, constraint in enumerate(settings.sim.constraints_cross_node):
+    if settings.sim.constraints.cross_node:
+        for idx_cross, constraint in enumerate(settings.sim.constraints.cross_node):
             # Cross-node constraints are single constraints with fixed node references
             g_cross.append(cp.Parameter(name="g_cross_" + str(idx_cross)))
             grad_g_X_cross.append(
@@ -165,8 +166,7 @@ def create_cvxpy_variables(settings: Config) -> Dict:
 
 
 def lower_convex_constraints(
-    constraints_nodal_convex,
-    constraints_cross_node_convex,
+    constraints: "ConstraintSet",
     ocp_vars: Dict,
     params: Dict = None,
 ) -> tuple[List[cp.Constraint], Dict[str, cp.Parameter]]:
@@ -178,20 +178,21 @@ def lower_convex_constraints(
         trajectory
 
     Args:
-        constraints_nodal_convex: List of convex NodalConstraint objects to lower
-        constraints_cross_node_convex: List of convex CrossNodeConstraint objects to lower
+        constraints: ConstraintSet containing convex constraints to lower (uses nodal_convex
+            and cross_node_convex fields)
         ocp_vars: Dictionary of CVXPy variables
         params: Optional dictionary of parameter values to override the defaults
 
     Returns:
         Tuple of (list of CVXPy constraints, dict of CVXPy Parameter objects)
     """
+    from openscvx.constraints import ConstraintSet
     from openscvx.symbolic.expr import Parameter, traverse
     from openscvx.symbolic.expr.control import Control
     from openscvx.symbolic.expr.state import State
     from openscvx.symbolic.lowerers.cvxpy import lower_to_cvxpy
 
-    all_constraints = list(constraints_nodal_convex) + list(constraints_cross_node_convex)
+    all_constraints = list(constraints.nodal_convex) + list(constraints.cross_node_convex)
 
     if not all_constraints:
         return [], {}
@@ -222,7 +223,7 @@ def lower_convex_constraints(
     cvxpy_constraints = []
 
     # Process nodal constraints
-    for constraint in constraints_nodal_convex:
+    for constraint in constraints.nodal_convex:
         # nodes should already be validated and normalized in preprocessing
         nodes = constraint.nodes
 
@@ -281,7 +282,7 @@ def lower_convex_constraints(
             cvxpy_constraints.append(cvxpy_constraint)
 
     # Process cross-node constraints
-    for constraint in constraints_cross_node_convex:
+    for constraint in constraints.cross_node_convex:
         # Collect all State and Control variables referenced in the constraint
         state_vars = {}
         control_vars = {}
@@ -378,8 +379,8 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
 
     # Linearized nodal constraints
     idx_ncvx = 0
-    if settings.sim.constraints_nodal:
-        for constraint in settings.sim.constraints_nodal:
+    if settings.sim.constraints.nodal:
+        for constraint in settings.sim.constraints.nodal:
             # nodes should already be validated and normalized in preprocessing
             nodes = constraint.nodes
             constr += [
@@ -395,8 +396,8 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
 
     # Linearized cross-node constraints
     idx_cross = 0
-    if settings.sim.constraints_cross_node:
-        for constraint in settings.sim.constraints_cross_node:
+    if settings.sim.constraints.cross_node:
+        for constraint in settings.sim.constraints.cross_node:
             # Linearization: g(X_bar, U_bar) + ∇g_X @ dX + ∇g_U @ dU == nu_vb
             # Sum over all trajectory nodes to couple multiple nodes
             residual = g_cross[idx_cross]
@@ -410,8 +411,8 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
             idx_cross += 1
 
     # Convex nodal constraints (already lowered to CVXPy in trajoptproblem)
-    if settings.sim.constraints_nodal_convex:
-        constr += settings.sim.constraints_nodal_convex
+    if settings.sim.constraints.nodal_convex:
+        constr += settings.sim.constraints.nodal_convex
 
     for i in range(settings.sim.true_state_slice.start, settings.sim.true_state_slice.stop):
         if settings.sim.x.initial_type[i] == "Fix":
@@ -476,16 +477,16 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     )  # Virtual Control Slack
 
     idx_ncvx = 0
-    if settings.sim.constraints_nodal:
-        for constraint in settings.sim.constraints_nodal:
+    if settings.sim.constraints.nodal:
+        for constraint in settings.sim.constraints.nodal:
             # if not constraint.convex:
             cost += lam_vb * cp.sum(cp.pos(nu_vb[idx_ncvx]))
             idx_ncvx += 1
 
     # Virtual slack penalty for cross-node constraints
     idx_cross = 0
-    if settings.sim.constraints_cross_node:
-        for constraint in settings.sim.constraints_cross_node:
+    if settings.sim.constraints.cross_node:
+        for constraint in settings.sim.constraints.cross_node:
             cost += settings.scp.lam_vb * cp.pos(nu_vb_cross[idx_cross])
             idx_cross += 1
 

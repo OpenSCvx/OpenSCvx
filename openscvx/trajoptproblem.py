@@ -152,11 +152,7 @@ class TrajOptProblem:
             dynamics_aug,
             x_aug,
             u_aug,
-            constraints_ctcs,
-            constraints_nodal,
-            constraints_nodal_convex,
-            constraints_cross_node,
-            constraints_cross_node_convex,
+            constraint_set,
             parameters,
             node_intervals,
             dynamics_prop_aug,
@@ -185,10 +181,7 @@ class TrajOptProblem:
         # are CVXPy Parameters, CVXPy lowering can happen here alongside JAX lowering.
         (
             dynamics_augmented,
-            lowered_constraints_nodal,
-            lowered_cross_node_constraints,
-            constraints_nodal_convex,
-            constraints_cross_node_convex,
+            lowered_constraint_set,
             x_unified,
             u_unified,
             dynamics_augmented_prop,
@@ -197,10 +190,7 @@ class TrajOptProblem:
             dynamics_aug=dynamics_aug,
             states_aug=x_aug,
             controls_aug=u_aug,
-            constraints_nodal=constraints_nodal,
-            constraints_nodal_convex=constraints_nodal_convex,
-            constraints_cross_node=constraints_cross_node,
-            constraints_cross_node_convex=constraints_cross_node_convex,
+            constraints=constraint_set,
             parameters=parameters,
             dynamics_prop=dynamics_prop_aug,
             states_prop=x_prop_aug,
@@ -265,11 +255,7 @@ class TrajOptProblem:
             prp = PropagationConfig()
 
         # Store constraints in SimConfig
-        sim.constraints_ctcs = constraints_ctcs
-        sim.constraints_nodal = lowered_constraints_nodal
-        sim.constraints_cross_node = lowered_cross_node_constraints
-        sim.constraints_nodal_convex = constraints_nodal_convex
-        sim.constraints_cross_node_convex = constraints_cross_node_convex
+        sim.constraints = lowered_constraint_set
 
         self.settings = Config(
             sim=sim,
@@ -400,23 +386,22 @@ class TrajOptProblem:
 
         # Phase 2: Lower convex constraints to CVXPy
         lowered_convex_constraints, self.cvxpy_params = lower_convex_constraints(
-            self.settings.sim.constraints_nodal_convex,
-            self.settings.sim.constraints_cross_node_convex,
+            self.settings.sim.constraints,
             ocp_vars,
             self._parameters,
         )
 
         # Store lowered constraints back in settings for Phase 3
-        self.settings.sim.constraints_nodal_convex = lowered_convex_constraints
+        self.settings.sim.constraints.nodal_convex = lowered_convex_constraints
 
         # Phase 3: Build complete optimal control problem
         self.optimal_control_problem = OptimalControlProblem(self.settings, ocp_vars)
 
         # Collect all relevant functions
         functions_to_hash = [self.dynamics_augmented.f, self.dynamics_augmented_prop.f]
-        for constraint in self.settings.sim.constraints_nodal:
+        for constraint in self.settings.sim.constraints.nodal:
             functions_to_hash.append(constraint.func)
-        for constraint in self.settings.sim.constraints_cross_node:
+        for constraint in self.settings.sim.constraints.cross_node:
             functions_to_hash.append(constraint.func)
         # Note: CTCS constraints are already included in dynamics_augmented.f,
         # so we don't need to add them separately
