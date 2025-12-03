@@ -82,7 +82,10 @@ def print_problem_summary(settings):
 
         # Phase 2: Lower convex constraints to CVXPy (needed for problem construction)
         lowered_convex_constraints, _ = lower_convex_constraints(
-            settings.sim.constraints_nodal_convex, ocp_vars, None
+            settings.sim.constraints_nodal_convex,
+            getattr(settings.sim, "constraints_cross_node_convex", []),
+            ocp_vars,
+            None,
         )
 
         # Temporarily store lowered constraints for problem construction

@@ -122,6 +122,7 @@ from openscvx.symbolic.expr import (
     Constant,
     Constraint,
     Cos,
+    CrossNodeConstraint,
     Diag,
     Div,
     Equality,
@@ -138,6 +139,7 @@ from openscvx.symbolic.expr import (
     Mul,
     Neg,
     NodalConstraint,
+    NodeReference,
     Norm,
     Or,
     Parameter,
@@ -934,3 +936,107 @@ class JaxLowerer:
             return stl_or(x)
 
         return or_fn
+
+    @visitor(NodeReference)
+    def _visit_node_reference(self, node: NodeReference):
+        """Lower NodeReference - extract value at a specific trajectory node.
+
+        NodeReference extracts a state/control value at a specific node from the
+        full trajectory arrays. The node index is baked into the lowered function.
+
+        Args:
+            node: NodeReference expression with base and node_idx (integer)
+
+        Returns:
+            Function (x, u, node_param, params) that extracts from trajectory
+                - x, u: Full trajectories (N, n_x) and (N, n_u)
+                - node_param: Unused (kept for signature compatibility)
+                - params: Problem parameters
+
+        Example:
+            position.at(5) lowers to a function that extracts x[5, position_slice]
+            position.at(k-1) where k=7 lowers to extract x[6, position_slice]
+        """
+        from openscvx.symbolic.expr.control import Control
+        from openscvx.symbolic.expr.state import State
+
+        # Node index is baked into the expression at construction time
+        fixed_idx = node.node_idx
+
+        if isinstance(node.base, State):
+            sl = node.base._slice
+            if sl is None:
+                raise ValueError(f"State {node.base.name!r} has no slice assigned")
+
+            def state_node_fn(x, u, node_param, params):
+                return x[fixed_idx, sl]
+
+            return state_node_fn
+
+        elif isinstance(node.base, Control):
+            sl = node.base._slice
+            if sl is None:
+                raise ValueError(f"Control {node.base.name!r} has no slice assigned")
+
+            def control_node_fn(x, u, node_param, params):
+                return u[fixed_idx, sl]
+
+            return control_node_fn
+
+        else:
+            # Compound expression (e.g., position[0].at(5))
+            base_fn = self.lower(node.base)
+
+            def compound_node_fn(x, u, node_param, params):
+                # Extract single-node slices and evaluate base expression
+                x_single = x[fixed_idx] if len(x.shape) > 1 else x
+                u_single = u[fixed_idx] if len(u.shape) > 1 else u
+                return base_fn(x_single, u_single, fixed_idx, params)
+
+            return compound_node_fn
+
+    @visitor(CrossNodeConstraint)
+    def _visit_cross_node_constraint(self, node: CrossNodeConstraint):
+        """Lower CrossNodeConstraint to trajectory-level function.
+
+        CrossNodeConstraint wraps constraints that reference multiple trajectory
+        nodes via NodeReference (e.g., rate limits like x.at(k) - x.at(k-1) <= r).
+
+        Unlike regular nodal constraints which have signature (x, u, node, params)
+        and are vmapped across nodes, cross-node constraints operate on full
+        trajectory arrays and return a scalar residual.
+
+        Args:
+            node: CrossNodeConstraint expression wrapping the inner constraint
+
+        Returns:
+            Function with signature (X, U, params) -> scalar residual
+                - X: Full state trajectory, shape (N, n_x)
+                - U: Full control trajectory, shape (N, n_u)
+                - params: Dictionary of problem parameters
+                - Returns: Scalar constraint residual (g <= 0 convention)
+
+        Note:
+            The inner constraint is lowered first (producing a function with the
+            standard (x, u, node, params) signature), then wrapped to provide the
+            trajectory-level (X, U, params) signature. The `node` parameter is
+            unused since NodeReference nodes have fixed indices baked in.
+
+        Example:
+            For constraint: position.at(5) - position.at(4) <= max_step
+
+            The lowered function evaluates:
+                X[5, pos_slice] - X[4, pos_slice] - max_step
+
+            And returns a scalar residual.
+        """
+        # Lower the inner constraint expression
+        inner_fn = self.lower(node.constraint)
+
+        # Wrap to provide trajectory-level signature
+        # The `node` parameter is unused for cross-node constraints since
+        # NodeReference nodes have fixed indices baked in at construction time
+        def trajectory_constraint(X, U, params):
+            return inner_fn(X, U, 0, params)
+
+        return trajectory_constraint

@@ -161,18 +161,21 @@ def preprocess_symbolic_problem(
             (default: None)
 
     Returns:
-        Tuple containing 11 elements:
+        Tuple containing 13 elements:
             0. dynamics_aug (Expr): Augmented dynamics = user dynamics + time + CTCS penalties
             1. states_aug (List[State]): User states + time + CTCS augmented states
             2. controls_aug (List[Control]): User controls + time dilation
             3. constraints_ctcs (List[CTCS]): CTCS constraints (remain symbolic)
             4. constraints_nodal (List[NodalConstraint]): Non-convex nodal constraints
             5. constraints_nodal_convex (List[NodalConstraint]): Convex nodal constraints
-            6. parameters (Dict[str, np.ndarray]): Parameter values extracted from expressions
-            7. node_intervals (List[Tuple[int, int]]): Time intervals for CTCS constraints
-            8. dynamics_prop (Expr): Propagation dynamics (includes extra states if provided)
-            9. states_prop (List[State]): Propagation states (includes extra states if provided)
-            10. controls_prop (List[Control]): Propagation controls (same as controls_aug)
+            6. constraints_cross_node (List[CrossNodeConstraint]): Non-convex cross-node constraints
+            7. constraints_cross_node_convex (List[CrossNodeConstraint]): Convex cross-node
+                constraints
+            8. parameters (Dict[str, np.ndarray]): Parameter values extracted from expressions
+            9. node_intervals (List[Tuple[int, int]]): Time intervals for CTCS constraints
+            10. dynamics_prop (Expr): Propagation dynamics (includes extra states if provided)
+            11. states_prop (List[State]): Propagation states (includes extra states if provided)
+            12. controls_prop (List[Control]): Propagation controls (same as controls_aug)
 
     Raises:
         ValueError: If validation fails at any stage
@@ -305,6 +308,8 @@ def preprocess_symbolic_problem(
         constraints_ctcs,
         constraints_nodal,
         constraints_nodal_convex,
+        constraints_cross_node,
+        constraints_cross_node_convex,
     ) = separate_constraints(constraints, N)
 
     # Decompose vector-valued nodal constraints into scalar constraints
@@ -365,6 +370,8 @@ def preprocess_symbolic_problem(
         constraints_ctcs,
         constraints_nodal,
         constraints_nodal_convex,
+        constraints_cross_node,
+        constraints_cross_node_convex,
         parameters,
         node_intervals,
         dynamics_prop,

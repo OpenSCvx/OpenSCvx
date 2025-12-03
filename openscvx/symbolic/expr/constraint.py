@@ -111,6 +111,8 @@ class Constraint(Expr):
         Returns:
             NodalConstraint wrapping this constraint with node specification
         """
+        if isinstance(nodes, int):
+            nodes = [nodes]
         return NodalConstraint(self, list(nodes))
 
     def over(
@@ -234,6 +236,11 @@ class NodalConstraint(Expr):
             TypeError: If constraint is not a Constraint instance
             TypeError: If nodes is not a list
             TypeError: If any node index is not an integer
+
+        Note:
+            Bounds checking for cross-node constraints (those containing NodeReference)
+            is performed later in the pipeline when N is known, via
+            validate_cross_node_constraint_bounds() in preprocessing.py.
         """
         if not isinstance(constraint, Constraint):
             raise TypeError("NodalConstraint must wrap a Constraint")
@@ -306,6 +313,125 @@ class NodalConstraint(Expr):
             str: String showing the wrapped constraint and node indices
         """
         return f"NodalConstraint({self.constraint!r}, nodes={self.nodes})"
+
+
+class CrossNodeConstraint(Expr):
+    """A constraint that couples specific trajectory nodes via .at(k) references.
+
+    Unlike NodalConstraint which applies a constraint pattern at multiple nodes
+    (via vmapping), CrossNodeConstraint is a single constraint with fixed node
+    indices embedded in the expression via NodeReference nodes.
+
+    CrossNodeConstraint is created automatically when a bare Constraint contains
+    NodeReference nodes (from .at(k) calls). Users should NOT manually wrap
+    cross-node constraints - they are auto-detected during constraint separation.
+
+    **Key differences from NodalConstraint:**
+
+    - **NodalConstraint**: Same constraint evaluated at multiple nodes via vmapping.
+      Signature: (x, u, node, params) → scalar, vmapped to (N, n_x) inputs.
+    - **CrossNodeConstraint**: Single constraint coupling specific fixed nodes.
+      Signature: (X, U, params) → scalar, operates on full trajectory arrays.
+
+    **Lowering:**
+
+    - **Non-convex**: Lowered to JAX with automatic differentiation for SCP linearization
+    - **Convex**: Lowered to CVXPy and solved directly by the convex solver
+
+    Attributes:
+        constraint: The wrapped Constraint containing NodeReference nodes
+
+    Example:
+        Rate limit constraint (auto-detected as CrossNodeConstraint):
+
+            position = State("pos", shape=(3,))
+
+            # This creates a CrossNodeConstraint automatically:
+            rate_limit = position.at(5) - position.at(4) <= 0.1
+
+            # Mark as convex if the constraint is convex:
+            rate_limit_convex = (position.at(5) - position.at(4) <= 0.1).convex()
+
+        Creating multiple cross-node constraints with a loop:
+
+            constraints = []
+            for k in range(1, N):
+                # Each iteration creates one CrossNodeConstraint
+                rate_limit = position.at(k) - position.at(k-1) <= max_step
+                constraints.append(rate_limit)
+
+    Note:
+        Do NOT use .at([...]) on cross-node constraints. The nodes are already
+        specified via .at(k) inside the expression. Using .at([...]) will raise
+        an error during constraint separation.
+    """
+
+    def __init__(self, constraint: Constraint):
+        """Initialize a CrossNodeConstraint.
+
+        Args:
+            constraint: The Constraint containing NodeReference nodes.
+                Must contain at least one NodeReference (from .at(k) calls).
+
+        Raises:
+            TypeError: If constraint is not a Constraint instance
+        """
+        if not isinstance(constraint, Constraint):
+            raise TypeError("CrossNodeConstraint must wrap a Constraint")
+
+        self.constraint = constraint
+
+    @property
+    def is_convex(self) -> bool:
+        """Whether the underlying constraint is marked as convex.
+
+        Returns:
+            bool: True if the constraint is convex, False otherwise
+        """
+        return self.constraint.is_convex
+
+    def children(self):
+        """Return the wrapped constraint as the only child.
+
+        Returns:
+            list: Single-element list containing the wrapped constraint
+        """
+        return [self.constraint]
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize the wrapped constraint.
+
+        Returns:
+            CrossNodeConstraint: A new CrossNodeConstraint with canonicalized inner constraint
+        """
+        canon_constraint = self.constraint.canonicalize()
+        return CrossNodeConstraint(canon_constraint)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Validate the wrapped constraint's shape.
+
+        Returns:
+            tuple: Empty tuple () representing scalar shape
+        """
+        self.constraint.check_shape()
+        return ()
+
+    def convex(self) -> "CrossNodeConstraint":
+        """Mark the underlying constraint as convex for CVXPy lowering.
+
+        Returns:
+            Self with underlying constraint's convex flag set to True
+        """
+        self.constraint.convex()
+        return self
+
+    def __repr__(self):
+        """String representation of the CrossNodeConstraint.
+
+        Returns:
+            str: String showing the wrapped constraint
+        """
+        return f"CrossNodeConstraint({self.constraint!r})"
 
 
 # CTCS STUFF

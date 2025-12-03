@@ -6,6 +6,7 @@ This module tests constraint node types:
 - Equality: Equality constraints (==)
 - Inequality: Inequality constraints (<=, >=)
 - NodalConstraint: Constraints applied at specific nodes
+- CrossNodeConstraint: Constraints coupling specific trajectory nodes via NodeReference
 - CTCS: Continuous-Time Constraint Satisfaction
 
 Tests are organized by node type, with each section covering:
@@ -23,6 +24,7 @@ import pytest
 from openscvx.symbolic.expr import (
     CTCS,
     Constant,
+    CrossNodeConstraint,
     Equality,
     Huber,
     Inequality,
@@ -575,6 +577,354 @@ def test_nodal_constraint_preserves_inner_convex_flag():
 # Note: NodalConstraint is a wrapper that gets processed during preprocessing.
 # It doesn't have direct CVXPy lowering - the wrapped constraint is extracted
 # and applied at specific nodes during problem compilation.
+
+
+# =============================================================================
+# CrossNodeConstraint
+# =============================================================================
+
+
+# --- CrossNodeConstraint: Creation & Tree Structure ---
+
+
+def test_cross_node_constraint_creation_basic():
+    """Test basic CrossNodeConstraint creation."""
+    x = State("x", shape=(3,))
+
+    # Create a constraint with NodeReferences
+    constraint = x.at(5) - x.at(4) <= 0.1
+
+    # Wrap in CrossNodeConstraint
+    cross_node = CrossNodeConstraint(constraint)
+
+    assert isinstance(cross_node, CrossNodeConstraint)
+    assert cross_node.constraint is constraint
+    assert cross_node.is_convex is False
+
+
+def test_cross_node_constraint_requires_constraint():
+    """Test that CrossNodeConstraint only accepts Constraint objects."""
+    x = State("x", shape=(3,))
+    not_a_constraint = x.at(5) - x.at(4)  # Expression, not constraint
+
+    with pytest.raises(TypeError, match="CrossNodeConstraint must wrap a Constraint"):
+        CrossNodeConstraint(not_a_constraint)
+
+
+def test_cross_node_constraint_children():
+    """Test that CrossNodeConstraint.children() returns only the wrapped constraint."""
+    x = State("x", shape=(2,))
+    constraint = x.at(10) == x.at(0)
+    cross_node = CrossNodeConstraint(constraint)
+
+    children = cross_node.children()
+    assert len(children) == 1
+    assert children[0] is constraint
+
+
+def test_cross_node_constraint_repr():
+    """Test CrossNodeConstraint string representation."""
+    x = State("x", shape=(2,))
+    constraint = x.at(5) - x.at(4) <= 0.1
+    cross_node = CrossNodeConstraint(constraint)
+
+    repr_str = repr(cross_node)
+    assert "CrossNodeConstraint" in repr_str
+    assert "<=" in repr_str
+
+
+def test_cross_node_constraint_convex_method():
+    """Test that CrossNodeConstraint.convex() marks the constraint as convex."""
+    x = State("x", shape=(3,))
+    constraint = x.at(5) - x.at(4) <= 1.0
+
+    # Non-convex by default
+    cross_node = CrossNodeConstraint(constraint)
+    assert cross_node.is_convex is False
+
+    # Mark as convex
+    cross_node_convex = cross_node.convex()
+    assert cross_node_convex.is_convex is True
+    assert isinstance(cross_node_convex, CrossNodeConstraint)
+
+
+def test_cross_node_constraint_convex_at_creation():
+    """Test creating convex CrossNodeConstraint from already-convex constraint."""
+    x = State("x", shape=(3,))
+
+    # Create convex constraint first, then wrap
+    convex_constraint = (x.at(5) - x.at(4) <= 1.0).convex()
+    cross_node = CrossNodeConstraint(convex_constraint)
+
+    assert cross_node.is_convex is True
+
+
+def test_cross_node_constraint_with_equality():
+    """Test CrossNodeConstraint with equality constraints."""
+    x = State("x", shape=(2,))
+
+    # Periodic boundary condition
+    constraint = x.at(0) == x.at(100)
+    cross_node = CrossNodeConstraint(constraint)
+
+    assert isinstance(cross_node.constraint, Equality)
+    assert cross_node.is_convex is False
+
+
+def test_cross_node_constraint_with_inequality():
+    """Test CrossNodeConstraint with inequality constraints."""
+    x = State("x", shape=(3,))
+
+    # Rate limit
+    constraint = x.at(10) - x.at(9) <= 0.5
+    cross_node = CrossNodeConstraint(constraint)
+
+    assert isinstance(cross_node.constraint, Inequality)
+
+
+# --- CrossNodeConstraint: Shape Checking ---
+
+
+def test_cross_node_constraint_shape_validation_scalar():
+    """Test CrossNodeConstraint shape validation with scalar result."""
+    x = State("x", shape=(1,))
+    constraint = x.at(5) - x.at(4) <= 0.1
+    cross_node = CrossNodeConstraint(constraint)
+
+    # Should validate successfully
+    shape = cross_node.check_shape()
+    assert shape == ()  # CrossNodeConstraint produces scalar
+
+
+def test_cross_node_constraint_shape_validation_vector():
+    """Test CrossNodeConstraint shape validation with vector constraint."""
+    x = State("x", shape=(3,))
+    constraint = x.at(5) - x.at(4) <= np.ones(3) * 0.1
+    cross_node = CrossNodeConstraint(constraint)
+
+    # Should validate successfully (vector constraints are element-wise)
+    shape = cross_node.check_shape()
+    assert shape == ()
+
+
+def test_cross_node_constraint_shape_mismatch_raises():
+    """Test that CrossNodeConstraint detects shape mismatches in wrapped constraint."""
+    x = State("x", shape=(2,))
+    # 2-dim state compared with 3-dim constant
+    constraint = x.at(5) == np.zeros(3)
+    cross_node = CrossNodeConstraint(constraint)
+
+    # Should raise due to wrapped constraint shape mismatch
+    with pytest.raises(ValueError):
+        cross_node.check_shape()
+
+
+# --- CrossNodeConstraint: Canonicalization ---
+
+
+def test_cross_node_constraint_canonicalization():
+    """Test that CrossNodeConstraint canonicalizes its inner constraint."""
+    from openscvx.symbolic.expr import Add
+
+    x = State("x", shape=(2,))
+
+    # Create constraint with non-canonical expression
+    lhs = Add(x.at(5), Constant(np.array([1.0, 2.0])))
+    rhs = Add(Constant(np.array([3.0, 4.0])), Constant(np.array([5.0, 6.0])))
+    constraint = lhs <= rhs
+
+    cross_node = CrossNodeConstraint(constraint)
+    canon = cross_node.canonicalize()
+
+    # Should still be CrossNodeConstraint
+    assert isinstance(canon, CrossNodeConstraint)
+    # Inner constraint should be canonicalized
+    assert isinstance(canon.constraint, Inequality)
+
+
+def test_cross_node_constraint_preserves_convex_flag():
+    """Test that canonicalization preserves the convex flag."""
+    x = State("x", shape=(3,))
+
+    # Create convex constraint
+    constraint = (x.at(5) - x.at(4) <= 1.0).convex()
+    cross_node = CrossNodeConstraint(constraint)
+
+    assert cross_node.is_convex is True
+
+    # Canonicalize
+    canon = cross_node.canonicalize()
+
+    # Convex flag should be preserved
+    assert canon.is_convex is True
+
+
+# --- CrossNodeConstraint: JAX Lowering ---
+
+
+def test_cross_node_constraint_jax_lowering():
+    """Test that CrossNodeConstraint lowers to trajectory-level function."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    position = State("pos", shape=(2,))
+    position._slice = slice(0, 2)
+
+    # Constraint: position[5] - position[4] <= 0
+    constraint = position.at(5) - position.at(4) <= 0
+    cross_node = CrossNodeConstraint(constraint)
+
+    jl = JaxLowerer()
+    fn = jl.lower(cross_node)
+
+    # Create fake trajectory
+    X = jnp.arange(20).reshape(10, 2).astype(float)  # 10 nodes, 2-dim state
+    U = jnp.zeros((10, 0))
+    params = {}
+
+    # CrossNodeConstraint visitor provides (X, U, params) signature
+    result = fn(X, U, params)
+
+    # Expected: X[5] - X[4] - 0 = [10, 11] - [8, 9] = [2, 2]
+    expected = jnp.array([2.0, 2.0])
+
+    assert result.shape == (2,)
+    assert jnp.allclose(result, expected)
+
+
+def test_cross_node_constraint_jax_lowering_scalar():
+    """Test CrossNodeConstraint JAX lowering with scalar constraint."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Norm
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    position = State("pos", shape=(2,))
+    position._slice = slice(0, 2)
+
+    # Constraint: norm(position[5] - position[4]) <= 1.0
+    constraint = Norm(position.at(5) - position.at(4)) <= 1.0
+    cross_node = CrossNodeConstraint(constraint)
+
+    jl = JaxLowerer()
+    fn = jl.lower(cross_node)
+
+    # Create fake trajectory
+    X = jnp.array(
+        [
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [2.0, 0.0],
+            [3.0, 0.0],
+            [4.0, 0.0],
+            [4.5, 0.0],
+            [5.0, 0.0],
+            [5.5, 0.0],
+            [6.0, 0.0],
+            [6.5, 0.0],
+        ]
+    )
+    U = jnp.zeros((10, 0))
+    params = {}
+
+    result = fn(X, U, params)
+
+    # Expected: norm([4.5, 0] - [4, 0]) - 1.0 = norm([0.5, 0]) - 1.0 = 0.5 - 1.0 = -0.5
+    expected = -0.5
+
+    assert result.shape == ()
+    assert jnp.allclose(result, expected)
+
+
+def test_cross_node_constraint_jax_jacobians():
+    """Test that Jacobians can be computed for CrossNodeConstraint."""
+    import jax.numpy as jnp
+    from jax import jacfwd
+
+    from openscvx.symbolic.lowerers.jax import JaxLowerer
+
+    position = State("pos", shape=(2,))
+    position._slice = slice(0, 2)
+
+    # Constraint: position[3] - position[2] <= 0
+    constraint = position.at(3) - position.at(2) <= 0
+    cross_node = CrossNodeConstraint(constraint)
+
+    jl = JaxLowerer()
+    fn = jl.lower(cross_node)
+
+    # Create trajectory
+    X = jnp.ones((5, 2))  # 5 nodes, 2-dim state
+    U = jnp.zeros((5, 0))
+    params = {}
+
+    # Compute Jacobian wrt X
+    grad_g_X = jacfwd(fn, argnums=0)(X, U, params)
+
+    # Shape should be (constraint_dim, N, n_x) = (2, 5, 2)
+    assert grad_g_X.shape == (2, 5, 2)
+
+    # Jacobian should only be non-zero at nodes 2 and 3
+    # At node 3: derivative is +1 (for each component)
+    # At node 2: derivative is -1 (for each component)
+    assert jnp.allclose(grad_g_X[0, 3, 0], 1.0)  # d(result[0])/d(X[3, 0])
+    assert jnp.allclose(grad_g_X[0, 2, 0], -1.0)  # d(result[0])/d(X[2, 0])
+    assert jnp.allclose(grad_g_X[1, 3, 1], 1.0)  # d(result[1])/d(X[3, 1])
+    assert jnp.allclose(grad_g_X[1, 2, 1], -1.0)  # d(result[1])/d(X[2, 1])
+
+    # All other nodes should have zero gradient
+    assert jnp.allclose(grad_g_X[:, 0, :], 0.0)
+    assert jnp.allclose(grad_g_X[:, 1, :], 0.0)
+    assert jnp.allclose(grad_g_X[:, 4, :], 0.0)
+
+
+# --- CrossNodeConstraint: CVXPy Lowering ---
+
+
+def test_cross_node_constraint_cvxpy_lowering():
+    """Test that CrossNodeConstraint lowers to CVXPy constraint."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    position = State("pos", shape=(2,))
+    position._slice = slice(0, 2)
+
+    # Constraint: position[5] - position[4] <= 0.1
+    constraint = position.at(5) - position.at(4) <= 0.1
+    cross_node = CrossNodeConstraint(constraint)
+
+    # Create CVXPy variables - full trajectory
+    x_cvx = cp.Variable((10, 2), name="x")
+    variable_map = {"x": x_cvx}
+
+    lowerer = CvxpyLowerer(variable_map)
+    result = lowerer.lower(cross_node)
+
+    assert isinstance(result, cp.Constraint)
+
+
+def test_cross_node_constraint_cvxpy_equality():
+    """Test CVXPy lowering of CrossNodeConstraint with equality."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    state = State("x", shape=(3,))
+    state._slice = slice(0, 3)
+
+    # Periodic boundary: state[0] == state[N-1]
+    constraint = state.at(0) == state.at(9)
+    cross_node = CrossNodeConstraint(constraint)
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+
+    lowerer = CvxpyLowerer(variable_map)
+    result = lowerer.lower(cross_node)
+
+    assert isinstance(result, cp.Constraint)
 
 
 # =============================================================================

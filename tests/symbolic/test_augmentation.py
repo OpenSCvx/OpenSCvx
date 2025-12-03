@@ -233,13 +233,19 @@ def test_augment_with_time_state_multiple_states():
 def test_separate_constraints_empty():
     """Test separate_constraints with no constraints."""
     n_nodes = 10
-    constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
-        [], n_nodes
-    )
+    (
+        constraints_ctcs,
+        constraints_nodal,
+        constraints_nodal_convex,
+        constraints_cross,
+        constraints_cross_convex,
+    ) = separate_constraints([], n_nodes)
 
     assert constraints_ctcs == []
     assert constraints_nodal == []
     assert constraints_nodal_convex == []
+    assert constraints_cross == []
+    assert constraints_cross_convex == []
 
 
 def test_separate_constraints_only_ctcs():
@@ -249,9 +255,13 @@ def test_separate_constraints_only_ctcs():
     c1 = ctcs(x <= 1.0, penalty="squared_relu")
     c2 = ctcs(x >= 0.0, penalty="huber", check_nodally=True)
 
-    constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
-        [c1, c2], n_nodes
-    )
+    (
+        constraints_ctcs,
+        constraints_nodal,
+        constraints_nodal_convex,
+        _,
+        _,
+    ) = separate_constraints([c1, c2], n_nodes)
 
     assert constraints_ctcs == [c1, c2]
     assert len(constraints_nodal) == 1  # Only c2 should be in nodal (check_nodally=True)
@@ -268,9 +278,13 @@ def test_separate_constraints_only_nodal():
     c1 = x <= 1.0
     c2 = x >= 0.0
 
-    constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
-        [c1, c2], n_nodes
-    )
+    (
+        constraints_ctcs,
+        constraints_nodal,
+        constraints_nodal_convex,
+        _,
+        _,
+    ) = separate_constraints([c1, c2], n_nodes)
 
     assert constraints_ctcs == []
     assert len(constraints_nodal) == 2
@@ -290,9 +304,13 @@ def test_separate_constraints_mixed():
     c2 = x >= 0.0  # Regular constraint
     c3 = ctcs(x <= 2.0, penalty="huber", check_nodally=True)
 
-    constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
-        [c1, c2, c3], n_nodes
-    )
+    (
+        constraints_ctcs,
+        constraints_nodal,
+        constraints_nodal_convex,
+        _,
+        _,
+    ) = separate_constraints([c1, c2, c3], n_nodes)
 
     assert constraints_ctcs == [c1, c3]
     assert len(constraints_nodal) == 2  # c2 + c3's underlying constraint
@@ -324,9 +342,13 @@ def test_separate_constraints_convex_constraints():
     c2 = x >= 0.0  # Non-convex constraint
     c3 = (x <= 2.0).convex()  # Another convex constraint
 
-    constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
-        [c1, c2, c3], n_nodes
-    )
+    (
+        constraints_ctcs,
+        constraints_nodal,
+        constraints_nodal_convex,
+        _,
+        _,
+    ) = separate_constraints([c1, c2, c3], n_nodes)
 
     assert constraints_ctcs == []
     assert len(constraints_nodal) == 1  # Only c2 (non-convex)
@@ -354,9 +376,13 @@ def test_separate_constraints_convex_nodal_constraints():
     nodal1 = NodalConstraint(c1, [0, 1, 2])  # Convex
     nodal2 = NodalConstraint(c2, [1, 2, 3])  # Non-convex
 
-    constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
-        [nodal1, nodal2], n_nodes
-    )
+    (
+        constraints_ctcs,
+        constraints_nodal,
+        constraints_nodal_convex,
+        _,
+        _,
+    ) = separate_constraints([nodal1, nodal2], n_nodes)
 
     assert constraints_ctcs == []
     assert len(constraints_nodal) == 1  # nodal2 (non-convex)
@@ -376,9 +402,13 @@ def test_separate_constraints_convex_ctcs_check_nodally():
     c1 = ctcs((x <= 1.0).convex(), penalty="squared_relu", check_nodally=True)
     c2 = ctcs(x >= 0.0, penalty="huber", check_nodally=True)  # Non-convex
 
-    constraints_ctcs, constraints_nodal, constraints_nodal_convex = separate_constraints(
-        [c1, c2], n_nodes
-    )
+    (
+        constraints_ctcs,
+        constraints_nodal,
+        constraints_nodal_convex,
+        _,
+        _,
+    ) = separate_constraints([c1, c2], n_nodes)
 
     assert constraints_ctcs == [c1, c2]
     assert len(constraints_nodal) == 1  # c2's underlying constraint (non-convex)
@@ -389,6 +419,19 @@ def test_separate_constraints_convex_ctcs_check_nodally():
     assert not constraints_nodal[0].constraint.is_convex
     assert constraints_nodal_convex[0].constraint == c1.constraint
     assert constraints_nodal_convex[0].constraint.is_convex
+
+
+def test_ctcs_with_node_reference_raises_error():
+    """Test that CTCS constraints cannot contain NodeReferences."""
+    n_nodes = 10
+    x = State("x", (3,))
+
+    # Try to create a CTCS constraint with NodeReference - should fail
+    cross_node_constraint = x.at(5) - x.at(4) <= 1.0
+    ctcs_constraint = ctcs(cross_node_constraint, penalty="squared_relu")
+
+    with pytest.raises(ValueError, match="CTCS constraints cannot contain NodeReferences"):
+        separate_constraints([ctcs_constraint], n_nodes)
 
 
 def test_augment_no_ctcs_constraints():
@@ -1232,3 +1275,174 @@ def test_decompose_empty_list():
     """Test decomposition with empty constraint list."""
     result = decompose_vector_nodal_constraints([])
     assert result == []
+
+
+def test_ctcs_check_nodally_node_interval_preserved():
+    """Test that CTCS constraints with check_nodally=True preserve their node interval."""
+    n_nodes = 50
+    x = State("x", (1,))
+
+    # Create a CTCS constraint with check_nodally over a specific interval
+    c1 = ctcs(x <= 1.0, nodes=(10, 30), penalty="squared_relu", check_nodally=True)
+
+    (
+        constraints_ctcs,
+        constraints_nodal,
+        _,
+        _,
+        _,
+    ) = separate_constraints([c1], n_nodes=n_nodes)
+
+    # Should have the CTCS constraint
+    assert len(constraints_ctcs) == 1
+    assert constraints_ctcs[0] is c1
+
+    # Should also have a nodal constraint extracted from CTCS
+    assert len(constraints_nodal) == 1
+
+    # The nodal constraint should only apply to nodes [10, 11, ..., 29]
+    nodal_from_ctcs = constraints_nodal[0]
+    expected_nodes = list(range(10, 30))
+    assert nodal_from_ctcs.nodes == expected_nodes, (
+        f"Expected nodes {expected_nodes}, got {nodal_from_ctcs.nodes}"
+    )
+
+
+# Tests for cross-node constraint validation
+
+
+def test_convex_nodal_constraint_with_node_reference_accepted():
+    """Test that convex constraint with NodeReference is now supported."""
+    n_nodes = 10
+    position = State("pos", shape=(3,))
+
+    # Create a convex cross-node constraint (linear inequality marked as convex)
+    # No outer .at([...]) needed - auto-detected as cross-node
+    cross_node_constraint = (position.at(5) - position.at(4) <= 0.1).convex()
+
+    # The constraint itself is convex (explicitly marked)
+    assert cross_node_constraint.is_convex
+
+    # Should successfully separate constraints without raising
+    (
+        constraints_ctcs,
+        constraints_nodal,
+        constraints_nodal_convex,
+        constraints_cross,
+        constraints_cross_convex,
+    ) = separate_constraints([cross_node_constraint], n_nodes=n_nodes)
+
+    # Should be classified as convex cross-node constraint
+    assert len(constraints_cross_convex) == 1
+    assert len(constraints_cross) == 0
+    assert len(constraints_nodal_convex) == 0
+    assert len(constraints_nodal) == 0
+    assert len(constraints_ctcs) == 0
+
+
+def test_convex_bare_constraint_with_node_reference_accepted():
+    """Test that bare convex constraint with NodeReference is now supported."""
+    n_nodes = 10
+    position = State("pos", shape=(3,))
+
+    # Create a bare convex cross-node constraint (linear inequality marked as convex)
+    # This will be auto-converted to CrossNodeConstraint
+    cross_node_constraint = (position.at(5) - position.at(4) <= 0.1).convex()
+
+    # The constraint itself is convex (explicitly marked)
+    assert cross_node_constraint.is_convex
+
+    # Should successfully separate constraints without raising
+    (
+        constraints_ctcs,
+        constraints_nodal,
+        constraints_nodal_convex,
+        constraints_cross,
+        constraints_cross_convex,
+    ) = separate_constraints([cross_node_constraint], n_nodes=n_nodes)
+
+    # Should be classified as convex cross-node constraint
+    assert len(constraints_cross_convex) == 1
+    assert len(constraints_cross) == 0
+    assert len(constraints_nodal_convex) == 0
+    assert len(constraints_nodal) == 0
+    assert len(constraints_ctcs) == 0
+
+
+def test_nonconvex_cross_node_constraint_accepted():
+    """Test that non-convex cross-node constraints are accepted."""
+    n_nodes = 10
+    position = State("pos", shape=(3,))
+
+    # Import linalg for Norm
+    from openscvx.symbolic.expr import linalg
+
+    # Create a non-convex cross-node constraint (norm inequality)
+    # No outer .at([...]) needed - auto-detected as cross-node
+    cross_node_constraint = linalg.Norm(position.at(5) - position.at(4), ord=2) <= 0.1
+
+    # The constraint itself is non-convex (norm)
+    assert not cross_node_constraint.is_convex
+
+    # Should NOT raise error
+    (
+        constraints_ctcs,
+        constraints_nodal,
+        constraints_nodal_convex,
+        constraints_cross,
+        constraints_cross_convex,
+    ) = separate_constraints([cross_node_constraint], n_nodes=n_nodes)
+
+    # Should be in the non-convex cross-node constraints
+    assert len(constraints_cross) == 1
+    assert len(constraints_cross_convex) == 0
+    assert len(constraints_nodal) == 0
+    assert len(constraints_nodal_convex) == 0
+    assert len(constraints_ctcs) == 0
+
+
+def test_cross_node_constraint_with_at_wrapper_rejected():
+    """Test that cross-node constraints with .at([...]) wrapper are rejected."""
+    n_nodes = 10
+    position = State("pos", shape=(3,))
+
+    # Import linalg for Norm
+    from openscvx.symbolic.expr import linalg
+
+    # Create a cross-node constraint WITH .at([...]) wrapper - should be rejected
+    cross_node_constraint = (linalg.Norm(position.at(5) - position.at(4), ord=2) <= 0.1).at([5])
+
+    # Should raise error because .at([...]) is not allowed on cross-node constraints
+    with pytest.raises(
+        ValueError,
+        match=r"Cross-node constraints should not use \.at\(\[\.\.\.\]\) wrapper",
+    ):
+        separate_constraints([cross_node_constraint], n_nodes=n_nodes)
+
+
+def test_regular_convex_constraint_without_node_reference_accepted():
+    """Test that regular convex constraints (without NodeReference) are still accepted."""
+    n_nodes = 10
+    position = State("pos", shape=(3,))
+
+    # Create a regular convex constraint (no cross-node reference)
+    regular_constraint = (position <= 10.0).convex().at([0, 5, 9])
+
+    # The constraint itself is convex
+    assert regular_constraint.constraint.is_convex
+
+    # Should NOT raise error
+    (
+        constraints_ctcs,
+        constraints_nodal,
+        constraints_nodal_convex,
+        constraints_cross,
+        constraints_cross_convex,
+    ) = separate_constraints([regular_constraint], n_nodes=n_nodes)
+
+    # Should be in convex nodal constraints
+    assert len(constraints_nodal_convex) == 1
+    assert len(constraints_nodal) == 0
+    assert len(constraints_cross) == 0
+    assert len(constraints_cross_convex) == 0
+    assert len(constraints_ctcs) == 0

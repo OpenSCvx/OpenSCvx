@@ -194,6 +194,8 @@ class SimConfig:
         constraints_ctcs: Optional[list[Callable]] = None,
         constraints_nodal: Optional[list[Callable]] = None,
         constraints_nodal_convex: Optional[list[Callable]] = None,
+        constraints_cross_node: Optional[list[Callable]] = None,
+        constraints_cross_node_convex: Optional[list[Callable]] = None,
         n_states: Optional[int] = None,
         n_states_prop: Optional[int] = None,
         n_controls: Optional[int] = None,
@@ -229,6 +231,8 @@ class SimConfig:
             constraints_ctcs (list, optional): List of CTCS constraints.
             constraints_nodal (list, optional): List of nodal constraints.
             constraints_nodal_convex (list, optional): List of convex nodal constraints.
+            constraints_cross_node (list, optional): List of non-convex cross-node constraints.
+            constraints_cross_node_convex (list, optional): List of convex cross-node constraints.
             n_states (int, optional): The number of state variables. Defaults to
                 `None` (inferred from x.max).
             n_states_prop (int, optional): The number of propagation state
@@ -252,6 +256,12 @@ class SimConfig:
         self.constraints_nodal = constraints_nodal if constraints_nodal is not None else []
         self.constraints_nodal_convex = (
             constraints_nodal_convex if constraints_nodal_convex is not None else []
+        )
+        self.constraints_cross_node = (
+            constraints_cross_node if constraints_cross_node is not None else []
+        )
+        self.constraints_cross_node_convex = (
+            constraints_cross_node_convex if constraints_cross_node_convex is not None else []
         )
         self.n_states = n_states
         self.n_states_prop = n_states_prop

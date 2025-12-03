@@ -50,6 +50,7 @@ from openscvx.symbolic.expr import (
     Constant,
     Constraint,
     Control,
+    CrossNodeConstraint,
     Expr,
     NodalConstraint,
     State,
@@ -238,9 +239,10 @@ def _traverse_with_depth(expr: Expr, visit: Callable[[Expr, int], None], depth: 
 def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
     """Validate that constraints only appear at the root level of expression trees.
 
-    Constraints and constraint wrappers (CTCS, NodalConstraint) must only appear as
-    top-level expressions, not nested within other expressions. However, constraints
-    inside constraint wrappers are allowed (e.g., the constraint inside CTCS(x <= 5)).
+    Constraints and constraint wrappers (CTCS, NodalConstraint, CrossNodeConstraint)
+    must only appear as top-level expressions, not nested within other expressions.
+    However, constraints inside constraint wrappers are allowed (e.g., the constraint
+    inside CTCS(x <= 5)).
 
     This ensures constraints are properly processed during problem compilation and
     prevents ambiguous constraint specifications.
@@ -261,7 +263,7 @@ def validate_constraints_at_root(exprs: Union[Expr, list[Expr]]):
     """
 
     # Define constraint wrappers that must also be at root level
-    CONSTRAINT_WRAPPERS = (CTCS, NodalConstraint)
+    CONSTRAINT_WRAPPERS = (CTCS, NodalConstraint, CrossNodeConstraint)
 
     # normalize to list
     expr_list = exprs if isinstance(exprs, (list, tuple)) else [exprs]
@@ -345,6 +347,113 @@ def validate_and_normalize_constraint_nodes(exprs: Union[Expr, list[Expr]], n_no
             for node in expr.nodes:
                 if node < 0 or node >= n_nodes:
                     raise ValueError(f"NodalConstraint node {node} is out of range [0, {n_nodes})")
+
+
+def validate_cross_node_constraint(cross_node_constraint, n_nodes: int) -> None:
+    """Validate cross-node constraint bounds and variable consistency.
+
+    This function performs two validations in a single tree traversal:
+
+    1. **Bounds checking**: Ensures all NodeReference indices are within [0, n_nodes).
+       Cross-node constraints reference fixed trajectory nodes (e.g., position.at(5)),
+       and this validates those indices are valid. Negative indices are normalized
+       (e.g., -1 becomes n_nodes-1) before checking.
+
+    2. **Variable consistency**: Ensures that if ANY variable uses .at(), then ALL
+       state/control variables must use .at(). Mixing causes shape mismatches during
+       lowering because:
+       - Variables with .at(k) extract single-node values: X[k, :] → shape (n_x,)
+       - Variables without .at() expect full trajectory: X[:, :] → shape (N, n_x)
+
+    Args:
+        cross_node_constraint: The CrossNodeConstraint to validate
+        n_nodes: Total number of trajectory nodes
+
+    Raises:
+        ValueError: If any NodeReference accesses nodes outside [0, n_nodes)
+        ValueError: If constraint mixes .at() and non-.at() variables
+
+    Example:
+        Valid cross-node constraint:
+
+            from openscvx.symbolic.expr import CrossNodeConstraint
+
+            position = State("pos", shape=(3,))
+
+            # Valid: all variables use .at(), indices in bounds
+            constraint = CrossNodeConstraint(position.at(5) - position.at(4) <= 0.1)
+            validate_cross_node_constraint(constraint, n_nodes=10)  # OK
+
+        Invalid - out of bounds:
+
+            # Invalid: node 10 is out of bounds for n_nodes=10
+            bad_bounds = CrossNodeConstraint(position.at(0) == position.at(10))
+            validate_cross_node_constraint(bad_bounds, n_nodes=10)  # Raises ValueError
+
+        Invalid - mixed .at() usage:
+
+            velocity = State("vel", shape=(3,))
+            # Invalid: position uses .at(), velocity doesn't
+            bad_mixed = CrossNodeConstraint(position.at(5) - velocity <= 0.1)
+            validate_cross_node_constraint(bad_mixed, n_nodes=10)  # Raises ValueError
+    """
+    from openscvx.symbolic.expr import Control, CrossNodeConstraint, NodeReference, State
+
+    if not isinstance(cross_node_constraint, CrossNodeConstraint):
+        raise TypeError(
+            f"Expected CrossNodeConstraint, got {type(cross_node_constraint).__name__}. "
+            f"Bare constraints with NodeReferences should be wrapped in CrossNodeConstraint "
+            f"by separate_constraints() before validation."
+        )
+
+    constraint = cross_node_constraint.constraint
+
+    # Collect information in a single traversal
+    node_refs = []  # List of (node_idx, normalized_idx) tuples
+    unwrapped_vars = []  # List of variable names without .at()
+
+    def traverse(expr):
+        if isinstance(expr, NodeReference):
+            # Normalize negative indices
+            idx = expr.node_idx
+            normalized_idx = idx if idx >= 0 else n_nodes + idx
+            node_refs.append((idx, normalized_idx))
+            # Don't traverse into children - NodeReference wraps the variable
+            return
+
+        if isinstance(expr, (State, Control)):
+            # Found a bare State/Control not wrapped in NodeReference
+            unwrapped_vars.append(expr.name)
+            return
+
+        # Recurse on children
+        for child in expr.children():
+            traverse(child)
+
+    # Traverse the constraint expression (both sides)
+    traverse(constraint.lhs)
+    traverse(constraint.rhs)
+
+    # Check 1: Bounds validation
+    for orig_idx, normalized_idx in node_refs:
+        if normalized_idx < 0 or normalized_idx >= n_nodes:
+            raise ValueError(
+                f"Cross-node constraint references invalid node index {orig_idx}. "
+                f"Node indices must be in range [0, {n_nodes}) "
+                f"(or negative indices in range [-{n_nodes}, -1]). "
+                f"Constraint: {constraint}"
+            )
+
+    # Check 2: Variable consistency - if we have NodeReferences, all vars must use .at()
+    if node_refs and unwrapped_vars:
+        raise ValueError(
+            f"Cross-node constraint contains NodeReferences (variables with .at(k)) "
+            f"but also has variables without .at(): {unwrapped_vars}. "
+            f"All state/control variables in cross-node constraints must use .at(k). "
+            f"For example, if you use 'position.at(5)', you must also use 'velocity.at(4)' "
+            f"instead of just 'velocity'. "
+            f"Constraint: {constraint}"
+        )
 
 
 def validate_dynamics_dimension(

@@ -155,6 +155,8 @@ class TrajOptProblem:
             constraints_ctcs,
             constraints_nodal,
             constraints_nodal_convex,
+            constraints_cross_node,
+            constraints_cross_node_convex,
             parameters,
             node_intervals,
             dynamics_prop_aug,
@@ -184,7 +186,9 @@ class TrajOptProblem:
         (
             dynamics_augmented,
             lowered_constraints_nodal,
+            lowered_cross_node_constraints,
             constraints_nodal_convex,
+            constraints_cross_node_convex,
             x_unified,
             u_unified,
             dynamics_augmented_prop,
@@ -195,6 +199,8 @@ class TrajOptProblem:
             controls_aug=u_aug,
             constraints_nodal=constraints_nodal,
             constraints_nodal_convex=constraints_nodal_convex,
+            constraints_cross_node=constraints_cross_node,
+            constraints_cross_node_convex=constraints_cross_node_convex,
             parameters=parameters,
             dynamics_prop=dynamics_prop_aug,
             states_prop=x_prop_aug,
@@ -261,7 +267,9 @@ class TrajOptProblem:
         # Store constraints in SimConfig
         sim.constraints_ctcs = constraints_ctcs
         sim.constraints_nodal = lowered_constraints_nodal
+        sim.constraints_cross_node = lowered_cross_node_constraints
         sim.constraints_nodal_convex = constraints_nodal_convex
+        sim.constraints_cross_node_convex = constraints_cross_node_convex
 
         self.settings = Config(
             sim=sim,
@@ -367,6 +375,12 @@ class TrajOptProblem:
             constraint.grad_g_x = jax.jit(constraint.grad_g_x)
             constraint.grad_g_u = jax.jit(constraint.grad_g_u)
 
+        # JIT compile cross-node constraints
+        for constraint in self.settings.sim.constraints_cross_node:
+            constraint.func = jax.jit(constraint.func)
+            constraint.grad_g_X = jax.jit(constraint.grad_g_X)
+            constraint.grad_g_U = jax.jit(constraint.grad_g_U)
+
         # Generate solvers and optimal control problem
         self.discretization_solver = get_discretization_solver(
             self.dynamics_augmented, self.settings, self.parameters
@@ -386,7 +400,10 @@ class TrajOptProblem:
 
         # Phase 2: Lower convex constraints to CVXPy
         lowered_convex_constraints, self.cvxpy_params = lower_convex_constraints(
-            self.settings.sim.constraints_nodal_convex, ocp_vars, self._parameters
+            self.settings.sim.constraints_nodal_convex,
+            self.settings.sim.constraints_cross_node_convex,
+            ocp_vars,
+            self._parameters,
         )
 
         # Store lowered constraints back in settings for Phase 3
@@ -398,6 +415,8 @@ class TrajOptProblem:
         # Collect all relevant functions
         functions_to_hash = [self.dynamics_augmented.f, self.dynamics_augmented_prop.f]
         for constraint in self.settings.sim.constraints_nodal:
+            functions_to_hash.append(constraint.func)
+        for constraint in self.settings.sim.constraints_cross_node:
             functions_to_hash.append(constraint.func)
         # Note: CTCS constraints are already included in dynamics_augmented.f,
         # so we don't need to add them separately
