@@ -46,8 +46,8 @@ def test_add_sub_basic_nodes_and_children():
     assert sub.children() == [a, b]
 
     # repr should nest correctly
-    assert repr(add) == "(Const(2) + Const(3))"
-    assert repr(sub) == "(Const(2) - Const(3))"
+    assert repr(add) == "(Const(2.0) + Const(3.0))"
+    assert repr(sub) == "(Const(2.0) - Const(3.0))"
 
 
 def test_add_accepts_many_terms():
@@ -56,7 +56,7 @@ def test_add_accepts_many_terms():
     add = Add(a, b, c, d)
 
     assert add.children() == [a, b, c, d]
-    assert repr(add) == "(Const(5) + Const(3) + Const(1) + Const(2))"
+    assert repr(add) == "(Const(5.0) + Const(3.0) + Const(1.0) + Const(2.0))"
 
 
 def test_add_requires_at_least_two_terms():
@@ -295,8 +295,8 @@ def test_mul_div_basic_nodes_and_children():
     assert div.children() == [a, b]
 
     # repr should nest correctly
-    assert repr(mul) == "(Const(2) * Const(3))"
-    assert repr(div) == "(Const(2) / Const(3))"
+    assert repr(mul) == "(Const(2.0) * Const(3.0))"
+    assert repr(div) == "(Const(2.0) / Const(3.0))"
 
 
 def test_mul_accepts_many_terms():
@@ -305,7 +305,7 @@ def test_mul_accepts_many_terms():
     mul = Mul(a, b, c, d)
 
     assert mul.children() == [a, b, c, d]
-    assert repr(mul) == "(Const(5) * Const(3) * Const(1) * Const(2))"
+    assert repr(mul) == "(Const(5.0) * Const(3.0) * Const(1.0) * Const(2.0))"
 
 
 def test_mul_requires_at_least_two_terms():
@@ -723,7 +723,7 @@ def test_neg_basic_node_and_children():
     assert neg.children() == [a]
 
     # repr should nest correctly
-    assert repr(neg) == "(-Const(2))"
+    assert repr(neg) == "(-Const(2.0))"
 
 
 # --- Neg: Shape Checking ---
@@ -820,13 +820,13 @@ def test_power_operator_and_node():
     pow1 = a**b
     assert isinstance(pow1, Power)
     assert pow1.children() == [a, b]
-    assert repr(pow1) == "(Const(2))**(Const(3))"
+    assert repr(pow1) == "(Const(2.0))**(Const(3.0))"
 
     # Test direct Power node creation
     pow2 = Power(a, b)
     assert isinstance(pow2, Power)
     assert pow2.children() == [a, b]
-    assert repr(pow2) == "(Const(2))**(Const(3))"
+    assert repr(pow2) == "(Const(2.0))**(Const(3.0))"
 
 
 def test_power_with_mixed_types():

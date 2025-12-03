@@ -174,7 +174,7 @@ class Variable(Leaf):
                 n_points = 50
                 pos.guess = np.linspace([0, 0, 0], [10, 5, 3], n_points)
         """
-        arr = np.asarray(arr)
+        arr = np.asarray(arr, dtype=float)
         if arr.ndim != 2:
             raise ValueError(
                 f"Guess must be a 2D array of shape (n_guess_points, {self.shape[0]}), got shape"

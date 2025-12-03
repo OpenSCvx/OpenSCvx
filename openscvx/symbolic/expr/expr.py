@@ -430,7 +430,7 @@ class Parameter(Leaf):
         super().__init__(name, shape)
         if value is None:
             raise ValueError(f"Parameter '{name}' requires an initial value")
-        self.value = np.asarray(value)
+        self.value = np.asarray(value, dtype=float)
 
 
 def to_expr(x: Union[Expr, float, int, np.ndarray]) -> Expr:
@@ -491,7 +491,7 @@ class Constant(Expr):
         # Normalize immediately upon construction to ensure consistency
         # This ensures Constant(5.0) and Constant([5.0]) create identical objects
         if not isinstance(value, np.ndarray):
-            value = np.array(value)
+            value = np.array(value, dtype=float)
         self.value = np.squeeze(value)
 
     def canonicalize(self) -> "Expr":
