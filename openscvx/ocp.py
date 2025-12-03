@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List
+from typing import Dict
 
 import cvxpy as cp
 import numpy as np
@@ -82,15 +82,9 @@ def create_cvxpy_variables(
     if constraints.nodal:
         for idx_ncvx, constraint in enumerate(constraints.nodal):
             g.append(cp.Parameter(N, name="g_" + str(idx_ncvx)))
-            grad_g_x.append(
-                cp.Parameter((N, n_states), name="grad_g_x_" + str(idx_ncvx))
-            )
-            grad_g_u.append(
-                cp.Parameter((N, n_controls), name="grad_g_u_" + str(idx_ncvx))
-            )
-            nu_vb.append(
-                cp.Variable(N, name="nu_vb_" + str(idx_ncvx))
-            )  # Virtual Control for VB
+            grad_g_x.append(cp.Parameter((N, n_states), name="grad_g_x_" + str(idx_ncvx)))
+            grad_g_u.append(cp.Parameter((N, n_controls), name="grad_g_u_" + str(idx_ncvx)))
+            nu_vb.append(cp.Variable(N, name="nu_vb_" + str(idx_ncvx)))  # Virtual Control for VB
 
     # Linearized Cross-Node Constraints
     g_cross = []
