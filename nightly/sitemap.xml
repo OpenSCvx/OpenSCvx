@@ -145,6 +145,10 @@
          <lastmod>2025-12-03</lastmod>
     </url>
     <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/problem/</loc>
+         <lastmod>2025-12-03</lastmod>
+    </url>
+    <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/reference/propagation/</loc>
          <lastmod>2025-12-03</lastmod>
     </url>
@@ -158,10 +162,6 @@
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/reference/time/</loc>
-         <lastmod>2025-12-03</lastmod>
-    </url>
-    <url>
-         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/trajoptproblem/</loc>
          <lastmod>2025-12-03</lastmod>
     </url>
     <url>
