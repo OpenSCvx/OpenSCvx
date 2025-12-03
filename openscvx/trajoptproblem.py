@@ -355,14 +355,14 @@ class TrajOptProblem:
             self.dynamics_augmented_prop.f, in_axes=(0, 0, 0, None)
         )
 
-        for constraint in self.settings.sim.constraints_nodal:
+        for constraint in self.settings.sim.constraints.nodal:
             # TODO: (haynec) switch to AOT instead of JIT
             constraint.func = jax.jit(constraint.func)
             constraint.grad_g_x = jax.jit(constraint.grad_g_x)
             constraint.grad_g_u = jax.jit(constraint.grad_g_u)
 
         # JIT compile cross-node constraints
-        for constraint in self.settings.sim.constraints_cross_node:
+        for constraint in self.settings.sim.constraints.cross_node:
             constraint.func = jax.jit(constraint.func)
             constraint.grad_g_X = jax.jit(constraint.grad_g_X)
             constraint.grad_g_U = jax.jit(constraint.grad_g_U)
