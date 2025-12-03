@@ -189,11 +189,6 @@ class Problem:
         )
 
         # Step 2: Lower to JAX
-        # TODO: Move CVXPy lowering here after SCP weights become CVXPy Parameters
-        # Currently CVXPy lowering happens in initialize() because some weights
-        # (lam_vc, lam_vb) are baked into OCP cost at creation time, and users
-        # currently modify these between __init__ and initialize(). Once all weights
-        # are CVXPy Parameters, CVXPy lowering can happen here alongside JAX lowering.
         (
             dynamics_augmented,
             lowered_constraint_set,
@@ -230,7 +225,6 @@ class Problem:
         # 2. _parameter_wrapper: wrapper dict for user access that auto-syncs
         self._parameters = parameters  # Plain dict for JAX
         self._parameter_wrapper = _ParameterDict(self, self._parameters, parameters)
-        self.cvxpy_params = None  # Will be set during initialize()
 
         # Store dynamics objects
         self.dynamics_augmented = dynamics_augmented
@@ -281,6 +275,23 @@ class Problem:
             prp=prp,
         )
 
+        # ==================== STEP 5: Lower to CVXPy ====================
+
+        # Create CVXPy variables and parameters
+        self._ocp_vars = create_cvxpy_variables(self.settings)
+
+        # Lower convex constraints to CVXPy
+        lowered_convex_constraints, self.cvxpy_params = lower_convex_constraints(
+            self.settings.sim.constraints,
+            self._ocp_vars,
+            self._parameters,
+        )
+
+        # Store lowered constraints in settings for OCP construction
+        self.settings.sim.constraints.nodal_convex = lowered_convex_constraints
+
+        # OCP construction happens in initialize() so users can modify
+        # settings (like uniform_time_grid) between __init__ and initialize()
         self.optimal_control_problem: cp.Problem = None
         self.discretization_solver: callable = None
         self.cpg_solve = None
@@ -382,7 +393,7 @@ class Problem:
             constraint.grad_g_X = jax.jit(constraint.grad_g_X)
             constraint.grad_g_U = jax.jit(constraint.grad_g_U)
 
-        # Generate solvers and optimal control problem
+        # Generate solvers
         self.discretization_solver = get_discretization_solver(
             self.dynamics_augmented, self.settings, self.parameters
         )
@@ -390,27 +401,9 @@ class Problem:
             self.dynamics_augmented_prop.f, self.settings, self.parameters
         )
 
-        # TODO: Move this CVXPy lowering section to lower_symbolic_expressions()
-        # This should happen in __init__ alongside JAX lowering for architectural consistency.
-        # Blocked until all SCP weights become CVXPy Parameters (currently lam_vc and lam_vb
-        # are baked into OCP at creation time). See docs/problem_preprocessing_analysis.md
-        # "CVXPy Lowering: Current Approach vs. Alternatives" section for details.
-
-        # Phase 1: Create CVXPy variables
-        ocp_vars = create_cvxpy_variables(self.settings)
-
-        # Phase 2: Lower convex constraints to CVXPy
-        lowered_convex_constraints, self.cvxpy_params = lower_convex_constraints(
-            self.settings.sim.constraints,
-            ocp_vars,
-            self._parameters,
-        )
-
-        # Store lowered constraints back in settings for Phase 3
-        self.settings.sim.constraints.nodal_convex = lowered_convex_constraints
-
-        # Phase 3: Build complete optimal control problem
-        self.optimal_control_problem = OptimalControlProblem(self.settings, ocp_vars)
+        # Build optimal control problem using pre-lowered CVXPy constraints
+        # (CVXPy variables and constraint lowering happened in __init__)
+        self.optimal_control_problem = OptimalControlProblem(self.settings, self._ocp_vars)
 
         # Collect all relevant functions
         functions_to_hash = [self.dynamics_augmented.f, self.dynamics_augmented_prop.f]

@@ -282,28 +282,16 @@ def lower_symbolic_expressions(
         The node parameter allows for time-varying behavior (e.g., nodal constraints).
         The params dictionary provides runtime parameter updates without recompilation.
 
-        **CVXPy Lowering Deferred**: Convex constraints are NOT lowered to CVXPy in
-        this function. They remain symbolic and are lowered later in the pipeline
-        during Problem.initialize() (see problem.py:378-393). This is
-        necessary because:
-            1. CVXPy lowering requires CVXPy variables (x, u) which are created during
-               initialize() by create_cvxpy_variables()
-            2. Some SCP weights (lam_vc, lam_vb) are currently baked into the OCP cost
-               at creation time rather than being CVXPy Parameters
-            3. The OCP must be fully constructed before constraints can be lowered
-
-        This architectural split means:
-            - JAX lowering happens early (in __init__ via this function)
-            - CVXPy lowering happens late (in initialize() via lower_convex_constraints())
-
-        Future work will move CVXPy lowering here once all SCP weights become CVXPy
-        Parameters instead of being baked into the cost function.
+        **CVXPy Lowering**: Convex constraints are NOT lowered to CVXPy in this
+        function. They remain symbolic and are lowered immediately after in
+        Problem.__init__ using create_cvxpy_variables() and lower_convex_constraints()
+        from ocp.py. This keeps JAX and CVXPy lowering as separate steps while
+        ensuring both happen during problem construction.
 
     See Also:
         - lower_to_jax(): The underlying lowering function for individual expressions
         - JaxLowerer: The visitor-pattern backend that implements JAX lowering
-        - lower_convex_constraints(): CVXPy lowering in ocp.py (called during initialize())
-        - Problem.initialize(): Where CVXPy lowering actually occurs (problem.py)
+        - lower_convex_constraints(): CVXPy lowering in ocp.py
         - UnifiedState/UnifiedControl: Aggregation containers in symbolic/unified.py
         - Dynamics: Container for dynamics functions in dynamics.py
         - LoweredNodalConstraint: Container for constraint functions in constraints/lowered.py
@@ -392,15 +380,11 @@ def lower_symbolic_expressions(
         )
         lowered_constraints.cross_node.append(cross_node_lowered)
 
-    # ==================== KEEP CONVEX CONSTRAINTS SYMBOLIC ====================
+    # ==================== CONVEX CONSTRAINTS REMAIN SYMBOLIC ====================
 
-    # TODO: Add CVXPy lowering here once SCP weights become CVXPy Parameters
-    # Convex constraints remain symbolic and will be lowered to CVXPy
-    # later in initialize() when CVXPy variables are available.
-    # Once all SCP weights (lam_vc, lam_vb) are CVXPy Parameters instead of
-    # being baked into the OCP cost, this function should handle CVXPy lowering
-    # alongside JAX lowering for architectural consistency.
-    # See docs/problem_preprocessing_analysis.md for full analysis.
+    # Convex constraints (nodal_convex, cross_node_convex) remain symbolic here.
+    # They are lowered to CVXPy in Problem.__init__ immediately after this function
+    # is called, using create_cvxpy_variables() and lower_convex_constraints().
 
     # ==================== RETURN LOWERED OUTPUTS ====================
 
