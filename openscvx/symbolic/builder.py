@@ -165,12 +165,7 @@ def preprocess_symbolic_problem(
             0. dynamics_aug (Expr): Augmented dynamics = user dynamics + time + CTCS penalties
             1. states_aug (List[State]): User states + time + CTCS augmented states
             2. controls_aug (List[Control]): User controls + time dilation
-            3. constraints (ConstraintSet): All categorized constraints:
-                - ctcs: CTCS constraints (remain symbolic)
-                - nodal: Non-convex nodal constraints
-                - nodal_convex: Convex nodal constraints
-                - cross_node: Non-convex cross-node constraints
-                - cross_node_convex: Convex cross-node constraints
+            3. constraints (ConstraintSet): All categorized constraints
             4. parameters (Dict[str, np.ndarray]): Parameter values extracted from expressions
             5. node_intervals (List[Tuple[int, int]]): Time intervals for CTCS constraints
             6. dynamics_prop (Expr): Propagation dynamics (includes extra states if provided)

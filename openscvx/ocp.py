@@ -178,8 +178,7 @@ def lower_convex_constraints(
         trajectory
 
     Args:
-        constraints: ConstraintSet containing convex constraints to lower (uses nodal_convex
-            and cross_node_convex fields)
+        constraints: ConstraintSet (only nodal_convex and cross_node_convex fields are used)
         ocp_vars: Dictionary of CVXPy variables
         params: Optional dictionary of parameter values to override the defaults
 

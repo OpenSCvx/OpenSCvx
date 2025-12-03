@@ -164,15 +164,8 @@ def sort_ctcs_constraints(
 def separate_constraints(constraints: List[Expr], n_nodes: int) -> ConstraintSet:
     """Separate and categorize constraints by type and convexity.
 
-    Separates constraints into five categories stored in a ConstraintSet:
-
-    1. ctcs: CTCS (continuous-time) constraints
-    2. nodal: Non-convex nodal constraints (regular constraints applied at specific nodes)
-    3. nodal_convex: Convex nodal constraints (regular constraints applied at specific nodes)
-    4. cross_node: Non-convex cross-node constraints (constraints coupling specific trajectory
-        nodes)
-    5. cross_node_convex: Convex cross-node constraints (constraints coupling specific trajectory
-        nodes)
+    Separates constraints into five categories stored in a ConstraintSet (CTCS, nodal,
+    nodal_convex, cross_node, and cross_node_convex).
 
     Bare Constraint objects are automatically categorized:
     - If they contain NodeReferences (from .at(k) calls), they become CrossNodeConstraint

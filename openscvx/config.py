@@ -227,12 +227,7 @@ class SimConfig:
                 functions. Defaults to False.
             ctcs_node_intervals (list, optional): Node intervals for CTCS
                 constraints.
-            constraints (ConstraintSet, optional): Container for all constraint types:
-                - ctcs: CTCS (continuous-time) constraints
-                - nodal: Non-convex nodal constraints
-                - nodal_convex: Convex nodal constraints
-                - cross_node: Non-convex cross-node constraints
-                - cross_node_convex: Convex cross-node constraints
+            constraints (ConstraintSet, optional): Container for all constraint types
             n_states (int, optional): The number of state variables. Defaults to
                 `None` (inferred from x.max).
             n_states_prop (int, optional): The number of propagation state
