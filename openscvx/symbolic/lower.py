@@ -315,81 +315,6 @@ def lower_cvxpy_constraints(
     return cvxpy_constraints, all_params
 
 
-def _create_cvxpy_trajectory_variables(
-    N: int,
-    x_unified: UnifiedState,
-    u_unified: UnifiedControl,
-) -> dict:
-    """Create CVXPy trajectory variables for constraint lowering.
-
-    Creates the minimal CVXPy variables needed to lower convex constraints:
-    x, u and their non-scaled versions. This is called during lowering before
-    the full OCP variable setup.
-
-    Args:
-        N: Number of discretization nodes
-        x_unified: Unified state with bounds for scaling
-        u_unified: Unified control with bounds for scaling
-
-    Returns:
-        Dict with keys: x, u, x_nonscaled, u_nonscaled, S_x, c_x, S_u, c_u
-    """
-    import cvxpy as cp
-    import numpy as np
-
-    from openscvx.config import get_affine_scaling_matrices
-
-    n_states = len(x_unified.max)
-    n_controls = len(u_unified.max)
-
-    # Compute scaling matrices from unified object bounds
-    # Use scaling_min/max if provided, otherwise use regular min/max
-    if x_unified.scaling_min is not None:
-        lower_x = np.array(x_unified.scaling_min, dtype=float)
-    else:
-        lower_x = np.array(x_unified.min, dtype=float)
-
-    if x_unified.scaling_max is not None:
-        upper_x = np.array(x_unified.scaling_max, dtype=float)
-    else:
-        upper_x = np.array(x_unified.max, dtype=float)
-
-    S_x, c_x = get_affine_scaling_matrices(n_states, lower_x, upper_x)
-
-    if u_unified.scaling_min is not None:
-        lower_u = np.array(u_unified.scaling_min, dtype=float)
-    else:
-        lower_u = np.array(u_unified.min, dtype=float)
-
-    if u_unified.scaling_max is not None:
-        upper_u = np.array(u_unified.scaling_max, dtype=float)
-    else:
-        upper_u = np.array(u_unified.max, dtype=float)
-
-    S_u, c_u = get_affine_scaling_matrices(n_controls, lower_u, upper_u)
-
-    # Create CVXPy variables
-    x = cp.Variable((N, n_states), name="x")
-    u = cp.Variable((N, n_controls), name="u")
-
-    # Create non-scaled versions (affine transformation)
-    x_nonscaled = [S_x @ x[k] + c_x for k in range(N)]
-    u_nonscaled = [S_u @ u[k] + c_u for k in range(N)]
-
-    return {
-        "x": x,
-        "u": u,
-        "x_nonscaled": x_nonscaled,
-        "u_nonscaled": u_nonscaled,
-        "S_x": S_x,
-        "c_x": c_x,
-        "S_u": S_u,
-        "c_u": c_u,
-        "n_states": n_states,
-        "n_controls": n_controls,
-    }
-
-
 def _contains_node_reference(expr: Expr) -> bool:
     """Check if an expression contains any NodeReference nodes.
 
@@ -637,16 +562,59 @@ def lower_symbolic_expressions(
         )
         lowered_constraints.cross_node.append(cross_node_lowered)
 
-    # ==================== LOWER CONVEX CONSTRAINTS TO CVXPY ====================
+    # ==================== CREATE CVXPY VARIABLES AND LOWER CONVEX CONSTRAINTS ====================
 
-    # Create CVXPy trajectory variables from unified objects
-    cvxpy_traj_vars = _create_cvxpy_trajectory_variables(N, x_unified, u_unified)
+    import numpy as np
+
+    from openscvx.config import get_affine_scaling_matrices
+    from openscvx.ocp import create_cvxpy_variables
+
+    n_states = len(x_unified.max)
+    n_controls = len(u_unified.max)
+
+    # Compute scaling matrices from unified object bounds
+    # Use scaling_min/max if provided, otherwise use regular min/max
+    if x_unified.scaling_min is not None:
+        lower_x = np.array(x_unified.scaling_min, dtype=float)
+    else:
+        lower_x = np.array(x_unified.min, dtype=float)
+
+    if x_unified.scaling_max is not None:
+        upper_x = np.array(x_unified.scaling_max, dtype=float)
+    else:
+        upper_x = np.array(x_unified.max, dtype=float)
+
+    S_x, c_x = get_affine_scaling_matrices(n_states, lower_x, upper_x)
+
+    if u_unified.scaling_min is not None:
+        lower_u = np.array(u_unified.scaling_min, dtype=float)
+    else:
+        lower_u = np.array(u_unified.min, dtype=float)
+
+    if u_unified.scaling_max is not None:
+        upper_u = np.array(u_unified.scaling_max, dtype=float)
+    else:
+        upper_u = np.array(u_unified.max, dtype=float)
+
+    S_u, c_u = get_affine_scaling_matrices(n_controls, lower_u, upper_u)
+
+    # Create all CVXPy variables for the OCP
+    ocp_vars = create_cvxpy_variables(
+        N=N,
+        n_states=n_states,
+        n_controls=n_controls,
+        S_x=S_x,
+        c_x=c_x,
+        S_u=S_u,
+        c_u=c_u,
+        constraints=lowered_constraints,
+    )
 
     # Lower convex constraints to CVXPy
     lowered_cvxpy_constraints, cvxpy_params = lower_cvxpy_constraints(
         lowered_constraints,
-        cvxpy_traj_vars["x_nonscaled"],
-        cvxpy_traj_vars["u_nonscaled"],
+        ocp_vars["x_nonscaled"],
+        ocp_vars["u_nonscaled"],
         parameters,
     )
 
@@ -662,6 +630,6 @@ def lower_symbolic_expressions(
         u_unified,
         dynamics_augmented_prop,
         x_prop_unified,
-        cvxpy_traj_vars,
+        ocp_vars,
         cvxpy_params,
     )

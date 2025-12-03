@@ -26,7 +26,7 @@ from openscvx.config import (
     SimConfig,
 )
 from openscvx.discretization import get_discretization_solver
-from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables
+from openscvx.ocp import OptimalControlProblem
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
 from openscvx.ptr import PTR_init, PTR_step, format_result
@@ -35,7 +35,7 @@ from openscvx.symbolic.builder import preprocess_symbolic_problem
 from openscvx.symbolic.expr import CTCS, Constraint
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
-from openscvx.symbolic.lower import lower_cvxpy_constraints, lower_symbolic_expressions
+from openscvx.symbolic.lower import lower_symbolic_expressions
 from openscvx.time import Time
 
 if TYPE_CHECKING:
@@ -192,7 +192,7 @@ class Problem:
             u_unified,
             dynamics_augmented_prop,
             x_prop_unified,
-            cvxpy_traj_vars,
+            ocp_vars,
             cvxpy_params,
         ) = lower_symbolic_expressions(
             dynamics_aug=dynamics_aug,
@@ -274,21 +274,11 @@ class Problem:
             prp=prp,
         )
 
-        # ==================== STEP 5: Lower to CVXPy ====================
+        # ==================== STEP 5: Store CVXPy Variables ====================
 
-        # Create CVXPy variables and parameters
-        self._ocp_vars = create_cvxpy_variables(self.settings)
-
-        # Lower convex constraints to CVXPy
-        lowered_convex_constraints, self.cvxpy_params = lower_cvxpy_constraints(
-            self.settings.sim.constraints,
-            self._ocp_vars["x_nonscaled"],
-            self._ocp_vars["u_nonscaled"],
-            self._parameters,
-        )
-
-        # Store lowered constraints in settings for OCP construction
-        self.settings.sim.constraints.nodal_convex = lowered_convex_constraints
+        # CVXPy variables and constraint lowering happened in Step 2
+        self._ocp_vars = ocp_vars
+        self.cvxpy_params = cvxpy_params
 
         # OCP construction happens in initialize() so users can modify
         # settings (like uniform_time_grid) between __init__ and initialize()

@@ -17,77 +17,79 @@ except ImportError:
     cpg = None
 
 
-def create_cvxpy_variables(settings: Config) -> Dict:
-    """Phase 1: Create CVXPy variables and parameters for the optimal control problem."""
+def create_cvxpy_variables(
+    N: int,
+    n_states: int,
+    n_controls: int,
+    S_x: np.ndarray,
+    c_x: np.ndarray,
+    S_u: np.ndarray,
+    c_u: np.ndarray,
+    constraints: ConstraintSet,
+) -> Dict:
+    """Create CVXPy variables and parameters for the optimal control problem.
+
+    Args:
+        N: Number of discretization nodes
+        n_states: Number of state variables
+        n_controls: Number of control variables
+        S_x: State scaling matrix
+        c_x: State offset vector
+        S_u: Control scaling matrix
+        c_u: Control offset vector
+        constraints: ConstraintSet containing nodal and cross_node constraints
+
+    Returns:
+        Dictionary containing all CVXPy variables and parameters for the OCP
+    """
     ########################
     # VARIABLES & PARAMETERS
     ########################
 
+    inv_S_x = np.linalg.inv(S_x)
+    inv_S_u = np.linalg.inv(S_u)
+
     # Parameters
     w_tr = cp.Parameter(nonneg=True, name="w_tr")
     lam_cost = cp.Parameter(nonneg=True, name="lam_cost")
-    lam_vc = cp.Parameter((settings.scp.n - 1, settings.sim.n_states), nonneg=True, name="lam_vc")
+    lam_vc = cp.Parameter((N - 1, n_states), nonneg=True, name="lam_vc")
     lam_vb = cp.Parameter(nonneg=True, name="lam_vb")
 
     # State
-    x = cp.Variable((settings.scp.n, settings.sim.n_states), name="x")  # Current State
-    dx = cp.Variable((settings.scp.n, settings.sim.n_states), name="dx")  # State Error
-    x_bar = cp.Parameter(
-        (settings.scp.n, settings.sim.n_states), name="x_bar"
-    )  # Previous SCP State
-    x_init = cp.Parameter(settings.sim.n_states, name="x_init")  # Initial State
-    x_term = cp.Parameter(settings.sim.n_states, name="x_term")  # Final State
-
-    # Affine Scaling for State
-    S_x = settings.sim.S_x
-    inv_S_x = settings.sim.inv_S_x
-    c_x = settings.sim.c_x
+    x = cp.Variable((N, n_states), name="x")  # Current State
+    dx = cp.Variable((N, n_states), name="dx")  # State Error
+    x_bar = cp.Parameter((N, n_states), name="x_bar")  # Previous SCP State
+    x_init = cp.Parameter(n_states, name="x_init")  # Initial State
+    x_term = cp.Parameter(n_states, name="x_term")  # Final State
 
     # Control
-    u = cp.Variable((settings.scp.n, settings.sim.n_controls), name="u")  # Current Control
-    du = cp.Variable((settings.scp.n, settings.sim.n_controls), name="du")  # Control Error
-    u_bar = cp.Parameter(
-        (settings.scp.n, settings.sim.n_controls), name="u_bar"
-    )  # Previous SCP Control
-
-    # Affine Scaling for Control
-    S_u = settings.sim.S_u
-    inv_S_u = settings.sim.inv_S_u
-    c_u = settings.sim.c_u
+    u = cp.Variable((N, n_controls), name="u")  # Current Control
+    du = cp.Variable((N, n_controls), name="du")  # Control Error
+    u_bar = cp.Parameter((N, n_controls), name="u_bar")  # Previous SCP Control
 
     # Discretized Augmented Dynamics Constraints
-    A_d = cp.Parameter(
-        (settings.scp.n - 1, (settings.sim.n_states) * (settings.sim.n_states)), name="A_d"
-    )
-    B_d = cp.Parameter(
-        (settings.scp.n - 1, settings.sim.n_states * settings.sim.n_controls), name="B_d"
-    )
-    C_d = cp.Parameter(
-        (settings.scp.n - 1, settings.sim.n_states * settings.sim.n_controls), name="C_d"
-    )
-    x_prop = cp.Parameter((settings.scp.n - 1, settings.sim.n_states), name="x_prop")
-    nu = cp.Variable((settings.scp.n - 1, settings.sim.n_states), name="nu")  # Virtual Control
+    A_d = cp.Parameter((N - 1, n_states * n_states), name="A_d")
+    B_d = cp.Parameter((N - 1, n_states * n_controls), name="B_d")
+    C_d = cp.Parameter((N - 1, n_states * n_controls), name="C_d")
+    x_prop = cp.Parameter((N - 1, n_states), name="x_prop")
+    nu = cp.Variable((N - 1, n_states), name="nu")  # Virtual Control
 
     # Linearized Nonconvex Nodal Constraints
     g = []
     grad_g_x = []
     grad_g_u = []
     nu_vb = []
-    if settings.sim.constraints.nodal:
-        for idx_ncvx, constraint in enumerate(settings.sim.constraints.nodal):
-            g.append(cp.Parameter(settings.scp.n, name="g_" + str(idx_ncvx)))
+    if constraints.nodal:
+        for idx_ncvx, constraint in enumerate(constraints.nodal):
+            g.append(cp.Parameter(N, name="g_" + str(idx_ncvx)))
             grad_g_x.append(
-                cp.Parameter(
-                    (settings.scp.n, settings.sim.n_states), name="grad_g_x_" + str(idx_ncvx)
-                )
+                cp.Parameter((N, n_states), name="grad_g_x_" + str(idx_ncvx))
             )
             grad_g_u.append(
-                cp.Parameter(
-                    (settings.scp.n, settings.sim.n_controls), name="grad_g_u_" + str(idx_ncvx)
-                )
+                cp.Parameter((N, n_controls), name="grad_g_u_" + str(idx_ncvx))
             )
             nu_vb.append(
-                cp.Variable(settings.scp.n, name="nu_vb_" + str(idx_ncvx))
+                cp.Variable(N, name="nu_vb_" + str(idx_ncvx))
             )  # Virtual Control for VB
 
     # Linearized Cross-Node Constraints
@@ -95,21 +97,15 @@ def create_cvxpy_variables(settings: Config) -> Dict:
     grad_g_X_cross = []
     grad_g_U_cross = []
     nu_vb_cross = []
-    if settings.sim.constraints.cross_node:
-        for idx_cross, constraint in enumerate(settings.sim.constraints.cross_node):
+    if constraints.cross_node:
+        for idx_cross, constraint in enumerate(constraints.cross_node):
             # Cross-node constraints are single constraints with fixed node references
             g_cross.append(cp.Parameter(name="g_cross_" + str(idx_cross)))
             grad_g_X_cross.append(
-                cp.Parameter(
-                    (settings.scp.n, settings.sim.n_states),
-                    name="grad_g_X_cross_" + str(idx_cross),
-                )
+                cp.Parameter((N, n_states), name="grad_g_X_cross_" + str(idx_cross))
             )
             grad_g_U_cross.append(
-                cp.Parameter(
-                    (settings.scp.n, settings.sim.n_controls),
-                    name="grad_g_U_cross_" + str(idx_cross),
-                )
+                cp.Parameter((N, n_controls), name="grad_g_U_cross_" + str(idx_cross))
             )
             nu_vb_cross.append(
                 cp.Variable(name="nu_vb_cross_" + str(idx_cross))
@@ -120,7 +116,7 @@ def create_cvxpy_variables(settings: Config) -> Dict:
     u_nonscaled = []
     dx_nonscaled = []
     du_nonscaled = []
-    for k in range(settings.scp.n):
+    for k in range(N):
         x_nonscaled.append(S_x @ x[k] + c_x)
         u_nonscaled.append(S_u @ u[k] + c_u)
         dx_nonscaled.append(S_x @ dx[k])
