@@ -164,7 +164,7 @@ Here's a simple example to get you started with OpenSCvx. This demonstrates a mi
 ```python
 import numpy as np
 import openscvx as ox
-from openscvx import TrajOptProblem
+from openscvx import Problem
 
 # Define state variables
 position = ox.State("position", shape=(2,))  # 2D position [x, y]
@@ -202,7 +202,7 @@ time = ox.Time(
 )
 
 # Create the problem
-problem = TrajOptProblem(
+problem = Problem(
     dynamics=dynamics,
     states=states,
     controls=controls,

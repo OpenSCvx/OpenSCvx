@@ -10,7 +10,7 @@ sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_animation_double_integrator
-from openscvx import TrajOptProblem
+from openscvx import Problem
 from openscvx.utils import gen_vertices, rot
 
 n = 22  # Number of Nodes
@@ -73,7 +73,7 @@ for center in gate_centers:
     vertices.append(gen_vertices(center, radii))
 ### End Gate Parameters ###
 
-# Define list of all states (needed for TrajOptProblem and constraints)
+# Define list of all states (needed for Problem and constraints)
 states = [position, velocity]
 controls = [force]
 
@@ -128,7 +128,7 @@ time = ox.Time(
     max=total_time,
 )
 
-problem = TrajOptProblem(
+problem = Problem(
     dynamics=dynamics,
     states=states,
     controls=controls,

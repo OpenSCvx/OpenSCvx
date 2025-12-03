@@ -51,7 +51,7 @@ Most examples follow this structure:
 2. **Problem Setup**: Define parameters, state, and control variables
 3. **Dynamics**: Specify the system dynamics
 4. **Constraints**: Define path and boundary constraints
-5. **Problem Instantiation**: Create and configure the TrajOptProblem
+5. **Problem Instantiation**: Create and configure the Problem
 6. **Solving**: Run the optimization
 7. **Visualization**: Plot and analyze results
 

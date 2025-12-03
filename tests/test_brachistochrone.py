@@ -142,7 +142,7 @@ def test_monolithic():
     import numpy as np
 
     import openscvx as ox
-    from openscvx import TrajOptProblem
+    from openscvx import Problem
 
     # Problem parameters
     n = 2
@@ -186,7 +186,7 @@ def test_monolithic():
         max=total_time,
     )
 
-    problem = TrajOptProblem(
+    problem = Problem(
         dynamics={"x": dyn_expr},
         states=[x],
         controls=[u],
@@ -246,7 +246,7 @@ def test_constraint_types(constraint_type):
     import numpy as np
 
     import openscvx as ox
-    from openscvx import TrajOptProblem
+    from openscvx import Problem
 
     # Problem parameters
     n = 2
@@ -278,7 +278,7 @@ def test_constraint_types(constraint_type):
     theta.min = np.array([0.0])
     theta.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1)
 
-    # Define list of all states (needed for TrajOptProblem and constraints)
+    # Define list of all states (needed for Problem and constraints)
     states = [position, velocity]
     controls = [theta]
 
@@ -318,7 +318,7 @@ def test_constraint_types(constraint_type):
         max=total_time,
     )
 
-    problem = TrajOptProblem(
+    problem = Problem(
         dynamics=dynamics,
         states=states,
         controls=controls,
@@ -388,7 +388,7 @@ def test_cross_nodal(max_step, should_converge, is_convex):
     import numpy as np
 
     import openscvx as ox
-    from openscvx import TrajOptProblem
+    from openscvx import Problem
 
     # Problem parameters
     n = 2
@@ -420,7 +420,7 @@ def test_cross_nodal(max_step, should_converge, is_convex):
     theta.min = np.array([0.0])
     theta.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1)
 
-    # Define list of all states (needed for TrajOptProblem and constraints)
+    # Define list of all states (needed for Problem and constraints)
     states = [position, velocity]
     controls = [theta]
 
@@ -460,7 +460,7 @@ def test_cross_nodal(max_step, should_converge, is_convex):
         max=total_time,
     )
 
-    problem = TrajOptProblem(
+    problem = Problem(
         dynamics=dynamics,
         states=states,
         controls=controls,
@@ -536,7 +536,7 @@ def test_parameters():
     import numpy as np
 
     import openscvx as ox
-    from openscvx import TrajOptProblem
+    from openscvx import Problem
 
     # Problem parameters
     n = 2
@@ -570,7 +570,7 @@ def test_parameters():
     theta.min = np.array([0.0])
     theta.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1)
 
-    # Define list of all states (needed for TrajOptProblem and constraints)
+    # Define list of all states (needed for Problem and constraints)
     states = [position, velocity]
     controls = [theta]
 
@@ -598,7 +598,7 @@ def test_parameters():
     time.scaling_min = 0.0
     time.scaling_max = 2.0
 
-    problem = TrajOptProblem(
+    problem = Problem(
         dynamics=dynamics,
         states=states,
         controls=controls,
@@ -715,7 +715,7 @@ def test_propagation():
     import numpy as np
 
     import openscvx as ox
-    from openscvx import TrajOptProblem
+    from openscvx import Problem
 
     # Problem parameters
     n = 2
@@ -788,7 +788,7 @@ def test_propagation():
         max=total_time,
     )
 
-    problem = TrajOptProblem(
+    problem = Problem(
         dynamics=dynamics,
         states=states,
         controls=controls,

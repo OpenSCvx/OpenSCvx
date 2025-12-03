@@ -28,7 +28,7 @@ import numpy as np
 import jax.numpy as jnp
 
 import openscvx as ox
-from openscvx import TrajOptProblem
+from openscvx import Problem
 from openscvx.utils import generate_orthogonal_unit_vectors
 ```
 
@@ -230,10 +230,10 @@ time = ox.Time(
 ```
 
 ## Problem Instantiation
-Now we instantiate the `TrajOptProblem`:
+Now we instantiate the `Problem`:
 
 ```python
-problem = TrajOptProblem(
+problem = Problem(
     dynamics=dynamics,
     states=states,
     controls=controls,

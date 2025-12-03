@@ -175,7 +175,7 @@ nav:
           - Dynamics: 'Usage/api_dynamics.md'
           - Constraints: 'Usage/api_constraints.md'
           - Integrators: 'Usage/api_integrators.md'
-          - TrajOptProblem: 'Usage/api_trajoptproblem.md'
+          - Problem: 'Usage/api_problem.md'
           - OptimizationResults: 'Usage/api_results.md'
       - Tutorials:
           - 'Usage/tutorial_6dof_obstacle_avoidance.md'

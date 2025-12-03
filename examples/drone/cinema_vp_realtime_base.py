@@ -11,7 +11,7 @@ sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_animation
-from openscvx import TrajOptProblem
+from openscvx import Problem
 
 n = 12  # Number of Nodes
 total_time = 40.0  # Total time for the simulation
@@ -81,7 +81,7 @@ R_sb = jnp.array([[0, 1, 0], [0, 0, 1], [1, 0, 0]])
 # Define keypoint position as a parameter (can be updated in realtime)
 kp_pose = ox.Parameter("kp_pose", shape=(3,), value=initial_kp_pose)
 
-# Define list of all states (needed for TrajOptProblem and constraints)
+# Define list of all states (needed for Problem and constraints)
 states = [position, velocity, attitude, angular_velocity, fuel]
 controls = [thrust_force, torque]
 
@@ -177,7 +177,7 @@ time_config = ox.Time(
     max=total_time,
 )
 
-problem = TrajOptProblem(
+problem = Problem(
     dynamics=dynamics,
     states=states,
     controls=controls,

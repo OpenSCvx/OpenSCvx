@@ -408,7 +408,7 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
             constr += [residual == nu_vb_cross[idx_cross]]
             idx_cross += 1
 
-    # Convex nodal constraints (already lowered to CVXPy in trajoptproblem)
+    # Convex nodal constraints (already lowered to CVXPy in problem)
     if settings.sim.constraints.nodal_convex:
         constr += settings.sim.constraints.nodal_convex
 
