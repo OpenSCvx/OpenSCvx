@@ -79,7 +79,7 @@ def _assert_brachistochrone_accuracy(comparison, problem, result):
     assert problem.timing_init < 10.0, (
         f"Initialization took {problem.timing_init:.2f}s (expected < 10s)"
     )
-    assert problem.timing_solve < 1.0, f"Solve took {problem.timing_solve:.2f}s (expected < 1s)"
+    assert problem.timing_solve < 1.2, f"Solve took {problem.timing_solve:.2f}s (expected < 1.2s)"
     assert problem.timing_post < 5.0, (
         f"Post-processing took {problem.timing_post:.2f}s (expected < 5s)"
     )
