@@ -485,7 +485,7 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     idx_cross = 0
     if settings.sim.constraints.cross_node:
         for constraint in settings.sim.constraints.cross_node:
-            cost += settings.scp.lam_vb * cp.pos(nu_vb_cross[idx_cross])
+            cost += lam_vb * cp.pos(nu_vb_cross[idx_cross])
             idx_cross += 1
 
     for idx, nodes in zip(
