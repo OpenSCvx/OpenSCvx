@@ -20,7 +20,7 @@ position = ox.State("position", shape=(2,))  # 2D position [x, y]
 position.min = np.array([-5.0, -5.0])
 position.max = np.array([5.0, 5.0])
 position.initial = np.array([0, -2])
-position.final = np.array([0, 2])
+position.final = [ox.Free(0), ox.Free(-1.5)]
 position.guess = np.linspace(position.initial, [0, 2], n)
 
 theta = ox.State("theta", shape=(1,))  # Heading angle
@@ -83,7 +83,7 @@ for state in states:
 constraints.append(ox.ctcs(visit_wp_expr <= 0.0).over((3, 5)))
 
 # TODO: (norrisg) Make the `cp.norm(x_[0][:2] - x_[-1][:2]) <= 1` work, allow cross-nodal
-# constraints
+constraints.append((ox.linalg.Norm(position.at(0) - position.at(n-1)) <= 1.0).convex())
 
 # Build the problem
 time = ox.Time(

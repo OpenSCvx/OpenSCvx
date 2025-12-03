@@ -16,7 +16,7 @@ from openscvx import TrajOptProblem
 # You can install it via pip:
 #     pip install stljax
 n = 8
-total_time = 4.0  # Total simulation time
+total_time = 6.0  # Total simulation time
 
 # Define state components
 position = ox.State("position", shape=(2,))  # 2D position [x, y]
@@ -44,8 +44,17 @@ angular_rate.min = np.array([-5])
 angular_rate.max = np.array([5])
 angular_rate.guess = np.zeros((n, 1))
 
+# Define time state (needed for time-dependent constraints)
+time = ox.State("time", shape=(1,))
+time.max = np.array([10])
+time.min = np.array([0.0])
+time.initial = np.array([0.0])
+time.final = [ox.Minimize(total_time)]
+time.guess = np.linspace(0.0, total_time, n).reshape(-1, 1)
+    
+
 # Define list of all states and controls
-states = [position, theta]
+states = [position, theta, time]
 controls = [speed, angular_rate]
 # Define Parameters for wp radius and center
 wp1_center = ox.Parameter("wp1_center", shape=(2,), value=np.array([-2.1, 0.0]))
@@ -61,6 +70,7 @@ dynamics = {
         speed[0] * ox.Cos(theta[0]),  # y_dot
     ),
     "theta": angular_rate[0],
+    "time": 1.0,
 }
 
 # Create symbolic expressions for waypoint predicates
@@ -79,18 +89,20 @@ for state in states:
 constraints.append(ox.ctcs(-visit_wp_or_expr <= 0.0).over((3, 5)))
 
 # Build the problem
-time = ox.Time(
+time_config = ox.Time(
     initial=0.0,
-    final=("minimize", total_time),
+    final=total_time,
     min=0.0,
     max=10,
 )
+
+constraints.append((time.at(5) - time.at(3) == 1.23).convex())
 
 problem = TrajOptProblem(
     dynamics=dynamics,
     states=states,
     controls=controls,
-    time=time,
+    time=time_config,
     constraints=constraints,
     N=n,
 )
