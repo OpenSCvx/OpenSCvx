@@ -78,9 +78,9 @@ class _ParameterDict(dict):
         # Sync to internal dict for JAX
         self._internal_dict[key] = value
         # Sync to CVXPy if it exists
-        cvxpy_params = getattr(self._problem, "cvxpy_params", None)
-        if cvxpy_params is not None and key in cvxpy_params:
-            cvxpy_params[key].value = value
+        lowered = getattr(self._problem, "_lowered", None)
+        if lowered is not None and key in lowered.cvxpy_params:
+            lowered.cvxpy_params[key].value = value
 
     def update(self, other=None, **kwargs):
         """Update multiple parameters and sync to internal dict and CVXPy."""
@@ -229,12 +229,6 @@ class Problem:
             prp=prp,
         )
 
-        # ==================== STEP 4: Store CVXPy Variables ====================
-
-        # CVXPy variables and constraint lowering happened in Step 2
-        self._ocp_vars = self._lowered.ocp_vars
-        self.cvxpy_params = self._lowered.cvxpy_params
-
         # OCP construction happens in initialize() so users can modify
         # settings (like uniform_time_grid) between __init__ and initialize()
         self.optimal_control_problem: cp.Problem = None
@@ -294,10 +288,10 @@ class Problem:
 
     def _sync_parameters(self):
         """Sync all parameter values to CVXPy parameters."""
-        if self.cvxpy_params is not None:
+        if self._lowered.cvxpy_params is not None:
             for name, value in self._parameter_wrapper.items():
-                if name in self.cvxpy_params:
-                    self.cvxpy_params[name].value = value
+                if name in self._lowered.cvxpy_params:
+                    self._lowered.cvxpy_params[name].value = value
 
     @property
     def lowered(self) -> LoweredProblem:
