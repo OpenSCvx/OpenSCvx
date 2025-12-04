@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from openscvx._version import __version__
+
 if TYPE_CHECKING:
     from openscvx.symbolic.problem import SymbolicProblem
 
@@ -43,6 +45,9 @@ def hash_symbolic_problem(problem: "SymbolicProblem") -> str:
         A hex string representing the SHA-256 hash of the problem structure
     """
     hasher = hashlib.sha256()
+
+    # Include library version to invalidate cache on version changes
+    hasher.update(f"openscvx:{__version__}:".encode())
 
     # Hash the dynamics
     hasher.update(b"dynamics:")
