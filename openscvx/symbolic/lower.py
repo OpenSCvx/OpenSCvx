@@ -52,9 +52,11 @@ Example:
         # Now have executable JAX functions with Jacobians
 """
 
-from typing import Any, List, Sequence, Tuple, Union
+from typing import Any, Dict, List, Sequence, Tuple, Union
 
+import cvxpy as cp
 import jax
+import numpy as np
 from jax import jacfwd
 
 from openscvx.constraints import ConstraintSet, CrossNodeConstraintLowered, LoweredNodalConstraint
@@ -66,6 +68,7 @@ __all__ = [
     "lower",
     "lower_to_jax",
     "lower_cvxpy_constraints",
+    "create_cvxpy_variables",
     "lower_symbolic_problem",
 ]
 from openscvx.symbolic.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
@@ -148,6 +151,144 @@ def lower_to_jax(exprs: Union[Expr, Sequence[Expr]]) -> Union[callable, list[cal
         return lower(exprs, jl)
     fns = [lower(e, jl) for e in exprs]
     return fns
+
+
+def create_cvxpy_variables(
+    N: int,
+    n_states: int,
+    n_controls: int,
+    S_x: np.ndarray,
+    c_x: np.ndarray,
+    S_u: np.ndarray,
+    c_u: np.ndarray,
+    constraints: ConstraintSet,
+) -> Dict:
+    """Create CVXPy variables and parameters for the optimal control problem.
+
+    Args:
+        N: Number of discretization nodes
+        n_states: Number of state variables
+        n_controls: Number of control variables
+        S_x: State scaling matrix
+        c_x: State offset vector
+        S_u: Control scaling matrix
+        c_u: Control offset vector
+        constraints: ConstraintSet containing nodal and cross_node constraints
+
+    Returns:
+        Dictionary containing all CVXPy variables and parameters for the OCP
+    """
+    ########################
+    # VARIABLES & PARAMETERS
+    ########################
+
+    inv_S_x = np.linalg.inv(S_x)
+    inv_S_u = np.linalg.inv(S_u)
+
+    # Parameters
+    w_tr = cp.Parameter(nonneg=True, name="w_tr")
+    lam_cost = cp.Parameter(nonneg=True, name="lam_cost")
+    lam_vc = cp.Parameter((N - 1, n_states), nonneg=True, name="lam_vc")
+    lam_vb = cp.Parameter(nonneg=True, name="lam_vb")
+
+    # State
+    x = cp.Variable((N, n_states), name="x")  # Current State
+    dx = cp.Variable((N, n_states), name="dx")  # State Error
+    x_bar = cp.Parameter((N, n_states), name="x_bar")  # Previous SCP State
+    x_init = cp.Parameter(n_states, name="x_init")  # Initial State
+    x_term = cp.Parameter(n_states, name="x_term")  # Final State
+
+    # Control
+    u = cp.Variable((N, n_controls), name="u")  # Current Control
+    du = cp.Variable((N, n_controls), name="du")  # Control Error
+    u_bar = cp.Parameter((N, n_controls), name="u_bar")  # Previous SCP Control
+
+    # Discretized Augmented Dynamics Constraints
+    A_d = cp.Parameter((N - 1, n_states * n_states), name="A_d")
+    B_d = cp.Parameter((N - 1, n_states * n_controls), name="B_d")
+    C_d = cp.Parameter((N - 1, n_states * n_controls), name="C_d")
+    x_prop = cp.Parameter((N - 1, n_states), name="x_prop")
+    nu = cp.Variable((N - 1, n_states), name="nu")  # Virtual Control
+
+    # Linearized Nonconvex Nodal Constraints
+    g = []
+    grad_g_x = []
+    grad_g_u = []
+    nu_vb = []
+    if constraints.nodal:
+        for idx_ncvx, constraint in enumerate(constraints.nodal):
+            g.append(cp.Parameter(N, name="g_" + str(idx_ncvx)))
+            grad_g_x.append(cp.Parameter((N, n_states), name="grad_g_x_" + str(idx_ncvx)))
+            grad_g_u.append(cp.Parameter((N, n_controls), name="grad_g_u_" + str(idx_ncvx)))
+            nu_vb.append(cp.Variable(N, name="nu_vb_" + str(idx_ncvx)))  # Virtual Control for VB
+
+    # Linearized Cross-Node Constraints
+    g_cross = []
+    grad_g_X_cross = []
+    grad_g_U_cross = []
+    nu_vb_cross = []
+    if constraints.cross_node:
+        for idx_cross, constraint in enumerate(constraints.cross_node):
+            # Cross-node constraints are single constraints with fixed node references
+            g_cross.append(cp.Parameter(name="g_cross_" + str(idx_cross)))
+            grad_g_X_cross.append(
+                cp.Parameter((N, n_states), name="grad_g_X_cross_" + str(idx_cross))
+            )
+            grad_g_U_cross.append(
+                cp.Parameter((N, n_controls), name="grad_g_U_cross_" + str(idx_cross))
+            )
+            nu_vb_cross.append(
+                cp.Variable(name="nu_vb_cross_" + str(idx_cross))
+            )  # Virtual Control for VB
+
+    # Applying the affine scaling to state and control
+    x_nonscaled = []
+    u_nonscaled = []
+    dx_nonscaled = []
+    du_nonscaled = []
+    for k in range(N):
+        x_nonscaled.append(S_x @ x[k] + c_x)
+        u_nonscaled.append(S_u @ u[k] + c_u)
+        dx_nonscaled.append(S_x @ dx[k])
+        du_nonscaled.append(S_u @ du[k])
+
+    return {
+        "w_tr": w_tr,
+        "lam_cost": lam_cost,
+        "lam_vc": lam_vc,
+        "lam_vb": lam_vb,
+        "x": x,
+        "dx": dx,
+        "x_bar": x_bar,
+        "x_init": x_init,
+        "x_term": x_term,
+        "u": u,
+        "du": du,
+        "u_bar": u_bar,
+        "A_d": A_d,
+        "B_d": B_d,
+        "C_d": C_d,
+        "x_prop": x_prop,
+        "nu": nu,
+        "g": g,
+        "grad_g_x": grad_g_x,
+        "grad_g_u": grad_g_u,
+        "nu_vb": nu_vb,
+        "g_cross": g_cross,
+        "grad_g_X_cross": grad_g_X_cross,
+        "grad_g_U_cross": grad_g_U_cross,
+        "nu_vb_cross": nu_vb_cross,
+        "S_x": S_x,
+        "inv_S_x": inv_S_x,
+        "c_x": c_x,
+        "S_u": S_u,
+        "inv_S_u": inv_S_u,
+        "c_u": c_u,
+        "x_nonscaled": x_nonscaled,
+        "u_nonscaled": u_nonscaled,
+        "dx_nonscaled": dx_nonscaled,
+        "du_nonscaled": du_nonscaled,
+    }
 
 
 def lower_cvxpy_constraints(
@@ -568,10 +709,7 @@ def lower_symbolic_problem(
 
     # ==================== CREATE CVXPY VARIABLES AND LOWER CONVEX CONSTRAINTS ====================
 
-    import numpy as np
-
     from openscvx.config import get_affine_scaling_matrices
-    from openscvx.ocp import create_cvxpy_variables
 
     n_states = len(x_unified.max)
     n_controls = len(u_unified.max)
