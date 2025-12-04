@@ -65,11 +65,11 @@ def format_result(problem, converged: bool) -> OptimizationResults:
     nodes_dict = {}
 
     # Add all states (user-defined and augmented)
-    for state in problem.states:
+    for state in problem.symbolic.states:
         nodes_dict[state.name] = problem.settings.sim.x.guess[:, state._slice]
 
     # Add all controls (user-defined and augmented)
-    for control in problem.controls:
+    for control in problem.symbolic.controls:
         nodes_dict[control.name] = problem.settings.sim.u.guess[:, control._slice]
 
     return OptimizationResults(
@@ -79,8 +79,8 @@ def format_result(problem, converged: bool) -> OptimizationResults:
         x=problem.settings.sim.x,
         nodes=nodes_dict,
         trajectory={},  # Populated by post_process
-        _states=problem.states_prop,  # Use propagation states for trajectory dict
-        _controls=problem.controls,
+        _states=problem.symbolic.states_prop,  # Use propagation states for trajectory dict
+        _controls=problem.symbolic.controls,
         x_history=problem.scp_trajs,
         u_history=problem.scp_controls,
         discretization_history=problem.scp_V_multi_shoot_traj,

@@ -161,7 +161,7 @@ class Problem:
         """
 
         # Step 1: Symbolic Preprocessing & Augmentation
-        symbolic_problem = preprocess_symbolic_problem(
+        self.symbolic = preprocess_symbolic_problem(
             dynamics=dynamics,
             constraints=ConstraintSet(unsorted=list(constraints)),
             states=states,
@@ -177,26 +177,14 @@ class Problem:
         )
 
         # Step 2: Lower to JAX and CVXPy
-        self._lowered: LoweredProblem = lower_symbolic_problem(symbolic_problem)
-
-        # Store SymbolicProblem for reference
-        self._symbolic_problem = symbolic_problem
-
-        # Step 3: Store Processed Components
-
-        # Store state and control lists (includes user-defined + augmented)
-        self.states = symbolic_problem.states
-        self.controls = symbolic_problem.controls
-
-        # Store propagation states (includes extra propagation-only states)
-        self.states_prop = symbolic_problem.states_prop
+        self._lowered: LoweredProblem = lower_symbolic_problem(self.symbolic)
 
         # Store parameters in two forms:
         # 1. _parameters: plain dict for JAX functions
         # 2. _parameter_wrapper: wrapper dict for user access that auto-syncs
-        self._parameters = symbolic_problem.parameters  # Plain dict for JAX
+        self._parameters = self.symbolic.parameters  # Plain dict for JAX
         self._parameter_wrapper = _ParameterDict(
-            self, self._parameters, symbolic_problem.parameters
+            self, self._parameters, self.symbolic.parameters
         )
 
         # Store dynamics objects (from LoweredProblem)
@@ -218,7 +206,7 @@ class Problem:
                 total_time=self._lowered.x_unified.initial[self._lowered.x_unified.time_slice][0],
                 n_states=self._lowered.x_unified.initial.shape[0],
                 n_states_prop=self._lowered.x_prop_unified.initial.shape[0],
-                ctcs_node_intervals=symbolic_problem.node_intervals,
+                ctcs_node_intervals=self.symbolic.node_intervals,
             )
 
         if scp is None:
