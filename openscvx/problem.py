@@ -25,6 +25,7 @@ from openscvx.config import (
     ScpConfig,
     SimConfig,
 )
+from openscvx.constraints import ConstraintSet
 from openscvx.discretization import get_discretization_solver
 from openscvx.lowered import LoweredProblem
 from openscvx.ocp import OptimalControlProblem
@@ -160,19 +161,9 @@ class Problem:
         """
 
         # Step 1: Symbolic Preprocessing & Augmentation
-        (
-            dynamics_aug,
-            x_aug,
-            u_aug,
-            constraint_set,
-            parameters,
-            node_intervals,
-            dynamics_prop_aug,
-            x_prop_aug,
-            u_prop_aug,
-        ) = preprocess_symbolic_problem(
+        symbolic_problem = preprocess_symbolic_problem(
             dynamics=dynamics,
-            constraints=constraints,
+            constraints=ConstraintSet(unsorted=list(constraints)),
             states=states,
             controls=controls,
             N=N,
@@ -186,35 +177,30 @@ class Problem:
         )
 
         # Step 2: Lower to JAX and CVXPy
-        lowered: LoweredProblem = lower_symbolic_problem(
-            dynamics_aug=dynamics_aug,
-            states_aug=x_aug,
-            controls_aug=u_aug,
-            constraints=constraint_set,
-            parameters=parameters,
-            N=N,
-            dynamics_prop=dynamics_prop_aug,
-            states_prop=x_prop_aug,
-            controls_prop=u_prop_aug,
-        )
+        lowered: LoweredProblem = lower_symbolic_problem(symbolic_problem)
 
         # Store LoweredProblem for structured access
         self._lowered = lowered
 
+        # Store SymbolicProblem for reference
+        self._symbolic_problem = symbolic_problem
+
         # Step 3: Store Processed Components
 
         # Store state and control lists (includes user-defined + augmented)
-        self.states = x_aug
-        self.controls = u_aug
+        self.states = symbolic_problem.states
+        self.controls = symbolic_problem.controls
 
         # Store propagation states (includes extra propagation-only states)
-        self.states_prop = x_prop_aug
+        self.states_prop = symbolic_problem.states_prop
 
         # Store parameters in two forms:
         # 1. _parameters: plain dict for JAX functions
         # 2. _parameter_wrapper: wrapper dict for user access that auto-syncs
-        self._parameters = parameters  # Plain dict for JAX
-        self._parameter_wrapper = _ParameterDict(self, self._parameters, parameters)
+        self._parameters = symbolic_problem.parameters  # Plain dict for JAX
+        self._parameter_wrapper = _ParameterDict(
+            self, self._parameters, symbolic_problem.parameters
+        )
 
         # Store dynamics objects (from LoweredProblem)
         self.dynamics_augmented = lowered.dynamics
@@ -235,7 +221,7 @@ class Problem:
                 total_time=lowered.x_unified.initial[lowered.x_unified.time_slice][0],
                 n_states=lowered.x_unified.initial.shape[0],
                 n_states_prop=lowered.x_prop_unified.initial.shape[0],
-                ctcs_node_intervals=node_intervals,
+                ctcs_node_intervals=symbolic_problem.node_intervals,
             )
 
         if scp is None:

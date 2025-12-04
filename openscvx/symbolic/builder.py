@@ -30,18 +30,18 @@ Architecture:
     Input:
 
     - User dynamics: Dict[str, Expr] mapping state names to dynamics
-    - User constraints: List of symbolic constraints
+    - User constraints: List of symbolic constraints (or ConstraintSet with unsorted)
     - User states & controls: Variable definitions
     - Time configuration: Time object specifying time bounds
 
     Output:
 
-    - Augmented dynamics: Original + time + CTCS augmented state dynamics
-    - Augmented states: Original + time + CTCS augmented states
-    - Augmented controls: Original + time dilation control
-    - Separated constraints: CTCS, nodal, and convex nodal lists
-    - Parameters: Extracted parameter values
-    - Metadata: Node intervals for CTCS constraints
+    - SymbolicProblem dataclass containing:
+        - Augmented dynamics, states, controls
+        - Categorized constraints (ConstraintSet with is_categorized=True)
+        - Extracted parameters
+        - CTCS node intervals
+        - Propagation dynamics/states/controls
 
 Example:
     Basic problem preprocessing::
@@ -69,7 +69,7 @@ Example:
         # Preprocess
         from openscvx.symbolic.builder import preprocess_symbolic_problem
 
-        result = preprocess_symbolic_problem(
+        problem = preprocess_symbolic_problem(
             dynamics=dynamics,
             constraints=constraints,
             states=[x, v],
@@ -78,14 +78,17 @@ Example:
             time=ox.Time(initial=0.0, final=10.0)
         )
 
-        dynamics_aug, states_aug, controls_aug, *_ = result
-        # Augmented dynamics: x_dot, v_dot, time_dot, ctcs_aug_dot
-        # states_aug: [x, v, time, _ctcs_aug_0]
-        # controls_aug: [u, _time_dilation]
+        # Access via SymbolicProblem dataclass
+        assert problem.is_preprocessed
+        # problem.dynamics: augmented dynamics expression
+        # problem.states: [x, v, time, _ctcs_aug_0]
+        # problem.controls: [u, _time_dilation]
+        # problem.constraints.ctcs, problem.constraints.nodal, etc.
 """
 
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple
 
+from openscvx.constraints import ConstraintSet
 from openscvx.symbolic.augmentation import (
     augment_dynamics_with_ctcs,
     augment_with_time_state,
@@ -93,7 +96,7 @@ from openscvx.symbolic.augmentation import (
     separate_constraints,
     sort_ctcs_constraints,
 )
-from openscvx.symbolic.expr import CTCS, Constraint, Parameter, traverse
+from openscvx.symbolic.expr import Parameter, traverse
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.preprocessing import (
@@ -108,12 +111,13 @@ from openscvx.symbolic.preprocessing import (
     validate_time_parameters,
     validate_variable_names,
 )
+from openscvx.symbolic.problem import SymbolicProblem
 from openscvx.time import Time
 
 
 def preprocess_symbolic_problem(
     dynamics: dict,
-    constraints: List[Union[Constraint, CTCS]],
+    constraints: ConstraintSet,
     states: List[State],
     controls: List[Control],
     N: int,
@@ -124,7 +128,7 @@ def preprocess_symbolic_problem(
     time_dilation_factor_max: float = 3.0,
     dynamics_prop_extra: dict = None,
     states_prop_extra: List[State] = None,
-) -> Tuple:
+) -> SymbolicProblem:
     """Preprocess and augment symbolic trajectory optimization problem.
 
     This is the main preprocessing pipeline that transforms a user-specified symbolic
@@ -133,8 +137,8 @@ def preprocess_symbolic_problem(
     well-defined phases.
 
     The function is purely symbolic - no code generation or compilation occurs. The
-    output is an augmented symbolic problem specification that can be lowered to
-    JAX or CVXPy by downstream compilation functions.
+    output is a SymbolicProblem dataclass that can be lowered to JAX or CVXPy by
+    downstream compilation functions.
 
     Pipeline phases:
         1. Time handling & validation: Auto-create or validate time state
@@ -146,7 +150,8 @@ def preprocess_symbolic_problem(
     Args:
         dynamics: Dictionary mapping state names to dynamics expressions.
             Example: {"x": v, "v": u}
-        constraints: List of constraints (Constraint, NodalConstraint, or CTCS)
+        constraints: ConstraintSet with raw constraints in `unsorted` field.
+            Create with: ConstraintSet(unsorted=[c1, c2, c3])
         states: List of user-defined State objects (should NOT include time or CTCS states)
         controls: List of user-defined Control objects (should NOT include time dilation)
         N: Number of discretization nodes in the trajectory
@@ -161,16 +166,16 @@ def preprocess_symbolic_problem(
             (default: None)
 
     Returns:
-        Tuple containing 9 elements:
-            0. dynamics_aug (Expr): Augmented dynamics = user dynamics + time + CTCS penalties
-            1. states_aug (List[State]): User states + time + CTCS augmented states
-            2. controls_aug (List[Control]): User controls + time dilation
-            3. constraints (ConstraintSet): All categorized constraints
-            4. parameters (Dict[str, np.ndarray]): Parameter values extracted from expressions
-            5. node_intervals (List[Tuple[int, int]]): Time intervals for CTCS constraints
-            6. dynamics_prop (Expr): Propagation dynamics (includes extra states if provided)
-            7. states_prop (List[State]): Propagation states (includes extra states if provided)
-            8. controls_prop (List[Control]): Propagation controls (same as controls_aug)
+        SymbolicProblem dataclass with:
+            - dynamics: Augmented dynamics (user + time + CTCS penalties)
+            - states: Augmented states (user + time + CTCS augmented)
+            - controls: Augmented controls (user + time dilation)
+            - constraints: ConstraintSet with is_categorized=True
+            - parameters: Dict of extracted parameter values
+            - node_intervals: List of (start, end) tuples for CTCS intervals
+            - dynamics_prop: Propagation dynamics
+            - states_prop: Propagation states
+            - controls_prop: Propagation controls
 
     Raises:
         ValueError: If validation fails at any stage
@@ -178,51 +183,52 @@ def preprocess_symbolic_problem(
     Example:
         Basic usage with CTCS constraint::
 
-                import openscvx as ox
-                x = ox.State("x", shape=(2,))
-                v = ox.State("v", shape=(2,))
-                u = ox.Control("u", shape=(2,))
+            import openscvx as ox
+            from openscvx.constraints import ConstraintSet
 
-                dynamics = {"x": v, "v": u}
-                constraints = [(ox.Norm(x) <= 5.0).over((0, 50))]
+            x = ox.State("x", shape=(2,))
+            v = ox.State("v", shape=(2,))
+            u = ox.Control("u", shape=(2,))
 
-                result = preprocess_symbolic_problem(
-                    dynamics=dynamics,
-                    constraints=constraints,
-                    states=[x, v],
-                    controls=[u],
-                    N=50,
-                    time=ox.Time(initial=0.0, final=10.0)
-                )
+            dynamics = {"x": v, "v": u}
+            constraints = ConstraintSet(unsorted=[
+                (ox.Norm(x) <= 5.0).over((0, 50))
+            ])
 
-                (dynamics_aug, states_aug, controls_aug,
-                 ctcs, nodal, nodal_convex, params, intervals,
-                 dyn_prop, states_prop, controls_prop) = result
+            problem = preprocess_symbolic_problem(
+                dynamics=dynamics,
+                constraints=constraints,
+                states=[x, v],
+                controls=[u],
+                N=50,
+                time=ox.Time(initial=0.0, final=10.0)
+            )
 
-                # Augmented dynamics components: [x_dot, v_dot, time_dot, ctcs_aug_dot]
-                # Augmented states: [x, v, time, _ctcs_aug_0]
-                # Augmented controls: [u, _time_dilation]
-                print([s.name for s in states_aug])
-            ['x', 'v', 'time', '_ctcs_aug_0']
+            assert problem.is_preprocessed
+            # problem.dynamics: augmented dynamics expression
+            # problem.states: [x, v, time, _ctcs_aug_0]
+            # problem.controls: [u, _time_dilation]
+            print([s.name for s in problem.states])
+            # ['x', 'v', 'time', '_ctcs_aug_0']
 
         With propagation-only states::
 
-                distance = ox.State("distance", shape=(1,))
-                dynamics_extra = {"distance": ox.Norm(v)}
+            distance = ox.State("distance", shape=(1,))
+            dynamics_extra = {"distance": ox.Norm(v)}
 
-                result = preprocess_symbolic_problem(
-                    dynamics=dynamics,
-                    constraints=constraints,
-                    states=[x, v],
-                    controls=[u],
-                    N=50,
-                    time=ox.Time(initial=0.0, final=10.0),
-                    dynamics_prop_extra=dynamics_extra,
-                    states_prop_extra=[distance]
-                )
+            problem = preprocess_symbolic_problem(
+                dynamics=dynamics,
+                constraints=constraints,
+                states=[x, v],
+                controls=[u],
+                N=50,
+                time=ox.Time(initial=0.0, final=10.0),
+                dynamics_prop_extra=dynamics_extra,
+                states_prop_extra=[distance]
+            )
 
-                # Propagation states include distance for post-solve simulation
-                _, _, _, _, _, _, _, _, dyn_prop, states_prop, _ = result
+            # Propagation states include distance for post-solve simulation
+            print([s.name for s in problem.states_prop])
     """
 
     # ==================== PHASE 1: Time Handling & Validation ====================
@@ -266,20 +272,20 @@ def preprocess_symbolic_problem(
 
     # ==================== PHASE 2: Expression Validation ====================
 
-    # Validate all expressions
-    all_exprs = [dynamics_concat] + constraints
+    # Validate all expressions (use unsorted constraints)
+    all_exprs = [dynamics_concat] + constraints.unsorted
     validate_variable_names(all_exprs)
     collect_and_assign_slices(states, controls)
     validate_shapes(all_exprs)
-    validate_constraints_at_root(constraints)
-    validate_and_normalize_constraint_nodes(constraints, N)
+    validate_constraints_at_root(constraints.unsorted)
+    validate_and_normalize_constraint_nodes(constraints.unsorted, N)
     validate_dynamics_dimension(dynamics_concat, states)
 
     # ==================== PHASE 3: Canonicalization & Parameter Collection ====================
 
     # Canonicalize all expressions after validation
     dynamics_concat = dynamics_concat.canonicalize()
-    constraints = [expr.canonicalize() for expr in constraints]
+    constraints.unsorted = [expr.canonicalize() for expr in constraints.unsorted]
 
     # Collect parameter values from all constraints and dynamics
     parameters = {}
@@ -293,27 +299,27 @@ def preprocess_symbolic_problem(
     traverse(dynamics_concat, collect_param_values)
 
     # Collect from constraints
-    for constraint in constraints:
+    for constraint in constraints.unsorted:
         traverse(constraint, collect_param_values)
 
     # ==================== PHASE 4: Constraint Separation & Augmentation ====================
 
-    # Sort and separate constraints by type
-    constraint_set = separate_constraints(constraints, N)
+    # Sort and separate constraints by type (drains unsorted -> fills categories)
+    separate_constraints(constraints, N)
 
     # Decompose vector-valued nodal constraints into scalar constraints
     # This is necessary for non-convex nodal constraints that get lowered to JAX
-    constraint_set.nodal = decompose_vector_nodal_constraints(constraint_set.nodal)
+    constraints.nodal = decompose_vector_nodal_constraints(constraints.nodal)
 
     # Sort CTCS constraints by their idx to get node_intervals
-    constraint_set.ctcs, node_intervals, _ = sort_ctcs_constraints(constraint_set.ctcs)
+    constraints.ctcs, node_intervals, _ = sort_ctcs_constraints(constraints.ctcs)
 
     # Augment dynamics, states, and controls with CTCS constraints, time dilation
     dynamics_aug, states_aug, controls_aug = augment_dynamics_with_ctcs(
         dynamics_concat,
         states,
         controls,
-        constraint_set.ctcs,
+        constraints.ctcs,
         N,
         licq_min=licq_min,
         licq_max=licq_max,
@@ -350,18 +356,19 @@ def preprocess_symbolic_problem(
             parameters=parameters,
         )
 
-    # ==================== Return Symbolic Outputs ====================
+    # ==================== Return SymbolicProblem ====================
 
-    return (
-        dynamics_aug,
-        states_aug,
-        controls_aug,
-        constraint_set,
-        parameters,
-        node_intervals,
-        dynamics_prop,
-        states_prop,
-        controls_prop,
+    return SymbolicProblem(
+        dynamics=dynamics_aug,
+        states=states_aug,
+        controls=controls_aug,
+        constraints=constraints,
+        parameters=parameters,
+        N=N,
+        node_intervals=node_intervals,
+        dynamics_prop=dynamics_prop,
+        states_prop=states_prop,
+        controls_prop=controls_prop,
     )
 
 

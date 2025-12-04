@@ -5,10 +5,10 @@ replacing the previous pattern of passing multiple lists or storing separate fie
 """
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Union
 
 if TYPE_CHECKING:
-    from openscvx.symbolic.expr import CTCS, CrossNodeConstraint, NodalConstraint
+    from openscvx.symbolic.expr import CTCS, Constraint, CrossNodeConstraint, NodalConstraint
 
     from .cross_node import CrossNodeConstraintLowered
     from .lowered import LoweredNodalConstraint
@@ -23,11 +23,15 @@ class ConstraintSet:
     - Clear API for accessing constraint categories
     - Easy extensibility when adding new constraint types
 
-    The constraint set can hold either symbolic constraints (before lowering)
-    or lowered constraints (after lowering to JAX/CVXPy), depending on the
-    stage of the pipeline.
+    The constraint set supports two lifecycle stages:
+
+    1. **Before preprocessing**: Raw constraints live in `unsorted`
+    2. **After preprocessing**: `unsorted` is empty, constraints are categorized
+
+    Use `is_categorized` to check which stage the constraint set is in.
 
     Attributes:
+        unsorted: Raw constraints before categorization. Empty after preprocessing.
         ctcs: CTCS (continuous-time) constraints
         nodal: Non-convex nodal constraints (lowered to JAX for SCP linearization)
         nodal_convex: Convex nodal constraints (lowered to CVXPy for direct solving)
@@ -35,23 +39,24 @@ class ConstraintSet:
         cross_node_convex: Convex cross-node constraints (lowered to CVXPy)
 
     Example:
-        Creating a constraint set from separate_constraints::
+        Before preprocessing (raw constraints)::
 
-            constraints = ConstraintSet()
-            constraints.ctcs.append(ctcs_constraint)
-            constraints.nodal.append(nodal_constraint)
+            constraints = ConstraintSet(unsorted=[c1, c2, c3])
+            assert not constraints.is_categorized
 
-        Accessing constraints::
+        After preprocessing (categorized)::
 
+            # preprocess_symbolic_problem drains unsorted -> fills categories
+            assert constraints.is_categorized
             for c in constraints.nodal:
                 # Process non-convex nodal constraints
                 pass
-
-            if constraints.cross_node:
-                # Handle cross-node constraints
-                pass
     """
 
+    # Raw constraints before categorization (empty after preprocessing)
+    unsorted: List[Union["Constraint", "CTCS"]] = field(default_factory=list)
+
+    # Categorized constraints (populated by preprocessing)
     ctcs: List["CTCS"] = field(default_factory=list)
     nodal: List["NodalConstraint | LoweredNodalConstraint"] = field(default_factory=list)
     nodal_convex: List["NodalConstraint"] = field(default_factory=list)
@@ -60,10 +65,20 @@ class ConstraintSet:
     )
     cross_node_convex: List["CrossNodeConstraint"] = field(default_factory=list)
 
+    @property
+    def is_categorized(self) -> bool:
+        """True if all constraints have been sorted into categories.
+
+        After preprocessing, `unsorted` should be empty and all constraints
+        should be in their appropriate category lists.
+        """
+        return len(self.unsorted) == 0
+
     def __bool__(self) -> bool:
-        """Return True if any constraint category is non-empty."""
+        """Return True if any constraint list is non-empty."""
         return bool(
-            self.ctcs
+            self.unsorted
+            or self.ctcs
             or self.nodal
             or self.nodal_convex
             or self.cross_node
@@ -71,9 +86,10 @@ class ConstraintSet:
         )
 
     def __len__(self) -> int:
-        """Return total number of constraints across all categories."""
+        """Return total number of constraints across all lists."""
         return (
-            len(self.ctcs)
+            len(self.unsorted)
+            + len(self.ctcs)
             + len(self.nodal)
             + len(self.nodal_convex)
             + len(self.cross_node)

@@ -161,11 +161,11 @@ def sort_ctcs_constraints(
     return constraints_ctcs, node_intervals, num_augmented_states
 
 
-def separate_constraints(constraints: List[Expr], n_nodes: int) -> ConstraintSet:
+def separate_constraints(constraint_set: ConstraintSet, n_nodes: int) -> ConstraintSet:
     """Separate and categorize constraints by type and convexity.
 
-    Separates constraints into five categories stored in a ConstraintSet (CTCS, nodal,
-    nodal_convex, cross_node, and cross_node_convex).
+    Moves constraints from `constraint_set.unsorted` into their appropriate
+    category fields (ctcs, nodal, nodal_convex, cross_node, cross_node_convex).
 
     Bare Constraint objects are automatically categorized:
     - If they contain NodeReferences (from .at(k) calls), they become CrossNodeConstraint
@@ -175,11 +175,11 @@ def separate_constraints(constraints: List[Expr], n_nodes: int) -> ConstraintSet
     and added to the nodal constraint lists.
 
     Args:
-        constraints: List of constraints (CTCS, NodalConstraint, or bare Constraint)
+        constraint_set: ConstraintSet with raw constraints in `unsorted` field
         n_nodes: Total number of nodes in the trajectory
 
     Returns:
-        ConstraintSet containing all categorized constraints
+        The same ConstraintSet with `unsorted` drained and categories populated
 
     Raises:
         ValueError: If a constraint is not one of the expected types
@@ -187,24 +187,23 @@ def separate_constraints(constraints: List[Expr], n_nodes: int) -> ConstraintSet
         ValueError: If a CTCS constraint contains NodeReferences
 
     Example:
-        Separate and categorize constraints:
+        Separate and categorize constraints::
 
             x = ox.State("x", shape=(3,))
-            ctcs_constraint = (x <= 5).over((0, 50))
-            nodal_constraint = (x >= 0).at([0, 10, 20])
-            bare_constraint = ox.Norm(x) <= 1  # Will apply at all nodes
-            cross_node = x.at(5) - x.at(4) <= 0.1  # Auto-detected as cross-node
-            result = separate_constraints(
-                [ctcs_constraint, nodal_constraint, bare_constraint, cross_node],
-                n_nodes=50
-            )
-            # Access via: result.ctcs, result.nodal, result.nodal_convex, etc.
+            constraint_set = ConstraintSet(unsorted=[
+                (x <= 5).over((0, 50)),           # CTCS
+                (x >= 0).at([0, 10, 20]),         # NodalConstraint
+                ox.Norm(x) <= 1,                  # Bare -> all nodes
+                x.at(5) - x.at(4) <= 0.1,         # Bare with NodeRef -> cross-node
+            ])
+            separate_constraints(constraint_set, n_nodes=50)
+            assert constraint_set.is_categorized
+            # Access via: constraint_set.ctcs, constraint_set.nodal, etc.
     """
     from openscvx.symbolic.lower import _contains_node_reference
 
-    result = ConstraintSet()
-
-    for c in constraints:
+    # Process all constraints from unsorted
+    for c in constraint_set.unsorted:
         if isinstance(c, CTCS):
             # Validate that CTCS constraints don't contain NodeReferences
             if _contains_node_reference(c.constraint):
@@ -215,7 +214,7 @@ def separate_constraints(constraints: List[Expr], n_nodes: int) -> ConstraintSet
                 )
             # Normalize None to full horizon
             c.nodes = c.nodes or (0, n_nodes)
-            result.ctcs.append(c)
+            constraint_set.ctcs.append(c)
 
         elif isinstance(c, NodalConstraint):
             # NodalConstraint means user explicitly called .at([...])
@@ -231,9 +230,9 @@ def separate_constraints(constraints: List[Expr], n_nodes: int) -> ConstraintSet
 
             # Regular nodal constraint - categorize by convexity
             if c.constraint.is_convex:
-                result.nodal_convex.append(c)
+                constraint_set.nodal_convex.append(c)
             else:
-                result.nodal.append(c)
+                constraint_set.nodal.append(c)
 
         elif isinstance(c, Constraint):
             # Bare constraint - check if it's a cross-node constraint
@@ -241,17 +240,17 @@ def separate_constraints(constraints: List[Expr], n_nodes: int) -> ConstraintSet
                 # Cross-node constraint: wrap in CrossNodeConstraint
                 cross_node = CrossNodeConstraint(c)
                 if c.is_convex:
-                    result.cross_node_convex.append(cross_node)
+                    constraint_set.cross_node_convex.append(cross_node)
                 else:
-                    result.cross_node.append(cross_node)
+                    constraint_set.cross_node.append(cross_node)
             else:
                 # Regular constraint: apply at all nodes
                 all_nodes = list(range(n_nodes))
                 nodal_constraint = NodalConstraint(c, all_nodes)
                 if c.is_convex:
-                    result.nodal_convex.append(nodal_constraint)
+                    constraint_set.nodal_convex.append(nodal_constraint)
                 else:
-                    result.nodal.append(nodal_constraint)
+                    constraint_set.nodal.append(nodal_constraint)
 
         else:
             raise ValueError(
@@ -259,8 +258,11 @@ def separate_constraints(constraints: List[Expr], n_nodes: int) -> ConstraintSet
                 f"got {type(c).__name__}"
             )
 
+    # Clear unsorted now that all have been categorized
+    constraint_set.unsorted = []
+
     # Add nodal constraints from CTCS constraints that have check_nodally=True
-    ctcs_nodal_constraints = get_nodal_constraints_from_ctcs(result.ctcs)
+    ctcs_nodal_constraints = get_nodal_constraints_from_ctcs(constraint_set.ctcs)
     for constraint, interval in ctcs_nodal_constraints:
         # CTCS check_nodally constraints cannot have NodeReferences (validated above)
         # Convert CTCS interval (start, end) to list of nodes [start, start+1, ..., end-1]
@@ -268,17 +270,17 @@ def separate_constraints(constraints: List[Expr], n_nodes: int) -> ConstraintSet
         nodal_constraint = NodalConstraint(constraint, interval_nodes)
 
         if constraint.is_convex:
-            result.nodal_convex.append(nodal_constraint)
+            constraint_set.nodal_convex.append(nodal_constraint)
         else:
-            result.nodal.append(nodal_constraint)
+            constraint_set.nodal.append(nodal_constraint)
 
     # Validate cross-node constraints (bounds and variable consistency)
     from openscvx.symbolic.preprocessing import validate_cross_node_constraint
 
-    for cross_node_constraint in result.cross_node + result.cross_node_convex:
+    for cross_node_constraint in constraint_set.cross_node + constraint_set.cross_node_convex:
         validate_cross_node_constraint(cross_node_constraint, n_nodes)
 
-    return result
+    return constraint_set
 
 
 def decompose_vector_nodal_constraints(
@@ -385,7 +387,7 @@ def get_nodal_constraints_from_ctcs(
 
 def augment_with_time_state(
     states: List[State],
-    constraints: List[Constraint],
+    constraints: ConstraintSet,
     time_initial: float | tuple,
     time_final: float | tuple,
     time_min: float,
@@ -393,7 +395,7 @@ def augment_with_time_state(
     N: int,
     time_scaling_min: Optional[float] = None,
     time_scaling_max: Optional[float] = None,
-) -> Tuple[List[State], List[Constraint]]:
+) -> Tuple[List[State], ConstraintSet]:
     """Augment problem with a time state variable.
 
     Creates a time state variable if one doesn't already exist and adds it to the
@@ -406,7 +408,7 @@ def augment_with_time_state(
 
     Args:
         states: List of State objects (will not be modified, copy is returned)
-        constraints: List of constraints (will not be modified, copy is returned)
+        constraints: ConstraintSet with unsorted constraints (will be modified in place)
         time_initial: Initial time boundary condition:
             - float: Fixed initial time
             - tuple: ("free", guess) for free initial time with initial guess
@@ -418,19 +420,20 @@ def augment_with_time_state(
     Returns:
         Tuple of:
             - Updated states list (original + time state if created)
-            - Updated constraints list (original + time bound CTCS constraints)
+            - The same ConstraintSet with time CTCS constraints added to unsorted
 
     Note:
         If a state named "time" already exists, it is not modified and no
         constraints are added.
 
     Example:
-        Get augmented states:
+        Get augmented states::
 
             x = ox.State("x", shape=(3,))
-            states_aug, constraints_aug = augment_with_time_state(
+            constraints = ConstraintSet()
+            states_aug, constraints = augment_with_time_state(
                 states=[x],
-                constraints=[],
+                constraints=constraints,
                 time_initial=0.0,
                 time_final=("free", 10.0),
                 time_min=0.0,
@@ -440,9 +443,8 @@ def augment_with_time_state(
 
         states_aug now includes time state with initial=0, final=free
     """
-    # Create copies to avoid mutating inputs
+    # Create copy of states to avoid mutating input
     states_aug = list(states)
-    constraints_aug = list(constraints)
 
     # Check if a time state already exists
     time_state = None
@@ -483,11 +485,11 @@ def augment_with_time_state(
         # Add time state to the list
         states_aug.append(time_state)
 
-        # Add CTCS constraints for time bounds
-        constraints_aug.append(CTCS(time_state <= time_state.max))
-        constraints_aug.append(CTCS(time_state.min <= time_state))
+        # Add CTCS constraints for time bounds to unsorted
+        constraints.unsorted.append(CTCS(time_state <= time_state.max))
+        constraints.unsorted.append(CTCS(time_state.min <= time_state))
 
-    return states_aug, constraints_aug
+    return states_aug, constraints
 
 
 def augment_dynamics_with_ctcs(
