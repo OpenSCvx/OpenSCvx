@@ -1,3 +1,5 @@
+import hashlib
+
 import numpy as np
 
 from .expr import Leaf
@@ -50,6 +52,29 @@ class Variable(Leaf):
 
     def __repr__(self):
         return f"Var({self.name!r})"
+
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
+        """Hash Variable using its slice (canonical position, name-invariant).
+
+        Instead of hashing the variable name, we hash the _slice attribute
+        which represents the variable's canonical position in the unified
+        state/control vector. This ensures that two problems with the same
+        structure but different variable names produce the same hash.
+
+        Args:
+            hasher: A hashlib hash object to update
+        """
+        hasher.update(self.__class__.__name__.encode())
+        hasher.update(str(self._shape).encode())
+        # Hash the slice (canonical position) - this is name-invariant
+        if self._slice is not None:
+            hasher.update(f"slice:{self._slice.start}:{self._slice.stop}".encode())
+        else:
+            raise RuntimeError(
+                f"Cannot hash Variable '{self.name}' without _slice attribute. "
+                "Hashing should only be called on preprocessed problems where "
+                "all Variables have been assigned canonical slice positions."
+            )
 
     @property
     def min(self):

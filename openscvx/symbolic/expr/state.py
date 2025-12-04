@@ -1,3 +1,4 @@
+import hashlib
 from enum import Enum
 
 import numpy as np
@@ -209,6 +210,26 @@ class State(Variable):
         self.final_type = None
         self._scaling_min = None
         self._scaling_max = None
+
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
+        """Hash State including boundary condition types.
+
+        Extends Variable._hash_into to include the structural metadata that
+        affects the compiled problem: boundary condition types (fixed, free,
+        minimize, maximize). Values are not hashed as they are runtime parameters.
+
+        Args:
+            hasher: A hashlib hash object to update
+        """
+        # Hash the base Variable attributes (class name, shape, slice)
+        super()._hash_into(hasher)
+        # Hash boundary condition types (these affect constraint structure)
+        if self.initial_type is not None:
+            hasher.update(b"initial_type:")
+            hasher.update(str(self.initial_type.tolist()).encode())
+        if self.final_type is not None:
+            hasher.update(b"final_type:")
+            hasher.update(str(self.final_type.tolist()).encode())
 
     @property
     def min(self):

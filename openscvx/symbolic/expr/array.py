@@ -72,6 +72,7 @@ Example:
         ])  # 2D rotation matrix, shape (2, 2)
 """
 
+import hashlib
 from typing import Tuple, Union
 
 import numpy as np
@@ -128,6 +129,18 @@ class Index(Expr):
         except Exception as e:
             raise ValueError(f"Bad index {self.index} for shape {base_shape}") from e
         return result.shape
+
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
+        """Hash Index including its index specification.
+
+        Args:
+            hasher: A hashlib hash object to update
+        """
+        hasher.update(b"Index")
+        # Hash the index specification (convert to string for generality)
+        hasher.update(repr(self.index).encode())
+        # Hash the base expression
+        self.base._hash_into(hasher)
 
     def __repr__(self):
         return f"{self.base!r}[{self.index!r}]"

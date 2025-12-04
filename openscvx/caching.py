@@ -1,56 +1,56 @@
+import hashlib
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 import jax
 import numpy as np
 from jax import export
 
-from openscvx.utils import stable_function_hash
+from openscvx.cache import get_cache_dir
+
+if TYPE_CHECKING:
+    from openscvx.symbolic.problem import SymbolicProblem
 
 
 def get_solver_cache_paths(
-    functions_to_hash: List[callable],
-    n_discretization_nodes: int,
+    symbolic_problem: "SymbolicProblem",
     dt: float,
     total_time: float,
-    state_max: np.ndarray,
-    state_min: np.ndarray,
-    control_max: np.ndarray,
-    control_min: np.ndarray,
-    cache_dir: str = ".tmp",
+    cache_dir: Optional[Path] = None,
 ) -> Tuple[Path, Path]:
-    """Generate cache file paths for discretization and propagation solvers.
+    """Generate cache file paths using symbolic AST hashing.
+
+    This function computes a hash based on the symbolic structure of the problem,
+    which is more stable than hashing lowered JAX code. Two problems with the same
+    mathematical structure will produce the same hash, regardless of variable names.
 
     Args:
-        functions_to_hash: List of functions to include in hash computation
-        n_discretization_nodes: Number of discretization nodes
+        symbolic_problem: The preprocessed SymbolicProblem
         dt: Time step for propagation
         total_time: Total simulation time
-        state_max: Maximum state bounds
-        state_min: Minimum state bounds
-        control_max: Maximum control bounds
-        control_min: Minimum control bounds
-        cache_dir: Directory to store cached solvers
+        cache_dir: Directory to store cached solvers. If None, uses the default
+            cache directory (see :func:`openscvx.get_cache_dir`).
 
     Returns:
         Tuple of (discretization_solver_path, propagation_solver_path)
     """
-    function_hash = stable_function_hash(
-        functions_to_hash,
-        n_discretization_nodes=n_discretization_nodes,
-        dt=dt,
-        total_time=total_time,
-        state_max=state_max,
-        state_min=state_min,
-        control_max=control_max,
-        control_min=control_min,
-    )
+    from openscvx.symbolic.hashing import hash_symbolic_problem
 
-    solver_dir = Path(cache_dir)
+    # Get the structural hash of the symbolic problem
+    problem_hash = hash_symbolic_problem(symbolic_problem)
+
+    # Include runtime config in the hash
+    final_hasher = hashlib.sha256()
+    final_hasher.update(problem_hash.encode())
+    final_hasher.update(f"dt:{dt}".encode())
+    final_hasher.update(f"total_time:{total_time}".encode())
+    final_hash = final_hasher.hexdigest()[:32]
+
+    solver_dir = cache_dir if cache_dir is not None else get_cache_dir()
     solver_dir.mkdir(parents=True, exist_ok=True)
 
-    dis_solver_file = solver_dir / f"compiled_discretization_solver_{function_hash}.jax"
-    prop_solver_file = solver_dir / f"compiled_propagation_solver_{function_hash}.jax"
+    dis_solver_file = solver_dir / f"compiled_discretization_solver_{final_hash}.jax"
+    prop_solver_file = solver_dir / f"compiled_propagation_solver_{final_hash}.jax"
 
     return dis_solver_file, prop_solver_file
 

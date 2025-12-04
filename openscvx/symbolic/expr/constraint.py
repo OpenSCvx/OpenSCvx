@@ -35,6 +35,8 @@ Example:
         safety_constraint = (distance >= obstacle_radius).over((0, 100))
 """
 
+import hashlib
+import struct
 from typing import Optional, Tuple, Union
 
 import numpy as np
@@ -305,6 +307,20 @@ class NodalConstraint(Expr):
         """
         self.constraint.convex()
         return self
+
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
+        """Hash NodalConstraint including its node list.
+
+        Args:
+            hasher: A hashlib hash object to update
+        """
+        hasher.update(b"NodalConstraint")
+        # Hash the nodes list
+        for node in self.nodes:
+            hasher.update(struct.pack(">i", node))
+        hasher.update(b"|")  # Separator to distinguish node counts
+        # Hash the wrapped constraint
+        self.constraint._hash_into(hasher)
 
     def __repr__(self):
         """String representation of the NodalConstraint.
@@ -623,6 +639,30 @@ class CTCS(Expr):
 
         # CTCS always produces a scalar due to the Sum in penalty_expr
         return ()
+
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
+        """Hash CTCS including all its parameters.
+
+        Args:
+            hasher: A hashlib hash object to update
+        """
+        hasher.update(b"CTCS")
+        # Hash penalty type
+        hasher.update(self.penalty.encode())
+        # Hash nodes interval
+        if self.nodes is not None:
+            hasher.update(struct.pack(">ii", self.nodes[0], self.nodes[1]))
+        else:
+            hasher.update(b"None")
+        # Hash idx
+        if self.idx is not None:
+            hasher.update(struct.pack(">i", self.idx))
+        else:
+            hasher.update(b"None")
+        # Hash check_nodally
+        hasher.update(b"1" if self.check_nodally else b"0")
+        # Hash the wrapped constraint
+        self.constraint._hash_into(hasher)
 
     def over(self, interval: tuple[int, int]) -> "CTCS":
         """Set or update the continuous interval for this CTCS constraint.

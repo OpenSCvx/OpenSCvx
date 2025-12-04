@@ -275,25 +275,12 @@ class Problem:
         # Build optimal control problem using LoweredProblem
         self.optimal_control_problem = OptimalControlProblem(self.settings, self._lowered)
 
-        # Collect all relevant functions
-        functions_to_hash = [self._lowered.dynamics.f, self._lowered.dynamics_prop.f]
-        for constraint in self._lowered.jax_constraints.nodal:
-            functions_to_hash.append(constraint.func)
-        for constraint in self._lowered.jax_constraints.cross_node:
-            functions_to_hash.append(constraint.func)
-        # Note: CTCS constraints are already included in dynamics_augmented.f,
-        # so we don't need to add them separately
-
-        # Get cache file paths
+        # Get cache file paths using symbolic AST hashing
+        # This is more stable than hashing lowered JAX code
         dis_solver_file, prop_solver_file = get_solver_cache_paths(
-            functions_to_hash,
-            n_discretization_nodes=self.settings.scp.n,
+            self.symbolic,
             dt=self.settings.prp.dt,
             total_time=self.settings.sim.total_time,
-            state_max=self.settings.sim.x.max,
-            state_min=self.settings.sim.x.min,
-            control_max=self.settings.sim.u.max,
-            control_min=self.settings.sim.u.min,
         )
 
         # Compile the discretization solver

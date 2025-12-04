@@ -47,6 +47,7 @@ Example:
         kinetic_energy = 0.5 * m * ox.Norm(v)**2
 """
 
+import hashlib
 from typing import Tuple
 
 from .expr import Expr, to_expr
@@ -261,6 +262,18 @@ class Norm(Expr):
         self.operand.check_shape()
         # Norm always produces a scalar regardless of input shape
         return ()
+
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
+        """Hash Norm including its ord parameter.
+
+        Args:
+            hasher: A hashlib hash object to update
+        """
+        hasher.update(b"Norm")
+        # Hash the ord parameter
+        hasher.update(repr(self.ord).encode())
+        # Hash the operand
+        self.operand._hash_into(hasher)
 
     def __repr__(self):
         return f"norm({self.operand!r}, ord={self.ord!r})"

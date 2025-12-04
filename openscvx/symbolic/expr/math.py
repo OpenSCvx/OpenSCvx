@@ -34,6 +34,8 @@ Example:
         penalty = ox.SmoothReLU(ox.Norm(x) - 1.0)  # Penalize norm > 1
 """
 
+import hashlib
+import struct
 from typing import Tuple
 
 import numpy as np
@@ -520,6 +522,18 @@ class Huber(Expr):
         """Huber penalty preserves the shape of x."""
         return self.x.check_shape()
 
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
+        """Hash Huber including its delta parameter.
+
+        Args:
+            hasher: A hashlib hash object to update
+        """
+        hasher.update(b"Huber")
+        # Hash delta as bytes
+        hasher.update(struct.pack(">d", self.delta))
+        # Hash the operand
+        self.x._hash_into(hasher)
+
     def __repr__(self):
         return f"huber({self.x!r}, delta={self.delta})"
 
@@ -569,6 +583,18 @@ class SmoothReLU(Expr):
     def check_shape(self) -> Tuple[int, ...]:
         """Smooth ReLU preserves the shape of x."""
         return self.x.check_shape()
+
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
+        """Hash SmoothReLU including its c parameter.
+
+        Args:
+            hasher: A hashlib hash object to update
+        """
+        hasher.update(b"SmoothReLU")
+        # Hash c as bytes
+        hasher.update(struct.pack(">d", self.c))
+        # Hash the operand
+        self.x._hash_into(hasher)
 
     def __repr__(self):
         return f"smooth_relu({self.x!r}, c={self.c})"

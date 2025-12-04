@@ -3,10 +3,12 @@ import os
 # Set Equinox error handling to return NaN instead of crashing
 os.environ["EQX_ON_ERROR"] = "nan"
 
+# Cache management
 # Core symbolic expressions - flat namespace for most common functions
 import openscvx.symbolic.expr.linalg as linalg
 import openscvx.symbolic.expr.spatial as spatial
 import openscvx.symbolic.expr.stl as stl
+from openscvx.cache import clear_cache, get_cache_dir, get_cache_size
 from openscvx.problem import Problem
 from openscvx.symbolic.expr import (
     CTCS,
@@ -51,6 +53,10 @@ from openscvx.time import Time
 __all__ = [
     # Main Trajectory Optimization Entrypoint
     "Problem",
+    # Cache management
+    "get_cache_dir",
+    "clear_cache",
+    "get_cache_size",
     # Time configuration
     "Time",
     # Core base classes
