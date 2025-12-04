@@ -1,17 +1,16 @@
+import hashlib
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Tuple
 
 import jax
 import numpy as np
 from jax import export
 
-from openscvx.utils import stable_function_hash
-
 if TYPE_CHECKING:
     from openscvx.symbolic.problem import SymbolicProblem
 
 
-def get_solver_cache_paths_from_symbolic(
+def get_solver_cache_paths(
     symbolic_problem: "SymbolicProblem",
     dt: float,
     total_time: float,
@@ -38,8 +37,6 @@ def get_solver_cache_paths_from_symbolic(
     problem_hash = hash_symbolic_problem(symbolic_problem)
 
     # Include runtime config in the hash
-    import hashlib
-
     final_hasher = hashlib.sha256()
     final_hasher.update(problem_hash.encode())
     final_hasher.update(f"dt:{dt}".encode())
@@ -51,56 +48,6 @@ def get_solver_cache_paths_from_symbolic(
 
     dis_solver_file = solver_dir / f"compiled_discretization_solver_{final_hash}.jax"
     prop_solver_file = solver_dir / f"compiled_propagation_solver_{final_hash}.jax"
-
-    return dis_solver_file, prop_solver_file
-
-
-def get_solver_cache_paths(
-    functions_to_hash: List[callable],
-    n_discretization_nodes: int,
-    dt: float,
-    total_time: float,
-    state_max: np.ndarray,
-    state_min: np.ndarray,
-    control_max: np.ndarray,
-    control_min: np.ndarray,
-    cache_dir: str = ".tmp",
-) -> Tuple[Path, Path]:
-    """Generate cache file paths for discretization and propagation solvers.
-
-    DEPRECATED: Use get_solver_cache_paths_from_symbolic instead for more stable
-    hashing based on the symbolic AST.
-
-    Args:
-        functions_to_hash: List of functions to include in hash computation
-        n_discretization_nodes: Number of discretization nodes
-        dt: Time step for propagation
-        total_time: Total simulation time
-        state_max: Maximum state bounds
-        state_min: Minimum state bounds
-        control_max: Maximum control bounds
-        control_min: Minimum control bounds
-        cache_dir: Directory to store cached solvers
-
-    Returns:
-        Tuple of (discretization_solver_path, propagation_solver_path)
-    """
-    function_hash = stable_function_hash(
-        functions_to_hash,
-        n_discretization_nodes=n_discretization_nodes,
-        dt=dt,
-        total_time=total_time,
-        state_max=state_max,
-        state_min=state_min,
-        control_max=control_max,
-        control_min=control_min,
-    )
-
-    solver_dir = Path(cache_dir)
-    solver_dir.mkdir(parents=True, exist_ok=True)
-
-    dis_solver_file = solver_dir / f"compiled_discretization_solver_{function_hash}.jax"
-    prop_solver_file = solver_dir / f"compiled_propagation_solver_{function_hash}.jax"
 
     return dis_solver_file, prop_solver_file
 

@@ -10,7 +10,7 @@ os.environ["EQX_ON_ERROR"] = "nan"
 
 from openscvx import io
 from openscvx.caching import (
-    get_solver_cache_paths_from_symbolic,
+    get_solver_cache_paths,
     load_or_compile_discretization_solver,
     load_or_compile_propagation_solver,
     prime_propagation_solver,
@@ -277,7 +277,7 @@ class Problem:
 
         # Get cache file paths using symbolic AST hashing
         # This is more stable than hashing lowered JAX code
-        dis_solver_file, prop_solver_file = get_solver_cache_paths_from_symbolic(
+        dis_solver_file, prop_solver_file = get_solver_cache_paths(
             self.symbolic,
             dt=self.settings.prp.dt,
             total_time=self.settings.sim.total_time,
