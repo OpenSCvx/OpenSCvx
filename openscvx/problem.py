@@ -5,7 +5,6 @@ import time
 from typing import TYPE_CHECKING, List, Optional, Union
 
 import jax
-import numpy as np
 
 os.environ["EQX_ON_ERROR"] = "nan"
 
@@ -27,7 +26,7 @@ from openscvx.config import (
 )
 from openscvx.constraints import ConstraintSet
 from openscvx.discretization import get_discretization_solver
-from openscvx.lowered import LoweredProblem
+from openscvx.lowered import LoweredProblem, ParameterDict
 from openscvx.ocp import OptimalControlProblem
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
@@ -43,57 +42,6 @@ from openscvx.time import Time
 
 if TYPE_CHECKING:
     import cvxpy as cp
-
-
-class _ParameterDict(dict):
-    """Dictionary that syncs to both internal _parameters dict and CVXPy parameters.
-
-    This allows users to naturally update parameters like:
-        problem.parameters["obs_radius"] = 2.0
-
-    Changes automatically propagate to:
-    1. Internal _parameters dict (plain dict for JAX)
-    2. CVXPy parameters (for optimization)
-    """
-
-    def __init__(self, problem, internal_dict, *args, **kwargs):
-        self._problem = problem
-        self._internal_dict = internal_dict  # Reference to plain dict for JAX
-        super().__init__()
-        # Initialize with float enforcement by using __setitem__
-        if args:
-            other = args[0]
-            if hasattr(other, "items"):
-                for key, value in other.items():
-                    self[key] = value
-            else:
-                for key, value in other:
-                    self[key] = value
-        for key, value in kwargs.items():
-            self[key] = value
-
-    def __setitem__(self, key, value):
-        # Enforce float dtype to prevent int/float mismatch bugs
-        value = np.asarray(value, dtype=float)
-        super().__setitem__(key, value)
-        # Sync to internal dict for JAX
-        self._internal_dict[key] = value
-        # Sync to CVXPy if it exists
-        lowered = getattr(self._problem, "_lowered", None)
-        if lowered is not None and key in lowered.cvxpy_params:
-            lowered.cvxpy_params[key].value = value
-
-    def update(self, other=None, **kwargs):
-        """Update multiple parameters and sync to internal dict and CVXPy."""
-        if other is not None:
-            if hasattr(other, "items"):
-                for key, value in other.items():
-                    self[key] = value
-            else:
-                for key, value in other:
-                    self[key] = value
-        for key, value in kwargs.items():
-            self[key] = value
 
 
 class Problem:
@@ -183,7 +131,7 @@ class Problem:
         # Store parameters in two forms:
         self._parameters = self.symbolic.parameters  # Plain dict for JAX functions
         # Wrapper dict for user access that auto-syncs
-        self._parameter_wrapper = _ParameterDict(self, self._parameters, self.symbolic.parameters)
+        self._parameter_wrapper = ParameterDict(self, self._parameters, self.symbolic.parameters)
 
         # ==================== STEP 3: Setup SCP Configuration ====================
 
@@ -269,7 +217,7 @@ class Problem:
             problem.parameters.update({"gate_0_center": center})  # Also syncs
 
         Returns:
-            _ParameterDict: Special dict that syncs to CVXPy on assignment
+            ParameterDict: Special dict that syncs to CVXPy on assignment
         """
         return self._parameter_wrapper
 
@@ -281,7 +229,7 @@ class Problem:
             new_params: New parameters dictionary
         """
         self._parameters = dict(new_params)  # Create new plain dict
-        self._parameter_wrapper = _ParameterDict(self, self._parameters, new_params)
+        self._parameter_wrapper = ParameterDict(self, self._parameters, new_params)
         self._sync_parameters()
 
     def _sync_parameters(self):
