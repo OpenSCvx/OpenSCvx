@@ -38,6 +38,7 @@ from openscvx.symbolic.expr import CTCS, Constraint
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.lower import lower_symbolic_problem
+from openscvx.symbolic.problem import SymbolicProblem
 from openscvx.time import Time
 
 if TYPE_CHECKING:
@@ -161,7 +162,7 @@ class Problem:
         """
 
         # Step 1: Symbolic Preprocessing & Augmentation
-        self.symbolic = preprocess_symbolic_problem(
+        self.symbolic: SymbolicProblem = preprocess_symbolic_problem(
             dynamics=dynamics,
             constraints=ConstraintSet(unsorted=list(constraints)),
             states=states,
@@ -180,12 +181,9 @@ class Problem:
         self._lowered: LoweredProblem = lower_symbolic_problem(self.symbolic)
 
         # Store parameters in two forms:
-        # 1. _parameters: plain dict for JAX functions
-        # 2. _parameter_wrapper: wrapper dict for user access that auto-syncs
-        self._parameters = self.symbolic.parameters  # Plain dict for JAX
-        self._parameter_wrapper = _ParameterDict(
-            self, self._parameters, self.symbolic.parameters
-        )
+        self._parameters = self.symbolic.parameters  # Plain dict for JAX functions
+        # Wrapper dict for user access that auto-syncs
+        self._parameter_wrapper = _ParameterDict(self, self._parameters, self.symbolic.parameters)
 
         # ==================== STEP 3: Setup SCP Configuration ====================
 
