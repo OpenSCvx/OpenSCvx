@@ -41,16 +41,19 @@ Example:
     Full problem lowering::
 
         # After building symbolic problem...
-        result = lower_symbolic_expressions(
+        lowered = lower_symbolic_problem(
             dynamics_aug, states_aug, controls_aug,
-            constraints_nodal, constraints_nodal_convex,
-            parameters, dynamics_prop, states_prop, controls_prop
+            constraints, parameters, N,
+            dynamics_prop, states_prop, controls_prop
         )
-        dynamics, constraints, _, x, u, dynamics_prop, x_prop = result
+        # Access via LoweredProblem dataclass
+        dynamics = lowered.dynamics
+        jax_constraints = lowered.jax_constraints
         # Now have executable JAX functions with Jacobians
 """
 
-from typing import Any, List, Sequence, Tuple, Union
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Dict, List, Sequence, Tuple, Union
 
 import jax
 from jax import jacfwd
@@ -59,6 +62,108 @@ from openscvx.constraints import ConstraintSet, CrossNodeConstraintLowered, Lowe
 from openscvx.dynamics import Dynamics
 from openscvx.symbolic.expr import Expr, NodeReference
 from openscvx.symbolic.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
+
+if TYPE_CHECKING:
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import CTCS
+
+
+# ==================== LOWERED OUTPUT DATACLASSES ====================
+
+
+@dataclass
+class LoweredJaxConstraints:
+    """JAX-lowered non-convex constraints with gradient functions.
+
+    Contains constraints that have been lowered to JAX callable functions
+    with automatically computed gradients. These are used for linearization
+    in the SCP (Sequential Convex Programming) loop.
+
+    Attributes:
+        nodal: List of LoweredNodalConstraint objects. Each has `func`,
+            `grad_g_x`, `grad_g_u` callables and `nodes` list.
+        cross_node: List of CrossNodeConstraintLowered objects. Each has
+            `func`, `grad_g_X`, `grad_g_U` for trajectory-level constraints.
+        ctcs: CTCS constraints (unchanged from input, not lowered here).
+    """
+
+    nodal: List[LoweredNodalConstraint] = field(default_factory=list)
+    cross_node: List[CrossNodeConstraintLowered] = field(default_factory=list)
+    ctcs: List["CTCS"] = field(default_factory=list)
+
+
+@dataclass
+class LoweredCvxpyConstraints:
+    """CVXPy-lowered convex constraints.
+
+    Contains constraints that have been lowered to CVXPy constraint objects.
+    These are added directly to the optimal control problem without
+    linearization.
+
+    Attributes:
+        constraints: List of CVXPy constraint objects (cp.Constraint).
+            Includes both nodal and cross-node convex constraints.
+    """
+
+    constraints: List["cp.Constraint"] = field(default_factory=list)
+
+
+@dataclass
+class LoweredProblem:
+    """Container for all outputs from symbolic problem lowering.
+
+    This dataclass holds all the results of lowering symbolic expressions
+    to executable JAX and CVXPy code. It provides a clean, typed interface
+    for accessing the various components needed for optimization.
+
+    Attributes:
+        dynamics: Optimization dynamics with fields f, A, B (JAX functions)
+        dynamics_prop: Propagation dynamics with fields f, A, B
+        jax_constraints: Non-convex constraints lowered to JAX with gradients
+        cvxpy_constraints: Convex constraints lowered to CVXPy
+        x_unified: Aggregated optimization state interface
+        u_unified: Aggregated optimization control interface
+        x_prop_unified: Aggregated propagation state interface
+        ocp_vars: Dict of CVXPy variables and parameters for OCP construction
+        cvxpy_params: Dict mapping user parameter names to CVXPy Parameter objects
+
+    Example:
+        After lowering a symbolic problem::
+
+            lowered = lower_symbolic_problem(
+                dynamics_aug=dynamics,
+                states_aug=states,
+                controls_aug=controls,
+                constraints=constraint_set,
+                parameters=params,
+                N=50,
+            )
+
+            # Access components
+            dx_dt = lowered.dynamics.f(x, u, node, params)
+            jacobian_A = lowered.dynamics.A(x, u, node, params)
+
+            # Use CVXPy objects
+            ocp = OptimalControlProblem(settings, lowered.ocp_vars)
+    """
+
+    # JAX dynamics
+    dynamics: Dynamics
+    dynamics_prop: Dynamics
+
+    # Lowered constraints (separate types for JAX vs CVXPy)
+    jax_constraints: LoweredJaxConstraints
+    cvxpy_constraints: LoweredCvxpyConstraints
+
+    # Unified interfaces
+    x_unified: UnifiedState
+    u_unified: UnifiedControl
+    x_prop_unified: UnifiedState
+
+    # CVXPy objects
+    ocp_vars: Dict[str, Any]
+    cvxpy_params: Dict[str, "cp.Parameter"]
 
 
 def lower(expr: Expr, lowerer: Any):
@@ -349,7 +454,7 @@ def _contains_node_reference(expr: Expr) -> bool:
     return False
 
 
-def lower_symbolic_expressions(
+def lower_symbolic_problem(
     dynamics_aug,
     states_aug: List,
     controls_aug: List,
@@ -359,8 +464,8 @@ def lower_symbolic_expressions(
     dynamics_prop=None,
     states_prop: List = None,
     controls_prop: List = None,
-) -> Tuple:
-    """Lower symbolic expressions to executable JAX and CVXPy code.
+) -> LoweredProblem:
+    """Lower symbolic problem specification to executable JAX and CVXPy code.
 
     This is the main orchestrator for converting symbolic problem specifications
     into executable numerical code. It coordinates the lowering of dynamics,
@@ -386,6 +491,11 @@ def lower_symbolic_expressions(
     This is pure translation - no validation, shape checking, or augmentation occurs
     here. Those steps happen earlier during problem construction.
 
+    Important:
+        This function does NOT mutate the input `constraints` ConstraintSet. It returns
+        new `LoweredJaxConstraints` and `LoweredCvxpyConstraints` objects containing the
+        lowered versions.
+
     Args:
         dynamics_aug: Symbolic dynamics expression representing dx/dt = f(x, u).
             Should be augmented with any virtual controls or extra states needed
@@ -397,9 +507,9 @@ def lower_symbolic_expressions(
         constraints: ConstraintSet containing all constraint categories:
             - ctcs: CTCS (continuous-time) constraints
             - nodal: Non-convex nodal constraints (lowered to JAX)
-            - nodal_convex: Convex nodal constraints (kept symbolic for CVXPy)
+            - nodal_convex: Convex nodal constraints (lowered to CVXPy)
             - cross_node: Non-convex cross-node constraints (lowered to JAX)
-            - cross_node_convex: Convex cross-node constraints (kept symbolic)
+            - cross_node_convex: Convex cross-node constraints (lowered to CVXPy)
         parameters: Dictionary mapping parameter names to numpy arrays. Used to
             provide parameter values during function evaluation.
         N: Number of discretization nodes. Used for creating CVXPy variables.
@@ -411,53 +521,43 @@ def lower_symbolic_expressions(
             controls_aug.
 
     Returns:
-        Tuple containing 9 elements:
-            - dynamics_augmented (Dynamics): Optimization dynamics with fields:
-                - f: JAX function (x, u, node, params) -> dx/dt
-                - A: JAX function (x, u, node, params) -> df/dx Jacobian
-                - B: JAX function (x, u, node, params) -> df/du Jacobian
-            - lowered_constraints (ConstraintSet): Constraints with non-convex lowered to JAX:
-                - ctcs: Unchanged (CTCS constraints)
-                - nodal: LoweredNodalConstraint objects with JAX functions and gradients
-                - nodal_convex: Lowered CVXPy constraints (list of cp.Constraint)
-                - cross_node: CrossNodeConstraintLowered objects with JAX functions
-                - cross_node_convex: Lowered CVXPy constraints (included in nodal_convex)
-            - x_unified (UnifiedState): Aggregated optimization state interface
-            - u_unified (UnifiedControl): Aggregated optimization control interface
-            - dynamics_augmented_prop (Dynamics): Propagation dynamics with f, A, B
-            - x_prop_unified (UnifiedState): Aggregated propagation state interface
-            - cvxpy_trajectory_vars (dict): CVXPy variables for OCP construction:
-                - x, u: CVXPy Variable objects
-                - x_nonscaled, u_nonscaled: Affine-transformed trajectory lists
-                - S_x, c_x, S_u, c_u: Scaling matrices
-            - cvxpy_params (dict): CVXPy Parameter objects for user parameters
+        LoweredProblem dataclass containing:
+            - dynamics: Optimization dynamics (Dynamics with f, A, B)
+            - dynamics_prop: Propagation dynamics (Dynamics with f, A, B)
+            - jax_constraints: LoweredJaxConstraints with nodal, cross_node, ctcs
+            - cvxpy_constraints: LoweredCvxpyConstraints with CVXPy constraint objects
+            - x_unified: Aggregated optimization state interface
+            - u_unified: Aggregated optimization control interface
+            - x_prop_unified: Aggregated propagation state interface
+            - ocp_vars: Dict of CVXPy variables for OCP construction
+            - cvxpy_params: Dict of CVXPy Parameter objects for user parameters
 
     Example:
         Basic usage after problem construction::
 
             # After building symbolic problem and augmentation...
-            result = lower_symbolic_expressions(
+            lowered = lower_symbolic_problem(
                 dynamics_aug=augmented_dynamics,
                 states_aug=[x, y, z, ctcs_state],
                 controls_aug=[u, ctcs_virtual],
-                constraints=constraint_set,  # ConstraintSet from separate_constraints
+                constraints=constraint_set,
                 parameters={"obs_center": np.array([1.0, 0.0, 0.0])},
+                N=50,
                 dynamics_prop=augmented_dynamics_prop,
                 states_prop=[x, y, z, ctcs_state],
                 controls_prop=[u, ctcs_virtual],
             )
 
-            # Unpack the results
-            (dynamics_opt, lowered_constraints,
-             x_unified, u_unified, dynamics_prop, x_prop) = result
-
-            # Access lowered constraints via ConstraintSet
-            for c in lowered_constraints.nodal:
+            # Access JAX-lowered constraints
+            for c in lowered.jax_constraints.nodal:
                 residual = c.func(x_batch, u_batch, node, params)
 
-            # Now can evaluate dynamics at a specific point
-            dx = dynamics_opt.f(x_val, u_val, node=0, params={...})
-            A_jac = dynamics_opt.A(x_val, u_val, node=0, params={...})
+            # Access dynamics
+            dx = lowered.dynamics.f(x_val, u_val, node=0, params={...})
+            A_jac = lowered.dynamics.A(x_val, u_val, node=0, params={...})
+
+            # Use CVXPy objects for OCP
+            ocp = OptimalControlProblem(settings, lowered.ocp_vars)
 
     Note:
         **JAX Function Signature**: All JAX functions use a standardized signature
@@ -465,18 +565,16 @@ def lower_symbolic_expressions(
         The node parameter allows for time-varying behavior (e.g., nodal constraints).
         The params dictionary provides runtime parameter updates without recompilation.
 
-        **CVXPy Trajectory Variables**: This function creates CVXPy variables (x, u)
-        and their affine-scaled versions (x_nonscaled, u_nonscaled) which are used
-        both for constraint lowering and later for OCP construction. The scaling
-        matrices are computed from the unified state/control bounds.
+        **Immutability**: The input ConstraintSet is not modified. Lowered constraints
+        are returned in separate LoweredJaxConstraints and LoweredCvxpyConstraints
+        objects to maintain clear type separation.
 
     See Also:
+        - LoweredProblem: The return type dataclass
+        - LoweredJaxConstraints: Container for JAX-lowered non-convex constraints
+        - LoweredCvxpyConstraints: Container for CVXPy-lowered convex constraints
         - lower_to_jax(): The underlying lowering function for individual expressions
-        - JaxLowerer: The visitor-pattern backend that implements JAX lowering
         - lower_cvxpy_constraints(): CVXPy constraint lowering helper
-        - UnifiedState/UnifiedControl: Aggregation containers in symbolic/unified.py
-        - Dynamics: Container for dynamics functions in dynamics.py
-        - LoweredNodalConstraint: Container for constraint functions in constraints/lowered.py
     """
 
     # ==================== CREATE UNIFIED AGGREGATES ====================
@@ -514,15 +612,9 @@ def lower_symbolic_expressions(
 
     # ==================== LOWER NON-CONVEX CONSTRAINTS TO JAX ====================
 
-    # Create result ConstraintSet - will hold lowered non-convex and original convex
-    lowered_constraints = ConstraintSet()
-
-    # Copy CTCS constraints unchanged
-    lowered_constraints.ctcs = constraints.ctcs
-
-    # Copy convex constraints unchanged (will be lowered to CVXPy later)
-    lowered_constraints.nodal_convex = constraints.nodal_convex
-    lowered_constraints.cross_node_convex = constraints.cross_node_convex
+    # Build lists for LoweredJaxConstraints (no mutation of input)
+    lowered_nodal: List[LoweredNodalConstraint] = []
+    lowered_cross_node: List[CrossNodeConstraintLowered] = []
 
     # Lower regular nodal constraints (standard path)
     if len(constraints.nodal) > 0:
@@ -540,7 +632,7 @@ def lower_symbolic_expressions(
                 grad_g_u=jax.vmap(jacfwd(fn, argnums=1), in_axes=(0, 0, None, None)),
                 nodes=constraints.nodal[i].nodes,
             )
-            lowered_constraints.nodal.append(constraint)
+            lowered_nodal.append(constraint)
 
     # Lower cross-node constraints (trajectory-level path)
     # The CrossNodeConstraint visitor in lowerers/jax.py handles wrapping the
@@ -560,7 +652,14 @@ def lower_symbolic_expressions(
             grad_g_X=grad_g_X,
             grad_g_U=grad_g_U,
         )
-        lowered_constraints.cross_node.append(cross_node_lowered)
+        lowered_cross_node.append(cross_node_lowered)
+
+    # Create LoweredJaxConstraints (immutable output)
+    jax_constraints = LoweredJaxConstraints(
+        nodal=lowered_nodal,
+        cross_node=lowered_cross_node,
+        ctcs=list(constraints.ctcs),  # Copy the list, don't reference original
+    )
 
     # ==================== CREATE CVXPY VARIABLES AND LOWER CONVEX CONSTRAINTS ====================
 
@@ -599,6 +698,7 @@ def lower_symbolic_expressions(
     S_u, c_u = get_affine_scaling_matrices(n_controls, lower_u, upper_u)
 
     # Create all CVXPy variables for the OCP
+    # Pass original constraints (for counting nodal/cross_node to create parameters)
     ocp_vars = create_cvxpy_variables(
         N=N,
         n_states=n_states,
@@ -607,29 +707,32 @@ def lower_symbolic_expressions(
         c_x=c_x,
         S_u=S_u,
         c_u=c_u,
-        constraints=lowered_constraints,
+        constraints=constraints,
     )
 
-    # Lower convex constraints to CVXPy
-    lowered_cvxpy_constraints, cvxpy_params = lower_cvxpy_constraints(
-        lowered_constraints,
+    # Lower convex constraints to CVXPy (from original symbolic constraints)
+    lowered_cvxpy_constraint_list, cvxpy_params = lower_cvxpy_constraints(
+        constraints,
         ocp_vars["x_nonscaled"],
         ocp_vars["u_nonscaled"],
         parameters,
     )
 
-    # Store lowered CVXPy constraints in the ConstraintSet
-    lowered_constraints.nodal_convex = lowered_cvxpy_constraints
+    # Create LoweredCvxpyConstraints (immutable output)
+    cvxpy_constraints = LoweredCvxpyConstraints(
+        constraints=lowered_cvxpy_constraint_list,
+    )
 
     # ==================== RETURN LOWERED OUTPUTS ====================
 
-    return (
-        dynamics_augmented,
-        lowered_constraints,
-        x_unified,
-        u_unified,
-        dynamics_augmented_prop,
-        x_prop_unified,
-        ocp_vars,
-        cvxpy_params,
+    return LoweredProblem(
+        dynamics=dynamics_augmented,
+        dynamics_prop=dynamics_augmented_prop,
+        jax_constraints=jax_constraints,
+        cvxpy_constraints=cvxpy_constraints,
+        x_unified=x_unified,
+        u_unified=u_unified,
+        x_prop_unified=x_prop_unified,
+        ocp_vars=ocp_vars,
+        cvxpy_params=cvxpy_params,
     )

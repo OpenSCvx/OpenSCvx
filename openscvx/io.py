@@ -59,12 +59,13 @@ def print_summary_box(lines, title="Summary"):
     print(f"{' ' * indent}╰{'─' * box_width}╯\n")
 
 
-def print_problem_summary(settings):
+def print_problem_summary(settings, ocp_vars):
     """
     Print the problem summary box.
 
     Args:
         settings: Configuration settings containing problem information
+        ocp_vars: CVXPy variables dictionary from lower_symbolic_problem()
     """
     n_nodal_convex = len(settings.sim.constraints.nodal_convex)
     n_nodal_nonconvex = len(settings.sim.constraints.nodal)
@@ -72,30 +73,12 @@ def print_problem_summary(settings):
     n_augmented = settings.sim.n_states - settings.sim.true_state_slice.stop
 
     # Count CVXPy variables, parameters, and constraints
-    from openscvx.ocp import OptimalControlProblem, create_cvxpy_variables
-    from openscvx.symbolic.lower import lower_cvxpy_constraints
+    from openscvx.ocp import OptimalControlProblem
 
     try:
-        # Phase 1: Create CVXPy variables
-        ocp_vars = create_cvxpy_variables(settings)
-
-        # Phase 2: Lower convex constraints to CVXPy (needed for problem construction)
-        lowered_convex_constraints, _ = lower_cvxpy_constraints(
-            settings.sim.constraints,
-            ocp_vars["x_nonscaled"],
-            ocp_vars["u_nonscaled"],
-            None,
-        )
-
-        # Temporarily store lowered constraints for problem construction
-        original_constraints = settings.sim.constraints.nodal_convex
-        settings.sim.constraints.nodal_convex = lowered_convex_constraints
-
-        # Phase 3: Build complete optimal control problem
+        # Build OCP using already-lowered constraints from settings.sim.constraints
+        # (nodal_convex already contains CVXPy constraints from lower_symbolic_problem)
         prob = OptimalControlProblem(settings, ocp_vars)
-
-        # Restore original constraints
-        settings.sim.constraints.nodal_convex = original_constraints
 
         # Get the actual problem size information like CVXPy verbose output
         n_cvx_variables = sum(var.size for var in prob.variables())

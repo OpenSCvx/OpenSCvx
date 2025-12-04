@@ -25,6 +25,7 @@ from openscvx.config import (
     ScpConfig,
     SimConfig,
 )
+from openscvx.constraints import ConstraintSet
 from openscvx.discretization import get_discretization_solver
 from openscvx.ocp import OptimalControlProblem
 from openscvx.post_processing import propagate_trajectory_results
@@ -35,7 +36,7 @@ from openscvx.symbolic.builder import preprocess_symbolic_problem
 from openscvx.symbolic.expr import CTCS, Constraint
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
-from openscvx.symbolic.lower import lower_symbolic_expressions
+from openscvx.symbolic.lower import LoweredProblem, lower_symbolic_problem
 from openscvx.time import Time
 
 if TYPE_CHECKING:
@@ -185,16 +186,7 @@ class Problem:
         )
 
         # Step 2: Lower to JAX and CVXPy
-        (
-            dynamics_augmented,
-            lowered_constraint_set,
-            x_unified,
-            u_unified,
-            dynamics_augmented_prop,
-            x_prop_unified,
-            ocp_vars,
-            cvxpy_params,
-        ) = lower_symbolic_expressions(
+        lowered: LoweredProblem = lower_symbolic_problem(
             dynamics_aug=dynamics_aug,
             states_aug=x_aug,
             controls_aug=u_aug,
@@ -206,6 +198,9 @@ class Problem:
             controls_prop=u_prop_aug,
         )
 
+        # Store LoweredProblem for structured access
+        self._lowered = lowered
+
         # Step 3: Store Processed Components
 
         # Store state and control lists (includes user-defined + augmented)
@@ -215,9 +210,9 @@ class Problem:
         # Store propagation states (includes extra propagation-only states)
         self.states_prop = x_prop_aug
 
-        # Store unified objects for easy access
-        self.x_unified = x_unified
-        self.u_unified = u_unified
+        # Store unified objects for easy access (from LoweredProblem)
+        self.x_unified = lowered.x_unified
+        self.u_unified = lowered.u_unified
 
         # Store parameters in two forms:
         # 1. _parameters: plain dict for JAX functions
@@ -225,9 +220,9 @@ class Problem:
         self._parameters = parameters  # Plain dict for JAX
         self._parameter_wrapper = _ParameterDict(self, self._parameters, parameters)
 
-        # Store dynamics objects
-        self.dynamics_augmented = dynamics_augmented
-        self.dynamics_augmented_prop = dynamics_augmented_prop
+        # Store dynamics objects (from LoweredProblem)
+        self.dynamics_augmented = lowered.dynamics
+        self.dynamics_augmented_prop = lowered.dynamics_prop
 
         # ==================== STEP 4: Setup SCP Configuration ====================
 
@@ -238,12 +233,12 @@ class Problem:
 
         if sim is None:
             sim = SimConfig(
-                x=x_unified,
-                x_prop=x_prop_unified,
-                u=u_unified,
-                total_time=x_unified.initial[x_unified.time_slice][0],
-                n_states=x_unified.initial.shape[0],
-                n_states_prop=x_prop_unified.initial.shape[0],
+                x=lowered.x_unified,
+                x_prop=lowered.x_prop_unified,
+                u=lowered.u_unified,
+                total_time=lowered.x_unified.initial[lowered.x_unified.time_slice][0],
+                n_states=lowered.x_unified.initial.shape[0],
+                n_states_prop=lowered.x_prop_unified.initial.shape[0],
                 ctcs_node_intervals=node_intervals,
             )
 
@@ -262,7 +257,15 @@ class Problem:
         if prp is None:
             prp = PropagationConfig()
 
-        # Store constraints in SimConfig
+        # Construct ConstraintSet for sim.constraints from LoweredProblem
+        # This maintains backwards compatibility with OCP, PTR, etc.
+        lowered_constraint_set = ConstraintSet(
+            ctcs=lowered.jax_constraints.ctcs,
+            nodal=lowered.jax_constraints.nodal,
+            nodal_convex=lowered.cvxpy_constraints.constraints,
+            cross_node=lowered.jax_constraints.cross_node,
+            cross_node_convex=[],  # Already included in cvxpy_constraints.constraints
+        )
         sim.constraints = lowered_constraint_set
 
         self.settings = Config(
@@ -277,8 +280,8 @@ class Problem:
         # ==================== STEP 5: Store CVXPy Variables ====================
 
         # CVXPy variables and constraint lowering happened in Step 2
-        self._ocp_vars = ocp_vars
-        self.cvxpy_params = cvxpy_params
+        self._ocp_vars = lowered.ocp_vars
+        self.cvxpy_params = lowered.cvxpy_params
 
         # OCP construction happens in initialize() so users can modify
         # settings (like uniform_time_grid) between __init__ and initialize()
@@ -348,7 +351,7 @@ class Problem:
         io.intro()
 
         # Print problem summary
-        io.print_problem_summary(self.settings)
+        io.print_problem_summary(self.settings, self._ocp_vars)
 
         # Enable the profiler
         if self.settings.dev.profiling:
