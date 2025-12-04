@@ -62,9 +62,9 @@ The discretized dynamics matrices are defined as follows:
 ```python
 
 # Discretized Augmented Dynamics Constraints
-A_d = cp.Parameter((params.scp.n - 1, (params.sim.n_states)*(params.sim.n_states)), name='A_d')
-B_d = cp.Parameter((params.scp.n - 1, params.sim.n_states*params.sim.n_controls), name='B_d')
-C_d = cp.Parameter((params.scp.n - 1, params.sim.n_states*params.sim.n_controls), name='C_d')
+A_d = cp.Parameter((params.scp.n - 1, params.sim.n_states, params.sim.n_states)), name='A_d')
+B_d = cp.Parameter((params.scp.n - 1, params.sim.n_states, params.sim.n_controls), name='B_d')
+C_d = cp.Parameter((params.scp.n - 1, params.sim.n_states, params.sim.n_controls), name='C_d')
 z_d = cp.Parameter((params.scp.n - 1, params.sim.n_states), name='z_d') # Nonlinear Propagation Defect
 nu  = cp.Variable((params.scp.n - 1, params.sim.n_states), name='nu')  # Virtual Control Slack Variable
 
@@ -121,9 +121,9 @@ def OptimalControlProblem(params: Config):
     c_u = params.sim.c_u
 
     # Discretized Augmented Dynamics Constraints
-    A_d = cp.Parameter((params.scp.n - 1, (params.sim.n_states)*(params.sim.n_states)), name='A_d')
-    B_d = cp.Parameter((params.scp.n - 1, params.sim.n_states*params.sim.n_controls), name='B_d')
-    C_d = cp.Parameter((params.scp.n - 1, params.sim.n_states*params.sim.n_controls), name='C_d')
+    A_d = cp.Parameter((params.scp.n - 1, params.sim.n_states, params.sim.n_states), name='A_d')
+    B_d = cp.Parameter((params.scp.n - 1, params.sim.n_states, params.sim.n_controls), name='B_d')
+    C_d = cp.Parameter((params.scp.n - 1, params.sim.n_states, params.sim.n_controls), name='C_d')
     z_d = cp.Parameter((params.scp.n - 1, params.sim.n_states), name='z_d')
     nu  = cp.Variable((params.scp.n - 1, params.sim.n_states), name='nu') # Virtual Control
 
@@ -189,9 +189,9 @@ def OptimalControlProblem(params: Config):
     constr += [0 == la.inv(S_u) @ (u_nonscaled[i] - u_bar[i] - du[i]) for i in range(params.scp.n)] # Control Error
 
     constr += [x_nonscaled[i] == \
-                      cp.reshape(A_d[i-1], (params.sim.n_states, params.sim.n_states)) @ x_nonscaled[i-1] \
-                    + cp.reshape(B_d[i-1], (params.sim.n_states, params.sim.n_controls)) @ u_nonscaled[i-1] \
-                    + cp.reshape(C_d[i-1], (params.sim.n_states, params.sim.n_controls)) @ u_nonscaled[i] \
+                      A_d[i-1] @ x_nonscaled[i-1] \
+                    + B_d[i-1] @ u_nonscaled[i-1] \
+                    + C_d[i-1] @ u_nonscaled[i] \
                     + z_d[i-1] \
                     + nu[i-1] for i in range(1, params.scp.n)] # Dynamics Constraint
     
