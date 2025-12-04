@@ -1,10 +1,11 @@
 """LoweredProblem dataclass - container for all lowering outputs."""
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Dict
 
 from openscvx.dynamics import Dynamics
 from openscvx.lowered.cvxpy_constraints import LoweredCvxpyConstraints
+from openscvx.lowered.cvxpy_variables import CVXPyVariables
 from openscvx.lowered.jax_constraints import LoweredJaxConstraints
 from openscvx.symbolic.unified import UnifiedControl, UnifiedState
 
@@ -28,7 +29,7 @@ class LoweredProblem:
         x_unified: Aggregated optimization state interface
         u_unified: Aggregated optimization control interface
         x_prop_unified: Aggregated propagation state interface
-        ocp_vars: Dict of CVXPy variables and parameters for OCP construction
+        ocp_vars: Typed CVXPy variables and parameters for OCP construction
         cvxpy_params: Dict mapping user parameter names to CVXPy Parameter objects
 
     Example:
@@ -65,5 +66,5 @@ class LoweredProblem:
     x_prop_unified: UnifiedState
 
     # CVXPy objects
-    ocp_vars: Dict[str, Any]
+    ocp_vars: CVXPyVariables
     cvxpy_params: Dict[str, "cp.Parameter"]

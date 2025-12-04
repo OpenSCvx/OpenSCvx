@@ -26,43 +26,43 @@ def OptimalControlProblem(settings: Config, lowered: "LoweredProblem"):
         settings: Configuration settings for the optimization problem
         lowered: LoweredProblem containing ocp_vars and lowered constraints
     """
-    # Extract ocp_vars from LoweredProblem
+    # Extract typed CVXPy variables from LoweredProblem
     ocp_vars = lowered.ocp_vars
 
-    # Extract variables from the dict for easier access
-    w_tr = ocp_vars["w_tr"]
-    lam_cost = ocp_vars["lam_cost"]
-    lam_vc = ocp_vars["lam_vc"]
-    lam_vb = ocp_vars["lam_vb"]
-    x = ocp_vars["x"]
-    dx = ocp_vars["dx"]
-    x_bar = ocp_vars["x_bar"]
-    x_init = ocp_vars["x_init"]
-    x_term = ocp_vars["x_term"]
-    u = ocp_vars["u"]
-    du = ocp_vars["du"]
-    u_bar = ocp_vars["u_bar"]
-    A_d = ocp_vars["A_d"]
-    B_d = ocp_vars["B_d"]
-    C_d = ocp_vars["C_d"]
-    x_prop = ocp_vars["x_prop"]
-    nu = ocp_vars["nu"]
-    g = ocp_vars["g"]
-    grad_g_x = ocp_vars["grad_g_x"]
-    grad_g_u = ocp_vars["grad_g_u"]
-    nu_vb = ocp_vars["nu_vb"]
-    g_cross = ocp_vars["g_cross"]
-    grad_g_X_cross = ocp_vars["grad_g_X_cross"]
-    grad_g_U_cross = ocp_vars["grad_g_U_cross"]
-    nu_vb_cross = ocp_vars["nu_vb_cross"]
-    S_x = ocp_vars["S_x"]
-    c_x = ocp_vars["c_x"]
-    S_u = ocp_vars["S_u"]
-    c_u = ocp_vars["c_u"]
-    x_nonscaled = ocp_vars["x_nonscaled"]
-    u_nonscaled = ocp_vars["u_nonscaled"]
-    dx_nonscaled = ocp_vars["dx_nonscaled"]
-    du_nonscaled = ocp_vars["du_nonscaled"]
+    # Extract variables from the dataclass for easier access
+    w_tr = ocp_vars.w_tr
+    lam_cost = ocp_vars.lam_cost
+    lam_vc = ocp_vars.lam_vc
+    lam_vb = ocp_vars.lam_vb
+    x = ocp_vars.x
+    dx = ocp_vars.dx
+    x_bar = ocp_vars.x_bar
+    x_init = ocp_vars.x_init
+    x_term = ocp_vars.x_term
+    u = ocp_vars.u
+    du = ocp_vars.du
+    u_bar = ocp_vars.u_bar
+    A_d = ocp_vars.A_d
+    B_d = ocp_vars.B_d
+    C_d = ocp_vars.C_d
+    x_prop = ocp_vars.x_prop
+    nu = ocp_vars.nu
+    g = ocp_vars.g
+    grad_g_x = ocp_vars.grad_g_x
+    grad_g_u = ocp_vars.grad_g_u
+    nu_vb = ocp_vars.nu_vb
+    g_cross = ocp_vars.g_cross
+    grad_g_X_cross = ocp_vars.grad_g_X_cross
+    grad_g_U_cross = ocp_vars.grad_g_U_cross
+    nu_vb_cross = ocp_vars.nu_vb_cross
+    S_x = ocp_vars.S_x
+    c_x = ocp_vars.c_x
+    S_u = ocp_vars.S_u
+    c_u = ocp_vars.c_u
+    x_nonscaled = ocp_vars.x_nonscaled
+    u_nonscaled = ocp_vars.u_nonscaled
+    dx_nonscaled = ocp_vars.dx_nonscaled
+    du_nonscaled = ocp_vars.du_nonscaled
 
     # Extract lowered constraints
     jax_constraints = lowered.jax_constraints

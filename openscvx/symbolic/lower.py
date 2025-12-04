@@ -52,7 +52,7 @@ Example:
         # Now have executable JAX functions with Jacobians
 """
 
-from typing import Any, Dict, List, Sequence, Tuple, Union
+from typing import Any, List, Sequence, Tuple, Union
 
 import cvxpy as cp
 import jax
@@ -61,7 +61,12 @@ from jax import jacfwd
 
 from openscvx.constraints import ConstraintSet, CrossNodeConstraintLowered, LoweredNodalConstraint
 from openscvx.dynamics import Dynamics
-from openscvx.lowered import LoweredCvxpyConstraints, LoweredJaxConstraints, LoweredProblem
+from openscvx.lowered import (
+    CVXPyVariables,
+    LoweredCvxpyConstraints,
+    LoweredJaxConstraints,
+    LoweredProblem,
+)
 from openscvx.symbolic.expr import Expr, NodeReference
 
 __all__ = [
@@ -162,7 +167,7 @@ def create_cvxpy_variables(
     S_u: np.ndarray,
     c_u: np.ndarray,
     constraints: ConstraintSet,
-) -> Dict:
+) -> CVXPyVariables:
     """Create CVXPy variables and parameters for the optimal control problem.
 
     Args:
@@ -252,43 +257,43 @@ def create_cvxpy_variables(
         dx_nonscaled.append(S_x @ dx[k])
         du_nonscaled.append(S_u @ du[k])
 
-    return {
-        "w_tr": w_tr,
-        "lam_cost": lam_cost,
-        "lam_vc": lam_vc,
-        "lam_vb": lam_vb,
-        "x": x,
-        "dx": dx,
-        "x_bar": x_bar,
-        "x_init": x_init,
-        "x_term": x_term,
-        "u": u,
-        "du": du,
-        "u_bar": u_bar,
-        "A_d": A_d,
-        "B_d": B_d,
-        "C_d": C_d,
-        "x_prop": x_prop,
-        "nu": nu,
-        "g": g,
-        "grad_g_x": grad_g_x,
-        "grad_g_u": grad_g_u,
-        "nu_vb": nu_vb,
-        "g_cross": g_cross,
-        "grad_g_X_cross": grad_g_X_cross,
-        "grad_g_U_cross": grad_g_U_cross,
-        "nu_vb_cross": nu_vb_cross,
-        "S_x": S_x,
-        "inv_S_x": inv_S_x,
-        "c_x": c_x,
-        "S_u": S_u,
-        "inv_S_u": inv_S_u,
-        "c_u": c_u,
-        "x_nonscaled": x_nonscaled,
-        "u_nonscaled": u_nonscaled,
-        "dx_nonscaled": dx_nonscaled,
-        "du_nonscaled": du_nonscaled,
-    }
+    return CVXPyVariables(
+        w_tr=w_tr,
+        lam_cost=lam_cost,
+        lam_vc=lam_vc,
+        lam_vb=lam_vb,
+        x=x,
+        dx=dx,
+        x_bar=x_bar,
+        x_init=x_init,
+        x_term=x_term,
+        u=u,
+        du=du,
+        u_bar=u_bar,
+        A_d=A_d,
+        B_d=B_d,
+        C_d=C_d,
+        x_prop=x_prop,
+        nu=nu,
+        g=g,
+        grad_g_x=grad_g_x,
+        grad_g_u=grad_g_u,
+        nu_vb=nu_vb,
+        g_cross=g_cross,
+        grad_g_X_cross=grad_g_X_cross,
+        grad_g_U_cross=grad_g_U_cross,
+        nu_vb_cross=nu_vb_cross,
+        S_x=S_x,
+        inv_S_x=inv_S_x,
+        c_x=c_x,
+        S_u=S_u,
+        inv_S_u=inv_S_u,
+        c_u=c_u,
+        x_nonscaled=x_nonscaled,
+        u_nonscaled=u_nonscaled,
+        dx_nonscaled=dx_nonscaled,
+        du_nonscaled=du_nonscaled,
+    )
 
 
 def lower_cvxpy_constraints(
@@ -324,8 +329,8 @@ def lower_cvxpy_constraints(
             ocp_vars = create_cvxpy_variables(settings)
             cvxpy_constraints, cvxpy_params = lower_cvxpy_constraints(
                 constraint_set,
-                ocp_vars["x_nonscaled"],
-                ocp_vars["u_nonscaled"],
+                ocp_vars.x_nonscaled,
+                ocp_vars.u_nonscaled,
                 parameters,
             )
 
@@ -756,8 +761,8 @@ def lower_symbolic_problem(
     # Lower convex constraints to CVXPy (from original symbolic constraints)
     lowered_cvxpy_constraint_list, cvxpy_params = lower_cvxpy_constraints(
         constraints,
-        ocp_vars["x_nonscaled"],
-        ocp_vars["u_nonscaled"],
+        ocp_vars.x_nonscaled,
+        ocp_vars.u_nonscaled,
         parameters,
     )
 
