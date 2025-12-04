@@ -16,8 +16,6 @@
 <!-- PROJECT LOGO -->
 <br />
 
-<img src="figures/oscvx_structure_full_dark.svg" width="1200"/>
-
 <!-- GETTING STARTED -->
 ## Getting Started
 
@@ -240,6 +238,9 @@ python3 examples/params/brachistochrone.py
 and adjust the plotting as needed.
 
 Check out the problem definitions inside `examples/params` to see how to define your own problems.
+
+## Code Structure
+<img src="figures/oscvx_structure_full_dark.svg" width="1200"/>
 
 ## ToDos
 
