@@ -81,7 +81,8 @@ __all__ = [
     "create_cvxpy_variables",
     "lower_symbolic_problem",
 ]
-from openscvx.symbolic.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
+from openscvx.lowered.unified import UnifiedControl, UnifiedState
+from openscvx.symbolic.unified import unify_controls, unify_states
 
 
 def lower(expr: Expr, lowerer: Any):

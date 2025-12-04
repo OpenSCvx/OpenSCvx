@@ -3,7 +3,7 @@ from typing import Optional
 
 import numpy as np
 
-from openscvx.symbolic.unified import UnifiedControl, UnifiedState
+from openscvx.lowered.unified import UnifiedControl, UnifiedState
 
 
 def get_affine_scaling_matrices(n, minimum, maximum):

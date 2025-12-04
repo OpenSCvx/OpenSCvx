@@ -7,7 +7,7 @@ from openscvx.lowered.cvxpy_constraints import LoweredCvxpyConstraints
 from openscvx.lowered.cvxpy_variables import CVXPyVariables
 from openscvx.lowered.dynamics import Dynamics
 from openscvx.lowered.jax_constraints import LoweredJaxConstraints
-from openscvx.symbolic.unified import UnifiedControl, UnifiedState
+from openscvx.lowered.unified import UnifiedControl, UnifiedState
 
 if TYPE_CHECKING:
     import cvxpy as cp
