@@ -135,10 +135,21 @@ def t_to_tau(u, t, t_nodal, params: Config):
     """
     u_guess = u.guess
 
-    def u_lam(new_t):
-        return np.array(
-            [np.interp(new_t, t_nodal, u_guess[:, i]) for i in range(u_guess.shape[1])]
-        ).T
+    if params.dis.dis_type == "ZOH":
+        # Zero-Order Hold: step interpolation (hold previous value)
+        def u_lam(new_t):
+            # Find the index of the last nodal time <= new_t
+            idx = np.searchsorted(t_nodal, new_t, side="right") - 1
+            idx = np.clip(idx, 0, len(t_nodal) - 1)
+            return u_guess[idx, :]
+    elif params.dis.dis_type == "FOH":
+        # First-Order Hold: linear interpolation
+        def u_lam(new_t):
+            return np.array(
+                [np.interp(new_t, t_nodal, u_guess[:, i]) for i in range(u_guess.shape[1])]
+            ).T
+    else:
+        raise ValueError("Currently unsupported discretization type")
 
     u = np.array([u_lam(t_i) for t_i in t])
 
