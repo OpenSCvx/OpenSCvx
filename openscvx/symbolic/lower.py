@@ -469,44 +469,24 @@ def lower_cvxpy_constraints(
     return cvxpy_constraints, all_params
 
 
-def _lower_dynamics(
-    dynamics_expr,
-    states: List,
-    controls: List,
-    name: str = "x",
-) -> Tuple[Dynamics, UnifiedState, UnifiedControl]:
-    """Lower symbolic dynamics to JAX functions with Jacobians.
+def _lower_dynamics(dynamics_expr) -> Dynamics:
+    """Lower symbolic dynamics to JAX function with Jacobians.
 
-    Creates unified state/control interfaces and converts the symbolic dynamics
-    expression to JAX functions with automatically computed Jacobians.
+    Converts a symbolic dynamics expression to a JAX function and computes
+    Jacobians via automatic differentiation.
 
     Args:
         dynamics_expr: Symbolic dynamics expression (dx/dt = f(x, u))
-        states: List of State objects
-        controls: List of Control objects
-        name: Name for the unified state object (default "x")
 
     Returns:
-        Tuple of:
-        - Dynamics object with f, A (df/dx), B (df/du)
-        - UnifiedState aggregating all states
-        - UnifiedControl aggregating all controls
+        Dynamics object with f, A (df/dx), B (df/du)
     """
-    # Create unified state/control objects
-    x_unified: UnifiedState = unify_states(states, name=name)
-    u_unified: UnifiedControl = unify_controls(controls)
-
-    # Convert symbolic dynamics expression to JAX function
     dyn_fn = lower_to_jax(dynamics_expr)
-
-    # Create Dynamics object with Jacobians via automatic differentiation
-    dynamics = Dynamics(
+    return Dynamics(
         f=dyn_fn,
         A=jacfwd(dyn_fn, argnums=0),  # df/dx
         B=jacfwd(dyn_fn, argnums=1),  # df/du
     )
-
-    return dynamics, x_unified, u_unified
 
 
 def _lower_jax_constraints(
@@ -804,15 +784,14 @@ def lower_symbolic_problem(
         - lower_to_jax(): The underlying lowering function for individual expressions
         - lower_cvxpy_constraints(): CVXPy constraint lowering helper
     """
-    # Lower optimization dynamics to JAX
-    dynamics, x_unified, u_unified = _lower_dynamics(
-        dynamics_aug, states_aug, controls_aug, name="x"
-    )
+    # Create unified state/control interfaces
+    x_unified = unify_states(states_aug, name="x")
+    u_unified = unify_controls(controls_aug)
+    x_prop_unified = unify_states(states_prop, name="x_prop")
 
-    # Lower propagation dynamics to JAX
-    dynamics_prop_lowered, x_prop_unified, _ = _lower_dynamics(
-        dynamics_prop, states_prop, controls_prop, name="x_prop"
-    )
+    # Lower dynamics to JAX
+    dynamics = _lower_dynamics(dynamics_aug)
+    dynamics_prop = _lower_dynamics(dynamics_prop)
 
     # Lower non-convex constraints to JAX
     jax_constraints = _lower_jax_constraints(constraints)
@@ -824,7 +803,7 @@ def lower_symbolic_problem(
 
     return LoweredProblem(
         dynamics=dynamics,
-        dynamics_prop=dynamics_prop_lowered,
+        dynamics_prop=dynamics_prop,
         jax_constraints=jax_constraints,
         cvxpy_constraints=cvxpy_constraints,
         x_unified=x_unified,
