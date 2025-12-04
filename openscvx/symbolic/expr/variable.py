@@ -1,6 +1,12 @@
+import hashlib
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from .expr import Leaf
+
+if TYPE_CHECKING:
+    from openscvx.symbolic.hashing import HashContext
 
 
 class Variable(Leaf):
@@ -50,6 +56,27 @@ class Variable(Leaf):
 
     def __repr__(self):
         return f"Var({self.name!r})"
+
+    def _hash_into(self, hasher: "hashlib._Hash", ctx: "HashContext") -> None:
+        """Hash Variable using its slice (canonical position, name-invariant).
+
+        Instead of hashing the variable name, we hash the _slice attribute
+        which represents the variable's canonical position in the unified
+        state/control vector. This ensures that two problems with the same
+        structure but different variable names produce the same hash.
+
+        Args:
+            hasher: A hashlib hash object to update
+            ctx: HashContext (for consistency with other nodes)
+        """
+        hasher.update(self.__class__.__name__.encode())
+        hasher.update(str(self._shape).encode())
+        # Hash the slice (canonical position) - this is name-invariant
+        if self._slice is not None:
+            hasher.update(f"slice:{self._slice.start}:{self._slice.stop}".encode())
+        else:
+            # Fallback for variables without slice (shouldn't happen after preprocessing)
+            hasher.update(b"no_slice")
 
     @property
     def min(self):

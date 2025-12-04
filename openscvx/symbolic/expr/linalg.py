@@ -47,9 +47,13 @@ Example:
         kinetic_energy = 0.5 * m * ox.Norm(v)**2
 """
 
-from typing import Tuple
+import hashlib
+from typing import TYPE_CHECKING, Tuple
 
 from .expr import Expr, to_expr
+
+if TYPE_CHECKING:
+    from openscvx.symbolic.hashing import HashContext
 
 
 class Transpose(Expr):
@@ -261,6 +265,19 @@ class Norm(Expr):
         self.operand.check_shape()
         # Norm always produces a scalar regardless of input shape
         return ()
+
+    def _hash_into(self, hasher: "hashlib._Hash", ctx: "HashContext") -> None:
+        """Hash Norm including its ord parameter.
+
+        Args:
+            hasher: A hashlib hash object to update
+            ctx: HashContext providing canonical IDs for variables
+        """
+        hasher.update(b"Norm")
+        # Hash the ord parameter
+        hasher.update(repr(self.ord).encode())
+        # Hash the operand
+        self.operand._hash_into(hasher, ctx)
 
     def __repr__(self):
         return f"norm({self.operand!r}, ord={self.ord!r})"

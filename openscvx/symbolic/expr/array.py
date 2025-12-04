@@ -72,11 +72,15 @@ Example:
         ])  # 2D rotation matrix, shape (2, 2)
 """
 
-from typing import Tuple, Union
+import hashlib
+from typing import TYPE_CHECKING, Tuple, Union
 
 import numpy as np
 
 from .expr import Expr, to_expr
+
+if TYPE_CHECKING:
+    from openscvx.symbolic.hashing import HashContext
 
 
 class Index(Expr):
@@ -128,6 +132,19 @@ class Index(Expr):
         except Exception as e:
             raise ValueError(f"Bad index {self.index} for shape {base_shape}") from e
         return result.shape
+
+    def _hash_into(self, hasher: "hashlib._Hash", ctx: "HashContext") -> None:
+        """Hash Index including its index specification.
+
+        Args:
+            hasher: A hashlib hash object to update
+            ctx: HashContext providing canonical IDs for variables
+        """
+        hasher.update(b"Index")
+        # Hash the index specification (convert to string for generality)
+        hasher.update(repr(self.index).encode())
+        # Hash the base expression
+        self.base._hash_into(hasher, ctx)
 
     def __repr__(self):
         return f"{self.base!r}[{self.index!r}]"
