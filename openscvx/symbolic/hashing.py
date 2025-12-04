@@ -128,9 +128,10 @@ def hash_symbolic_problem(problem: "SymbolicProblem") -> str:
     # This allows the same compiled solver to be reused across parameter sweeps -
     # only the structure matters for compilation, not the actual values.
     hasher.update(b"parameters:")
+    hasher.update(str(len(problem.parameters)).encode())  # Hash count for structure
     for name in sorted(problem.parameters.keys()):
         value = problem.parameters[name]
-        hasher.update(name.encode())
+        # Only hash shape, not name - maintains name-invariance
         if isinstance(value, np.ndarray):
             hasher.update(str(value.shape).encode())
         else:
