@@ -9,6 +9,7 @@ from openscvx.symbolic.augmentation import (
     separate_constraints,
     sort_ctcs_constraints,
 )
+from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import (
     CTCS,
     Add,
@@ -37,7 +38,7 @@ def test_augment_with_time_state_basic():
     x.final = np.array([10.0, 5.0])
 
     states = [x]
-    constraints = []
+    constraints = ConstraintSet()
     N = 10
 
     states_aug, constraints_aug = augment_with_time_state(
@@ -73,7 +74,7 @@ def test_augment_with_time_state_basic():
     assert np.allclose(time_state.guess, np.linspace(0.0, 2.0, N).reshape(-1, 1))
 
     # Should have added 2 CTCS constraints for time bounds
-    assert len(constraints_aug) == 2
+    assert len(constraints_aug.unsorted) == 2
 
 
 def test_augment_with_time_state_scaling():
@@ -83,7 +84,7 @@ def test_augment_with_time_state_scaling():
     x.final = np.array([10.0, 5.0])
 
     states = [x]
-    constraints = []
+    constraints = ConstraintSet()
     N = 10
 
     states_aug, constraints_aug = augment_with_time_state(
@@ -112,7 +113,7 @@ def test_augment_with_time_state_free_initial():
     x.final = np.array([1.0])
 
     states = [x]
-    constraints = []
+    constraints = ConstraintSet()
     N = 5
 
     states_aug, constraints_aug = augment_with_time_state(
@@ -145,7 +146,7 @@ def test_augment_with_time_state_minimize_final():
     x.final = np.array([1.0, 2.0, 3.0])
 
     states = [x]
-    constraints = []
+    constraints = ConstraintSet()
     N = 8
 
     states_aug, constraints_aug = augment_with_time_state(
@@ -181,7 +182,7 @@ def test_augment_with_time_state_existing_constraints():
     existing_constraint = ctcs(x[0] <= 1.0)
 
     states = [x]
-    constraints = [existing_constraint]
+    constraints = ConstraintSet(unsorted=[existing_constraint])
     N = 5
 
     states_aug, constraints_aug = augment_with_time_state(
@@ -195,8 +196,8 @@ def test_augment_with_time_state_existing_constraints():
     )
 
     # Should have original constraint + 2 time CTCS constraints
-    assert len(constraints_aug) == 3
-    assert constraints_aug[0] is existing_constraint
+    assert len(constraints_aug.unsorted) == 3
+    assert constraints_aug.unsorted[0] is existing_constraint
 
 
 def test_augment_with_time_state_multiple_states():
@@ -210,7 +211,7 @@ def test_augment_with_time_state_multiple_states():
     x2.final = np.array([2.0, 2.0, 2.0])
 
     states = [x1, x2]
-    constraints = []
+    constraints = ConstraintSet()
     N = 10
 
     states_aug, constraints_aug = augment_with_time_state(
@@ -233,13 +234,15 @@ def test_augment_with_time_state_multiple_states():
 def test_separate_constraints_empty():
     """Test separate_constraints with no constraints."""
     n_nodes = 10
-    result = separate_constraints([], n_nodes)
+    constraint_set = ConstraintSet()
+    result = separate_constraints(constraint_set, n_nodes)
 
     assert result.ctcs == []
     assert result.nodal == []
     assert result.nodal_convex == []
     assert result.cross_node == []
     assert result.cross_node_convex == []
+    assert result.is_categorized
 
 
 def test_separate_constraints_only_ctcs():
@@ -249,7 +252,8 @@ def test_separate_constraints_only_ctcs():
     c1 = ctcs(x <= 1.0, penalty="squared_relu")
     c2 = ctcs(x >= 0.0, penalty="huber", check_nodally=True)
 
-    result = separate_constraints([c1, c2], n_nodes)
+    constraint_set = ConstraintSet(unsorted=[c1, c2])
+    result = separate_constraints(constraint_set, n_nodes)
 
     assert result.ctcs == [c1, c2]
     assert len(result.nodal) == 1  # Only c2 should be in nodal (check_nodally=True)
@@ -257,6 +261,7 @@ def test_separate_constraints_only_ctcs():
     # Should be converted to NodalConstraint
     assert hasattr(result.nodal[0], "constraint")
     assert result.nodal[0].constraint == c2.constraint
+    assert result.is_categorized
 
 
 def test_separate_constraints_only_nodal():
@@ -266,7 +271,8 @@ def test_separate_constraints_only_nodal():
     c1 = x <= 1.0
     c2 = x >= 0.0
 
-    result = separate_constraints([c1, c2], n_nodes)
+    constraint_set = ConstraintSet(unsorted=[c1, c2])
+    result = separate_constraints(constraint_set, n_nodes)
 
     assert result.ctcs == []
     assert len(result.nodal) == 2
@@ -276,6 +282,7 @@ def test_separate_constraints_only_nodal():
     assert hasattr(result.nodal[1], "constraint")
     assert result.nodal[0].constraint == c1
     assert result.nodal[1].constraint == c2
+    assert result.is_categorized
 
 
 def test_separate_constraints_mixed():
@@ -286,7 +293,8 @@ def test_separate_constraints_mixed():
     c2 = x >= 0.0  # Regular constraint
     c3 = ctcs(x <= 2.0, penalty="huber", check_nodally=True)
 
-    result = separate_constraints([c1, c2, c3], n_nodes)
+    constraint_set = ConstraintSet(unsorted=[c1, c2, c3])
+    result = separate_constraints(constraint_set, n_nodes)
 
     assert result.ctcs == [c1, c3]
     assert len(result.nodal) == 2  # c2 + c3's underlying constraint
@@ -294,6 +302,7 @@ def test_separate_constraints_mixed():
     # Should be converted to NodalConstraint objects
     assert result.nodal[0].constraint == c2
     assert result.nodal[1].constraint == c3.constraint
+    assert result.is_categorized
 
 
 def test_separate_constraints_invalid_type():
@@ -302,8 +311,9 @@ def test_separate_constraints_invalid_type():
     x = State("x", (1,))
     invalid = Add(x, Constant(1.0))  # Not a constraint
 
+    constraint_set = ConstraintSet(unsorted=[invalid])
     with pytest.raises(ValueError) as exc:
-        separate_constraints([invalid], n_nodes)
+        separate_constraints(constraint_set, n_nodes)
 
     assert "Constraints must be `Constraint`, `NodalConstraint`, or `CTCS`" in str(exc.value)
 
@@ -318,7 +328,8 @@ def test_separate_constraints_convex_constraints():
     c2 = x >= 0.0  # Non-convex constraint
     c3 = (x <= 2.0).convex()  # Another convex constraint
 
-    result = separate_constraints([c1, c2, c3], n_nodes)
+    constraint_set = ConstraintSet(unsorted=[c1, c2, c3])
+    result = separate_constraints(constraint_set, n_nodes)
 
     assert result.ctcs == []
     assert len(result.nodal) == 1  # Only c2 (non-convex)
@@ -333,6 +344,7 @@ def test_separate_constraints_convex_constraints():
     assert result.nodal_convex[0].constraint.is_convex
     assert result.nodal_convex[1].constraint == c3
     assert result.nodal_convex[1].constraint.is_convex
+    assert result.is_categorized
 
 
 def test_separate_constraints_convex_nodal_constraints():
@@ -346,7 +358,8 @@ def test_separate_constraints_convex_nodal_constraints():
     nodal1 = NodalConstraint(c1, [0, 1, 2])  # Convex
     nodal2 = NodalConstraint(c2, [1, 2, 3])  # Non-convex
 
-    result = separate_constraints([nodal1, nodal2], n_nodes)
+    constraint_set = ConstraintSet(unsorted=[nodal1, nodal2])
+    result = separate_constraints(constraint_set, n_nodes)
 
     assert result.ctcs == []
     assert len(result.nodal) == 1  # nodal2 (non-convex)
@@ -355,6 +368,7 @@ def test_separate_constraints_convex_nodal_constraints():
     # Verify the NodalConstraint objects are preserved
     assert result.nodal[0] is nodal2
     assert result.nodal_convex[0] is nodal1
+    assert result.is_categorized
 
 
 def test_separate_constraints_convex_ctcs_check_nodally():
@@ -366,7 +380,8 @@ def test_separate_constraints_convex_ctcs_check_nodally():
     c1 = ctcs((x <= 1.0).convex(), penalty="squared_relu", check_nodally=True)
     c2 = ctcs(x >= 0.0, penalty="huber", check_nodally=True)  # Non-convex
 
-    result = separate_constraints([c1, c2], n_nodes)
+    constraint_set = ConstraintSet(unsorted=[c1, c2])
+    result = separate_constraints(constraint_set, n_nodes)
 
     assert result.ctcs == [c1, c2]
     assert len(result.nodal) == 1  # c2's underlying constraint (non-convex)
@@ -377,6 +392,7 @@ def test_separate_constraints_convex_ctcs_check_nodally():
     assert not result.nodal[0].constraint.is_convex
     assert result.nodal_convex[0].constraint == c1.constraint
     assert result.nodal_convex[0].constraint.is_convex
+    assert result.is_categorized
 
 
 def test_ctcs_with_node_reference_raises_error():
@@ -388,8 +404,9 @@ def test_ctcs_with_node_reference_raises_error():
     cross_node_constraint = x.at(5) - x.at(4) <= 1.0
     ctcs_constraint = ctcs(cross_node_constraint, penalty="squared_relu")
 
+    constraint_set = ConstraintSet(unsorted=[ctcs_constraint])
     with pytest.raises(ValueError, match="CTCS constraints cannot contain NodeReferences"):
-        separate_constraints([ctcs_constraint], n_nodes)
+        separate_constraints(constraint_set, n_nodes)
 
 
 def test_augment_no_ctcs_constraints():
@@ -1243,7 +1260,8 @@ def test_ctcs_check_nodally_node_interval_preserved():
     # Create a CTCS constraint with check_nodally over a specific interval
     c1 = ctcs(x <= 1.0, nodes=(10, 30), penalty="squared_relu", check_nodally=True)
 
-    result = separate_constraints([c1], n_nodes=n_nodes)
+    constraint_set = ConstraintSet(unsorted=[c1])
+    result = separate_constraints(constraint_set, n_nodes=n_nodes)
 
     # Should have the CTCS constraint
     assert len(result.ctcs) == 1
@@ -1276,7 +1294,8 @@ def test_convex_nodal_constraint_with_node_reference_accepted():
     assert cross_node_constraint.is_convex
 
     # Should successfully separate constraints without raising
-    result = separate_constraints([cross_node_constraint], n_nodes=n_nodes)
+    constraint_set = ConstraintSet(unsorted=[cross_node_constraint])
+    result = separate_constraints(constraint_set, n_nodes=n_nodes)
 
     # Should be classified as convex cross-node constraint
     assert len(result.cross_node_convex) == 1
@@ -1299,7 +1318,8 @@ def test_convex_bare_constraint_with_node_reference_accepted():
     assert cross_node_constraint.is_convex
 
     # Should successfully separate constraints without raising
-    result = separate_constraints([cross_node_constraint], n_nodes=n_nodes)
+    constraint_set = ConstraintSet(unsorted=[cross_node_constraint])
+    result = separate_constraints(constraint_set, n_nodes=n_nodes)
 
     # Should be classified as convex cross-node constraint
     assert len(result.cross_node_convex) == 1
@@ -1325,7 +1345,8 @@ def test_nonconvex_cross_node_constraint_accepted():
     assert not cross_node_constraint.is_convex
 
     # Should NOT raise error
-    result = separate_constraints([cross_node_constraint], n_nodes=n_nodes)
+    constraint_set = ConstraintSet(unsorted=[cross_node_constraint])
+    result = separate_constraints(constraint_set, n_nodes=n_nodes)
 
     # Should be in the non-convex cross-node constraints
     assert len(result.cross_node) == 1
@@ -1347,11 +1368,12 @@ def test_cross_node_constraint_with_at_wrapper_rejected():
     cross_node_constraint = (linalg.Norm(position.at(5) - position.at(4), ord=2) <= 0.1).at([5])
 
     # Should raise error because .at([...]) is not allowed on cross-node constraints
+    constraint_set = ConstraintSet(unsorted=[cross_node_constraint])
     with pytest.raises(
         ValueError,
         match=r"Cross-node constraints should not use \.at\(\[\.\.\.\]\) wrapper",
     ):
-        separate_constraints([cross_node_constraint], n_nodes=n_nodes)
+        separate_constraints(constraint_set, n_nodes=n_nodes)
 
 
 def test_regular_convex_constraint_without_node_reference_accepted():
@@ -1366,7 +1388,8 @@ def test_regular_convex_constraint_without_node_reference_accepted():
     assert regular_constraint.constraint.is_convex
 
     # Should NOT raise error
-    result = separate_constraints([regular_constraint], n_nodes=n_nodes)
+    constraint_set = ConstraintSet(unsorted=[regular_constraint])
+    result = separate_constraints(constraint_set, n_nodes=n_nodes)
 
     # Should be in convex nodal constraints
     assert len(result.nodal_convex) == 1
