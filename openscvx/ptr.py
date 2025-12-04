@@ -1,6 +1,7 @@
 import pickle
 import time
 import warnings
+from typing import TYPE_CHECKING
 
 import cvxpy as cp
 import numpy as np
@@ -10,10 +11,19 @@ from openscvx.autotuning import update_scp_weights
 from openscvx.config import Config
 from openscvx.results import OptimizationResults
 
+if TYPE_CHECKING:
+    from openscvx.lowered import LoweredJaxConstraints
+
 warnings.filterwarnings("ignore")
 
 
-def PTR_init(params, ocp: cp.Problem, discretization_solver: callable, settings: Config):
+def PTR_init(
+    params,
+    ocp: cp.Problem,
+    discretization_solver: callable,
+    settings: Config,
+    jax_constraints: "LoweredJaxConstraints",
+):
     if settings.cvx.cvxpygen:
         try:
             from solver.cpg_solver import cpg_solve
@@ -43,6 +53,7 @@ def PTR_init(params, ocp: cp.Problem, discretization_solver: callable, settings:
         discretization_solver,
         ocp,
         settings,
+        jax_constraints,
     )
 
     return cpg_solve
@@ -54,11 +65,11 @@ def format_result(problem, converged: bool) -> OptimizationResults:
     nodes_dict = {}
 
     # Add all states (user-defined and augmented)
-    for state in problem.states:
+    for state in problem.symbolic.states:
         nodes_dict[state.name] = problem.settings.sim.x.guess[:, state._slice]
 
     # Add all controls (user-defined and augmented)
-    for control in problem.controls:
+    for control in problem.symbolic.controls:
         nodes_dict[control.name] = problem.settings.sim.u.guess[:, control._slice]
 
     return OptimizationResults(
@@ -68,8 +79,8 @@ def format_result(problem, converged: bool) -> OptimizationResults:
         x=problem.settings.sim.x,
         nodes=nodes_dict,
         trajectory={},  # Populated by post_process
-        _states=problem.states_prop,  # Use propagation states for trajectory dict
-        _controls=problem.controls,
+        _states=problem.symbolic.states_prop,  # Use propagation states for trajectory dict
+        _controls=problem.symbolic.controls,
         x_history=problem.scp_trajs,
         u_history=problem.scp_controls,
         discretization_history=problem.scp_V_multi_shoot_traj,
@@ -93,6 +104,7 @@ def PTR_step(
     scp_trajs: list,
     scp_controls: list,
     scp_V_multi_shoot_traj: list,
+    jax_constraints: "LoweredJaxConstraints",
 ) -> dict:
     """Performs a single SCP iteration.
 
@@ -110,6 +122,7 @@ def PTR_step(
         scp_trajs: List of trajectory history
         scp_controls: List of control history
         scp_V_multi_shoot_traj: List of discretization history
+        jax_constraints: JAX-lowered non-convex constraints
 
     Returns:
         dict: Updated SCP state and convergence information
@@ -138,6 +151,7 @@ def PTR_step(
         discretization_solver,
         prob,
         settings,
+        jax_constraints,
     )
 
     # Update state
@@ -186,76 +200,16 @@ def PTR_step(
     }
 
 
-def PTR_main(
-    params, settings: Config, prob: cp.Problem, aug_dy: callable, cpg_solve, emitter_function
-) -> OptimizationResults:
-    x = settings.sim.x
-    u = settings.sim.u
-
-    if "x_init" in prob.param_dict:
-        prob.param_dict["x_init"].value = settings.sim.x.initial
-
-    if "x_term" in prob.param_dict:
-        prob.param_dict["x_term"].value = settings.sim.x.final
-
-    # Initialize SCP state
-    scp_k = 1
-    scp_J_tr = 1e2
-    scp_J_vb = 1e2
-    scp_J_vc = 1e2
-    scp_trajs = [x.guess]
-    scp_controls = [u.guess]
-    scp_V_multi_shoot_traj = []
-
-    while scp_k <= settings.scp.k_max and (
-        (scp_J_tr >= settings.scp.ep_tr)
-        or (scp_J_vb >= settings.scp.ep_vb)
-        or (scp_J_vc >= settings.scp.ep_vc)
-    ):
-        result = PTR_step(
-            params,
-            settings,
-            prob,
-            aug_dy,
-            cpg_solve,
-            emitter_function,
-            scp_k,
-            scp_J_tr,
-            scp_J_vb,
-            scp_J_vc,
-            scp_trajs,
-            scp_controls,
-            scp_V_multi_shoot_traj,
-        )
-
-        # Update state from result
-        scp_k = result["scp_k"]
-        scp_J_tr = result["scp_J_tr"]
-        scp_J_vb = result["scp_J_vb"]
-        scp_J_vc = result["scp_J_vc"]
-
-    # Use the final vectors for the result (from the last iteration)
-    final_J_tr_vec = [scp_J_tr]
-    final_J_vb_vec = [scp_J_vb]
-    final_J_vc_vec = [scp_J_vc]
-
-    result = OptimizationResults(
-        converged=scp_k <= settings.scp.k_max,
-        t_final=x.guess[:, settings.sim.time_slice][-1],
-        u=u,
-        x=x,
-        x_history=scp_trajs,
-        u_history=scp_controls,
-        discretization_history=scp_V_multi_shoot_traj,
-        J_tr_history=final_J_tr_vec,
-        J_vb_history=final_J_vb_vec,
-        J_vc_history=final_J_vc_vec,
-    )
-
-    return result
-
-
-def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
+def PTR_subproblem(
+    params,
+    cpg_solve,
+    x,
+    u,
+    aug_dy,
+    prob,
+    settings: Config,
+    jax_constraints: "LoweredJaxConstraints",
+):
     prob.param_dict["x_bar"].value = x.guess
     prob.param_dict["u_bar"].value = u.guess
 
@@ -273,9 +227,10 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
     prob.param_dict["x_prop"].value = x_prop.__array__()
     dis_time = time.time() - t0
 
+    # Update nodal constraint linearization parameters
     # TODO: (norrisg) investigate why we are passing `0` for the node here
-    if settings.sim.constraints.nodal:
-        for g_id, constraint in enumerate(settings.sim.constraints.nodal):
+    if jax_constraints.nodal:
+        for g_id, constraint in enumerate(jax_constraints.nodal):
             prob.param_dict["g_" + str(g_id)].value = np.asarray(
                 constraint.func(x.guess, u.guess, 0, param_dict)
             )
@@ -286,9 +241,9 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
                 constraint.grad_g_u(x.guess, u.guess, 0, param_dict)
             )
 
-    # Update cross-node constraint parameters
-    if settings.sim.constraints.cross_node:
-        for g_id, constraint in enumerate(settings.sim.constraints.cross_node):
+    # Update cross-node constraint linearization parameters
+    if jax_constraints.cross_node:
+        for g_id, constraint in enumerate(jax_constraints.cross_node):
             # Cross-node constraints take (X, U, params) not (x, u, node, params)
             prob.param_dict["g_cross_" + str(g_id)].value = np.asarray(
                 constraint.func(x.guess, u.guess, param_dict)
@@ -365,15 +320,15 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
 
     id_ncvx = 0
     J_vb_vec = 0
-    if settings.sim.constraints.nodal:
-        for constraint in settings.sim.constraints.nodal:
+    if jax_constraints.nodal:
+        for constraint in jax_constraints.nodal:
             J_vb_vec += np.maximum(0, prob.var_dict["nu_vb_" + str(id_ncvx)].value)
             id_ncvx += 1
 
     # Add cross-node constraint violations
     id_cross = 0
-    if settings.sim.constraints.cross_node:
-        for constraint in settings.sim.constraints.cross_node:
+    if jax_constraints.cross_node:
+        for constraint in jax_constraints.cross_node:
             J_vb_vec += np.maximum(0, prob.var_dict["nu_vb_cross_" + str(id_cross)].value)
             id_cross += 1
 

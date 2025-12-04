@@ -5,7 +5,6 @@ import time
 from typing import TYPE_CHECKING, List, Optional, Union
 
 import jax
-import numpy as np
 
 os.environ["EQX_ON_ERROR"] = "nan"
 
@@ -26,75 +25,23 @@ from openscvx.config import (
     SimConfig,
 )
 from openscvx.discretization import get_discretization_solver
-from openscvx.ocp import (
-    OptimalControlProblem,
-    create_cvxpy_variables,
-    lower_convex_constraints,
-)
+from openscvx.lowered import LoweredProblem, ParameterDict
+from openscvx.ocp import OptimalControlProblem
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
 from openscvx.ptr import PTR_init, PTR_step, format_result
 from openscvx.results import OptimizationResults
 from openscvx.symbolic.builder import preprocess_symbolic_problem
+from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import CTCS, Constraint
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
-from openscvx.symbolic.lower import lower_symbolic_expressions
+from openscvx.symbolic.lower import lower_symbolic_problem
+from openscvx.symbolic.problem import SymbolicProblem
 from openscvx.time import Time
 
 if TYPE_CHECKING:
     import cvxpy as cp
-
-
-class _ParameterDict(dict):
-    """Dictionary that syncs to both internal _parameters dict and CVXPy parameters.
-
-    This allows users to naturally update parameters like:
-        problem.parameters["obs_radius"] = 2.0
-
-    Changes automatically propagate to:
-    1. Internal _parameters dict (plain dict for JAX)
-    2. CVXPy parameters (for optimization)
-    """
-
-    def __init__(self, problem, internal_dict, *args, **kwargs):
-        self._problem = problem
-        self._internal_dict = internal_dict  # Reference to plain dict for JAX
-        super().__init__()
-        # Initialize with float enforcement by using __setitem__
-        if args:
-            other = args[0]
-            if hasattr(other, "items"):
-                for key, value in other.items():
-                    self[key] = value
-            else:
-                for key, value in other:
-                    self[key] = value
-        for key, value in kwargs.items():
-            self[key] = value
-
-    def __setitem__(self, key, value):
-        # Enforce float dtype to prevent int/float mismatch bugs
-        value = np.asarray(value, dtype=float)
-        super().__setitem__(key, value)
-        # Sync to internal dict for JAX
-        self._internal_dict[key] = value
-        # Sync to CVXPy if it exists
-        cvxpy_params = getattr(self._problem, "cvxpy_params", None)
-        if cvxpy_params is not None and key in cvxpy_params:
-            cvxpy_params[key].value = value
-
-    def update(self, other=None, **kwargs):
-        """Update multiple parameters and sync to internal dict and CVXPy."""
-        if other is not None:
-            if hasattr(other, "items"):
-                for key, value in other.items():
-                    self[key] = value
-            else:
-                for key, value in other:
-                    self[key] = value
-        for key, value in kwargs.items():
-            self[key] = value
 
 
 class Problem:
@@ -108,12 +55,6 @@ class Problem:
         time: Time,
         dynamics_prop: Optional[dict] = None,
         states_prop: Optional[List[State]] = None,
-        scp: Optional[ScpConfig] = None,
-        dis: Optional[DiscretizationConfig] = None,
-        prp: Optional[PropagationConfig] = None,
-        sim: Optional[SimConfig] = None,
-        dev: Optional[DevConfig] = None,
-        cvx: Optional[ConvexSolverConfig] = None,
         licq_min=0.0,
         licq_max=1e-4,
         time_dilation_factor_min=0.3,
@@ -141,12 +82,6 @@ class Problem:
                 state dynamics here.
             states_prop (List[State], optional): List of EXTRA State objects for propagation only.
                 Only specify additional states beyond optimization states. Used with dynamics_prop.
-            scp: SCP configuration object
-            dis: Discretization configuration object
-            prp: Propagation configuration object
-            sim: Simulation configuration object
-            dev: Development configuration object
-            cvx: Convex solver configuration object
             licq_min: Minimum LICQ constraint value
             licq_max: Maximum LICQ constraint value
             time_dilation_factor_min: Minimum time dilation factor
@@ -162,20 +97,10 @@ class Problem:
                in dynamics dict, don't provide Time object
         """
 
-        # Step 1: Symbolic Preprocessing & Augmentation
-        (
-            dynamics_aug,
-            x_aug,
-            u_aug,
-            constraint_set,
-            parameters,
-            node_intervals,
-            dynamics_prop_aug,
-            x_prop_aug,
-            u_prop_aug,
-        ) = preprocess_symbolic_problem(
+        # Symbolic Preprocessing & Augmentation
+        self.symbolic: SymbolicProblem = preprocess_symbolic_problem(
             dynamics=dynamics,
-            constraints=constraints,
+            constraints=ConstraintSet(unsorted=list(constraints)),
             states=states,
             controls=controls,
             N=N,
@@ -188,104 +113,42 @@ class Problem:
             states_prop_extra=states_prop,
         )
 
-        # Step 2: Lower to JAX
-        # TODO: Move CVXPy lowering here after SCP weights become CVXPy Parameters
-        # Currently CVXPy lowering happens in initialize() because some weights
-        # (lam_vc, lam_vb) are baked into OCP cost at creation time, and users
-        # currently modify these between __init__ and initialize(). Once all weights
-        # are CVXPy Parameters, CVXPy lowering can happen here alongside JAX lowering.
-        (
-            dynamics_augmented,
-            lowered_constraint_set,
-            x_unified,
-            u_unified,
-            dynamics_augmented_prop,
-            x_prop_unified,
-        ) = lower_symbolic_expressions(
-            dynamics_aug=dynamics_aug,
-            states_aug=x_aug,
-            controls_aug=u_aug,
-            constraints=constraint_set,
-            parameters=parameters,
-            dynamics_prop=dynamics_prop_aug,
-            states_prop=x_prop_aug,
-            controls_prop=u_prop_aug,
-        )
-
-        # Step 3: Store Processed Components
-
-        # Store state and control lists (includes user-defined + augmented)
-        self.states = x_aug
-        self.controls = u_aug
-
-        # Store propagation states (includes extra propagation-only states)
-        self.states_prop = x_prop_aug
-
-        # Store unified objects for easy access
-        self.x_unified = x_unified
-        self.u_unified = u_unified
+        # Lower to JAX and CVXPy
+        self._lowered: LoweredProblem = lower_symbolic_problem(self.symbolic)
 
         # Store parameters in two forms:
-        # 1. _parameters: plain dict for JAX functions
-        # 2. _parameter_wrapper: wrapper dict for user access that auto-syncs
-        self._parameters = parameters  # Plain dict for JAX
-        self._parameter_wrapper = _ParameterDict(self, self._parameters, parameters)
-        self.cvxpy_params = None  # Will be set during initialize()
+        self._parameters = self.symbolic.parameters  # Plain dict for JAX functions
+        # Wrapper dict for user access that auto-syncs
+        self._parameter_wrapper = ParameterDict(self, self._parameters, self.symbolic.parameters)
 
-        # Store dynamics objects
-        self.dynamics_augmented = dynamics_augmented
-        self.dynamics_augmented_prop = dynamics_augmented_prop
-
-        # ==================== STEP 4: Setup SCP Configuration ====================
-
-        # All indices are now stored in the unified objects themselves!
-        # SimConfig will access them via properties
-        if dis is None:
-            dis = DiscretizationConfig()
-
-        if sim is None:
-            sim = SimConfig(
-                x=x_unified,
-                x_prop=x_prop_unified,
-                u=u_unified,
-                total_time=x_unified.initial[x_unified.time_slice][0],
-                n_states=x_unified.initial.shape[0],
-                n_states_prop=x_prop_unified.initial.shape[0],
-                ctcs_node_intervals=node_intervals,
-            )
-
-        if scp is None:
-            scp = ScpConfig(
+        # Setup SCP Configuration
+        self.settings = Config(
+            sim=SimConfig(
+                x=self._lowered.x_unified,
+                x_prop=self._lowered.x_prop_unified,
+                u=self._lowered.u_unified,
+                total_time=self._lowered.x_unified.initial[self._lowered.x_unified.time_slice][0],
+                n_states=self._lowered.x_unified.initial.shape[0],
+                n_states_prop=self._lowered.x_prop_unified.initial.shape[0],
+                ctcs_node_intervals=self.symbolic.node_intervals,
+            ),
+            scp=ScpConfig(
                 n=N,
                 w_tr_max_scaling_factor=1e2,  # Maximum Trust Region Weight
-            )
-        else:
-            assert scp.n == N, "Number of segments must be the same as in the config"
-
-        if dev is None:
-            dev = DevConfig()
-        if cvx is None:
-            cvx = ConvexSolverConfig()
-        if prp is None:
-            prp = PropagationConfig()
-
-        # Store constraints in SimConfig
-        sim.constraints = lowered_constraint_set
-
-        self.settings = Config(
-            sim=sim,
-            scp=scp,
-            dis=dis,
-            dev=dev,
-            cvx=cvx,
-            prp=prp,
+            ),
+            dis=DiscretizationConfig(),
+            dev=DevConfig(),
+            cvx=ConvexSolverConfig(),
+            prp=PropagationConfig(),
         )
 
+        # OCP construction happens in initialize() so users can modify
+        # settings (like uniform_time_grid) between __init__ and initialize()
         self.optimal_control_problem: cp.Problem = None
         self.discretization_solver: callable = None
         self.cpg_solve = None
 
-        # set up emitter & thread only if printing is enabled
+        # Set up emitter & thread only if printing is enabled
         if self.settings.dev.printing:
             self.print_queue = queue.Queue()
             self.emitter_function = lambda data: self.print_queue.put(data)
@@ -321,7 +184,7 @@ class Problem:
             problem.parameters.update({"gate_0_center": center})  # Also syncs
 
         Returns:
-            _ParameterDict: Special dict that syncs to CVXPy on assignment
+            ParameterDict: Special dict that syncs to CVXPy on assignment
         """
         return self._parameter_wrapper
 
@@ -333,21 +196,40 @@ class Problem:
             new_params: New parameters dictionary
         """
         self._parameters = dict(new_params)  # Create new plain dict
-        self._parameter_wrapper = _ParameterDict(self, self._parameters, new_params)
+        self._parameter_wrapper = ParameterDict(self, self._parameters, new_params)
         self._sync_parameters()
 
     def _sync_parameters(self):
         """Sync all parameter values to CVXPy parameters."""
-        if self.cvxpy_params is not None:
+        if self._lowered.cvxpy_params is not None:
             for name, value in self._parameter_wrapper.items():
-                if name in self.cvxpy_params:
-                    self.cvxpy_params[name].value = value
+                if name in self._lowered.cvxpy_params:
+                    self._lowered.cvxpy_params[name].value = value
+
+    @property
+    def lowered(self) -> LoweredProblem:
+        """Access the lowered problem containing JAX/CVXPy objects.
+
+        Returns:
+            LoweredProblem with dynamics, constraints, unified interfaces, and CVXPy vars
+        """
+        return self._lowered
+
+    @property
+    def x_unified(self):
+        """Unified state interface (delegates to lowered.x_unified)."""
+        return self._lowered.x_unified
+
+    @property
+    def u_unified(self):
+        """Unified control interface (delegates to lowered.u_unified)."""
+        return self._lowered.u_unified
 
     def initialize(self):
         io.intro()
 
         # Print problem summary
-        io.print_problem_summary(self.settings)
+        io.print_problem_summary(self.settings, self._lowered)
 
         # Enable the profiler
         if self.settings.dev.profiling:
@@ -362,61 +244,42 @@ class Problem:
         self.settings.sim.__post_init__()
 
         # Compile dynamics and jacobians
-        self.dynamics_augmented.f = jax.vmap(self.dynamics_augmented.f, in_axes=(0, 0, 0, None))
-        self.dynamics_augmented.A = jax.vmap(self.dynamics_augmented.A, in_axes=(0, 0, 0, None))
-        self.dynamics_augmented.B = jax.vmap(self.dynamics_augmented.B, in_axes=(0, 0, 0, None))
+        self._lowered.dynamics.f = jax.vmap(self._lowered.dynamics.f, in_axes=(0, 0, 0, None))
+        self._lowered.dynamics.A = jax.vmap(self._lowered.dynamics.A, in_axes=(0, 0, 0, None))
+        self._lowered.dynamics.B = jax.vmap(self._lowered.dynamics.B, in_axes=(0, 0, 0, None))
 
-        self.dynamics_augmented_prop.f = jax.vmap(
-            self.dynamics_augmented_prop.f, in_axes=(0, 0, 0, None)
+        self._lowered.dynamics_prop.f = jax.vmap(
+            self._lowered.dynamics_prop.f, in_axes=(0, 0, 0, None)
         )
 
-        for constraint in self.settings.sim.constraints.nodal:
+        for constraint in self._lowered.jax_constraints.nodal:
             # TODO: (haynec) switch to AOT instead of JIT
             constraint.func = jax.jit(constraint.func)
             constraint.grad_g_x = jax.jit(constraint.grad_g_x)
             constraint.grad_g_u = jax.jit(constraint.grad_g_u)
 
         # JIT compile cross-node constraints
-        for constraint in self.settings.sim.constraints.cross_node:
+        for constraint in self._lowered.jax_constraints.cross_node:
             constraint.func = jax.jit(constraint.func)
             constraint.grad_g_X = jax.jit(constraint.grad_g_X)
             constraint.grad_g_U = jax.jit(constraint.grad_g_U)
 
-        # Generate solvers and optimal control problem
+        # Generate solvers
         self.discretization_solver = get_discretization_solver(
-            self.dynamics_augmented, self.settings, self.parameters
+            self._lowered.dynamics, self.settings, self.parameters
         )
         self.propagation_solver = get_propagation_solver(
-            self.dynamics_augmented_prop.f, self.settings, self.parameters
+            self._lowered.dynamics_prop.f, self.settings, self.parameters
         )
 
-        # TODO: Move this CVXPy lowering section to lower_symbolic_expressions()
-        # This should happen in __init__ alongside JAX lowering for architectural consistency.
-        # Blocked until all SCP weights become CVXPy Parameters (currently lam_vc and lam_vb
-        # are baked into OCP at creation time). See docs/problem_preprocessing_analysis.md
-        # "CVXPy Lowering: Current Approach vs. Alternatives" section for details.
-
-        # Phase 1: Create CVXPy variables
-        ocp_vars = create_cvxpy_variables(self.settings)
-
-        # Phase 2: Lower convex constraints to CVXPy
-        lowered_convex_constraints, self.cvxpy_params = lower_convex_constraints(
-            self.settings.sim.constraints,
-            ocp_vars,
-            self._parameters,
-        )
-
-        # Store lowered constraints back in settings for Phase 3
-        self.settings.sim.constraints.nodal_convex = lowered_convex_constraints
-
-        # Phase 3: Build complete optimal control problem
-        self.optimal_control_problem = OptimalControlProblem(self.settings, ocp_vars)
+        # Build optimal control problem using LoweredProblem
+        self.optimal_control_problem = OptimalControlProblem(self.settings, self._lowered)
 
         # Collect all relevant functions
-        functions_to_hash = [self.dynamics_augmented.f, self.dynamics_augmented_prop.f]
-        for constraint in self.settings.sim.constraints.nodal:
+        functions_to_hash = [self._lowered.dynamics.f, self._lowered.dynamics_prop.f]
+        for constraint in self._lowered.jax_constraints.nodal:
             functions_to_hash.append(constraint.func)
-        for constraint in self.settings.sim.constraints.cross_node:
+        for constraint in self._lowered.jax_constraints.cross_node:
             functions_to_hash.append(constraint.func)
         # Note: CTCS constraints are already included in dynamics_augmented.f,
         # so we don't need to add them separately
@@ -468,6 +331,7 @@ class Problem:
             self.optimal_control_problem,
             self.discretization_solver,
             self.settings,
+            self._lowered.jax_constraints,
         )
         print("✓ SCvx Subproblem Solver initialized")
 
@@ -516,6 +380,7 @@ class Problem:
             self.scp_trajs,
             self.scp_controls,
             self.scp_V_multi_shoot_traj,
+            self._lowered.jax_constraints,
         )
 
         # Update instance state from result

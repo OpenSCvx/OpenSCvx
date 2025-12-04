@@ -1,14 +1,48 @@
-"""Cross-node constraint handling for OpenSCVX.
+"""JAX-lowered constraint dataclass."""
 
-This module provides lowered constraint representations for constraints that
-relate variables across different trajectory nodes, such as rate limits and
-multi-step dependencies.
-"""
-
-from dataclasses import dataclass
-from typing import Callable
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Callable, List, Optional
 
 import jax.numpy as jnp
+
+if TYPE_CHECKING:
+    from openscvx.symbolic.expr import CTCS
+
+
+@dataclass
+class LoweredNodalConstraint:
+    """
+    Dataclass to hold a lowered symbolic constraint function and its jacobians.
+
+    This is a simplified drop-in replacement for NodalConstraint that holds
+    only the essential lowered JAX functions and their jacobians, without
+    the complexity of convex/vectorized flags or post-initialization logic.
+
+    Designed for use with symbolic expressions that have been lowered to JAX
+    and will be linearized for sequential convex programming.
+
+    Args:
+        func (Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):
+            The lowered constraint function g(x, u, ...params) that returns
+            constraint residuals. Should follow g(x, u) <= 0 convention.
+            - x: 1D array (state at a single node), shape (n_x,)
+            - u: 1D array (control at a single node), shape (n_u,)
+            - Additional parameters: passed as keyword arguments
+
+        grad_g_x (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
+            Jacobian of g w.r.t. x. If None, should be computed using jax.jacfwd.
+
+        grad_g_u (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):
+            Jacobian of g w.r.t. u. If None, should be computed using jax.jacfwd.
+
+        nodes (Optional[List[int]]): List of node indices where this constraint applies.
+            Set after lowering from NodalConstraint.
+    """
+
+    func: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]
+    grad_g_x: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
+    grad_g_u: Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]] = None
+    nodes: Optional[List[int]] = None
 
 
 @dataclass
@@ -76,3 +110,24 @@ class CrossNodeConstraintLowered:
     func: Callable[[jnp.ndarray, jnp.ndarray, dict], jnp.ndarray]
     grad_g_X: Callable[[jnp.ndarray, jnp.ndarray, dict], jnp.ndarray]
     grad_g_U: Callable[[jnp.ndarray, jnp.ndarray, dict], jnp.ndarray]
+
+
+@dataclass
+class LoweredJaxConstraints:
+    """JAX-lowered non-convex constraints with gradient functions.
+
+    Contains constraints that have been lowered to JAX callable functions
+    with automatically computed gradients. These are used for linearization
+    in the SCP (Sequential Convex Programming) loop.
+
+    Attributes:
+        nodal: List of LoweredNodalConstraint objects. Each has `func`,
+            `grad_g_x`, `grad_g_u` callables and `nodes` list.
+        cross_node: List of CrossNodeConstraintLowered objects. Each has
+            `func`, `grad_g_X`, `grad_g_U` for trajectory-level constraints.
+        ctcs: CTCS constraints (unchanged from input, not lowered here).
+    """
+
+    nodal: list[LoweredNodalConstraint] = field(default_factory=list)
+    cross_node: list[CrossNodeConstraintLowered] = field(default_factory=list)
+    ctcs: list["CTCS"] = field(default_factory=list)

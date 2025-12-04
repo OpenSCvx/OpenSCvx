@@ -190,3 +190,4 @@ nav:
       - 'Overview/discretization.md'
     - Under the Hood:
       - 'UnderTheHood/vectorization_and_vmapping.md'
+      - 'UnderTheHood/lowering_architecture.md'
