@@ -112,25 +112,17 @@ def hash_symbolic_problem(problem: "SymbolicProblem") -> str:
         for constraint in constraint_list:
             constraint._hash_into(hasher, ctx)
 
-    # Hash state metadata (shapes and boundary condition types only)
-    # Values (initial, final, min, max) are runtime parameters, not structural.
-    # The _slice is already hashed in the dynamics expressions.
+    # Hash all states and controls explicitly to capture metadata (boundary
+    # condition types) that may not appear in expressions. For example, a state
+    # with dynamics dx/dt = 1.0 doesn't appear in the expression tree, but its
+    # boundary condition types still affect the compiled problem structure.
     hasher.update(b"states:")
     for state in problem.states:
-        hasher.update(str(state.shape).encode())
-        # Hash boundary condition types (these affect constraint structure)
-        if state.initial_type is not None:
-            hasher.update(b"initial_type:")
-            hasher.update(str(state.initial_type.tolist()).encode())
-        if state.final_type is not None:
-            hasher.update(b"final_type:")
-            hasher.update(str(state.final_type.tolist()).encode())
+        state._hash_into(hasher, ctx)
 
-    # Hash control metadata (shapes only)
-    # Bound values are runtime parameters, not structural.
     hasher.update(b"controls:")
     for control in problem.controls:
-        hasher.update(str(control.shape).encode())
+        control._hash_into(hasher, ctx)
 
     # Hash parameter shapes (not values) from the problem's parameter dict.
     # This allows the same compiled solver to be reused across parameter sweeps -

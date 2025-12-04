@@ -210,6 +210,27 @@ class State(Variable):
         self._scaling_min = None
         self._scaling_max = None
 
+    def _hash_into(self, hasher, ctx) -> None:
+        """Hash State including boundary condition types.
+
+        Extends Variable._hash_into to include the structural metadata that
+        affects the compiled problem: boundary condition types (fixed, free,
+        minimize, maximize). Values are not hashed as they are runtime parameters.
+
+        Args:
+            hasher: A hashlib hash object to update
+            ctx: HashContext (for consistency with other nodes)
+        """
+        # Hash the base Variable attributes (class name, shape, slice)
+        super()._hash_into(hasher, ctx)
+        # Hash boundary condition types (these affect constraint structure)
+        if self.initial_type is not None:
+            hasher.update(b"initial_type:")
+            hasher.update(str(self.initial_type.tolist()).encode())
+        if self.final_type is not None:
+            hasher.update(b"final_type:")
+            hasher.update(str(self.final_type.tolist()).encode())
+
     @property
     def min(self):
         """Get the minimum bounds for the state variables.
