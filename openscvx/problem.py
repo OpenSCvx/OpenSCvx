@@ -55,12 +55,6 @@ class Problem:
         time: Time,
         dynamics_prop: Optional[dict] = None,
         states_prop: Optional[List[State]] = None,
-        scp: Optional[ScpConfig] = None,
-        dis: Optional[DiscretizationConfig] = None,
-        prp: Optional[PropagationConfig] = None,
-        sim: Optional[SimConfig] = None,
-        dev: Optional[DevConfig] = None,
-        cvx: Optional[ConvexSolverConfig] = None,
         licq_min=0.0,
         licq_max=1e-4,
         time_dilation_factor_min=0.3,
@@ -88,12 +82,6 @@ class Problem:
                 state dynamics here.
             states_prop (List[State], optional): List of EXTRA State objects for propagation only.
                 Only specify additional states beyond optimization states. Used with dynamics_prop.
-            scp: SCP configuration object
-            dis: Discretization configuration object
-            prp: Propagation configuration object
-            sim: Simulation configuration object
-            dev: Development configuration object
-            cvx: Convex solver configuration object
             licq_min: Minimum LICQ constraint value
             licq_max: Maximum LICQ constraint value
             time_dilation_factor_min: Minimum time dilation factor
@@ -134,11 +122,8 @@ class Problem:
         self._parameter_wrapper = ParameterDict(self, self._parameters, self.symbolic.parameters)
 
         # Setup SCP Configuration
-        if dis is None:
-            dis = DiscretizationConfig()
-
-        if sim is None:
-            sim = SimConfig(
+        self.settings = Config(
+            sim=SimConfig(
                 x=self._lowered.x_unified,
                 x_prop=self._lowered.x_prop_unified,
                 u=self._lowered.u_unified,
@@ -146,30 +131,15 @@ class Problem:
                 n_states=self._lowered.x_unified.initial.shape[0],
                 n_states_prop=self._lowered.x_prop_unified.initial.shape[0],
                 ctcs_node_intervals=self.symbolic.node_intervals,
-            )
-
-        if scp is None:
-            scp = ScpConfig(
+            ),
+            scp=ScpConfig(
                 n=N,
                 w_tr_max_scaling_factor=1e2,  # Maximum Trust Region Weight
-            )
-        else:
-            assert scp.n == N, "Number of segments must be the same as in the config"
-
-        if dev is None:
-            dev = DevConfig()
-        if cvx is None:
-            cvx = ConvexSolverConfig()
-        if prp is None:
-            prp = PropagationConfig()
-
-        self.settings = Config(
-            sim=sim,
-            scp=scp,
-            dis=dis,
-            dev=dev,
-            cvx=cvx,
-            prp=prp,
+            ),
+            dis=DiscretizationConfig(),
+            dev=DevConfig(),
+            cvx=ConvexSolverConfig(),
+            prp=PropagationConfig(),
         )
 
         # OCP construction happens in initialize() so users can modify
