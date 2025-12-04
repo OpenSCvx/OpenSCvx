@@ -61,14 +61,19 @@ def hash_symbolic_problem(problem: "SymbolicProblem") -> str:
     """Compute a structural hash of a symbolic optimization problem.
 
     This function computes a hash that depends only on the mathematical structure
-    of the problem, not on variable names. Two problems with the same:
+    of the problem, not on variable names or runtime values. Two problems with the same:
     - Dynamics expressions (using _slice for canonical variable positions)
     - Constraints
-    - State/control shapes and bounds
-    - Parameter values
+    - State/control shapes and boundary condition types
+    - Parameter shapes
     - Configuration (N, etc.)
 
     will produce the same hash, regardless of what names are used for variables.
+
+    Notably, the following are NOT included in the hash (allowing solver reuse):
+    - Boundary condition values (initial/final state values)
+    - Bound values (min/max for states and controls)
+    - Parameter values (only shapes are hashed)
 
     Args:
         problem: A SymbolicProblem (should be preprocessed for best results,
@@ -107,31 +112,25 @@ def hash_symbolic_problem(problem: "SymbolicProblem") -> str:
         for constraint in constraint_list:
             constraint._hash_into(hasher, ctx)
 
-    # Hash state metadata (shapes, bounds, boundary conditions)
-    # Note: The _slice is already hashed in the dynamics, but bounds
-    # and boundary conditions also affect the compiled problem
+    # Hash state metadata (shapes and boundary condition types only)
+    # Values (initial, final, min, max) are runtime parameters, not structural.
+    # The _slice is already hashed in the dynamics expressions.
     hasher.update(b"states:")
     for state in problem.states:
         hasher.update(str(state.shape).encode())
-        if state.min is not None:
-            hasher.update(state.min.tobytes())
-        if state.max is not None:
-            hasher.update(state.max.tobytes())
-        if state.initial is not None:
-            hasher.update(state.initial.tobytes())
+        # Hash boundary condition types (these affect constraint structure)
+        if state.initial_type is not None:
+            hasher.update(b"initial_type:")
             hasher.update(str(state.initial_type.tolist()).encode())
-        if state.final is not None:
-            hasher.update(state.final.tobytes())
+        if state.final_type is not None:
+            hasher.update(b"final_type:")
             hasher.update(str(state.final_type.tolist()).encode())
 
-    # Hash control metadata (shapes, bounds)
+    # Hash control metadata (shapes only)
+    # Bound values are runtime parameters, not structural.
     hasher.update(b"controls:")
     for control in problem.controls:
         hasher.update(str(control.shape).encode())
-        if control.min is not None:
-            hasher.update(control.min.tobytes())
-        if control.max is not None:
-            hasher.update(control.max.tobytes())
 
     # Hash parameter shapes (not values) from the problem's parameter dict.
     # This allows the same compiled solver to be reused across parameter sweeps -
