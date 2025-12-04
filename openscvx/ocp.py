@@ -143,11 +143,9 @@ def OptimalControlProblem(settings: Config, lowered: "LoweredProblem"):
 
     constr += [
         x_nonscaled[i]
-        == cp.reshape(A_d[i - 1], (settings.sim.n_states, settings.sim.n_states))
-        @ dx_nonscaled[i - 1]
-        + cp.reshape(B_d[i - 1], (settings.sim.n_states, settings.sim.n_controls))
-        @ du_nonscaled[i - 1]
-        + cp.reshape(C_d[i - 1], (settings.sim.n_states, settings.sim.n_controls)) @ du_nonscaled[i]
+        == A_d[i - 1] @ dx_nonscaled[i - 1]
+        + B_d[i - 1] @ du_nonscaled[i - 1]
+        + C_d[i - 1] @ du_nonscaled[i]
         + x_prop[i - 1]
         + nu[i - 1]
         for i in range(1, settings.scp.n)

@@ -217,9 +217,9 @@ def create_cvxpy_variables(
     u_bar = cp.Parameter((N, n_controls), name="u_bar")  # Previous SCP Control
 
     # Discretized Augmented Dynamics Constraints
-    A_d = cp.Parameter((N - 1, n_states * n_states), name="A_d")
-    B_d = cp.Parameter((N - 1, n_states * n_controls), name="B_d")
-    C_d = cp.Parameter((N - 1, n_states * n_controls), name="C_d")
+    A_d = cp.Parameter((N - 1, n_states, n_states), name="A_d")
+    B_d = cp.Parameter((N - 1, n_states, n_controls), name="B_d")
+    C_d = cp.Parameter((N - 1, n_states, n_controls), name="C_d")
     x_prop = cp.Parameter((N - 1, n_states), name="x_prop")
     nu = cp.Variable((N - 1, n_states), name="nu")  # Virtual Control
 
