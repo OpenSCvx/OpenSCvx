@@ -857,3 +857,193 @@ def test_concat_order_matters():
     c2 = Concat(y, x)
 
     assert hash_expr(c1) != hash_expr(c2)
+
+
+# =============================================================================
+# Constraint Order Invariance Tests
+# =============================================================================
+
+
+def test_problem_nodal_constraint_order_invariant():
+    """Problem hash should be the same regardless of nodal constraint order."""
+    from openscvx.symbolic.constraint_set import ConstraintSet
+    from openscvx.symbolic.problem import SymbolicProblem
+
+    def make_problem_with_constraints(constraint_order):
+        x = State("x", (3,))
+        x._slice = slice(0, 3)
+        x.min = [-10.0, -10.0, -10.0]
+        x.max = [10.0, 10.0, 10.0]
+        x.initial = [0.0, 0.0, 0.0]
+        x.final = [5.0, 5.0, 5.0]
+
+        u = Control("u", (2,))
+        u._slice = slice(0, 2)
+        u.min = [-1.0, -1.0]
+        u.max = [1.0, 1.0]
+
+        # Create constraints in the specified order
+        constraints_map = {
+            "norm_x": Norm(x) <= 5.0,
+            "x0_positive": x[0] >= 0,
+            "x1_bounded": x[1] <= 3.0,
+        }
+        ordered_constraints = [constraints_map[name] for name in constraint_order]
+
+        return SymbolicProblem(
+            states=[x],
+            controls=[u],
+            dynamics=Concat(u, Constant(np.array([0.0]))),
+            constraints=ConstraintSet(nodal=ordered_constraints),
+            parameters={},
+            N=50,
+        )
+
+    # Create problems with constraints in different orders
+    p1 = make_problem_with_constraints(["norm_x", "x0_positive", "x1_bounded"])
+    p2 = make_problem_with_constraints(["x1_bounded", "norm_x", "x0_positive"])
+    p3 = make_problem_with_constraints(["x0_positive", "x1_bounded", "norm_x"])
+
+    hash1 = hash_symbolic_problem(p1)
+    hash2 = hash_symbolic_problem(p2)
+    hash3 = hash_symbolic_problem(p3)
+
+    assert hash1 == hash2
+    assert hash2 == hash3
+
+
+def test_problem_ctcs_constraint_order_invariant():
+    """Problem hash should be the same regardless of CTCS constraint order."""
+    from openscvx.symbolic.constraint_set import ConstraintSet
+    from openscvx.symbolic.problem import SymbolicProblem
+
+    def make_problem_with_ctcs(constraint_order):
+        x = State("x", (2,))
+        x._slice = slice(0, 2)
+        x.min = [-10.0, -10.0]
+        x.max = [10.0, 10.0]
+        x.initial = [0.0, 0.0]
+        x.final = [5.0, 5.0]
+
+        u = Control("u", (2,))
+        u._slice = slice(0, 2)
+        u.min = [-1.0, -1.0]
+        u.max = [1.0, 1.0]
+
+        # Create CTCS constraints in the specified order
+        constraints_map = {
+            "ctcs_norm": CTCS(Norm(x) <= 3.0, penalty="l2"),
+            "ctcs_x0": CTCS(x[0] >= -1.0, penalty="l1"),
+            "ctcs_x1": CTCS(x[1] <= 2.0, penalty="l2"),
+        }
+        ordered_constraints = [constraints_map[name] for name in constraint_order]
+
+        return SymbolicProblem(
+            states=[x],
+            controls=[u],
+            dynamics=u,
+            constraints=ConstraintSet(ctcs=ordered_constraints),
+            parameters={},
+            N=50,
+        )
+
+    p1 = make_problem_with_ctcs(["ctcs_norm", "ctcs_x0", "ctcs_x1"])
+    p2 = make_problem_with_ctcs(["ctcs_x1", "ctcs_norm", "ctcs_x0"])
+    p3 = make_problem_with_ctcs(["ctcs_x0", "ctcs_x1", "ctcs_norm"])
+
+    hash1 = hash_symbolic_problem(p1)
+    hash2 = hash_symbolic_problem(p2)
+    hash3 = hash_symbolic_problem(p3)
+
+    assert hash1 == hash2
+    assert hash2 == hash3
+
+
+def test_problem_mixed_constraint_order_invariant():
+    """Problem hash should be order-invariant across all constraint categories."""
+    from openscvx.symbolic.constraint_set import ConstraintSet
+    from openscvx.symbolic.problem import SymbolicProblem
+
+    def make_problem(nodal_order, ctcs_order):
+        x = State("x", (2,))
+        x._slice = slice(0, 2)
+        x.min = [-10.0, -10.0]
+        x.max = [10.0, 10.0]
+        x.initial = [0.0, 0.0]
+        x.final = [5.0, 5.0]
+
+        u = Control("u", (2,))
+        u._slice = slice(0, 2)
+        u.min = [-1.0, -1.0]
+        u.max = [1.0, 1.0]
+
+        nodal_map = {
+            "a": Norm(x) <= 5.0,
+            "b": x[0] >= -2.0,
+        }
+        ctcs_map = {
+            "c": CTCS(x[1] <= 1.0),
+            "d": CTCS(Norm(u) <= 0.5),
+        }
+
+        return SymbolicProblem(
+            states=[x],
+            controls=[u],
+            dynamics=u,
+            constraints=ConstraintSet(
+                nodal=[nodal_map[k] for k in nodal_order],
+                ctcs=[ctcs_map[k] for k in ctcs_order],
+            ),
+            parameters={},
+            N=50,
+        )
+
+    # All permutations should hash the same
+    p1 = make_problem(["a", "b"], ["c", "d"])
+    p2 = make_problem(["b", "a"], ["c", "d"])
+    p3 = make_problem(["a", "b"], ["d", "c"])
+    p4 = make_problem(["b", "a"], ["d", "c"])
+
+    hashes = [hash_symbolic_problem(p) for p in [p1, p2, p3, p4]]
+
+    assert all(h == hashes[0] for h in hashes)
+
+
+def test_duplicate_constraints_same_hash():
+    """Duplicate constraints should produce consistent hashes."""
+    from openscvx.symbolic.constraint_set import ConstraintSet
+    from openscvx.symbolic.problem import SymbolicProblem
+
+    def make_problem(num_duplicates):
+        x = State("x", (2,))
+        x._slice = slice(0, 2)
+        x.min = [-10.0, -10.0]
+        x.max = [10.0, 10.0]
+        x.initial = [0.0, 0.0]
+        x.final = [5.0, 5.0]
+
+        u = Control("u", (2,))
+        u._slice = slice(0, 2)
+        u.min = [-1.0, -1.0]
+        u.max = [1.0, 1.0]
+
+        # Create identical constraints
+        constraints = [Norm(x) <= 5.0 for _ in range(num_duplicates)]
+
+        return SymbolicProblem(
+            states=[x],
+            controls=[u],
+            dynamics=u,
+            constraints=ConstraintSet(nodal=constraints),
+            parameters={},
+            N=50,
+        )
+
+    # Same number of duplicates should hash the same
+    p1 = make_problem(3)
+    p2 = make_problem(3)
+    assert hash_symbolic_problem(p1) == hash_symbolic_problem(p2)
+
+    # Different number of duplicates should hash differently
+    p3 = make_problem(2)
+    assert hash_symbolic_problem(p1) != hash_symbolic_problem(p3)

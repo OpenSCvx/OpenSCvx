@@ -58,7 +58,9 @@ def hash_symbolic_problem(problem: "SymbolicProblem") -> str:
         hasher.update(b"dynamics_prop:")
         problem.dynamics_prop._hash_into(hasher)
 
-    # Hash all constraints
+    # Hash all constraints (order-invariant within each category)
+    # We compute individual hashes and sort them so that the same set of
+    # constraints produces the same hash regardless of definition order.
     hasher.update(b"constraints:")
     for constraint_list in [
         problem.constraints.ctcs,
@@ -67,8 +69,12 @@ def hash_symbolic_problem(problem: "SymbolicProblem") -> str:
         problem.constraints.cross_node,
         problem.constraints.cross_node_convex,
     ]:
-        for constraint in constraint_list:
-            constraint._hash_into(hasher)
+        # Compute individual hashes for each constraint
+        constraint_hashes = sorted(c.structural_hash() for c in constraint_list)
+        # Hash the count and sorted hashes
+        hasher.update(len(constraint_hashes).to_bytes(4, "big"))
+        for h in constraint_hashes:
+            hasher.update(h)
 
     # Hash all states and controls explicitly to capture metadata (boundary
     # condition types) that may not appear in expressions. For example, a state
