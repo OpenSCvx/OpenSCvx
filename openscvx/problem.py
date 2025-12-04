@@ -177,10 +177,7 @@ class Problem:
         )
 
         # Step 2: Lower to JAX and CVXPy
-        lowered: LoweredProblem = lower_symbolic_problem(symbolic_problem)
-
-        # Store LoweredProblem for structured access
-        self._lowered = lowered
+        self._lowered: LoweredProblem = lower_symbolic_problem(symbolic_problem)
 
         # Store SymbolicProblem for reference
         self._symbolic_problem = symbolic_problem
@@ -203,8 +200,8 @@ class Problem:
         )
 
         # Store dynamics objects (from LoweredProblem)
-        self.dynamics_augmented = lowered.dynamics
-        self.dynamics_augmented_prop = lowered.dynamics_prop
+        self.dynamics_augmented = self._lowered.dynamics
+        self.dynamics_augmented_prop = self._lowered.dynamics_prop
 
         # ==================== STEP 4: Setup SCP Configuration ====================
 
@@ -215,12 +212,12 @@ class Problem:
 
         if sim is None:
             sim = SimConfig(
-                x=lowered.x_unified,
-                x_prop=lowered.x_prop_unified,
-                u=lowered.u_unified,
-                total_time=lowered.x_unified.initial[lowered.x_unified.time_slice][0],
-                n_states=lowered.x_unified.initial.shape[0],
-                n_states_prop=lowered.x_prop_unified.initial.shape[0],
+                x=self._lowered.x_unified,
+                x_prop=self._lowered.x_prop_unified,
+                u=self._lowered.u_unified,
+                total_time=self._lowered.x_unified.initial[self._lowered.x_unified.time_slice][0],
+                n_states=self._lowered.x_unified.initial.shape[0],
+                n_states_prop=self._lowered.x_prop_unified.initial.shape[0],
                 ctcs_node_intervals=symbolic_problem.node_intervals,
             )
 
@@ -251,8 +248,8 @@ class Problem:
         # ==================== STEP 5: Store CVXPy Variables ====================
 
         # CVXPy variables and constraint lowering happened in Step 2
-        self._ocp_vars = lowered.ocp_vars
-        self.cvxpy_params = lowered.cvxpy_params
+        self._ocp_vars = self._lowered.ocp_vars
+        self.cvxpy_params = self._lowered.cvxpy_params
 
         # OCP construction happens in initialize() so users can modify
         # settings (like uniform_time_grid) between __init__ and initialize()

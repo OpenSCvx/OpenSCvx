@@ -681,16 +681,7 @@ def lower_symbolic_problem(problem: "SymbolicProblem") -> LoweredProblem:
             Must have is_preprocessed == True.
 
     Returns:
-        LoweredProblem dataclass containing:
-            - dynamics: Optimization dynamics (Dynamics with f, A, B)
-            - dynamics_prop: Propagation dynamics (Dynamics with f, A, B)
-            - jax_constraints: LoweredJaxConstraints with nodal, cross_node, ctcs
-            - cvxpy_constraints: LoweredCvxpyConstraints with CVXPy constraint objects
-            - x_unified: Aggregated optimization state interface
-            - u_unified: Aggregated optimization control interface
-            - x_prop_unified: Aggregated propagation state interface
-            - ocp_vars: CVXPyVariables for OCP construction
-            - cvxpy_params: Dict of CVXPy Parameter objects for user parameters
+        LoweredProblem dataclass containing lowered problem
 
     Example:
         After preprocessing::

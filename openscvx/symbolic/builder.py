@@ -2,7 +2,7 @@
 
 This module provides the main preprocessing pipeline for trajectory optimization problems,
 transforming user-specified symbolic dynamics and constraints into an augmented form
-ready for compilation to executable code (JAX/CVXPy).
+ready for compilation to executable code.
 
 The preprocessing pipeline is purely symbolic - no code generation occurs here. Instead,
 it performs validation, canonicalization, and augmentation to prepare the problem for
@@ -17,73 +17,16 @@ Key functionality:
     - CTCS augmentation: Add augmented states and time dilation for path constraints
     - Propagation dynamics: Optionally extend dynamics for post-solution propagation
 
+The preprocessing pipeline is purely symbolic - no code generation occurs here.
+
 Pipeline stages:
-    1. Time handling & validation: Process time configuration
-    2. Expression validation: Check shapes, names, constraint structure
-    3. Canonicalization & parameter collection: Simplify and extract parameters
-    4. Constraint separation & augmentation: Sort constraints and add CTCS states
-    5. Propagation dynamics creation: Optionally add extra states for simulation
+    1. Time handling & validation
+    2. Expression validation (shapes, names, constraint structure)
+    3. Canonicalization & parameter collection
+    4. Constraint separation & CTCS augmentation
+    5. Propagation dynamics creation
 
-Architecture:
-    The main function `preprocess_symbolic_problem` orchestrates the pipeline:
-
-    Input:
-
-    - User dynamics: Dict[str, Expr] mapping state names to dynamics
-    - User constraints: List of symbolic constraints (or ConstraintSet with unsorted)
-    - User states & controls: Variable definitions
-    - Time configuration: Time object specifying time bounds
-
-    Output:
-
-    - SymbolicProblem dataclass containing:
-        - Augmented dynamics, states, controls
-        - Categorized constraints (ConstraintSet with is_categorized=True)
-        - Extracted parameters
-        - CTCS node intervals
-        - Propagation dynamics/states/controls
-
-Example:
-    Basic problem preprocessing::
-
-        import openscvx as ox
-        import numpy as np
-
-        # Define problem
-        x = ox.State("x", shape=(2,))
-        v = ox.State("v", shape=(2,))
-        u = ox.Control("u", shape=(2,))
-
-        # Dynamics
-        dynamics = {
-            "x": v,
-            "v": u
-        }
-
-        # Constraints
-        constraints = [
-            (ox.Norm(x) <= 5.0).over((0, 50)),  # Path constraint via CTCS
-            (ox.Norm(u) <= 1.0).at([0, 10, 20, 30, 40, 50])  # Nodal constraint
-        ]
-
-        # Preprocess
-        from openscvx.symbolic.builder import preprocess_symbolic_problem
-
-        problem = preprocess_symbolic_problem(
-            dynamics=dynamics,
-            constraints=constraints,
-            states=[x, v],
-            controls=[u],
-            N=50,
-            time=ox.Time(initial=0.0, final=10.0)
-        )
-
-        # Access via SymbolicProblem dataclass
-        assert problem.is_preprocessed
-        # problem.dynamics: augmented dynamics expression
-        # problem.states: [x, v, time, _ctcs_aug_0]
-        # problem.controls: [u, _time_dilation]
-        # problem.constraints.ctcs, problem.constraints.nodal, etc.
+See `preprocess_symbolic_problem()` for the main entry point.
 """
 
 from typing import Dict, List, Tuple
