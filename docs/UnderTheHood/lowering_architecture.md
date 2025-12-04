@@ -160,31 +160,6 @@ JAX lowering has no dependency on:
 
 This means JAX-lowered dynamics and constraints could be used with alternative solvers.
 
-## Usage Example
-
-```python
-# User defines problem symbolically
-problem = Problem(
-    states=[position, velocity],
-    controls=[thrust],
-    dynamics=dynamics,
-    constraints=constraints,
-    ...
-)
-
-# Inside Problem.__init__:
-#   1. preprocess_symbolic_problem() → SymbolicProblem
-#   2. lower_symbolic_problem() → LoweredProblem
-#   3. Store self._lowered
-
-# Later, during optimization:
-dx = problem._lowered.dynamics.f(x, u, node, params)
-A = problem._lowered.dynamics.A(x, u, node, params)
-
-# CVXPy subproblem uses:
-ocp = OptimalControlProblem(settings, problem._lowered)
-```
-
 ## Further Reading
 
 - `openscvx/symbolic/lower.py` — Main lowering implementation
