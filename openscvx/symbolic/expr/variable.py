@@ -1,12 +1,8 @@
 import hashlib
-from typing import TYPE_CHECKING
 
 import numpy as np
 
 from .expr import Leaf
-
-if TYPE_CHECKING:
-    from openscvx.symbolic.hashing import HashContext
 
 
 class Variable(Leaf):
@@ -57,7 +53,7 @@ class Variable(Leaf):
     def __repr__(self):
         return f"Var({self.name!r})"
 
-    def _hash_into(self, hasher: "hashlib._Hash", ctx: "HashContext") -> None:
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
         """Hash Variable using its slice (canonical position, name-invariant).
 
         Instead of hashing the variable name, we hash the _slice attribute
@@ -67,7 +63,6 @@ class Variable(Leaf):
 
         Args:
             hasher: A hashlib hash object to update
-            ctx: HashContext (for consistency with other nodes)
         """
         hasher.update(self.__class__.__name__.encode())
         hasher.update(str(self._shape).encode())

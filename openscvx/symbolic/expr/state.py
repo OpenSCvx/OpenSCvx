@@ -1,3 +1,4 @@
+import hashlib
 from enum import Enum
 
 import numpy as np
@@ -210,7 +211,7 @@ class State(Variable):
         self._scaling_min = None
         self._scaling_max = None
 
-    def _hash_into(self, hasher, ctx) -> None:
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
         """Hash State including boundary condition types.
 
         Extends Variable._hash_into to include the structural metadata that
@@ -219,10 +220,9 @@ class State(Variable):
 
         Args:
             hasher: A hashlib hash object to update
-            ctx: HashContext (for consistency with other nodes)
         """
         # Hash the base Variable attributes (class name, shape, slice)
-        super()._hash_into(hasher, ctx)
+        super()._hash_into(hasher)
         # Hash boundary condition types (these affect constraint structure)
         if self.initial_type is not None:
             hasher.update(b"initial_type:")

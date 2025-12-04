@@ -23,27 +23,12 @@ from openscvx.symbolic.expr import (
 from openscvx.symbolic.expr.constraint import CTCS
 from openscvx.symbolic.expr.linalg import Norm
 from openscvx.symbolic.expr.math import Cos, Huber, Sin, SmoothReLU
-from openscvx.symbolic.hashing import HashContext, hash_symbolic_problem
-
-# =============================================================================
-# Helper Functions
-# =============================================================================
+from openscvx.symbolic.hashing import hash_symbolic_problem
 
 
-def make_context(states=None, controls=None, parameters=None):
-    """Create a HashContext for testing."""
-    return HashContext(
-        states=states or [],
-        controls=controls or [],
-        parameters=parameters or {},
-    )
-
-
-def hash_expr(expr, ctx=None):
+def hash_expr(expr):
     """Compute the structural hash of an expression."""
-    if ctx is None:
-        ctx = make_context()
-    return expr.structural_hash(ctx)
+    return expr.structural_hash()
 
 
 # =============================================================================

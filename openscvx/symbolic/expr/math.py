@@ -36,14 +36,11 @@ Example:
 
 import hashlib
 import struct
-from typing import TYPE_CHECKING, Tuple
+from typing import Tuple
 
 import numpy as np
 
 from .expr import Expr, to_expr
-
-if TYPE_CHECKING:
-    from openscvx.symbolic.hashing import HashContext
 
 
 class Sin(Expr):
@@ -525,18 +522,17 @@ class Huber(Expr):
         """Huber penalty preserves the shape of x."""
         return self.x.check_shape()
 
-    def _hash_into(self, hasher: "hashlib._Hash", ctx: "HashContext") -> None:
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
         """Hash Huber including its delta parameter.
 
         Args:
             hasher: A hashlib hash object to update
-            ctx: HashContext providing canonical IDs for variables
         """
         hasher.update(b"Huber")
         # Hash delta as bytes
         hasher.update(struct.pack(">d", self.delta))
         # Hash the operand
-        self.x._hash_into(hasher, ctx)
+        self.x._hash_into(hasher)
 
     def __repr__(self):
         return f"huber({self.x!r}, delta={self.delta})"
@@ -588,18 +584,17 @@ class SmoothReLU(Expr):
         """Smooth ReLU preserves the shape of x."""
         return self.x.check_shape()
 
-    def _hash_into(self, hasher: "hashlib._Hash", ctx: "HashContext") -> None:
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
         """Hash SmoothReLU including its c parameter.
 
         Args:
             hasher: A hashlib hash object to update
-            ctx: HashContext providing canonical IDs for variables
         """
         hasher.update(b"SmoothReLU")
         # Hash c as bytes
         hasher.update(struct.pack(">d", self.c))
         # Hash the operand
-        self.x._hash_into(hasher, ctx)
+        self.x._hash_into(hasher)
 
     def __repr__(self):
         return f"smooth_relu({self.x!r}, c={self.c})"

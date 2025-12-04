@@ -65,12 +65,9 @@ Example:
 
 import hashlib
 import struct
-from typing import TYPE_CHECKING, Callable, Tuple, Union
+from typing import Callable, Tuple, Union
 
 import numpy as np
-
-if TYPE_CHECKING:
-    from openscvx.symbolic.hashing import HashContext
 
 
 class Expr:
@@ -346,7 +343,7 @@ class Expr:
             lines.append(child.pretty(indent + 1))
         return "\n".join(lines)
 
-    def _hash_into(self, hasher: "hashlib._Hash", ctx: "HashContext") -> None:
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
         """Contribute this expression's structural identity to a hash.
 
         This method is used to compute a structural hash of the expression tree
@@ -358,29 +355,25 @@ class Expr:
 
         Args:
             hasher: A hashlib hash object to update
-            ctx: HashContext providing canonical IDs for variables
         """
         # Hash the class name to distinguish different node types
         hasher.update(self.__class__.__name__.encode())
         # Recursively hash all children
         for child in self.children():
-            child._hash_into(hasher, ctx)
+            child._hash_into(hasher)
 
-    def structural_hash(self, ctx: "HashContext") -> bytes:
+    def structural_hash(self) -> bytes:
         """Compute a structural hash of this expression.
 
         Returns a hash that depends only on the mathematical structure of the
         expression, not on variable names. Two expressions that are structurally
         equivalent (same operations, same variable positions) will have the same hash.
 
-        Args:
-            ctx: HashContext providing canonical IDs for states, controls, parameters
-
         Returns:
             bytes: SHA-256 digest of the expression structure
         """
         hasher = hashlib.sha256()
-        self._hash_into(hasher, ctx)
+        self._hash_into(hasher)
         return hasher.digest()
 
 
@@ -440,7 +433,7 @@ class Leaf(Expr):
         """
         return self._shape
 
-    def _hash_into(self, hasher: "hashlib._Hash", ctx: "HashContext") -> None:
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
         """Hash leaf node by class name and shape.
 
         This base implementation hashes the class name and shape. Subclasses
@@ -449,7 +442,6 @@ class Leaf(Expr):
 
         Args:
             hasher: A hashlib hash object to update
-            ctx: HashContext (for consistency with other nodes)
         """
         hasher.update(self.__class__.__name__.encode())
         hasher.update(str(self._shape).encode())
@@ -488,7 +480,7 @@ class Parameter(Leaf):
             raise ValueError(f"Parameter '{name}' requires an initial value")
         self.value = np.asarray(value, dtype=float)
 
-    def _hash_into(self, hasher: "hashlib._Hash", ctx: "HashContext") -> None:
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
         """Hash Parameter by its shape only (value-invariant).
 
         Parameters are hashed by shape only, not by value. This allows the same
@@ -497,7 +489,6 @@ class Parameter(Leaf):
 
         Args:
             hasher: A hashlib hash object to update
-            ctx: HashContext (unused for parameters)
         """
         hasher.update(b"Parameter")
         hasher.update(str(self._shape).encode())
@@ -589,7 +580,7 @@ class Constant(Expr):
             )
         return self.value.shape
 
-    def _hash_into(self, hasher: "hashlib._Hash", ctx: "HashContext") -> None:
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
         """Hash constant by its value.
 
         Constants are hashed by their actual numeric value, ensuring that
@@ -597,7 +588,6 @@ class Constant(Expr):
 
         Args:
             hasher: A hashlib hash object to update
-            ctx: HashContext (unused for constants, but required by interface)
         """
         hasher.update(b"Constant")
         hasher.update(str(self.value.shape).encode())
@@ -709,18 +699,17 @@ class NodeReference(Expr):
         """
         return self.base.check_shape()
 
-    def _hash_into(self, hasher: "hashlib._Hash", ctx: "HashContext") -> None:
+    def _hash_into(self, hasher: "hashlib._Hash") -> None:
         """Hash NodeReference including its node index.
 
         Args:
             hasher: A hashlib hash object to update
-            ctx: HashContext providing canonical IDs for variables
         """
         hasher.update(b"NodeReference")
         # Hash the node index (signed int)
         hasher.update(struct.pack(">i", self.node_idx))
         # Hash the base expression
-        self.base._hash_into(hasher, ctx)
+        self.base._hash_into(hasher)
 
     def __repr__(self):
         """String representation of the NodeReference.

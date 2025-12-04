@@ -9,52 +9,12 @@ the same structure, the cached compiled artifacts can be reused.
 """
 
 import hashlib
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 if TYPE_CHECKING:
-    from openscvx.symbolic.expr.control import Control
-    from openscvx.symbolic.expr.state import State
     from openscvx.symbolic.problem import SymbolicProblem
-
-
-class HashContext:
-    """Context for name-invariant structural hashing of expressions.
-
-    This class provides context for hashing leaf nodes in a name-invariant way.
-    Instead of maintaining a mapping, we use the `_slice` attribute that is set
-    on Variable subclasses (State, Control) during preprocessing. This slice
-    represents their canonical position in the unified state/control vector.
-
-    Example:
-        Two equivalent problems with different names::
-
-            # Problem A
-            x = State("x", (3,))  # x._slice = slice(0, 3) after preprocessing
-            dynamics_a = {x: x * 2}
-
-            # Problem B (same structure, different name)
-            position = State("position", (3,))  # position._slice = slice(0, 3)
-            dynamics_b = {position: position * 2}
-
-            # Both hash identically because _slice values are the same
-    """
-
-    def __init__(
-        self,
-        states: List["State"],
-        controls: List["Control"],
-        parameters: Dict[str, any],
-    ):
-        """Initialize HashContext.
-
-        Args:
-            states: Ordered list of State objects (for reference)
-            controls: Ordered list of Control objects (for reference)
-            parameters: Dictionary of parameters (name -> value)
-        """
-        self._parameters = parameters
 
 
 def hash_symbolic_problem(problem: "SymbolicProblem") -> str:
@@ -82,23 +42,16 @@ def hash_symbolic_problem(problem: "SymbolicProblem") -> str:
     Returns:
         A hex string representing the SHA-256 hash of the problem structure
     """
-    # Create the hash context (lightweight, just stores parameters reference)
-    ctx = HashContext(
-        states=problem.states,
-        controls=problem.controls,
-        parameters=problem.parameters,
-    )
-
     hasher = hashlib.sha256()
 
     # Hash the dynamics
     hasher.update(b"dynamics:")
-    problem.dynamics._hash_into(hasher, ctx)
+    problem.dynamics._hash_into(hasher)
 
     # Hash propagation dynamics if present
     if problem.dynamics_prop is not None:
         hasher.update(b"dynamics_prop:")
-        problem.dynamics_prop._hash_into(hasher, ctx)
+        problem.dynamics_prop._hash_into(hasher)
 
     # Hash all constraints
     hasher.update(b"constraints:")
@@ -110,7 +63,7 @@ def hash_symbolic_problem(problem: "SymbolicProblem") -> str:
         problem.constraints.cross_node_convex,
     ]:
         for constraint in constraint_list:
-            constraint._hash_into(hasher, ctx)
+            constraint._hash_into(hasher)
 
     # Hash all states and controls explicitly to capture metadata (boundary
     # condition types) that may not appear in expressions. For example, a state
@@ -118,11 +71,11 @@ def hash_symbolic_problem(problem: "SymbolicProblem") -> str:
     # boundary condition types still affect the compiled problem structure.
     hasher.update(b"states:")
     for state in problem.states:
-        state._hash_into(hasher, ctx)
+        state._hash_into(hasher)
 
     hasher.update(b"controls:")
     for control in problem.controls:
-        control._hash_into(hasher, ctx)
+        control._hash_into(hasher)
 
     # Hash parameter shapes (not values) from the problem's parameter dict.
     # This allows the same compiled solver to be reused across parameter sweeps -
