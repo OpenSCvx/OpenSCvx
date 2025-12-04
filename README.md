@@ -16,6 +16,8 @@
 <!-- PROJECT LOGO -->
 <br />
 
+<img src="figures/oscvx_structure_full_dark.svg" width="1200"/>
+
 <!-- GETTING STARTED -->
 ## Getting Started
 
