@@ -109,7 +109,7 @@ class Problem:
                in dynamics dict, don't provide Time object
         """
 
-        # Step 1: Symbolic Preprocessing & Augmentation
+        # Symbolic Preprocessing & Augmentation
         self.symbolic: SymbolicProblem = preprocess_symbolic_problem(
             dynamics=dynamics,
             constraints=ConstraintSet(unsorted=list(constraints)),
@@ -125,7 +125,7 @@ class Problem:
             states_prop_extra=states_prop,
         )
 
-        # Step 2: Lower to JAX and CVXPy
+        # Lower to JAX and CVXPy
         self._lowered: LoweredProblem = lower_symbolic_problem(self.symbolic)
 
         # Store parameters in two forms:
@@ -133,10 +133,7 @@ class Problem:
         # Wrapper dict for user access that auto-syncs
         self._parameter_wrapper = ParameterDict(self, self._parameters, self.symbolic.parameters)
 
-        # ==================== STEP 3: Setup SCP Configuration ====================
-
-        # All indices are now stored in the unified objects themselves!
-        # SimConfig will access them via properties
+        # Setup SCP Configuration
         if dis is None:
             dis = DiscretizationConfig()
 
@@ -181,7 +178,7 @@ class Problem:
         self.discretization_solver: callable = None
         self.cpg_solve = None
 
-        # set up emitter & thread only if printing is enabled
+        # Set up emitter & thread only if printing is enabled
         if self.settings.dev.printing:
             self.print_queue = queue.Queue()
             self.emitter_function = lambda data: self.print_queue.put(data)
