@@ -75,8 +75,11 @@ class Variable(Leaf):
         if self._slice is not None:
             hasher.update(f"slice:{self._slice.start}:{self._slice.stop}".encode())
         else:
-            # Fallback for variables without slice (shouldn't happen after preprocessing)
-            hasher.update(b"no_slice")
+            raise RuntimeError(
+                f"Cannot hash Variable '{self.name}' without _slice attribute. "
+                "Hashing should only be called on preprocessed problems where "
+                "all Variables have been assigned canonical slice positions."
+            )
 
     @property
     def min(self):
