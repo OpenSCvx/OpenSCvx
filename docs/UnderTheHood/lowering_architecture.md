@@ -132,45 +132,6 @@ class LoweredCvxpyConstraints:
     constraints: List[cp.Constraint]  # Added directly to OCP
 ```
 
-## The Three Lowering Steps
-
-Internally, `lower_symbolic_problem()` coordinates three sub-functions:
-
-### 1. `_lower_dynamics()`
-
-Converts symbolic dynamics to JAX:
-
-```python
-# Symbolic: dynamics = {"pos": vel, "vel": thrust/m - g}
-# Becomes:
-dynamics.f(x, u, node, params)  # → dx/dt vector
-dynamics.A(x, u, node, params)  # → df/dx Jacobian (via jax.jacfwd)
-dynamics.B(x, u, node, params)  # → df/du Jacobian (via jax.jacfwd)
-```
-
-### 2. `_lower_jax_constraints()`
-
-Converts non-convex constraints to JAX with automatic gradients:
-
-```python
-# Symbolic: Norm(position - obstacle) >= safe_distance
-# Becomes:
-constraint.func(x, u, node, params)      # → residual (should be ≤ 0)
-constraint.grad_g_x(x, u, node, params)  # → dg/dx
-constraint.grad_g_u(x, u, node, params)  # → dg/du
-```
-
-Functions are `vmap`-ed over nodes for efficient batch evaluation.
-
-### 3. `_lower_cvxpy()`
-
-Creates CVXPy variables and lowers convex constraints:
-
-- Computes affine scaling matrices from state/control bounds
-- Creates trajectory variables: `x[N, n_states]`, `u[N, n_controls]`
-- Lowers symbolic convex constraints to `cp.Constraint` objects
-- Creates linearization parameters for non-convex constraint handling
-
 ## Design Principles
 
 ### Immutability
