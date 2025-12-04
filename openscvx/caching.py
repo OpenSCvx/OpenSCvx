@@ -1,10 +1,12 @@
 import hashlib
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 import jax
 import numpy as np
 from jax import export
+
+from openscvx.cache import get_cache_dir
 
 if TYPE_CHECKING:
     from openscvx.symbolic.problem import SymbolicProblem
@@ -14,7 +16,7 @@ def get_solver_cache_paths(
     symbolic_problem: "SymbolicProblem",
     dt: float,
     total_time: float,
-    cache_dir: str = ".tmp",
+    cache_dir: Optional[Path] = None,
 ) -> Tuple[Path, Path]:
     """Generate cache file paths using symbolic AST hashing.
 
@@ -26,7 +28,8 @@ def get_solver_cache_paths(
         symbolic_problem: The preprocessed SymbolicProblem
         dt: Time step for propagation
         total_time: Total simulation time
-        cache_dir: Directory to store cached solvers
+        cache_dir: Directory to store cached solvers. If None, uses the default
+            cache directory (see :func:`openscvx.get_cache_dir`).
 
     Returns:
         Tuple of (discretization_solver_path, propagation_solver_path)
@@ -43,7 +46,7 @@ def get_solver_cache_paths(
     final_hasher.update(f"total_time:{total_time}".encode())
     final_hash = final_hasher.hexdigest()[:16]  # Truncate for shorter filenames
 
-    solver_dir = Path(cache_dir)
+    solver_dir = cache_dir if cache_dir is not None else get_cache_dir()
     solver_dir.mkdir(parents=True, exist_ok=True)
 
     dis_solver_file = solver_dir / f"compiled_discretization_solver_{final_hash}.jax"
