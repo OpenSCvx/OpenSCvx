@@ -1,0 +1,14 @@
+name: 📖 Docs Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  docs:
+    name: 📖 Build Documentation
+    uses: ./.github/workflows/_docs.yml
