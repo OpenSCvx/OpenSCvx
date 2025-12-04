@@ -207,27 +207,10 @@ def calculate_discretization(
 
     x_prop = Vend[:, i0:i1]
 
-    A_bar = (
-        Vend[:, i1:i2]
-        .reshape(N - 1, n_x, n_x)
-        .transpose(1, 2, 0)
-        .reshape(n_x * n_x, -1, order="F")
-        .T
-    )
-    B_bar = (
-        Vend[:, i2:i3]
-        .reshape(N - 1, n_x, n_u)
-        .transpose(1, 2, 0)
-        .reshape(n_x * n_u, -1, order="F")
-        .T
-    )
-    C_bar = (
-        Vend[:, i3:i4]
-        .reshape(N - 1, n_x, n_u)
-        .transpose(1, 2, 0)
-        .reshape(n_x * n_u, -1, order="F")
-        .T
-    )
+    # Return as 3D arrays: (N-1, n_x, n_x) for A_bar, (N-1, n_x, n_u) for B_bar/C_bar
+    A_bar = Vend[:, i1:i2].reshape(N - 1, n_x, n_x)
+    B_bar = Vend[:, i2:i3].reshape(N - 1, n_x, n_u)
+    C_bar = Vend[:, i3:i4].reshape(N - 1, n_x, n_u)
 
     return A_bar, B_bar, C_bar, x_prop, Vmulti
 
