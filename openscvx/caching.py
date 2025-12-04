@@ -44,7 +44,7 @@ def get_solver_cache_paths(
     final_hasher.update(problem_hash.encode())
     final_hasher.update(f"dt:{dt}".encode())
     final_hasher.update(f"total_time:{total_time}".encode())
-    final_hash = final_hasher.hexdigest()[:16]  # Truncate for shorter filenames
+    final_hash = final_hasher.hexdigest()[:32]
 
     solver_dir = cache_dir if cache_dir is not None else get_cache_dir()
     solver_dir.mkdir(parents=True, exist_ok=True)
