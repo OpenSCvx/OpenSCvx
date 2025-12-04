@@ -124,27 +124,8 @@ problem = Problem(
     N=n,
 )
 
-# Apply custom scaling overrides (if needed)
-# Note: In the new API, state indices refer to components within each state in the states list
-# states = [position (3D), velocity (3D), mass (1D)] -> indices 0-2, 3-5, 6
-problem.settings.sim.scaling_x_overrides = [
-    # Example: (upper_bound, lower_bound, idx)
-    # (1800, 1505, 6),  # Custom scaling for mass (index 6 in flattened state)
-]
-
-# problem.settings.sim.scaling_u_overrides = [
-#     # Example: (upper_bound, lower_bound, idx)
-#     (n_eng * T_bar, -n_eng * T_bar, 0),  # Custom scaling for thrust[0]
-#     (n_eng * T_bar, -n_eng * T_bar, 1),  # Custom scaling for thrust[1]
-#     (n_eng * T_bar, -n_eng * T_bar, 2),  # Custom scaling for thrust[2]
-# ]
-
-
 # Set solver parameters
-problem.settings.prp.dt = 0.01
-
-problem.settings.sim.save_compiled = False
-
+problem.settings.scp.k_max = 500
 problem.settings.scp.w_tr_adapt = 1.04
 problem.settings.scp.w_tr = 2e0
 problem.settings.scp.lam_cost = 4e-1
