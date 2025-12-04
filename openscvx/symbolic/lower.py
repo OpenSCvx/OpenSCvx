@@ -59,10 +59,10 @@ import jax
 import numpy as np
 from jax import jacfwd
 
-from openscvx.dynamics import Dynamics
 from openscvx.lowered import (
     CrossNodeConstraintLowered,
     CVXPyVariables,
+    Dynamics,
     LoweredCvxpyConstraints,
     LoweredJaxConstraints,
     LoweredNodalConstraint,

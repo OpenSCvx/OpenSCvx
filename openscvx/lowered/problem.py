@@ -3,9 +3,9 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict
 
-from openscvx.dynamics import Dynamics
 from openscvx.lowered.cvxpy_constraints import LoweredCvxpyConstraints
 from openscvx.lowered.cvxpy_variables import CVXPyVariables
+from openscvx.lowered.dynamics import Dynamics
 from openscvx.lowered.jax_constraints import LoweredJaxConstraints
 from openscvx.symbolic.unified import UnifiedControl, UnifiedState
 

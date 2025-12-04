@@ -9,6 +9,7 @@ Classes:
     LoweredCvxpyConstraints: CVXPy-lowered convex constraints
     CVXPyVariables: CVXPy variables and parameters for the OCP
     ParameterDict: Dictionary that syncs parameters between JAX and CVXPy
+    Dynamics: JAX-lowered dynamics functions (f, A, B)
 """
 
 from openscvx.lowered.cvxpy_constraints import LoweredCvxpyConstraints
@@ -19,6 +20,7 @@ from openscvx.lowered.jax_constraints import (
     LoweredNodalConstraint,
 )
 from openscvx.lowered.parameters import ParameterDict
+from openscvx.lowered.dynamics import Dynamics
 from openscvx.lowered.problem import LoweredProblem
 
 __all__ = [
@@ -29,4 +31,5 @@ __all__ = [
     "CrossNodeConstraintLowered",
     "CVXPyVariables",
     "ParameterDict",
+    "Dynamics",
 ]
