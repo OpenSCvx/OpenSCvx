@@ -8,7 +8,7 @@ from openscvx.config import Config
 from openscvx.constraints import ConstraintSet
 
 if TYPE_CHECKING:
-    from openscvx.symbolic.lower import LoweredProblem
+    from openscvx.lowered import LoweredProblem
 
 # Optional cvxpygen import
 try:

@@ -52,118 +52,23 @@ Example:
         # Now have executable JAX functions with Jacobians
 """
 
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Sequence, Tuple, Union
+from typing import Any, List, Sequence, Tuple, Union
 
 import jax
 from jax import jacfwd
 
 from openscvx.constraints import ConstraintSet, CrossNodeConstraintLowered, LoweredNodalConstraint
 from openscvx.dynamics import Dynamics
+from openscvx.lowered import LoweredCvxpyConstraints, LoweredJaxConstraints, LoweredProblem
 from openscvx.symbolic.expr import Expr, NodeReference
+
+__all__ = [
+    "lower",
+    "lower_to_jax",
+    "lower_cvxpy_constraints",
+    "lower_symbolic_problem",
+]
 from openscvx.symbolic.unified import UnifiedControl, UnifiedState, unify_controls, unify_states
-
-if TYPE_CHECKING:
-    import cvxpy as cp
-
-    from openscvx.symbolic.expr import CTCS
-
-
-# ==================== LOWERED OUTPUT DATACLASSES ====================
-
-
-@dataclass
-class LoweredJaxConstraints:
-    """JAX-lowered non-convex constraints with gradient functions.
-
-    Contains constraints that have been lowered to JAX callable functions
-    with automatically computed gradients. These are used for linearization
-    in the SCP (Sequential Convex Programming) loop.
-
-    Attributes:
-        nodal: List of LoweredNodalConstraint objects. Each has `func`,
-            `grad_g_x`, `grad_g_u` callables and `nodes` list.
-        cross_node: List of CrossNodeConstraintLowered objects. Each has
-            `func`, `grad_g_X`, `grad_g_U` for trajectory-level constraints.
-        ctcs: CTCS constraints (unchanged from input, not lowered here).
-    """
-
-    nodal: List[LoweredNodalConstraint] = field(default_factory=list)
-    cross_node: List[CrossNodeConstraintLowered] = field(default_factory=list)
-    ctcs: List["CTCS"] = field(default_factory=list)
-
-
-@dataclass
-class LoweredCvxpyConstraints:
-    """CVXPy-lowered convex constraints.
-
-    Contains constraints that have been lowered to CVXPy constraint objects.
-    These are added directly to the optimal control problem without
-    linearization.
-
-    Attributes:
-        constraints: List of CVXPy constraint objects (cp.Constraint).
-            Includes both nodal and cross-node convex constraints.
-    """
-
-    constraints: List["cp.Constraint"] = field(default_factory=list)
-
-
-@dataclass
-class LoweredProblem:
-    """Container for all outputs from symbolic problem lowering.
-
-    This dataclass holds all the results of lowering symbolic expressions
-    to executable JAX and CVXPy code. It provides a clean, typed interface
-    for accessing the various components needed for optimization.
-
-    Attributes:
-        dynamics: Optimization dynamics with fields f, A, B (JAX functions)
-        dynamics_prop: Propagation dynamics with fields f, A, B
-        jax_constraints: Non-convex constraints lowered to JAX with gradients
-        cvxpy_constraints: Convex constraints lowered to CVXPy
-        x_unified: Aggregated optimization state interface
-        u_unified: Aggregated optimization control interface
-        x_prop_unified: Aggregated propagation state interface
-        ocp_vars: Dict of CVXPy variables and parameters for OCP construction
-        cvxpy_params: Dict mapping user parameter names to CVXPy Parameter objects
-
-    Example:
-        After lowering a symbolic problem::
-
-            lowered = lower_symbolic_problem(
-                dynamics_aug=dynamics,
-                states_aug=states,
-                controls_aug=controls,
-                constraints=constraint_set,
-                parameters=params,
-                N=50,
-            )
-
-            # Access components
-            dx_dt = lowered.dynamics.f(x, u, node, params)
-            jacobian_A = lowered.dynamics.A(x, u, node, params)
-
-            # Use CVXPy objects
-            ocp = OptimalControlProblem(settings, lowered.ocp_vars)
-    """
-
-    # JAX dynamics
-    dynamics: Dynamics
-    dynamics_prop: Dynamics
-
-    # Lowered constraints (separate types for JAX vs CVXPy)
-    jax_constraints: LoweredJaxConstraints
-    cvxpy_constraints: LoweredCvxpyConstraints
-
-    # Unified interfaces
-    x_unified: UnifiedState
-    u_unified: UnifiedControl
-    x_prop_unified: UnifiedState
-
-    # CVXPy objects
-    ocp_vars: Dict[str, Any]
-    cvxpy_params: Dict[str, "cp.Parameter"]
 
 
 def lower(expr: Expr, lowerer: Any):

@@ -26,6 +26,7 @@ from openscvx.config import (
     SimConfig,
 )
 from openscvx.discretization import get_discretization_solver
+from openscvx.lowered import LoweredProblem
 from openscvx.ocp import OptimalControlProblem
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
@@ -35,7 +36,7 @@ from openscvx.symbolic.builder import preprocess_symbolic_problem
 from openscvx.symbolic.expr import CTCS, Constraint
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
-from openscvx.symbolic.lower import LoweredProblem, lower_symbolic_problem
+from openscvx.symbolic.lower import lower_symbolic_problem
 from openscvx.time import Time
 
 if TYPE_CHECKING:

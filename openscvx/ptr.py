@@ -12,7 +12,7 @@ from openscvx.config import Config
 from openscvx.results import OptimizationResults
 
 if TYPE_CHECKING:
-    from openscvx.symbolic.lower import LoweredJaxConstraints
+    from openscvx.lowered import LoweredJaxConstraints
 
 warnings.filterwarnings("ignore")
 
