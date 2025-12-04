@@ -1,11 +1,14 @@
 import os
-from typing import Dict
+from typing import TYPE_CHECKING, Dict
 
 import cvxpy as cp
 import numpy as np
 
 from openscvx.config import Config
 from openscvx.constraints import ConstraintSet
+
+if TYPE_CHECKING:
+    from openscvx.symbolic.lower import LoweredProblem
 
 # Optional cvxpygen import
 try:
@@ -155,8 +158,16 @@ def create_cvxpy_variables(
     }
 
 
-def OptimalControlProblem(settings: Config, ocp_vars: Dict):
-    """Phase 3: Build the complete optimal control problem with all constraints."""
+def OptimalControlProblem(settings: Config, lowered: "LoweredProblem"):
+    """Build the complete optimal control problem with all constraints.
+
+    Args:
+        settings: Configuration settings for the optimization problem
+        lowered: LoweredProblem containing ocp_vars and lowered constraints
+    """
+    # Extract ocp_vars from LoweredProblem
+    ocp_vars = lowered.ocp_vars
+
     # Extract variables from the dict for easier access
     w_tr = ocp_vars["w_tr"]
     lam_cost = ocp_vars["lam_cost"]
@@ -192,6 +203,10 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     dx_nonscaled = ocp_vars["dx_nonscaled"]
     du_nonscaled = ocp_vars["du_nonscaled"]
 
+    # Extract lowered constraints
+    jax_constraints = lowered.jax_constraints
+    cvxpy_constraints = lowered.cvxpy_constraints
+
     constr = []
     cost = lam_cost * 0
     cost += lam_vb * 0
@@ -200,10 +215,10 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     # CONSTRAINTS
     #############
 
-    # Linearized nodal constraints
+    # Linearized nodal constraints (from JAX-lowered non-convex)
     idx_ncvx = 0
-    if settings.sim.constraints.nodal:
-        for constraint in settings.sim.constraints.nodal:
+    if jax_constraints.nodal:
+        for constraint in jax_constraints.nodal:
             # nodes should already be validated and normalized in preprocessing
             nodes = constraint.nodes
             constr += [
@@ -217,10 +232,10 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
             ]
             idx_ncvx += 1
 
-    # Linearized cross-node constraints
+    # Linearized cross-node constraints (from JAX-lowered non-convex)
     idx_cross = 0
-    if settings.sim.constraints.cross_node:
-        for constraint in settings.sim.constraints.cross_node:
+    if jax_constraints.cross_node:
+        for constraint in jax_constraints.cross_node:
             # Linearization: g(X_bar, U_bar) + ∇g_X @ dX + ∇g_U @ dU == nu_vb
             # Sum over all trajectory nodes to couple multiple nodes
             residual = g_cross[idx_cross]
@@ -233,9 +248,9 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
             constr += [residual == nu_vb_cross[idx_cross]]
             idx_cross += 1
 
-    # Convex nodal constraints (already lowered to CVXPy in problem)
-    if settings.sim.constraints.nodal_convex:
-        constr += settings.sim.constraints.nodal_convex
+    # Convex constraints (already lowered to CVXPy)
+    if cvxpy_constraints.constraints:
+        constr += cvxpy_constraints.constraints
 
     for i in range(settings.sim.true_state_slice.start, settings.sim.true_state_slice.stop):
         if settings.sim.x.initial_type[i] == "Fix":
@@ -300,16 +315,15 @@ def OptimalControlProblem(settings: Config, ocp_vars: Dict):
     )  # Virtual Control Slack
 
     idx_ncvx = 0
-    if settings.sim.constraints.nodal:
-        for constraint in settings.sim.constraints.nodal:
-            # if not constraint.convex:
+    if jax_constraints.nodal:
+        for constraint in jax_constraints.nodal:
             cost += lam_vb * cp.sum(cp.pos(nu_vb[idx_ncvx]))
             idx_ncvx += 1
 
     # Virtual slack penalty for cross-node constraints
     idx_cross = 0
-    if settings.sim.constraints.cross_node:
-        for constraint in settings.sim.constraints.cross_node:
+    if jax_constraints.cross_node:
+        for constraint in jax_constraints.cross_node:
             cost += lam_vb * cp.pos(nu_vb_cross[idx_cross])
             idx_cross += 1
 

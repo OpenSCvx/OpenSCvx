@@ -25,7 +25,6 @@ from openscvx.config import (
     ScpConfig,
     SimConfig,
 )
-from openscvx.constraints import ConstraintSet
 from openscvx.discretization import get_discretization_solver
 from openscvx.ocp import OptimalControlProblem
 from openscvx.post_processing import propagate_trajectory_results
@@ -257,17 +256,6 @@ class Problem:
         if prp is None:
             prp = PropagationConfig()
 
-        # Construct ConstraintSet for sim.constraints from LoweredProblem
-        # This maintains backwards compatibility with OCP, PTR, etc.
-        lowered_constraint_set = ConstraintSet(
-            ctcs=lowered.jax_constraints.ctcs,
-            nodal=lowered.jax_constraints.nodal,
-            nodal_convex=lowered.cvxpy_constraints.constraints,
-            cross_node=lowered.jax_constraints.cross_node,
-            cross_node_convex=[],  # Already included in cvxpy_constraints.constraints
-        )
-        sim.constraints = lowered_constraint_set
-
         self.settings = Config(
             sim=sim,
             scp=scp,
@@ -351,7 +339,7 @@ class Problem:
         io.intro()
 
         # Print problem summary
-        io.print_problem_summary(self.settings, self._ocp_vars)
+        io.print_problem_summary(self.settings, self._lowered)
 
         # Enable the profiler
         if self.settings.dev.profiling:
@@ -374,14 +362,14 @@ class Problem:
             self.dynamics_augmented_prop.f, in_axes=(0, 0, 0, None)
         )
 
-        for constraint in self.settings.sim.constraints.nodal:
+        for constraint in self._lowered.jax_constraints.nodal:
             # TODO: (haynec) switch to AOT instead of JIT
             constraint.func = jax.jit(constraint.func)
             constraint.grad_g_x = jax.jit(constraint.grad_g_x)
             constraint.grad_g_u = jax.jit(constraint.grad_g_u)
 
         # JIT compile cross-node constraints
-        for constraint in self.settings.sim.constraints.cross_node:
+        for constraint in self._lowered.jax_constraints.cross_node:
             constraint.func = jax.jit(constraint.func)
             constraint.grad_g_X = jax.jit(constraint.grad_g_X)
             constraint.grad_g_U = jax.jit(constraint.grad_g_U)
@@ -394,15 +382,14 @@ class Problem:
             self.dynamics_augmented_prop.f, self.settings, self.parameters
         )
 
-        # Build optimal control problem using pre-lowered CVXPy constraints
-        # (CVXPy variables and constraint lowering happened in __init__)
-        self.optimal_control_problem = OptimalControlProblem(self.settings, self._ocp_vars)
+        # Build optimal control problem using LoweredProblem
+        self.optimal_control_problem = OptimalControlProblem(self.settings, self._lowered)
 
         # Collect all relevant functions
         functions_to_hash = [self.dynamics_augmented.f, self.dynamics_augmented_prop.f]
-        for constraint in self.settings.sim.constraints.nodal:
+        for constraint in self._lowered.jax_constraints.nodal:
             functions_to_hash.append(constraint.func)
-        for constraint in self.settings.sim.constraints.cross_node:
+        for constraint in self._lowered.jax_constraints.cross_node:
             functions_to_hash.append(constraint.func)
         # Note: CTCS constraints are already included in dynamics_augmented.f,
         # so we don't need to add them separately
@@ -454,6 +441,7 @@ class Problem:
             self.optimal_control_problem,
             self.discretization_solver,
             self.settings,
+            self._lowered.jax_constraints,
         )
         print("✓ SCvx Subproblem Solver initialized")
 
@@ -502,6 +490,7 @@ class Problem:
             self.scp_trajs,
             self.scp_controls,
             self.scp_V_multi_shoot_traj,
+            self._lowered.jax_constraints,
         )
 
         # Update instance state from result

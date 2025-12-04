@@ -59,26 +59,25 @@ def print_summary_box(lines, title="Summary"):
     print(f"{' ' * indent}╰{'─' * box_width}╯\n")
 
 
-def print_problem_summary(settings, ocp_vars):
+def print_problem_summary(settings, lowered):
     """
     Print the problem summary box.
 
     Args:
         settings: Configuration settings containing problem information
-        ocp_vars: CVXPy variables dictionary from lower_symbolic_problem()
+        lowered: LoweredProblem from lower_symbolic_problem()
     """
-    n_nodal_convex = len(settings.sim.constraints.nodal_convex)
-    n_nodal_nonconvex = len(settings.sim.constraints.nodal)
-    n_ctcs = len(settings.sim.constraints.ctcs)
+    n_nodal_convex = len(lowered.cvxpy_constraints.constraints)
+    n_nodal_nonconvex = len(lowered.jax_constraints.nodal)
+    n_ctcs = len(lowered.jax_constraints.ctcs)
     n_augmented = settings.sim.n_states - settings.sim.true_state_slice.stop
 
     # Count CVXPy variables, parameters, and constraints
     from openscvx.ocp import OptimalControlProblem
 
     try:
-        # Build OCP using already-lowered constraints from settings.sim.constraints
-        # (nodal_convex already contains CVXPy constraints from lower_symbolic_problem)
-        prob = OptimalControlProblem(settings, ocp_vars)
+        # Build OCP using LoweredProblem
+        prob = OptimalControlProblem(settings, lowered)
 
         # Get the actual problem size information like CVXPy verbose output
         n_cvx_variables = sum(var.size for var in prob.variables())

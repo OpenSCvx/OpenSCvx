@@ -1,6 +1,7 @@
 import pickle
 import time
 import warnings
+from typing import TYPE_CHECKING
 
 import cvxpy as cp
 import numpy as np
@@ -10,10 +11,19 @@ from openscvx.autotuning import update_scp_weights
 from openscvx.config import Config
 from openscvx.results import OptimizationResults
 
+if TYPE_CHECKING:
+    from openscvx.symbolic.lower import LoweredJaxConstraints
+
 warnings.filterwarnings("ignore")
 
 
-def PTR_init(params, ocp: cp.Problem, discretization_solver: callable, settings: Config):
+def PTR_init(
+    params,
+    ocp: cp.Problem,
+    discretization_solver: callable,
+    settings: Config,
+    jax_constraints: "LoweredJaxConstraints",
+):
     if settings.cvx.cvxpygen:
         try:
             from solver.cpg_solver import cpg_solve
@@ -43,6 +53,7 @@ def PTR_init(params, ocp: cp.Problem, discretization_solver: callable, settings:
         discretization_solver,
         ocp,
         settings,
+        jax_constraints,
     )
 
     return cpg_solve
@@ -93,6 +104,7 @@ def PTR_step(
     scp_trajs: list,
     scp_controls: list,
     scp_V_multi_shoot_traj: list,
+    jax_constraints: "LoweredJaxConstraints",
 ) -> dict:
     """Performs a single SCP iteration.
 
@@ -110,6 +122,7 @@ def PTR_step(
         scp_trajs: List of trajectory history
         scp_controls: List of control history
         scp_V_multi_shoot_traj: List of discretization history
+        jax_constraints: JAX-lowered non-convex constraints
 
     Returns:
         dict: Updated SCP state and convergence information
@@ -138,6 +151,7 @@ def PTR_step(
         discretization_solver,
         prob,
         settings,
+        jax_constraints,
     )
 
     # Update state
@@ -255,7 +269,16 @@ def PTR_main(
     return result
 
 
-def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
+def PTR_subproblem(
+    params,
+    cpg_solve,
+    x,
+    u,
+    aug_dy,
+    prob,
+    settings: Config,
+    jax_constraints: "LoweredJaxConstraints",
+):
     prob.param_dict["x_bar"].value = x.guess
     prob.param_dict["u_bar"].value = u.guess
 
@@ -273,9 +296,10 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
     prob.param_dict["x_prop"].value = x_prop.__array__()
     dis_time = time.time() - t0
 
+    # Update nodal constraint linearization parameters
     # TODO: (norrisg) investigate why we are passing `0` for the node here
-    if settings.sim.constraints.nodal:
-        for g_id, constraint in enumerate(settings.sim.constraints.nodal):
+    if jax_constraints.nodal:
+        for g_id, constraint in enumerate(jax_constraints.nodal):
             prob.param_dict["g_" + str(g_id)].value = np.asarray(
                 constraint.func(x.guess, u.guess, 0, param_dict)
             )
@@ -286,9 +310,9 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
                 constraint.grad_g_u(x.guess, u.guess, 0, param_dict)
             )
 
-    # Update cross-node constraint parameters
-    if settings.sim.constraints.cross_node:
-        for g_id, constraint in enumerate(settings.sim.constraints.cross_node):
+    # Update cross-node constraint linearization parameters
+    if jax_constraints.cross_node:
+        for g_id, constraint in enumerate(jax_constraints.cross_node):
             # Cross-node constraints take (X, U, params) not (x, u, node, params)
             prob.param_dict["g_cross_" + str(g_id)].value = np.asarray(
                 constraint.func(x.guess, u.guess, param_dict)
@@ -365,15 +389,15 @@ def PTR_subproblem(params, cpg_solve, x, u, aug_dy, prob, settings: Config):
 
     id_ncvx = 0
     J_vb_vec = 0
-    if settings.sim.constraints.nodal:
-        for constraint in settings.sim.constraints.nodal:
+    if jax_constraints.nodal:
+        for constraint in jax_constraints.nodal:
             J_vb_vec += np.maximum(0, prob.var_dict["nu_vb_" + str(id_ncvx)].value)
             id_ncvx += 1
 
     # Add cross-node constraint violations
     id_cross = 0
-    if settings.sim.constraints.cross_node:
-        for constraint in settings.sim.constraints.cross_node:
+    if jax_constraints.cross_node:
+        for constraint in jax_constraints.cross_node:
             J_vb_vec += np.maximum(0, prob.var_dict["nu_vb_cross_" + str(id_cross)].value)
             id_cross += 1
 
