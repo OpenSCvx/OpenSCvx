@@ -166,7 +166,8 @@ def create_cvxpy_variables(
     c_x: np.ndarray,
     S_u: np.ndarray,
     c_u: np.ndarray,
-    constraints: ConstraintSet,
+    n_nodal_constraints: int,
+    n_cross_node_constraints: int,
 ) -> CVXPyVariables:
     """Create CVXPy variables and parameters for the optimal control problem.
 
@@ -178,10 +179,11 @@ def create_cvxpy_variables(
         c_x: State offset vector
         S_u: Control scaling matrix
         c_u: Control offset vector
-        constraints: ConstraintSet containing nodal and cross_node constraints
+        n_nodal_constraints: Number of non-convex nodal constraints (for linearization params)
+        n_cross_node_constraints: Number of non-convex cross-node constraints
 
     Returns:
-        Dictionary containing all CVXPy variables and parameters for the OCP
+        CVXPyVariables dataclass containing all CVXPy variables and parameters for the OCP
     """
     ########################
     # VARIABLES & PARAMETERS
@@ -220,31 +222,27 @@ def create_cvxpy_variables(
     grad_g_x = []
     grad_g_u = []
     nu_vb = []
-    if constraints.nodal:
-        for idx_ncvx, constraint in enumerate(constraints.nodal):
-            g.append(cp.Parameter(N, name="g_" + str(idx_ncvx)))
-            grad_g_x.append(cp.Parameter((N, n_states), name="grad_g_x_" + str(idx_ncvx)))
-            grad_g_u.append(cp.Parameter((N, n_controls), name="grad_g_u_" + str(idx_ncvx)))
-            nu_vb.append(cp.Variable(N, name="nu_vb_" + str(idx_ncvx)))  # Virtual Control for VB
+    for idx_ncvx in range(n_nodal_constraints):
+        g.append(cp.Parameter(N, name="g_" + str(idx_ncvx)))
+        grad_g_x.append(cp.Parameter((N, n_states), name="grad_g_x_" + str(idx_ncvx)))
+        grad_g_u.append(cp.Parameter((N, n_controls), name="grad_g_u_" + str(idx_ncvx)))
+        nu_vb.append(cp.Variable(N, name="nu_vb_" + str(idx_ncvx)))  # Virtual Control for VB
 
     # Linearized Cross-Node Constraints
     g_cross = []
     grad_g_X_cross = []
     grad_g_U_cross = []
     nu_vb_cross = []
-    if constraints.cross_node:
-        for idx_cross, constraint in enumerate(constraints.cross_node):
-            # Cross-node constraints are single constraints with fixed node references
-            g_cross.append(cp.Parameter(name="g_cross_" + str(idx_cross)))
-            grad_g_X_cross.append(
-                cp.Parameter((N, n_states), name="grad_g_X_cross_" + str(idx_cross))
-            )
-            grad_g_U_cross.append(
-                cp.Parameter((N, n_controls), name="grad_g_U_cross_" + str(idx_cross))
-            )
-            nu_vb_cross.append(
-                cp.Variable(name="nu_vb_cross_" + str(idx_cross))
-            )  # Virtual Control for VB
+    for idx_cross in range(n_cross_node_constraints):
+        # Cross-node constraints are single constraints with fixed node references
+        g_cross.append(cp.Parameter(name="g_cross_" + str(idx_cross)))
+        grad_g_X_cross.append(cp.Parameter((N, n_states), name="grad_g_X_cross_" + str(idx_cross)))
+        grad_g_U_cross.append(
+            cp.Parameter((N, n_controls), name="grad_g_U_cross_" + str(idx_cross))
+        )
+        nu_vb_cross.append(
+            cp.Variable(name="nu_vb_cross_" + str(idx_cross))
+        )  # Virtual Control for VB
 
     # Applying the affine scaling to state and control
     x_nonscaled = []
@@ -746,7 +744,6 @@ def lower_symbolic_problem(
     S_u, c_u = get_affine_scaling_matrices(n_controls, lower_u, upper_u)
 
     # Create all CVXPy variables for the OCP
-    # Pass original constraints (for counting nodal/cross_node to create parameters)
     ocp_vars = create_cvxpy_variables(
         N=N,
         n_states=n_states,
@@ -755,7 +752,8 @@ def lower_symbolic_problem(
         c_x=c_x,
         S_u=S_u,
         c_u=c_u,
-        constraints=constraints,
+        n_nodal_constraints=len(constraints.nodal),
+        n_cross_node_constraints=len(constraints.cross_node),
     )
 
     # Lower convex constraints to CVXPy (from original symbolic constraints)
