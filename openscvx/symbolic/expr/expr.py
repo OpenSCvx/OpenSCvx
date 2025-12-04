@@ -489,11 +489,11 @@ class Parameter(Leaf):
         self.value = np.asarray(value, dtype=float)
 
     def _hash_into(self, hasher: "hashlib._Hash", ctx: "HashContext") -> None:
-        """Hash Parameter by its value (name-invariant).
+        """Hash Parameter by its shape only (value-invariant).
 
-        Parameters are hashed by their value since that's what affects the
-        compiled problem. Two parameters with the same shape and value will
-        produce the same hash regardless of their names.
+        Parameters are hashed by shape only, not by value. This allows the same
+        compiled solver to be reused across parameter sweeps - only the structure
+        matters for compilation, not the actual values.
 
         Args:
             hasher: A hashlib hash object to update
@@ -501,7 +501,6 @@ class Parameter(Leaf):
         """
         hasher.update(b"Parameter")
         hasher.update(str(self._shape).encode())
-        hasher.update(self.value.tobytes())
 
 
 def to_expr(x: Union[Expr, float, int, np.ndarray]) -> Expr:

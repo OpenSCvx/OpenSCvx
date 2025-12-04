@@ -133,16 +133,17 @@ def hash_symbolic_problem(problem: "SymbolicProblem") -> str:
         if control.max is not None:
             hasher.update(control.max.tobytes())
 
-    # Hash parameter values from the problem's parameter dict
-    # (these affect the compiled problem and may differ from Parameter node values)
+    # Hash parameter shapes (not values) from the problem's parameter dict.
+    # This allows the same compiled solver to be reused across parameter sweeps -
+    # only the structure matters for compilation, not the actual values.
     hasher.update(b"parameters:")
     for name in sorted(problem.parameters.keys()):
         value = problem.parameters[name]
         hasher.update(name.encode())
         if isinstance(value, np.ndarray):
-            hasher.update(value.tobytes())
+            hasher.update(str(value.shape).encode())
         else:
-            hasher.update(str(value).encode())
+            hasher.update(b"scalar")
 
     # Hash configuration
     hasher.update(f"N:{problem.N}".encode())
