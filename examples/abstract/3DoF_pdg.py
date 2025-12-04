@@ -8,7 +8,7 @@ grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 import openscvx as ox
-from examples.plotting import plot_control_norm, plot_xy_xz_yz, plot_animation_pyqtgraph
+from examples.plotting import plot_control_norm, plot_xy_xz_yz
 from openscvx import Problem
 
 n = 10
@@ -162,4 +162,4 @@ if __name__ == "__main__":
     plot_xy_xz_yz(results, problem.settings).show()
 
     # If installed with extras, you can use the following to plot with pyqtgraph
-    plot_animation_pyqtgraph(results, problem.settings)
+    # plot_animation_pyqtgraph(results, problem.settings)
