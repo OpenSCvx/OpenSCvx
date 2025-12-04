@@ -2,13 +2,6 @@
 !!! Warning
     This page is still under development :construction:.
 
-<!-- ## Dynamics -->
-
-::: openscvx.dynamics.Dynamics
-    options:
-      show_source: false
-      show_root_heading: true
-
 ## Constraints
 
 Constraints in openscvx are created using symbolic expressions with comparison operators (`==`, `<=`, `>=`). By default, constraints are enforced at discrete nodes along the trajectory (nodal constraints). The symbolic expression system provides two specialized constraint wrappers for precise control over when and how constraints are enforced.
