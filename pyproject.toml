@@ -17,7 +17,7 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
-    "cvxpy",
+    "cvxpy>=1.6",
     "qoco",
     "numpy",
     "jax",
