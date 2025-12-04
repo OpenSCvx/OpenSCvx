@@ -11,7 +11,7 @@ import openscvx as ox
 from examples.plotting import plot_control_norm, plot_xy_xz_yz
 from openscvx import Problem
 
-n = 30
+n = 10
 total_time = 95.0  # Total simulation time
 
 # Define state components
@@ -34,8 +34,10 @@ mass = ox.State("mass", shape=(1,))  # Vehicle mass
 mass.max = np.array([1905])
 mass.min = np.array([1505])
 mass.initial = np.array([1905])
-mass.final = [("maximize", 1590)]
-mass.guess = np.linspace(mass.initial, 1590, n).reshape(-1, 1)
+mass.final = [("maximize", 1690)]
+mass.scaling_min = np.array([1690])
+# mass.scaling_max = np.array([1700])
+mass.guess = np.linspace(mass.initial, 1690, n).reshape(-1, 1)
 
 # Define control
 thrust = ox.Control("thrust", shape=(3,))  # Thrust force vector [Tx, Ty, Tz]
@@ -127,10 +129,13 @@ problem = Problem(
 # Set solver parameters
 problem.settings.scp.k_max = 500
 problem.settings.scp.w_tr_adapt = 1.04
-problem.settings.scp.w_tr = 2e0
+problem.settings.scp.w_tr = 6e-1
 problem.settings.scp.lam_cost = 4e-1
-problem.settings.scp.lam_vc = 1.2e0
-problem.settings.scp.ep_tr = 6.9e-4
+problem.settings.scp.lam_vc = 1.5e0
+
+# problem.settings.scp.uniform_time_grid = True
+
+problem.settings.dis.dis_type = "ZOH"
 
 problem.settings.dis.solver = "Dopri8"
 
