@@ -13,7 +13,11 @@ Classes:
 
 from openscvx.lowered.cvxpy_constraints import LoweredCvxpyConstraints
 from openscvx.lowered.cvxpy_variables import CVXPyVariables
-from openscvx.lowered.jax_constraints import LoweredJaxConstraints
+from openscvx.lowered.jax_constraints import (
+    CrossNodeConstraintLowered,
+    LoweredJaxConstraints,
+    LoweredNodalConstraint,
+)
 from openscvx.lowered.parameters import ParameterDict
 from openscvx.lowered.problem import LoweredProblem
 
@@ -21,6 +25,8 @@ __all__ = [
     "LoweredProblem",
     "LoweredJaxConstraints",
     "LoweredCvxpyConstraints",
+    "LoweredNodalConstraint",
+    "CrossNodeConstraintLowered",
     "CVXPyVariables",
     "ParameterDict",
 ]

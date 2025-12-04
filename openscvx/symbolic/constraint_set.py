@@ -1,7 +1,7 @@
-"""Container for categorized constraints in trajectory optimization.
+"""Container for categorized symbolic constraints.
 
-This module provides a dataclass to hold all constraint types in a structured way,
-replacing the previous pattern of passing multiple lists or storing separate fields.
+This module provides a dataclass to hold all symbolic constraint types in a
+structured way before they are lowered to JAX/CVXPy.
 """
 
 from dataclasses import dataclass, field
@@ -10,18 +10,15 @@ from typing import TYPE_CHECKING, List, Union
 if TYPE_CHECKING:
     from openscvx.symbolic.expr import CTCS, Constraint, CrossNodeConstraint, NodalConstraint
 
-    from .cross_node import CrossNodeConstraintLowered
-    from .lowered import LoweredNodalConstraint
-
 
 @dataclass
 class ConstraintSet:
-    """Container for categorized constraints.
+    """Container for categorized symbolic constraints.
 
-    This dataclass holds all constraint types in a structured way, providing:
-    - Type safety through named fields instead of tuple unpacking
-    - Clear API for accessing constraint categories
-    - Easy extensibility when adding new constraint types
+    This dataclass holds all symbolic constraint types in a structured way,
+    providing type safety and a clear API for accessing constraint categories.
+    This is a pre-lowering container - after lowering, constraints live in
+    LoweredJaxConstraints and LoweredCvxpyConstraints.
 
     The constraint set supports two lifecycle stages:
 
@@ -32,11 +29,11 @@ class ConstraintSet:
 
     Attributes:
         unsorted: Raw constraints before categorization. Empty after preprocessing.
-        ctcs: CTCS (continuous-time) constraints
-        nodal: Non-convex nodal constraints (lowered to JAX for SCP linearization)
-        nodal_convex: Convex nodal constraints (lowered to CVXPy for direct solving)
-        cross_node: Non-convex cross-node constraints (lowered to JAX)
-        cross_node_convex: Convex cross-node constraints (lowered to CVXPy)
+        ctcs: CTCS (continuous-time) constraints.
+        nodal: Non-convex nodal constraints (will be lowered to JAX).
+        nodal_convex: Convex nodal constraints (will be lowered to CVXPy).
+        cross_node: Non-convex cross-node constraints (will be lowered to JAX).
+        cross_node_convex: Convex cross-node constraints (will be lowered to CVXPy).
 
     Example:
         Before preprocessing (raw constraints)::
@@ -56,13 +53,11 @@ class ConstraintSet:
     # Raw constraints before categorization (empty after preprocessing)
     unsorted: List[Union["Constraint", "CTCS"]] = field(default_factory=list)
 
-    # Categorized constraints (populated by preprocessing)
+    # Categorized symbolic constraints (populated by preprocessing)
     ctcs: List["CTCS"] = field(default_factory=list)
-    nodal: List["NodalConstraint | LoweredNodalConstraint"] = field(default_factory=list)
+    nodal: List["NodalConstraint"] = field(default_factory=list)
     nodal_convex: List["NodalConstraint"] = field(default_factory=list)
-    cross_node: List["CrossNodeConstraint | CrossNodeConstraintLowered"] = field(
-        default_factory=list
-    )
+    cross_node: List["CrossNodeConstraint"] = field(default_factory=list)
     cross_node_convex: List["CrossNodeConstraint"] = field(default_factory=list)
 
     @property

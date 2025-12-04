@@ -2,7 +2,6 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from openscvx.constraints import ConstraintSet
 from openscvx.symbolic.augmentation import (
     augment_dynamics_with_ctcs,
     augment_with_time_state,
@@ -10,6 +9,7 @@ from openscvx.symbolic.augmentation import (
     separate_constraints,
     sort_ctcs_constraints,
 )
+from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import (
     CTCS,
     Add,

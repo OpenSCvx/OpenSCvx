@@ -14,7 +14,7 @@ Use `is_preprocessed` to check which stage the problem is in.
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
-from openscvx.constraints import ConstraintSet
+from openscvx.symbolic.constraint_set import ConstraintSet
 
 if TYPE_CHECKING:
     from openscvx.symbolic.expr import Expr

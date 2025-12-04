@@ -31,7 +31,6 @@ See `preprocess_symbolic_problem()` for the main entry point.
 
 from typing import Dict, List, Tuple
 
-from openscvx.constraints import ConstraintSet
 from openscvx.symbolic.augmentation import (
     augment_dynamics_with_ctcs,
     augment_with_time_state,
@@ -39,6 +38,7 @@ from openscvx.symbolic.augmentation import (
     separate_constraints,
     sort_ctcs_constraints,
 )
+from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import Parameter, traverse
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
@@ -127,7 +127,7 @@ def preprocess_symbolic_problem(
         Basic usage with CTCS constraint::
 
             import openscvx as ox
-            from openscvx.constraints import ConstraintSet
+            from openscvx.symbolic.constraint_set import ConstraintSet
 
             x = ox.State("x", shape=(2,))
             v = ox.State("v", shape=(2,))

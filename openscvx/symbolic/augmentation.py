@@ -57,7 +57,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from openscvx.constraints import ConstraintSet
+from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import (
     CTCS,
     Add,

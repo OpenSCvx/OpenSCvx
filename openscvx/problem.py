@@ -24,7 +24,6 @@ from openscvx.config import (
     ScpConfig,
     SimConfig,
 )
-from openscvx.constraints import ConstraintSet
 from openscvx.discretization import get_discretization_solver
 from openscvx.lowered import LoweredProblem, ParameterDict
 from openscvx.ocp import OptimalControlProblem
@@ -33,6 +32,7 @@ from openscvx.propagation import get_propagation_solver
 from openscvx.ptr import PTR_init, PTR_step, format_result
 from openscvx.results import OptimizationResults
 from openscvx.symbolic.builder import preprocess_symbolic_problem
+from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import CTCS, Constraint
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State

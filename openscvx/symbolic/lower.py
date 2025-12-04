@@ -59,14 +59,16 @@ import jax
 import numpy as np
 from jax import jacfwd
 
-from openscvx.constraints import ConstraintSet, CrossNodeConstraintLowered, LoweredNodalConstraint
 from openscvx.dynamics import Dynamics
 from openscvx.lowered import (
+    CrossNodeConstraintLowered,
     CVXPyVariables,
     LoweredCvxpyConstraints,
     LoweredJaxConstraints,
+    LoweredNodalConstraint,
     LoweredProblem,
 )
+from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import Expr, NodeReference
 
 if TYPE_CHECKING:
