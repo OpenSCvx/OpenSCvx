@@ -4,12 +4,11 @@ import os
 os.environ["EQX_ON_ERROR"] = "nan"
 
 # Cache management
-from openscvx.cache import clear_cache, get_cache_dir, get_cache_size
-
 # Core symbolic expressions - flat namespace for most common functions
 import openscvx.symbolic.expr.linalg as linalg
 import openscvx.symbolic.expr.spatial as spatial
 import openscvx.symbolic.expr.stl as stl
+from openscvx.cache import clear_cache, get_cache_dir, get_cache_size
 from openscvx.problem import Problem
 from openscvx.symbolic.expr import (
     CTCS,
