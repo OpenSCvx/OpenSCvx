@@ -187,11 +187,7 @@ class Problem:
             self, self._parameters, self.symbolic.parameters
         )
 
-        # Store dynamics objects (from LoweredProblem)
-        self.dynamics_augmented = self._lowered.dynamics
-        self.dynamics_augmented_prop = self._lowered.dynamics_prop
-
-        # ==================== STEP 4: Setup SCP Configuration ====================
+        # ==================== STEP 3: Setup SCP Configuration ====================
 
         # All indices are now stored in the unified objects themselves!
         # SimConfig will access them via properties
@@ -233,7 +229,7 @@ class Problem:
             prp=prp,
         )
 
-        # ==================== STEP 5: Store CVXPy Variables ====================
+        # ==================== STEP 4: Store CVXPy Variables ====================
 
         # CVXPy variables and constraint lowering happened in Step 2
         self._ocp_vars = self._lowered.ocp_vars
@@ -341,12 +337,12 @@ class Problem:
         self.settings.sim.__post_init__()
 
         # Compile dynamics and jacobians
-        self.dynamics_augmented.f = jax.vmap(self.dynamics_augmented.f, in_axes=(0, 0, 0, None))
-        self.dynamics_augmented.A = jax.vmap(self.dynamics_augmented.A, in_axes=(0, 0, 0, None))
-        self.dynamics_augmented.B = jax.vmap(self.dynamics_augmented.B, in_axes=(0, 0, 0, None))
+        self._lowered.dynamics.f = jax.vmap(self._lowered.dynamics.f, in_axes=(0, 0, 0, None))
+        self._lowered.dynamics.A = jax.vmap(self._lowered.dynamics.A, in_axes=(0, 0, 0, None))
+        self._lowered.dynamics.B = jax.vmap(self._lowered.dynamics.B, in_axes=(0, 0, 0, None))
 
-        self.dynamics_augmented_prop.f = jax.vmap(
-            self.dynamics_augmented_prop.f, in_axes=(0, 0, 0, None)
+        self._lowered.dynamics_prop.f = jax.vmap(
+            self._lowered.dynamics_prop.f, in_axes=(0, 0, 0, None)
         )
 
         for constraint in self._lowered.jax_constraints.nodal:
@@ -363,17 +359,17 @@ class Problem:
 
         # Generate solvers
         self.discretization_solver = get_discretization_solver(
-            self.dynamics_augmented, self.settings, self.parameters
+            self._lowered.dynamics, self.settings, self.parameters
         )
         self.propagation_solver = get_propagation_solver(
-            self.dynamics_augmented_prop.f, self.settings, self.parameters
+            self._lowered.dynamics_prop.f, self.settings, self.parameters
         )
 
         # Build optimal control problem using LoweredProblem
         self.optimal_control_problem = OptimalControlProblem(self.settings, self._lowered)
 
         # Collect all relevant functions
-        functions_to_hash = [self.dynamics_augmented.f, self.dynamics_augmented_prop.f]
+        functions_to_hash = [self._lowered.dynamics.f, self._lowered.dynamics_prop.f]
         for constraint in self._lowered.jax_constraints.nodal:
             functions_to_hash.append(constraint.func)
         for constraint in self._lowered.jax_constraints.cross_node:
