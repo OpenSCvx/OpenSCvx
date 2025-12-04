@@ -210,10 +210,6 @@ class Problem:
         # Store propagation states (includes extra propagation-only states)
         self.states_prop = x_prop_aug
 
-        # Store unified objects for easy access (from LoweredProblem)
-        self.x_unified = lowered.x_unified
-        self.u_unified = lowered.u_unified
-
         # Store parameters in two forms:
         # 1. _parameters: plain dict for JAX functions
         # 2. _parameter_wrapper: wrapper dict for user access that auto-syncs
@@ -335,6 +331,25 @@ class Problem:
             for name, value in self._parameter_wrapper.items():
                 if name in self.cvxpy_params:
                     self.cvxpy_params[name].value = value
+
+    @property
+    def lowered(self) -> LoweredProblem:
+        """Access the lowered problem containing JAX/CVXPy objects.
+
+        Returns:
+            LoweredProblem with dynamics, constraints, unified interfaces, and CVXPy vars
+        """
+        return self._lowered
+
+    @property
+    def x_unified(self):
+        """Unified state interface (delegates to lowered.x_unified)."""
+        return self._lowered.x_unified
+
+    @property
+    def u_unified(self):
+        """Unified control interface (delegates to lowered.u_unified)."""
+        return self._lowered.u_unified
 
     def initialize(self):
         io.intro()
