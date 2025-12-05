@@ -63,7 +63,11 @@ def PTR_init(
 
 
 def format_result(problem, converged: bool) -> OptimizationResults:
-    """Formats the final result as an OptimizationResults object from the problem's state."""
+    """Formats the final result as an OptimizationResults object from the problem's state.
+
+    The State/Control objects from the solver state already contain the final trajectories
+    and all necessary metadata, so we pass them directly without copying.
+    """
     state = problem._state
 
     # Build nodes dictionary with all states and controls
@@ -80,8 +84,8 @@ def format_result(problem, converged: bool) -> OptimizationResults:
     return OptimizationResults(
         converged=converged,
         t_final=state.x_guess[:, problem.settings.sim.time_slice][-1],
-        u=problem.settings.sim.u,
-        x=problem.settings.sim.x,
+        u=state.u,  # Pass State/Control objects directly from solver state
+        x=state.x,
         nodes=nodes_dict,
         trajectory={},  # Populated by post_process
         _states=problem.symbolic.states_prop,  # Use propagation states for trajectory dict
@@ -145,8 +149,8 @@ def PTR_step(
 
     # Update state in place
     state.V_history.append(V_multi_shoot)
-    state.x_guess = x_sol
-    state.u_guess = u_sol
+    state.x.guess = x_sol
+    state.u.guess = u_sol
     state.x_history.append(x_sol.copy())
     state.u_history.append(u_sol.copy())
 

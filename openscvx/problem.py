@@ -175,6 +175,9 @@ class Problem:
         # Solver state (created fresh for each solve)
         self._state: Optional[SolverState] = None
 
+        # Final solution state (saved after successful solve)
+        self._solution: Optional[SolverState] = None
+
     @property
     def parameters(self):
         """Get the parameters dictionary.
@@ -471,13 +474,8 @@ class Problem:
             # Save results so it can be viusualized with snakeviz
             pr.dump_stats("profiling_solve.prof")
 
-        # Sync final solution back to settings for post_processing compatibility
-        # TODO: (norrisg) This is hacky and not idempotent!
-        # Should instead update post processing to handle SolverState directly
-        # Could then save a `self._solution: SolverState` attribute to hold the final state and pass]
-        # that into the post processing pipeline 
-        self.settings.sim.x.guess = self._state.x_guess
-        self.settings.sim.u.guess = self._state.u_guess
+        # Store final solution state for reference
+        self._solution = self._state
 
         return format_result(self, self._state.k <= k_max)
 
