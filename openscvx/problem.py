@@ -452,8 +452,8 @@ class Problem:
         k_max = max_iters if max_iters is not None else self.settings.scp.k_max
 
         while self._state.k <= k_max:
-            converged = self.step()
-            if converged and not continuous:
+            result = self.step()
+            if result["converged"] and not continuous:
                 break
 
         t_f_while = time.time()
