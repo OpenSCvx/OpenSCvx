@@ -49,7 +49,7 @@ def prop_aug_dy(
     return u[:, idx_s] * state_dot(x, u[:, :-1], node, params).squeeze()
 
 
-def get_propagation_solver(state_dot, settings, param_map):
+def get_propagation_solver(state_dot, settings):
     """Create a propagation solver function.
 
     This function creates a solver that propagates the system state using the

@@ -266,10 +266,10 @@ class Problem:
 
         # Generate solvers
         self.discretization_solver = get_discretization_solver(
-            self._lowered.dynamics, self.settings, self.parameters
+            self._lowered.dynamics, self.settings
         )
         self.propagation_solver = get_propagation_solver(
-            self._lowered.dynamics_prop.f, self.settings, self.parameters
+            self._lowered.dynamics_prop.f, self.settings
         )
 
         # Build optimal control problem using LoweredProblem
