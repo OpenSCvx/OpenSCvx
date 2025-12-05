@@ -896,6 +896,8 @@ def test_idempotency():
 
     # First solve cycle
     problem.initialize()
+    # TODO: (norrisg) should check `problem.initialze()` a second time
+    # -> May break jitting of constraints
     result1 = problem.solve()
     result1 = problem.post_process(result1)
 
