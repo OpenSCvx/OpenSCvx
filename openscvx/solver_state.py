@@ -32,6 +32,7 @@ class SolverState:
         w_tr: Current trust region weight (may adapt during solve)
         lam_cost: Current cost weight (may relax during solve)
         lam_vc: Current virtual control penalty weight
+        lam_vb: Current virtual buffer penalty weight
         x_history: List of state trajectory iterates
         u_history: List of control trajectory iterates
         V_history: List of discretization error history
@@ -46,6 +47,7 @@ class SolverState:
     w_tr: float
     lam_cost: float
     lam_vc: Union[float, np.ndarray]
+    lam_vb: float
     x_history: List[np.ndarray] = field(default_factory=list)
     u_history: List[np.ndarray] = field(default_factory=list)
     V_history: List[np.ndarray] = field(default_factory=list)
@@ -73,6 +75,7 @@ class SolverState:
             w_tr=settings.scp.w_tr,
             lam_cost=settings.scp.lam_cost,
             lam_vc=settings.scp.lam_vc,
+            lam_vb=settings.scp.lam_vb,
             x_history=[x_guess.copy()],
             u_history=[u_guess.copy()],
             V_history=[],
