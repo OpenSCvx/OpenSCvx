@@ -357,7 +357,33 @@ class Problem:
             # Save results so it can be viusualized with snakeviz
             pr.dump_stats("profiling_initialize.prof")
 
-    def step(self):
+    def reset(self):
+        """Reset solver state to run the same problem again.
+
+        This method creates a fresh SolverState from the current settings,
+        allowing you to re-run the optimization with the same initial conditions.
+        The compiled dynamics and optimal control problem are preserved.
+
+        Raises:
+            ValueError: If initialize() has not been called yet.
+
+        Example:
+            >>> problem.initialize()
+            >>> result1 = problem.solve()
+            >>> problem.reset()  # Reset to initial state
+            >>> result2 = problem.solve()  # Run again from scratch
+        """
+        if self._compiled is None:
+            raise ValueError("Problem has not been initialized. Call initialize() first")
+
+        # Create fresh solver state from settings
+        self._state = SolverState.from_settings(self.settings)
+
+        # Reset timing
+        self.timing_solve = None
+        self.timing_post = None
+
+    def step(self) -> dict:
         """Performs a single SCP iteration.
 
         This method is designed for real-time plotting and interactive optimization.
