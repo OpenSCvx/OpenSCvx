@@ -28,11 +28,11 @@ from openscvx.discretization import get_discretization_solver
 from openscvx.lowered import LoweredProblem, ParameterDict
 from openscvx.lowered.dynamics import Dynamics
 from openscvx.ocp import OptimalControlProblem
-from openscvx.solver_state import SolverState
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
 from openscvx.ptr import PTR_init, PTR_step, format_result
 from openscvx.results import OptimizationResults
+from openscvx.solver_state import SolverState
 from openscvx.symbolic.builder import preprocess_symbolic_problem
 from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import CTCS, Constraint
