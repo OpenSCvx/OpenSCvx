@@ -425,10 +425,6 @@ class Problem:
         # Sync parameters before solving
         self._sync_parameters()
 
-        # Ensure parameter sizes and normalization are correct
-        self.settings.scp.__post_init__()
-        self.settings.sim.__post_init__()
-
         if self.optimal_control_problem is None or self.discretization_solver is None:
             raise ValueError("Problem has not been initialized. Call initialize() before solve()")
 
