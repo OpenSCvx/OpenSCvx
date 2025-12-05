@@ -92,16 +92,9 @@ class SolverState:
         Returns:
             Fresh SolverState initialized from settings with copied State/Control objects
         """
-        # Create shallow copies of State/Control objects
-        # This preserves all metadata (bounds, initial_type, final_type, etc.)
-        # while allowing independent mutation of the guess trajectories
-        x = copy.copy(settings.sim.x)
-        u = copy.copy(settings.sim.u)
-
-        # Copy the guess arrays to ensure independence from settings
-        # Use the .guess setter to ensure proper handling
-        x.guess = settings.sim.x.guess.copy()
-        u.guess = settings.sim.u.guess.copy()
+        # Deep copy ensures all arrays are independent
+        x = copy.deepcopy(settings.sim.x)
+        u = copy.deepcopy(settings.sim.u)
 
         return cls(
             k=1,
