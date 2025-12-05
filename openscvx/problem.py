@@ -41,6 +41,7 @@ from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.lower import lower_symbolic_problem
 from openscvx.symbolic.problem import SymbolicProblem
 from openscvx.time import Time
+from openscvx.utils import profiling_end, profiling_start
 
 if TYPE_CHECKING:
     import cvxpy as cp
@@ -252,11 +253,7 @@ class Problem:
         io.print_problem_summary(self.settings, self._lowered)
 
         # Enable the profiler
-        if self.settings.dev.profiling:
-            import cProfile
-
-            pr = cProfile.Profile()
-            pr.enable()
+        pr = profiling_start(self.settings.dev.profiling)
 
         t_0_while = time.time()
         # Ensure parameter sizes and normalization are correct
@@ -355,10 +352,7 @@ class Problem:
         # Prime the propagation solver
         prime_propagation_solver(self.propagation_solver, self._parameters, self.settings)
 
-        if self.settings.dev.profiling:
-            pr.disable()
-            # Save results so it can be viusualized with snakeviz
-            pr.dump_stats("profiling_initialize.prof")
+        profiling_end(pr, "initialize")
 
     def reset(self):
         """Reset solver state to run the same problem again.
@@ -438,11 +432,7 @@ class Problem:
         self._state.lam_vb = self.settings.scp.lam_vb
 
         # Enable the profiler
-        if self.settings.dev.profiling:
-            import cProfile
-
-            pr = cProfile.Profile()
-            pr.enable()
+        pr = profiling_start(self.settings.dev.profiling)
 
         t_0_while = time.time()
         # Print top header for solver results
@@ -464,11 +454,7 @@ class Problem:
         # Print bottom footer for solver results as well as total computation time
         io.footer()
 
-        # Disable the profiler
-        if self.settings.dev.profiling:
-            pr.disable()
-            # Save results so it can be viusualized with snakeviz
-            pr.dump_stats("profiling_solve.prof")
+        profiling_end(pr, "solve")
 
         # Store final solution state for reference
         self._solution = self._state
@@ -477,11 +463,7 @@ class Problem:
 
     def post_process(self, result: OptimizationResults) -> OptimizationResults:
         # Enable the profiler
-        if self.settings.dev.profiling:
-            import cProfile
-
-            pr = cProfile.Profile()
-            pr.enable()
+        pr = profiling_start(self.settings.dev.profiling)
 
         t_0_post = time.time()
         result = propagate_trajectory_results(
@@ -494,9 +476,5 @@ class Problem:
         # Print results summary
         io.print_results_summary(result, self.timing_post, self.timing_init, self.timing_solve)
 
-        # Disable the profiler
-        if self.settings.dev.profiling:
-            pr.disable()
-            # Save results so it can be viusualized with snakeviz
-            pr.dump_stats("profiling_postprocess.prof")
+        profiling_end(pr, "postprocess")
         return result
