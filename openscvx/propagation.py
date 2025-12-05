@@ -85,6 +85,10 @@ def get_propagation_solver(state_dot, settings):
                 # additional named parameters as **kwargs
             ),
             tau_0=tau_grid[0],  # scalar
+            solver_name=settings.prp.solver,
+            rtol=settings.prp.rtol,
+            atol=settings.prp.atol,
+            extra_kwargs=settings.prp.args,
             save_time=save_time,  # shape (MAX_TAU_LEN,)
             mask=mask,  # shape (MAX_TAU_LEN,), dtype=bool
         )

@@ -195,7 +195,7 @@ def calculate_discretization(
             rtol=settings.dis.rtol,
             atol=settings.dis.atol,
             args=(),
-            extra_kwargs=None,
+            extra_kwargs=settings.dis.args,
         )
 
     Vend = sol[-1].T.reshape(-1, i4)
