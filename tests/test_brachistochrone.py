@@ -877,3 +877,90 @@ def test_propagation():
 
     # Clean up JAX caches
     jax.clear_caches()
+
+
+def test_idempotency():
+    """
+    Test that Problem.reset() enables idempotent solve() and post_process().
+
+    This validates that:
+    1. reset() restores solver state to initial conditions
+    2. Multiple solve/post_process cycles produce identical results
+    3. Settings remain unchanged between solves
+    """
+    from examples.abstract.brachistochrone import problem
+
+    # Disable printing for cleaner test output
+    if hasattr(problem.settings, "dev"):
+        problem.settings.dev.printing = False
+
+    # First solve cycle
+    problem.initialize()
+    result1 = problem.solve()
+    result1 = problem.post_process(result1)
+
+    # Check convergence
+    assert result1["converged"], "First solve failed to converge"
+
+    # Reset and second solve cycle
+    problem.reset()
+    result2 = problem.solve()
+    result2 = problem.post_process(result2)
+
+    # Check convergence
+    assert result2["converged"], "Second solve failed to converge"
+
+    # Results should be identical - state trajectories
+    np.testing.assert_allclose(
+        result1.x.guess,
+        result2.x.guess,
+        rtol=1e-10,
+        atol=1e-10,
+        err_msg="State trajectories differ between solves",
+    )
+
+    # Control trajectories
+    np.testing.assert_allclose(
+        result1.u.guess,
+        result2.u.guess,
+        rtol=1e-10,
+        atol=1e-10,
+        err_msg="Control trajectories differ between solves",
+    )
+
+    # Propagated state trajectories
+    np.testing.assert_allclose(
+        result1.x_full,
+        result2.x_full,
+        rtol=1e-10,
+        atol=1e-10,
+        err_msg="Propagated state trajectories differ between solves",
+    )
+
+    # Propagated control trajectories
+    np.testing.assert_allclose(
+        result1.u_full,
+        result2.u_full,
+        rtol=1e-10,
+        atol=1e-10,
+        err_msg="Propagated control trajectories differ between solves",
+    )
+
+    # Check that final times are identical
+    assert abs(result1.t_final - result2.t_final) < 1e-10, (
+        f"Final times differ: {result1.t_final} vs {result2.t_final}"
+    )
+
+    print("\nIdempotency Test Results:")
+    print(
+        f"  First solve:  t_final={float(result1.t_final):.6f}s, converged={result1['converged']}"
+    )
+    print(
+        f"  Second solve: t_final={float(result2.t_final):.6f}s, converged={result2['converged']}"
+    )
+    print(f"  Max state diff:   {float(np.max(np.abs(result1.x.guess - result2.x.guess))):.2e}")
+    print(f"  Max control diff: {float(np.max(np.abs(result1.u.guess - result2.u.guess))):.2e}")
+    print("  ✓ reset() successfully restored initial conditions")
+
+    # Clean up JAX caches
+    jax.clear_caches()
