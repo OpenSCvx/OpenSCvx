@@ -1,3 +1,15 @@
+"""Dubins car with disjoint waypoint visiting constraints.
+
+This example demonstrates a Dubins car that must visit one of two waypoints
+using a smooth max approximation for the disjoint constraint. The problem includes:
+
+- 2D position and heading dynamics
+- Disjoint waypoint visiting requirement (visit wp1 OR wp2)
+- Smooth max approximation for non-convex OR constraint
+- Loop closure constraint requiring similar start/end positions
+- Minimal time objective
+"""
+
 import os
 import sys
 

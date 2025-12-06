@@ -1,3 +1,15 @@
+"""Drone racing with continuous viewpoint constraints.
+
+This example combines drone racing through gates with camera viewpoint constraints
+to maintain visual contact with reference targets. The problem includes:
+
+- 6-DOF rigid body dynamics (position, velocity, attitude quaternion, angular velocity)
+- Sequential gate passage constraints
+- Attitude planning for simultaneous gate navigation and visual tracking
+- _Continuous_ sensor visibility constraints to keep targets in FOV
+- Minimal time objective
+"""
+
 import os
 import sys
 

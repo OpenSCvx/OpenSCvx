@@ -1,3 +1,15 @@
+"""Base problem setup for real-time cinematic viewpoint planning.
+
+This module defines the base optimization problem for real-time aerial
+cinematography, designed to be imported by interactive visualization examples.
+The problem includes:
+
+- 6-DOF dynamics with parametric target positions
+- Field-of-view constraints for visual tracking
+- Sensor cone constraints for camera pointing
+- Configured for real-time re-optimization with moving targets
+"""
+
 import os
 import sys
 

@@ -40,7 +40,7 @@ def get_source_without_docstring(file_path: Path) -> str:
             # Split source into lines and skip the docstring lines
             lines = source_code.splitlines(keepends=True)
             # Rejoin from after the docstring, preserving remaining code
-            return ''.join(lines[end_lineno:])
+            return "".join(lines[end_lineno:])
 
         return source_code
     except Exception:

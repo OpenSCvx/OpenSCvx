@@ -1,3 +1,15 @@
+"""Base problem setup for real-time 6-DOF obstacle avoidance.
+
+This module defines the base optimization problem for real-time quadrotor
+obstacle avoidance, designed to be imported by interactive visualization examples.
+The problem includes:
+
+- 6-DOF dynamics (position, velocity, attitude quaternion, angular velocity)
+- Parametric obstacle positions for runtime updates
+- Ellipsoidal obstacle avoidance constraints
+- Configured for real-time re-optimization
+"""
+
 import os
 import sys
 

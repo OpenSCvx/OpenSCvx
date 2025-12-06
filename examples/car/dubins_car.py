@@ -1,3 +1,16 @@
+"""Dubins car path planning with obstacle avoidance.
+
+This example demonstrates minimum-time path planning for a Dubins car
+(car-like vehicle with minimum turning radius) navigating around a
+circular obstacle. The problem includes:
+
+- 2D position and heading dynamics
+- Speed and angular rate control inputs
+- Circular obstacle avoidance constraint
+- Minimal time objective with free final heading
+- Parameter updates for multiple scenarios
+"""
+
 import os
 import sys
 

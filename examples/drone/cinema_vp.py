@@ -1,3 +1,15 @@
+"""Cinematic viewpoint planning for aerial filming.
+
+This example demonstrates optimal trajectory planning for a quadrotor performing
+aerial cinematography with viewpoint constraints. The problem includes:
+
+- 6-DOF dynamics with fuel consumption tracking
+- _Continuous_ field-of-view (FOV) constraints to keep moving target in view
+- Sensor pointing constraints using camera cone geometry
+- Fuel-optimal trajectory generation
+- Attitude planning to maintain visual coverage
+"""
+
 import os
 import sys
 

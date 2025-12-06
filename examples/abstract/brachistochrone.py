@@ -1,3 +1,15 @@
+"""Brachistochrone problem: finding the fastest descent path.
+
+This classic calculus of variations problem finds the curve of fastest descent
+between two points under gravity. The solution demonstrates time-optimal
+trajectory generation with:
+
+- 2D position dynamics
+- Speed dynamics under gravitational acceleration
+- Angle control subject to bounds
+- Minimal time objective
+"""
+
 import os
 import sys
 

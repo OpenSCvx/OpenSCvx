@@ -1,3 +1,14 @@
+"""6-DOF quadrotor obstacle avoidance with nodal constraints.
+
+This example demonstrates optimal trajectory planning for a quadrotor with
+obstacle avoidance constraints applied at specific nodes. The problem includes:
+
+- 6-DOF rigid body dynamics (position, velocity, attitude quaternion, angular velocity)
+- Thrust force and torque control inputs
+- **Nodal** obstacle avoidance constraints at specific trajectory points
+- Minimal time objective
+"""
+
 import os
 import sys
 

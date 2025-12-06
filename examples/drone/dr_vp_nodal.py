@@ -1,3 +1,15 @@
+"""Drone racing with nodal viewpoint constraints.
+
+This example demonstrates drone racing through gates with sensor visibility
+constraints applied at all nodes. The problem includes:
+
+- 6-DOF rigid-body dynamics (position, velocity, attitude quaternion, angular velocity)
+- Sequential gate passage constraints
+- Attitude planning for simultaneous gate navigation and visual tracking
+- **Nodal** sensor visibility constraints throughout trajectory
+- Minimal time objective
+"""
+
 import os
 import sys
 

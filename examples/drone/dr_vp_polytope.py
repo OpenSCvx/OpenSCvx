@@ -1,3 +1,16 @@
+"""Drone racing with continuous viewpoint constraints using polytope target arrangement.
+
+This example demonstrates drone racing through polytope (polyhedron-shaped)
+gates with sensor visibility constraints. The problem includes:
+
+- 6-DOF rigid body dynamics (position, velocity, attitude quaternion, angular velocity)
+- Sequential gate passage constraints
+- Attitude planning for simultaneous gate navigation and visual tracking
+- _Continuous_ sensor visibility constraints to keep targets in FOV
+- Viewplanning targets are arranged in a polytope
+- Minimal time objective
+"""
+
 import os
 import sys
 

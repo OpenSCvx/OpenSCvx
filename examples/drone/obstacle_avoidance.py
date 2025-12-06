@@ -1,3 +1,15 @@
+"""6-DOF quadrotor obstacle avoidance with ellipsoidal obstacles.
+
+This example demonstrates optimal trajectory planning for a quadrotor
+navigating through multiple ellipsoidal obstacles which are enforced in continuous time.
+The problem includes:
+
+- 6-DOF rigid body dynamics (position, velocity, attitude quaternion, angular velocity)
+- Thrust force and torque control inputs
+- _Continuous_ ellipsoidal obstacle avoidance constraints
+- Minimal time objective
+"""
+
 import os
 import sys
 

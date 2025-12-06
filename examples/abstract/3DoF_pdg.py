@@ -1,3 +1,15 @@
+"""3-DOF Powered Descent Guidance (PDG) for planetary landing.
+
+This example demonstrates optimal trajectory generation for a rocket performing
+powered descent guidance, similar to SpaceX Falcon 9 or Blue Origin landings.
+The problem includes:
+
+- 3D position and velocity dynamics
+- Fuel-optimal mass minimization
+- Thrust magnitude and pointing constraints
+- Glideslope constraint for safe landing approach
+"""
+
 import os
 import sys
 

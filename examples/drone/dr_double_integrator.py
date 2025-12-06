@@ -1,3 +1,15 @@
+"""Simplified drone racing using double integrator dynamics.
+
+This example demonstrates time-optimal racing through gates using simplified
+double integrator (point mass) dynamics instead of full 6-DOF dynamics. The problem includes:
+
+- 3-DOF point mass dynamics (position and velocity only)
+- Direct force control inputs (no attitude dynamics)
+- Sequential gate passage constraints
+- Minimal time objective
+- Loop closure constraint
+"""
+
 import os
 import sys
 
