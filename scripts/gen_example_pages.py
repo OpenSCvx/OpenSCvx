@@ -24,6 +24,29 @@ def get_module_docstring(file_path: Path) -> str | None:
         return None
 
 
+def get_source_without_docstring(file_path: Path) -> str:
+    """Get source code without the module-level docstring."""
+    source_code = file_path.read_text()
+    try:
+        tree = ast.parse(source_code)
+        docstring = ast.get_docstring(tree)
+
+        if docstring and tree.body and isinstance(tree.body[0], ast.Expr):
+            # Find the end of the docstring node
+            docstring_node = tree.body[0].value
+            # Get the line number where the docstring ends
+            end_lineno = docstring_node.end_lineno
+
+            # Split source into lines and skip the docstring lines
+            lines = source_code.splitlines(keepends=True)
+            # Rejoin from after the docstring, preserving remaining code
+            return ''.join(lines[end_lineno:])
+
+        return source_code
+    except Exception:
+        return source_code
+
+
 def format_title(name: str) -> str:
     """Convert a file name to a human-readable title."""
     title = name.replace("_", " ").replace("-", " ")
@@ -58,7 +81,7 @@ for path in sorted(examples_dir.rglob("*.py")):
 
     # Get module docstring and source code
     docstring = get_module_docstring(path)
-    source_code = path.read_text()
+    source_code = get_source_without_docstring(path)
 
     # Generate the markdown content
     with mkdocs_gen_files.open(full_doc_path, "w") as fd:
