@@ -2,6 +2,7 @@ import numpy as np
 
 from openscvx.config import Config
 from openscvx.integrators import solve_ivp_diffrax_prop
+from openscvx.lowered import Dynamics
 
 
 def prop_aug_dy(
@@ -49,7 +50,7 @@ def prop_aug_dy(
     return u[:, idx_s] * state_dot(x, u[:, :-1], node, params).squeeze()
 
 
-def get_propagation_solver(state_dot, settings, param_map):
+def get_propagation_solver(state_dot: Dynamics, settings: Config):
     """Create a propagation solver function.
 
     This function creates a solver that propagates the system state using the
@@ -85,6 +86,10 @@ def get_propagation_solver(state_dot, settings, param_map):
                 # additional named parameters as **kwargs
             ),
             tau_0=tau_grid[0],  # scalar
+            solver_name=settings.prp.solver,
+            rtol=settings.prp.rtol,
+            atol=settings.prp.atol,
+            extra_kwargs=settings.prp.args,
             save_time=save_time,  # shape (MAX_TAU_LEN,)
             mask=mask,  # shape (MAX_TAU_LEN,), dtype=bool
         )
@@ -92,7 +97,7 @@ def get_propagation_solver(state_dot, settings, param_map):
     return propagation_solver
 
 
-def s_to_t(x, u, params: Config):
+def s_to_t(x, u, settings: Config):
     """Convert normalized time s to real time t.
 
     This function converts the normalized time variable s to real time t
@@ -101,24 +106,24 @@ def s_to_t(x, u, params: Config):
     Args:
         x: State trajectory.
         u: Control trajectory.
-        params (Config): Configuration settings.
+        settings (Config): Configuration settings.
 
     Returns:
         list: List of real time points.
     """
-    t = [x.guess[:, params.sim.time_slice][0]]
-    tau = np.linspace(0, 1, params.scp.n)
-    for k in range(1, params.scp.n):
+    t = [x.guess[:, settings.sim.time_slice][0]]
+    tau = np.linspace(0, 1, settings.scp.n)
+    for k in range(1, settings.scp.n):
         s_kp = u.guess[k - 1, -1]
         s_k = u.guess[k, -1]
-        if params.dis.dis_type == "ZOH":
+        if settings.dis.dis_type == "ZOH":
             t.append(t[k - 1] + (tau[k] - tau[k - 1]) * (s_kp))
         else:
             t.append(t[k - 1] + 0.5 * (s_k + s_kp) * (tau[k] - tau[k - 1]))
     return t
 
 
-def t_to_tau(u, t, t_nodal, params: Config):
+def t_to_tau(u, t, t_nodal, settings: Config):
     """Convert real time t to normalized time tau.
 
     This function converts real time t to normalized time tau and interpolates
@@ -128,21 +133,21 @@ def t_to_tau(u, t, t_nodal, params: Config):
         u: Control trajectory.
         t (np.ndarray): Real time points.
         t_nodal (np.ndarray): Nodal time points.
-        params (Config): Configuration settings.
+        settings (Config): Configuration settings.
 
     Returns:
         tuple: (tau, u_interp) where tau is normalized time and u_interp is interpolated controls.
     """
     u_guess = u.guess
 
-    if params.dis.dis_type == "ZOH":
+    if settings.dis.dis_type == "ZOH":
         # Zero-Order Hold: step interpolation (hold previous value)
         def u_lam(new_t):
             # Find the index of the last nodal time <= new_t
             idx = np.searchsorted(t_nodal, new_t, side="right") - 1
             idx = np.clip(idx, 0, len(t_nodal) - 1)
             return u_guess[idx, :]
-    elif params.dis.dis_type == "FOH":
+    elif settings.dis.dis_type == "FOH":
         # First-Order Hold: linear interpolation
         def u_lam(new_t):
             return np.array(
@@ -154,7 +159,7 @@ def t_to_tau(u, t, t_nodal, params: Config):
     u = np.array([u_lam(t_i) for t_i in t])
 
     tau = np.zeros(len(t))
-    tau_nodal = np.linspace(0, 1, params.scp.n)
+    tau_nodal = np.linspace(0, 1, settings.scp.n)
     for k in range(1, len(t)):
         k_nodal = np.where(t_nodal < t[k])[0][-1]
         s_kp = u_guess[k_nodal, -1]
@@ -162,7 +167,7 @@ def t_to_tau(u, t, t_nodal, params: Config):
         tau_p = tau_nodal[k_nodal]
 
         s_k = u[k, -1]
-        if params.dis.dis_type == "ZOH":
+        if settings.dis.dis_type == "ZOH":
             tau[k] = tau_p + (t[k] - tp) / s_kp
         else:
             tau[k] = tau_p + 2 * (t[k] - tp) / (s_k + s_kp)

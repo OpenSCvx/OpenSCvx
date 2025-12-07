@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 import numpy as np
 
+from openscvx.config import Config
 from openscvx.integrators import solve_ivp_diffrax, solve_ivp_rk45
 from openscvx.lowered import Dynamics
 
@@ -110,15 +111,7 @@ def calculate_discretization(
     state_dot: callable,
     A: callable,
     B: callable,
-    n_x: int,
-    n_u: int,
-    N: int,
-    custom_integrator: bool,
-    debug: bool,
-    solver: str,
-    rtol,
-    atol,
-    dis_type: str,
+    settings: Config,
     params: dict,
 ):
     """Calculate the discretized system matrices.
@@ -132,9 +125,7 @@ def calculate_discretization(
         state_dot (callable): Function computing state derivatives.
         A (callable): Function computing state Jacobian.
         B (callable): Function computing control Jacobian.
-        n_x (int): Number of states.
-        n_u (int): Number of controls.
-        N (int): Number of nodes in trajectory.
+        settings: Configuration settings for OpenSCvx.
         custom_integrator (bool): Whether to use custom RK45 integrator.
         debug (bool): Whether to use debug mode.
         solver (str): Name of the solver to use.
@@ -151,6 +142,12 @@ def calculate_discretization(
             - z_bar: Defect vector
             - Vmulti: Full augmented state trajectory
     """
+    # Unpack settings
+    n_x = settings.sim.n_states
+    n_u = settings.sim.n_controls
+
+    N = settings.scp.n
+
     # Define indices for slicing the augmented state vector
     i0 = 0
     i1 = n_x
@@ -173,7 +170,7 @@ def calculate_discretization(
         n_x=n_x,
         n_u=n_u,
         N=N,
-        dis_type=dis_type,
+        dis_type=settings.dis.dis_type,
         params=params,  # Pass params as single dict
     )
 
@@ -182,24 +179,24 @@ def calculate_discretization(
         return dVdt(t, y, **integrator_args)
 
     # Choose integrator
-    if custom_integrator:
+    if settings.dis.custom_integrator:
         sol = solve_ivp_rk45(
             dVdt_wrapped,
             1.0 / (N - 1),
             V0.reshape(-1),
             args=(),
-            is_not_compiled=debug,
+            is_not_compiled=settings.dev.debug,
         )
     else:
         sol = solve_ivp_diffrax(
             dVdt_wrapped,
             1.0 / (N - 1),
             V0.reshape(-1),
-            solver_name=solver,
-            rtol=rtol,
-            atol=atol,
+            solver_name=settings.dis.solver,
+            rtol=settings.dis.rtol,
+            atol=settings.dis.atol,
             args=(),
-            extra_kwargs=None,
+            extra_kwargs=settings.dis.args,
         )
 
     Vend = sol[-1].T.reshape(-1, i4)
@@ -215,7 +212,7 @@ def calculate_discretization(
     return A_bar, B_bar, C_bar, x_prop, Vmulti
 
 
-def get_discretization_solver(dyn: Dynamics, settings, param_map):
+def get_discretization_solver(dyn: Dynamics, settings: Config):
     """Create a discretization solver function.
 
     This function creates a solver that computes the discretized system matrices
@@ -224,7 +221,6 @@ def get_discretization_solver(dyn: Dynamics, settings, param_map):
     Args:
         dyn (Dynamics): System dynamics object.
         settings: Configuration settings for discretization.
-        param_map (dict): Mapping of parameter names to values.
 
     Returns:
         callable: A function that computes the discretized system matrices.
@@ -235,14 +231,6 @@ def get_discretization_solver(dyn: Dynamics, settings, param_map):
         state_dot=dyn.f,
         A=dyn.A,
         B=dyn.B,
-        n_x=settings.sim.n_states,
-        n_u=settings.sim.n_controls,
-        N=settings.scp.n,
-        custom_integrator=settings.dis.custom_integrator,
-        debug=settings.dev.debug,
-        solver=settings.dis.solver,
-        rtol=settings.dis.rtol,
-        atol=settings.dis.atol,
-        dis_type=settings.dis.dis_type,
+        settings=settings,
         params=params,  # Pass as single dict
     )
