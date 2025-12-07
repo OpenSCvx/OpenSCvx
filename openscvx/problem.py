@@ -256,6 +256,16 @@ class Problem:
         return self._lowered.u_unified
 
     def initialize(self):
+        """Compile dynamics, constraints, and solvers; prepare for optimization.
+
+        This method vmaps dynamics, JIT-compiles constraints, builds the convex
+        subproblem, and initializes the solver state. Must be called before solve().
+
+        Example:
+            >>> problem = Problem(dynamics, constraints, states, controls, N, time)
+            >>> problem.initialize()  # Compile and prepare
+            >>> problem.solve()       # Run optimization
+        """
         io.intro()
 
         # Print problem summary
@@ -380,11 +390,10 @@ class Problem:
         profiling_end(pr, "initialize")
 
     def reset(self):
-        """Reset solver state to run the same problem again.
+        """Reset solver state to re-run optimization from initial conditions.
 
-        This method creates a fresh SolverState from the current settings,
-        allowing you to re-run the optimization with the same initial conditions.
-        The compiled dynamics and optimal control problem are preserved.
+        Creates fresh SolverState while preserving compiled dynamics and solvers.
+        Use this to run multiple optimizations without re-initializing.
 
         Raises:
             ValueError: If initialize() has not been called yet.
@@ -392,8 +401,8 @@ class Problem:
         Example:
             >>> problem.initialize()
             >>> result1 = problem.solve()
-            >>> problem.reset()  # Reset to initial state
-            >>> result2 = problem.solve()  # Run again from scratch
+            >>> problem.reset()
+            >>> result2 = problem.solve()  # Fresh run with same setup
         """
         if self._compiled_dynamics is None:
             raise ValueError("Problem has not been initialized. Call initialize() first")
@@ -409,14 +418,18 @@ class Problem:
         self.timing_post = None
 
     def step(self) -> dict:
-        """Performs a single SCP iteration.
+        """Perform a single SCP iteration.
 
-        This method is designed for real-time plotting and interactive optimization.
-        It performs one complete SCP iteration including subproblem solving,
-        state updates, and progress emission for real-time visualization.
+        Designed for real-time plotting and interactive optimization. Performs one
+        iteration including subproblem solve, state update, and progress emission.
 
         Returns:
-            dict: Dictionary containing convergence status and current state
+            dict: Contains "converged" (bool) and current iteration state
+
+        Example:
+            >>> problem.initialize()
+            >>> while not problem.step()["converged"]:
+            ...     plot_trajectory(problem.state.trajs[-1])
         """
         if self._state is None:
             raise ValueError("Problem has not been initialized. Call initialize() first")
@@ -444,6 +457,20 @@ class Problem:
     def solve(
         self, max_iters: Optional[int] = None, continuous: bool = False
     ) -> OptimizationResults:
+        """Run the SCP algorithm until convergence or iteration limit.
+
+        Args:
+            max_iters: Maximum iterations (default: settings.scp.k_max)
+            continuous: If True, run all iterations regardless of convergence
+
+        Returns:
+            OptimizationResults with trajectory and convergence info (call post_process() for full propagation)
+
+        Example:
+            >>> problem.initialize()
+            >>> result = problem.solve(max_iters=50)
+            >>> result = problem.post_process()  # High-fidelity propagation
+        """
         # Sync parameters before solving
         self._sync_parameters()
 
@@ -488,14 +515,13 @@ class Problem:
         return format_result(self, self._state, self._state.k <= k_max)
 
     def post_process(self) -> OptimizationResults:
-        """Propagate the solution trajectory through the full nonlinear dynamics.
+        """Propagate solution through full nonlinear dynamics for high-fidelity trajectory.
 
-        This method takes the converged SCP solution and propagates it through
-        the nonlinear dynamics to produce a high-fidelity trajectory. It populates
-        the trajectory fields (x_full, u_full, t_full, cost) on the result.
+        Integrates the converged SCP solution through the nonlinear dynamics to
+        produce x_full, u_full, and t_full. Call after solve() for final results.
 
         Returns:
-            OptimizationResults: Complete results with propagated trajectory fields.
+            OptimizationResults with propagated trajectory fields
 
         Raises:
             ValueError: If solve() has not been called yet.
@@ -504,7 +530,7 @@ class Problem:
             >>> problem.initialize()
             >>> problem.solve()
             >>> result = problem.post_process()
-            >>> print(result.x_full.shape)  # Full propagated state trajectory
+            >>> print(result.x_full.shape)  # High-fidelity trajectory
         """
         if self._solution is None:
             raise ValueError("No solution available. Call solve() first.")
