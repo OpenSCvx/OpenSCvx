@@ -46,11 +46,11 @@ class LoweredNodalConstraint:
 
 
 @dataclass
-class CrossNodeConstraintLowered:
+class LoweredCrossNodeConstraint:
     """Lowered cross-node constraint with trajectory-level evaluation.
 
     Unlike regular LoweredNodalConstraint which operates on single-node vectors
-    and is vmapped across the trajectory, CrossNodeConstraintLowered operates
+    and is vmapped across the trajectory, LoweredCrossNodeConstraint operates
     on full trajectory arrays to relate multiple nodes simultaneously.
 
     This is necessary for constraints like:
@@ -123,11 +123,11 @@ class LoweredJaxConstraints:
     Attributes:
         nodal: List of LoweredNodalConstraint objects. Each has `func`,
             `grad_g_x`, `grad_g_u` callables and `nodes` list.
-        cross_node: List of CrossNodeConstraintLowered objects. Each has
+        cross_node: List of LoweredCrossNodeConstraint objects. Each has
             `func`, `grad_g_X`, `grad_g_U` for trajectory-level constraints.
         ctcs: CTCS constraints (unchanged from input, not lowered here).
     """
 
     nodal: list[LoweredNodalConstraint] = field(default_factory=list)
-    cross_node: list[CrossNodeConstraintLowered] = field(default_factory=list)
+    cross_node: list[LoweredCrossNodeConstraint] = field(default_factory=list)
     ctcs: list["CTCS"] = field(default_factory=list)

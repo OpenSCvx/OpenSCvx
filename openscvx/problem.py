@@ -44,7 +44,7 @@ from openscvx.discretization import get_discretization_solver
 from openscvx.lowered import LoweredProblem, ParameterDict
 from openscvx.lowered.dynamics import Dynamics
 from openscvx.lowered.jax_constraints import (
-    CrossNodeConstraintLowered,
+    LoweredCrossNodeConstraint,
     LoweredJaxConstraints,
     LoweredNodalConstraint,
 )
@@ -324,7 +324,7 @@ class Problem:
         ]
 
         compiled_cross_node = [
-            CrossNodeConstraintLowered(
+            LoweredCrossNodeConstraint(
                 func=jax.jit(c.func),
                 grad_g_X=jax.jit(c.grad_g_X),
                 grad_g_U=jax.jit(c.grad_g_U),

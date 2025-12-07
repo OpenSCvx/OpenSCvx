@@ -257,7 +257,7 @@ class Expr:
 
         Performance Note:
             Cross-node constraints use dense Jacobian storage which can be memory-intensive
-            for large N (>100 nodes). See CrossNodeConstraintLowered documentation for
+            for large N (>100 nodes). See LoweredCrossNodeConstraint documentation for
             details on memory usage and future sparse Jacobian support.
         """
         return NodeReference(self, k)
@@ -647,7 +647,7 @@ class NodeReference(Expr):
 
     Performance Note:
         Cross-node constraints use dense Jacobian storage. For details on memory
-        usage and performance implications, see CrossNodeConstraintLowered documentation.
+        usage and performance implications, see LoweredCrossNodeConstraint documentation.
 
     Note:
         NodeReference is typically created via the `.at(k)` method on expressions
