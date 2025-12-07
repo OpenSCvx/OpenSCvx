@@ -1120,6 +1120,8 @@
       
         
       
+        
+      
     
     
     
@@ -1574,6 +1576,34 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../reference/solver_state/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    solver_state
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
       
@@ -1612,7 +1642,7 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_16" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_17" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1634,14 +1664,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_16" id="__nav_4_16_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_4_17" id="__nav_4_17_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_16_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_16">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_17_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_17">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1781,7 +1811,7 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_16_4" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_17_4" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1803,14 +1833,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_16_4" id="__nav_4_16_4_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_4_17_4" id="__nav_4_17_4_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_16_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_16_4">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_17_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_17_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2220,7 +2250,7 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_16_7" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_17_7" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -2242,14 +2272,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_16_7" id="__nav_4_16_7_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_4_17_7" id="__nav_4_17_7_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_16_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_16_7">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_17_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_17_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3407,7 +3437,7 @@
 </tbody>
 </table>
 <p><strong>Evaluation:</strong> During SCP iterations, each cross-node constraint receives the full trajectory arrays and returns a scalar residual:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Each CrossNodeConstraintLowered operates on full trajectories</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Each LoweredCrossNodeConstraint operates on full trajectories</span>
 </span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="n">residual</span> <span class="o">=</span> <span class="n">constraint</span><span class="o">.</span><span class="n">func</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">U</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>      <span class="c1"># scalar</span>
 </span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="n">grad_X</span> <span class="o">=</span> <span class="n">constraint</span><span class="o">.</span><span class="n">grad_g_X</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">U</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>    <span class="c1"># (N, n_x) - sparse, mostly zeros</span>
 </span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="n">grad_U</span> <span class="o">=</span> <span class="n">constraint</span><span class="o">.</span><span class="n">grad_g_U</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">U</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>    <span class="c1"># (N, n_u) - sparse, mostly zeros</span>
@@ -3757,7 +3787,7 @@
 </tr>
 <tr>
 <td><code>openscvx/constraints/cross_node.py</code></td>
-<td><code>CrossNodeConstraintLowered</code></td>
+<td><code>LoweredCrossNodeConstraint</code></td>
 <td>Container for trajectory-level cross-node constraints</td>
 </tr>
 <tr>
