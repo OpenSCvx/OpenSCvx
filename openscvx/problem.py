@@ -28,6 +28,11 @@ from openscvx.config import (
 from openscvx.discretization import get_discretization_solver
 from openscvx.lowered import LoweredProblem, ParameterDict
 from openscvx.lowered.dynamics import Dynamics
+from openscvx.lowered.jax_constraints import (
+    CrossNodeConstraintLowered,
+    LoweredJaxConstraints,
+    LoweredNodalConstraint,
+)
 from openscvx.ocp import OptimalControlProblem
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
@@ -174,6 +179,9 @@ class Problem:
         self._compiled: Optional[Dynamics] = None
         self._compiled_prop: Optional[Dynamics] = None
 
+        # Compiled constraints (JIT-compiled versions, set in initialize())
+        self._compiled_constraints: Optional[LoweredJaxConstraints] = None
+
         # Solver state (created fresh for each solve)
         self._state: Optional[SolverState] = None
 
@@ -273,17 +281,33 @@ class Problem:
             f=jax.vmap(self._lowered.dynamics_prop.f, in_axes=(0, 0, 0, None)),
         )
 
-        for constraint in self._lowered.jax_constraints.nodal:
-            # TODO: (haynec) switch to AOT instead of JIT
-            constraint.func = jax.jit(constraint.func)
-            constraint.grad_g_x = jax.jit(constraint.grad_g_x)
-            constraint.grad_g_u = jax.jit(constraint.grad_g_u)
+        # Create compiled (JIT-compiled) constraints as new instances
+        # This preserves the original un-JIT'd versions in _lowered
+        # TODO: (haynec) switch to AOT instead of JIT
+        compiled_nodal = [
+            LoweredNodalConstraint(
+                func=jax.jit(c.func),
+                grad_g_x=jax.jit(c.grad_g_x),
+                grad_g_u=jax.jit(c.grad_g_u),
+                nodes=c.nodes,
+            )
+            for c in self._lowered.jax_constraints.nodal
+        ]
 
-        # JIT compile cross-node constraints
-        for constraint in self._lowered.jax_constraints.cross_node:
-            constraint.func = jax.jit(constraint.func)
-            constraint.grad_g_X = jax.jit(constraint.grad_g_X)
-            constraint.grad_g_U = jax.jit(constraint.grad_g_U)
+        compiled_cross_node = [
+            CrossNodeConstraintLowered(
+                func=jax.jit(c.func),
+                grad_g_X=jax.jit(c.grad_g_X),
+                grad_g_U=jax.jit(c.grad_g_U),
+            )
+            for c in self._lowered.jax_constraints.cross_node
+        ]
+
+        self._compiled_constraints = LoweredJaxConstraints(
+            nodal=compiled_nodal,
+            cross_node=compiled_cross_node,
+            ctcs=self._lowered.jax_constraints.ctcs,  # CTCS aren't JIT-compiled here
+        )
 
         # Generate solvers using compiled (vmapped) dynamics
         self.discretization_solver = get_discretization_solver(
@@ -339,7 +363,7 @@ class Problem:
             self.optimal_control_problem,
             self.discretization_solver,
             self.settings,
-            self._lowered.jax_constraints,
+            self._compiled_constraints,
         )
         print("✓ SCvx Subproblem Solver initialized")
 
@@ -402,7 +426,7 @@ class Problem:
             self.discretization_solver,
             self.cpg_solve,
             self.emitter_function,
-            self._lowered.jax_constraints,
+            self._compiled_constraints,
         )
 
         # Return dict matching original API
