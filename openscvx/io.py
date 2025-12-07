@@ -73,11 +73,11 @@ def print_problem_summary(settings, lowered):
     n_augmented = settings.sim.n_states - settings.sim.true_state_slice.stop
 
     # Count CVXPy variables, parameters, and constraints
-    from openscvx.ocp import OptimalControlProblem
+    from openscvx.ocp import optimal_control_problem
 
     try:
         # Build OCP using LoweredProblem
-        prob = OptimalControlProblem(settings, lowered)
+        prob = optimal_control_problem(settings, lowered)
 
         # Get the actual problem size information like CVXPy verbose output
         n_cvx_variables = sum(var.size for var in prob.variables())

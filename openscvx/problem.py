@@ -33,7 +33,7 @@ from openscvx.lowered.jax_constraints import (
     LoweredJaxConstraints,
     LoweredNodalConstraint,
 )
-from openscvx.ocp import OptimalControlProblem
+from openscvx.ocp import optimal_control_problem
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
 from openscvx.ptr import PTR_init, PTR_step, format_result
@@ -318,7 +318,7 @@ class Problem:
         )
 
         # Build optimal control problem using LoweredProblem
-        self._optimal_control_problem = OptimalControlProblem(self.settings, self._lowered)
+        self._optimal_control_problem = optimal_control_problem(self.settings, self._lowered)
 
         # Get cache file paths using symbolic AST hashing
         # This is more stable than hashing lowered JAX code
