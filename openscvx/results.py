@@ -3,9 +3,6 @@ from typing import Any, Optional
 
 import numpy as np
 
-from openscvx.symbolic.expr.control import Control
-from openscvx.symbolic.expr.state import State
-
 
 @dataclass
 class OptimizationResults:
@@ -20,8 +17,8 @@ class OptimizationResults:
     Attributes:
         converged (bool): Whether the optimization successfully converged
         t_final (float): Final time of the optimized trajectory
-        u (Control): Optimized control trajectory at discretization nodes
-        x (State): Optimized state trajectory at discretization nodes
+        x_guess (np.ndarray): Optimized state trajectory at discretization nodes, shape (N, n_states)
+        u_guess (np.ndarray): Optimized control trajectory at discretization nodes, shape (N, n_controls)
 
         # Dictionary-based Access
         nodes (dict[str, np.ndarray]): Dictionary mapping state/control names to arrays
@@ -51,8 +48,8 @@ class OptimizationResults:
     # Core optimization results
     converged: bool
     t_final: float
-    u: Control
-    x: State
+    x_guess: np.ndarray
+    u_guess: np.ndarray
 
     # Dictionary-based access to states and controls
     nodes: dict[str, np.ndarray] = field(default_factory=dict)

@@ -250,8 +250,8 @@ def plot_constraint_violation(result: OptimizationResults, params: Config):
 
 
 def plot_initial_guess(result: OptimizationResults, params: Config):
-    x_positions = result.x.guess[:, 0:3].T
-    x_attitude = result.x.guess[:, 6:10].T
+    x_positions = result.x_guess[:, 0:3].T
+    x_attitude = result.x_guess[:, 6:10].T
     subs_positions = result.plotting_data["sub_positions"]
 
     fig = go.Figure(

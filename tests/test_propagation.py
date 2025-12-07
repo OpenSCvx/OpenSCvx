@@ -90,7 +90,8 @@ def test_s_to_t_basic(dis_type):
     u.guess = np.stack([[0.0, float(s)] for s in [1, 2, 3, 4]])
     x = State("x", shape=(1,))  # dummy initial state
     x.guess = np.array([[0.0], [1.0]])
-    t = s_to_t(x, u, p)
+    # Pass arrays instead of State/Control objects
+    t = s_to_t(x.guess, u.guess, p)
 
     # manually reconstruct expected t
     tau = np.linspace(0, 1, p.scp.n)
@@ -132,11 +133,11 @@ def test_t_to_tau_constant_slack(dis_type):
     u = Control("u", shape=(2,))  # 2 controls, last is slack
     u.guess = np.tile(np.array([0.0, 2.0]), (N, 1))  # constant slack of 2.0
 
-    # get the “nodal” times via s_to_t
-    t_nodal = s_to_t(x, u, p)
+    # get the "nodal" times via s_to_t - pass arrays instead of State/Control objects
+    t_nodal = s_to_t(x.guess, u.guess, p)
 
-    # invert back
-    tau, u_interp = t_to_tau(u, np.array(t_nodal).squeeze(), np.array(t_nodal).squeeze(), p)
+    # invert back - pass array instead of Control object
+    tau, u_interp = t_to_tau(u.guess, np.array(t_nodal).squeeze(), np.array(t_nodal).squeeze(), p)
 
     np.testing.assert_allclose(tau, np.linspace(0, 1, N), rtol=1e-6)
     # since slack & control are constant, interpolation must reprodu

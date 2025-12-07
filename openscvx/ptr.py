@@ -11,6 +11,7 @@ from openscvx.autotuning import update_scp_weights
 from openscvx.config import Config
 from openscvx.results import OptimizationResults
 from openscvx.solver_state import SolverState
+from openscvx.utils import calculate_cost_from_boundaries
 
 if TYPE_CHECKING:
     from openscvx.lowered import LoweredJaxConstraints
@@ -65,6 +66,9 @@ def PTR_init(
 def format_result(problem, state: "SolverState", converged: bool) -> OptimizationResults:
     """Formats the solver state as an OptimizationResults object.
 
+    Directly passes trajectory arrays from solver state to results - no object
+    construction needed. Results store pure arrays, settings store metadata.
+
     Args:
         problem: The Problem instance (for symbolic metadata and settings).
         state: The SolverState to extract results from.
@@ -73,7 +77,6 @@ def format_result(problem, state: "SolverState", converged: bool) -> Optimizatio
     Returns:
         OptimizationResults containing the solution data.
     """
-
     # Build nodes dictionary with all states and controls
     nodes_dict = {}
 
@@ -88,8 +91,8 @@ def format_result(problem, state: "SolverState", converged: bool) -> Optimizatio
     return OptimizationResults(
         converged=converged,
         t_final=state.x_guess[:, problem.settings.sim.time_slice][-1],
-        u=state.u,  # Pass State/Control objects directly from solver state
-        x=state.x,
+        x_guess=state.x_guess.copy(),
+        u_guess=state.u_guess.copy(),
         nodes=nodes_dict,
         trajectory={},  # Populated by post_process
         _states=problem.symbolic.states_prop,  # Use propagation states for trajectory dict
@@ -153,8 +156,8 @@ def PTR_step(
 
     # Update state in place
     state.V_history.append(V_multi_shoot)
-    state.x.guess = x_sol
-    state.u.guess = u_sol
+    state.x_guess = x_sol
+    state.u_guess = u_sol
     state.x_history.append(x_sol.copy())
     state.u_history.append(u_sol.copy())
 
@@ -275,14 +278,15 @@ def PTR_subproblem(
         settings.sim.S_u @ prob.var_dict["u"].value.T + np.expand_dims(settings.sim.c_u, axis=1)
     ).T
 
-    i = 0
+    # Calculate costs from boundary conditions using utility function
+    # Note: The original code only considered final_type, but the utility handles both
+    # Here we maintain backward compatibility by only using final_type
     costs = [0]
-    for type in settings.sim.x.final_type:
-        if type == "Minimize":
+    for i, bc_type in enumerate(settings.sim.x.final_type):
+        if bc_type == "Minimize":
             costs += x_new_guess[:, i]
-        if type == "Maximize":
+        elif bc_type == "Maximize":
             costs -= x_new_guess[:, i]
-        i += 1
 
     # Create the block diagonal matrix using jax.numpy.block
     inv_block_diag = np.block(

@@ -93,3 +93,46 @@ def profiling_end(pr: "Optional[cProfile.Profile]", identifier: str):
         # Save results so it can be visualized with snakeviz
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         pr.dump_stats(f"profiling/{timestamp}_{identifier}.prof")
+
+
+def calculate_cost_from_boundaries(
+    x_guess: np.ndarray, initial_type: np.ndarray, final_type: np.ndarray
+) -> float:
+    """Calculate cost from boundary condition objectives.
+
+    This function computes the total cost contribution from state boundary conditions
+    marked as "Minimize" or "Maximize" at initial and final times.
+
+    Args:
+        x_guess: State trajectory array of shape (N, n_states)
+        initial_type: Array of boundary condition types for initial states
+        final_type: Array of boundary condition types for final states
+
+    Returns:
+        Total cost from minimize/maximize boundary conditions
+
+    Example:
+        >>> # State with final time to minimize
+        >>> x = np.array([[0.0, 5.0], [10.0, 20.0]])  # 2 nodes, 2 states
+        >>> initial_type = np.array(["Fix", "Free"])
+        >>> final_type = np.array(["Minimize", "Free"])
+        >>> cost = calculate_cost_from_boundaries(x, initial_type, final_type)
+        >>> cost  # Returns x[-1, 0] = 10.0
+    """
+    cost = 0.0
+
+    # Add costs from initial boundary conditions
+    for i, bc_type in enumerate(initial_type):
+        if bc_type == "Minimize":
+            cost += x_guess[0, i]
+        elif bc_type == "Maximize":
+            cost -= x_guess[0, i]
+
+    # Add costs from final boundary conditions
+    for i, bc_type in enumerate(final_type):
+        if bc_type == "Minimize":
+            cost += x_guess[-1, i]
+        elif bc_type == "Maximize":
+            cost -= x_guess[-1, i]
+
+    return cost
