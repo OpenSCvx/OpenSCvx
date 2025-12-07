@@ -447,11 +447,15 @@ class Problem:
         # Sync parameters before solving
         self._sync_parameters()
 
-        if self.optimal_control_problem is None or self.discretization_solver is None:
+        required = [
+            self._compiled,
+            self._compiled_constraints,
+            self.optimal_control_problem,
+            self.discretization_solver,
+            self._state,
+        ]
+        if any(r is None for r in required):
             raise ValueError("Problem has not been initialized. Call initialize() before solve()")
-
-        if self._state is None:
-            raise ValueError("Solver state not initialized. Call initialize() before solve()")
 
         # Enable the profiler
         pr = profiling_start(self.settings.dev.profiling)
