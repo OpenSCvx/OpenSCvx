@@ -23,12 +23,13 @@ class SolverState:
     It stores only the evolving trajectory arrays, not the full State/Control
     objects which contain immutable configuration metadata.
 
+    Trajectory arrays are stored in history lists, with the current guess
+    accessed via properties that return the latest entry.
+
     A fresh instance is created for each solve, enabling easy reset functionality.
 
     Attributes:
         k: Current iteration number (starts at 1)
-        x_guess: Current state trajectory array, shape (N, n_states)
-        u_guess: Current control trajectory array, shape (N, n_controls)
         J_tr: Current trust region cost
         J_vb: Current virtual buffer cost
         J_vc: Current virtual control cost
@@ -36,14 +37,12 @@ class SolverState:
         lam_cost: Current cost weight (may relax during solve)
         lam_vc: Current virtual control penalty weight
         lam_vb: Current virtual buffer penalty weight
-        x_history: List of state trajectory iterates
-        u_history: List of control trajectory iterates
-        V_history: List of discretization error history
+        X: List of state trajectory iterates
+        U: List of control trajectory iterates
+        V_sequence: List of discretization error history
     """
 
     k: int
-    x_guess: np.ndarray
-    u_guess: np.ndarray
     J_tr: float
     J_vb: float
     J_vc: float
@@ -51,9 +50,27 @@ class SolverState:
     lam_cost: float
     lam_vc: Union[float, np.ndarray]
     lam_vb: float
-    x_history: List[np.ndarray] = field(default_factory=list)
-    u_history: List[np.ndarray] = field(default_factory=list)
-    V_history: List[np.ndarray] = field(default_factory=list)
+    X: List[np.ndarray] = field(default_factory=list)
+    U: List[np.ndarray] = field(default_factory=list)
+    V_sequence: List[np.ndarray] = field(default_factory=list)
+
+    @property
+    def x(self) -> np.ndarray:
+        """Get current state trajectory array.
+
+        Returns:
+            Current state trajectory guess (latest entry in history), shape (N, n_states)
+        """
+        return self.X[-1]
+
+    @property
+    def u(self) -> np.ndarray:
+        """Get current control trajectory array.
+
+        Returns:
+            Current control trajectory guess (latest entry in history), shape (N, n_controls)
+        """
+        return self.U[-1]
 
     @classmethod
     def from_settings(cls, settings: "Config") -> "SolverState":
@@ -70,8 +87,6 @@ class SolverState:
         """
         return cls(
             k=1,
-            x_guess=settings.sim.x.guess.copy(),
-            u_guess=settings.sim.u.guess.copy(),
             J_tr=1e2,
             J_vb=1e2,
             J_vc=1e2,
@@ -79,7 +94,7 @@ class SolverState:
             lam_cost=settings.scp.lam_cost,
             lam_vc=settings.scp.lam_vc,
             lam_vb=settings.scp.lam_vb,
-            x_history=[settings.sim.x.guess.copy()],
-            u_history=[settings.sim.u.guess.copy()],
-            V_history=[],
+            X=[settings.sim.x.guess.copy()],
+            U=[settings.sim.u.guess.copy()],
+            V_sequence=[],
         )

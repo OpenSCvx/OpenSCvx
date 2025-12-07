@@ -82,24 +82,24 @@ def format_result(problem, state: "SolverState", converged: bool) -> Optimizatio
 
     # Add all states (user-defined and augmented)
     for sym_state in problem.symbolic.states:
-        nodes_dict[sym_state.name] = state.x_guess[:, sym_state._slice]
+        nodes_dict[sym_state.name] = state.x[:, sym_state._slice]
 
     # Add all controls (user-defined and augmented)
     for control in problem.symbolic.controls:
-        nodes_dict[control.name] = state.u_guess[:, control._slice]
+        nodes_dict[control.name] = state.u[:, control._slice]
 
     return OptimizationResults(
         converged=converged,
-        t_final=state.x_guess[:, problem.settings.sim.time_slice][-1],
-        x_guess=state.x_guess.copy(),
-        u_guess=state.u_guess.copy(),
+        t_final=state.x[:, problem.settings.sim.time_slice][-1],
+        x_guess=state.x.copy(),
+        u_guess=state.u.copy(),
         nodes=nodes_dict,
         trajectory={},  # Populated by post_process
         _states=problem.symbolic.states_prop,  # Use propagation states for trajectory dict
         _controls=problem.symbolic.controls,
-        x_history=state.x_history,
-        u_history=state.u_history,
-        discretization_history=state.V_history,
+        x_history=state.X,
+        u_history=state.U,
+        discretization_history=state.V_sequence,
         J_tr_history=state.J_tr,
         J_vb_history=state.J_vb,
         J_vc_history=state.J_vc,
@@ -154,12 +154,11 @@ def PTR_step(
         jax_constraints,
     )
 
-    # Update state in place
-    state.V_history.append(V_multi_shoot)
-    state.x_guess = x_sol
-    state.u_guess = u_sol
-    state.x_history.append(x_sol.copy())
-    state.u_history.append(u_sol.copy())
+    # Update state in place by appending to history
+    # The x_guess/u_guess properties will automatically return the latest entry
+    state.V_sequence.append(V_multi_shoot)
+    state.X.append(x_sol)
+    state.U.append(u_sol)
 
     state.J_tr = np.sum(np.array(J_tr_vec))
     state.J_vb = np.sum(np.array(J_vb_vec))
@@ -203,15 +202,15 @@ def PTR_subproblem(
     settings: Config,
     jax_constraints: "LoweredJaxConstraints",
 ):
-    prob.param_dict["x_bar"].value = state.x_guess
-    prob.param_dict["u_bar"].value = state.u_guess
+    prob.param_dict["x_bar"].value = state.x
+    prob.param_dict["u_bar"].value = state.u
 
     # Convert parameters to dictionary
     param_dict = dict(params)
 
     t0 = time.time()
     A_bar, B_bar, C_bar, x_prop, V_multi_shoot = aug_dy.call(
-        state.x_guess, state.u_guess.astype(float), param_dict
+        state.x, state.u.astype(float), param_dict
     )
 
     prob.param_dict["A_d"].value = A_bar.__array__()
@@ -225,13 +224,13 @@ def PTR_subproblem(
     if jax_constraints.nodal:
         for g_id, constraint in enumerate(jax_constraints.nodal):
             prob.param_dict["g_" + str(g_id)].value = np.asarray(
-                constraint.func(state.x_guess, state.u_guess, 0, param_dict)
+                constraint.func(state.x, state.u, 0, param_dict)
             )
             prob.param_dict["grad_g_x_" + str(g_id)].value = np.asarray(
-                constraint.grad_g_x(state.x_guess, state.u_guess, 0, param_dict)
+                constraint.grad_g_x(state.x, state.u, 0, param_dict)
             )
             prob.param_dict["grad_g_u_" + str(g_id)].value = np.asarray(
-                constraint.grad_g_u(state.x_guess, state.u_guess, 0, param_dict)
+                constraint.grad_g_u(state.x, state.u, 0, param_dict)
             )
 
     # Update cross-node constraint linearization parameters
@@ -239,13 +238,13 @@ def PTR_subproblem(
         for g_id, constraint in enumerate(jax_constraints.cross_node):
             # Cross-node constraints take (X, U, params) not (x, u, node, params)
             prob.param_dict["g_cross_" + str(g_id)].value = np.asarray(
-                constraint.func(state.x_guess, state.u_guess, param_dict)
+                constraint.func(state.x, state.u, param_dict)
             )
             prob.param_dict["grad_g_X_cross_" + str(g_id)].value = np.asarray(
-                constraint.grad_g_X(state.x_guess, state.u_guess, param_dict)
+                constraint.grad_g_X(state.x, state.u, param_dict)
             )
             prob.param_dict["grad_g_U_cross_" + str(g_id)].value = np.asarray(
-                constraint.grad_g_U(state.x_guess, state.u_guess, param_dict)
+                constraint.grad_g_U(state.x, state.u, param_dict)
             )
 
     # Convex constraints are already lowered and handled in the OCP, no action needed here
@@ -306,7 +305,7 @@ def PTR_subproblem(
     J_tr_vec = (
         la.norm(
             inv_block_diag
-            @ np.hstack((x_new_guess - state.x_guess, u_new_guess - state.u_guess)).T,
+            @ np.hstack((x_new_guess - state.x, u_new_guess - state.u)).T,
             axis=0,
         )
         ** 2
