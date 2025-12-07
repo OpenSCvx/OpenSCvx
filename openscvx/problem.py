@@ -1,3 +1,14 @@
+"""Core optimization problem interface for trajectory optimization.
+
+This module provides the Problem class, the main entry point for defining
+and solving trajectory optimization problems using Sequential Convex Programming (SCP).
+
+Typical usage:
+    problem = Problem(dynamics, constraints, states, controls, N, time)
+    problem.initialize()
+    result = problem.solve()
+    result = problem.post_process()
+"""
 import copy
 import os
 import queue
