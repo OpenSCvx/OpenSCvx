@@ -91,14 +91,12 @@ def format_result(problem, state: "SolverState", converged: bool) -> Optimizatio
     return OptimizationResults(
         converged=converged,
         t_final=state.x[:, problem.settings.sim.time_slice][-1],
-        x_guess=state.x.copy(),
-        u_guess=state.u.copy(),
         nodes=nodes_dict,
         trajectory={},  # Populated by post_process
         _states=problem.symbolic.states_prop,  # Use propagation states for trajectory dict
         _controls=problem.symbolic.controls,
-        x_history=state.X,
-        u_history=state.U,
+        X=state.X,  # Single source of truth - x and u are properties
+        U=state.U,
         discretization_history=state.V_sequence,
         J_tr_history=state.J_tr,
         J_vb_history=state.J_vb,

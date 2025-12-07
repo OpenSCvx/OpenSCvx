@@ -32,8 +32,8 @@ def propagate_trajectory_results(
             - ctcs_violation: CTCS constraint violation
     """
     # Get arrays from result
-    x = result.x_guess
-    u = result.u_guess
+    x = result.x
+    u = result.u
 
     t = np.array(s_to_t(x, u, settings)).squeeze()
 
