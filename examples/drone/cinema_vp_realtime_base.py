@@ -1,13 +1,17 @@
-import os
-import sys
+"""Base problem setup for real-time cinematic viewpoint planning.
 
+This module defines the base optimization problem for real-time aerial
+cinematography, designed to be imported by interactive visualization examples.
+The problem includes:
+
+- 6-DOF dynamics with parametric target positions
+- Field-of-view constraints for visual tracking
+- Sensor cone constraints for camera pointing
+- Configured for real-time re-optimization with moving targets
+"""
 import jax.numpy as jnp
 import numpy as np
 import numpy.linalg as la
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
-sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_animation

@@ -256,7 +256,7 @@ constraints = []
 for state in states:
     constraints.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
 
-# Add visibility constraints for submarines using symbolic expressions
+# Add visibility constraints using symbolic expressions
 for pose in init_poses:
     constraints.append(ox.ctcs(g_vp(pose, position, attitude) <= 0.0))
 ```

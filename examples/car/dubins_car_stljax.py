@@ -1,12 +1,17 @@
-import os
-import sys
+"""Dubins car with Signal Temporal Logic (STL) constraints using stljax.
+
+This example demonstrates a Dubins car with temporal logic specifications
+using the stljax library for STL constraint formulation. The problem includes:
+
+- 2D position and heading dynamics with time state
+- STL specification for waypoint visiting (visit wp1 OR wp2)
+- Temporal constraints on when waypoints must be visited
+- Integration with stljax library for formal specifications
+- Requires: pip install stljax
+"""
 
 import jax.numpy as jnp
 import numpy as np
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
-sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_dubins_car_disjoint

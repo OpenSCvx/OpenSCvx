@@ -1,3 +1,9 @@
+"""Interactive real-time visualization for Dubins car path planning.
+
+This module provides a PyQt5-based GUI for interactively solving and visualizing
+the Dubins car trajectory optimization problem in real-time.
+"""
+
 import os
 import sys
 import threading

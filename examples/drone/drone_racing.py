@@ -1,12 +1,16 @@
-import os
-import sys
+"""6-DOF quadrotor racing through sequential gates.
+
+This example demonstrates time-optimal trajectory planning for a quadrotor
+racing through a series of gates in a specified order. The problem includes:
+
+- 6-DOF rigid body dynamics (position, velocity, attitude quaternion, angular velocity)
+- Nodal constraints enforcing gate traversal at sequential nodes
+- Minimal time objective
+- Loop closure (start equals end position)
+"""
 
 import jax.numpy as jnp
 import numpy as np
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
-sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_animation

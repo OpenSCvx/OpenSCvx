@@ -1,11 +1,16 @@
-import os
-import sys
+"""3-DOF Powered Descent Guidance (PDG) for planetary landing.
+
+This example demonstrates optimal trajectory generation for a rocket performing
+powered descent guidance, similar to SpaceX Falcon 9 or Blue Origin landings.
+The problem includes:
+
+- 3D position and velocity dynamics
+- Fuel-optimal mass minimization
+- Thrust magnitude and pointing constraints
+- Glideslope constraint for safe landing approach
+"""
 
 import numpy as np
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
-sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_control_norm, plot_xy_xz_yz

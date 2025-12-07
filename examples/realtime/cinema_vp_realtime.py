@@ -1,3 +1,9 @@
+"""Interactive real-time visualization for cinematic viewpoint planning.
+
+This module provides a PyQt5-based GUI for interactively solving and visualizing
+the cinematic viewpoint planning trajectory optimization problem in real-time.
+"""
+
 import os
 import sys
 import threading

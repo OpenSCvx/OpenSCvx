@@ -1,12 +1,17 @@
-import os
-import sys
+"""Brachistochrone problem: finding the fastest descent path.
+
+This classic calculus of variations problem finds the curve of fastest descent
+between two points under gravity. The solution demonstrates time-optimal
+trajectory generation with:
+
+- 2D position dynamics
+- Speed dynamics under gravitational acceleration
+- Angle control subject to bounds
+- Minimal time objective
+"""
 
 import jax.numpy as jnp
 import numpy as np
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
-sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import (

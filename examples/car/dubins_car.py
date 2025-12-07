@@ -1,12 +1,18 @@
-import os
-import sys
+"""Dubins car path planning with obstacle avoidance.
+
+This example demonstrates minimum-time path planning for a Dubins car
+(car-like vehicle with minimum turning radius) navigating around a
+circular obstacle. The problem includes:
+
+- 2D position and heading dynamics
+- Speed and angular rate control inputs
+- Circular obstacle avoidance constraint
+- Minimal time objective with free final heading
+- Parameter updates for multiple scenarios
+"""
 
 import jax.numpy as jnp
 import numpy as np
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
-sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_dubins_car

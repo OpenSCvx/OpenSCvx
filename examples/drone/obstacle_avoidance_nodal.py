@@ -1,12 +1,16 @@
-import os
-import sys
+"""6-DOF quadrotor obstacle avoidance with nodal constraints.
+
+This example demonstrates optimal trajectory planning for a quadrotor with
+obstacle avoidance constraints applied at specific nodes. The problem includes:
+
+- 6-DOF rigid body dynamics (position, velocity, attitude quaternion, angular velocity)
+- Thrust force and torque control inputs
+- **Nodal** obstacle avoidance constraints at specific trajectory points
+- Minimal time objective
+"""
 
 import jax.numpy as jnp
 import numpy as np
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
-sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_animation

@@ -1,12 +1,17 @@
-import os
-import sys
+"""Base problem setup for real-time 6-DOF obstacle avoidance.
+
+This module defines the base optimization problem for real-time quadrotor
+obstacle avoidance, designed to be imported by interactive visualization examples.
+The problem includes:
+
+- 6-DOF dynamics (position, velocity, attitude quaternion, angular velocity)
+- Parametric obstacle positions for runtime updates
+- Ellipsoidal obstacle avoidance constraints
+- Configured for real-time re-optimization
+"""
 
 import jax.numpy as jnp
 import numpy as np
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
-sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_animation

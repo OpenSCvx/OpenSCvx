@@ -1,13 +1,18 @@
-import os
-import sys
+"""Drone racing with continuous viewpoint constraints.
+
+This example combines drone racing through gates with camera viewpoint constraints
+to maintain visual contact with reference targets. The problem includes:
+
+- 6-DOF rigid body dynamics (position, velocity, attitude quaternion, angular velocity)
+- Sequential gate passage constraints
+- Attitude planning for simultaneous gate navigation and visual tracking
+- _Continuous_ sensor visibility constraints to keep targets in FOV
+- Minimal time objective
+"""
 
 import jax.numpy as jnp
 import numpy as np
 import numpy.linalg as la
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
-sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_animation
@@ -126,7 +131,7 @@ constraints = []
 for state in states:
     constraints.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
 
-# Add visibility constraints for submarines using symbolic expressions
+# Add visibility constraints using symbolic expressions
 for pose in init_poses:
     constraints.append(ox.ctcs(g_vp(pose, position, attitude) <= 0.0))
 

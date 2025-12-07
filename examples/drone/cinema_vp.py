@@ -1,13 +1,18 @@
-import os
-import sys
+"""Cinematic viewpoint planning for aerial filming.
+
+This example demonstrates optimal trajectory planning for a quadrotor performing
+aerial cinematography with viewpoint constraints. The problem includes:
+
+- 6-DOF dynamics with fuel consumption tracking
+- _Continuous_ field-of-view (FOV) constraints to keep moving target in view
+- Sensor pointing constraints using camera cone geometry
+- Fuel-optimal trajectory generation
+- Attitude planning to maintain visual coverage
+"""
 
 import jax.numpy as jnp
 import numpy as np
 import numpy.linalg as la
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
-sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_animation

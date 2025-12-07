@@ -1,12 +1,17 @@
-import os
-import sys
+"""Simplified drone racing using double integrator dynamics.
+
+This example demonstrates time-optimal racing through gates using simplified
+double integrator (point mass) dynamics instead of full 6-DOF dynamics. The problem includes:
+
+- 3-DOF point mass dynamics (position and velocity only)
+- Direct force control inputs (no attitude dynamics)
+- Sequential gate passage constraints
+- Minimal time objective
+- Loop closure constraint
+"""
 
 import jax.numpy as jnp
 import numpy as np
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
-sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_animation_double_integrator
