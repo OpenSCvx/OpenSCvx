@@ -68,7 +68,7 @@ def dynamics():
 
 def test_discretization_shapes(settings, dynamics):
     # build solver
-    solver = get_discretization_solver(dynamics, settings, {})
+    solver = get_discretization_solver(dynamics, settings)
 
     # dummy x,u
     x = jnp.ones((settings.scp.n, settings.sim.n_states))
@@ -119,7 +119,7 @@ def test_jit_discretization_solver_compiles(settings, dynamics, integrator):
         settings.dis.custom_integrator = False
 
     # build the solver (captures only hashable primitives)
-    solver = get_discretization_solver(dynamics, settings, {})
+    solver = get_discretization_solver(dynamics, settings)
 
     # dummy x,u (including slack column)
     x = jnp.ones((settings.scp.n, settings.sim.n_states))

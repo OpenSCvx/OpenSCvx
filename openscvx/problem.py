@@ -311,10 +311,10 @@ class Problem:
 
         # Generate solvers using compiled (vmapped) dynamics
         self._discretization_solver = get_discretization_solver(
-            self._compiled_dynamics, self.settings, self.parameters
+            self._compiled_dynamics, self.settings
         )
         self._propagation_solver = get_propagation_solver(
-            self._compiled_dynamics_prop.f, self.settings, self.parameters
+            self._compiled_dynamics_prop.f, self.settings
         )
 
         # Build optimal control problem using LoweredProblem

@@ -2,6 +2,7 @@ import numpy as np
 
 from openscvx.config import Config
 from openscvx.integrators import solve_ivp_diffrax_prop
+from openscvx.lowered import Dynamics
 
 
 def prop_aug_dy(
@@ -49,7 +50,7 @@ def prop_aug_dy(
     return u[:, idx_s] * state_dot(x, u[:, :-1], node, params).squeeze()
 
 
-def get_propagation_solver(state_dot, settings, param_map):
+def get_propagation_solver(state_dot: Dynamics, settings: Config):
     """Create a propagation solver function.
 
     This function creates a solver that propagates the system state using the
@@ -85,6 +86,10 @@ def get_propagation_solver(state_dot, settings, param_map):
                 # additional named parameters as **kwargs
             ),
             tau_0=tau_grid[0],  # scalar
+            solver_name=settings.prp.solver,
+            rtol=settings.prp.rtol,
+            atol=settings.prp.atol,
+            extra_kwargs=settings.prp.args,
             save_time=save_time,  # shape (MAX_TAU_LEN,)
             mask=mask,  # shape (MAX_TAU_LEN,), dtype=bool
         )
@@ -101,7 +106,7 @@ def s_to_t(x: np.ndarray, u: np.ndarray, settings: Config):
     Args:
         x: State trajectory array, shape (N, n_states).
         u: Control trajectory array, shape (N, n_controls).
-        settings: Configuration settings.
+        settings (Config): Configuration settings.
 
     Returns:
         list: List of real time points.
@@ -128,7 +133,7 @@ def t_to_tau(u: np.ndarray, t, t_nodal, settings: Config):
         u (np.ndarray): Control trajectory array, shape (N, n_controls).
         t (np.ndarray): Real time points.
         t_nodal (np.ndarray): Nodal time points.
-        settings: Configuration settings.
+        settings (Config): Configuration settings.
 
     Returns:
         tuple: (tau, u_interp) where tau is normalized time and u_interp is interpolated controls.

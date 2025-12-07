@@ -154,11 +154,16 @@ def test_propagation_solver_decay(dis_type):
     p.scp.n = 2  # only one segment needed
     p.dis = Dummy()
     p.dis.dis_type = dis_type
+    p.prp = Dummy()
+    p.prp.solver = "Tsit5"
+    p.prp.rtol = 1e-6
+    p.prp.atol = 1e-3
+    p.prp.args = {}
     p.sim = Dummy()
     p.sim.idx_s = Dummy()
     p.sim.idx_s.stop = 1  # slack index
 
-    solver = get_propagation_solver(decay, p, {})
+    solver = get_propagation_solver(decay, p)
 
     # Initial conditions
     V0 = jnp.array([1.0])
@@ -196,11 +201,16 @@ def test_jit_propagation_solver_compiles(dis_type):
     p.scp.n = 5
     p.dis = Dummy()
     p.dis.dis_type = dis_type
+    p.prp = Dummy()
+    p.prp.solver = "Tsit5"
+    p.prp.rtol = 1e-6
+    p.prp.atol = 1e-3
+    p.prp.args = {}
     p.sim = Dummy()
     p.sim.idx_s = Dummy()
     p.sim.idx_s.stop = 0  # dummy value
 
-    solver = get_propagation_solver(decay, p, {})
+    solver = get_propagation_solver(decay, p)
 
     # — dummy inputs —
     V0 = jnp.array([1.0])
