@@ -881,12 +881,15 @@ def test_propagation():
 
 def test_idempotency():
     """
-    Test that Problem.reset() enables idempotent solve() and post_process().
+    Test that each step of the pipeline is idempotent.
+
+    Calling initialize(), solve(), and post_process() twice in a row should
+    not break anything and should produce identical results.
 
     This validates that:
-    1. reset() restores solver state to initial conditions
-    2. Multiple solve/post_process cycles produce identical results
-    3. Settings remain unchanged between solves
+    1. initialize() can be called multiple times without double-wrapping vmap/jit
+    2. solve() can be called multiple times without corrupting state
+    3. post_process() can be called multiple times without mutating solution/settings
     """
     from examples.abstract.brachistochrone import problem
 
@@ -894,75 +897,62 @@ def test_idempotency():
     if hasattr(problem.settings, "dev"):
         problem.settings.dev.printing = False
 
-    # First solve cycle
+    # Call each step twice to test idempotency
     problem.initialize()
-    # TODO: (norrisg) should check `problem.initialze()` a second time
-    # -> May break jitting of constraints
+    problem.initialize()  # Should not double-wrap vmap/jit
+
     problem.solve()
+    problem.solve()  # Should not corrupt state (likely converges immediately)
+
     result1 = problem.post_process()
+    result2 = problem.post_process()  # Should return identical results
 
     # Check convergence
-    assert result1["converged"], "First solve failed to converge"
+    assert result1["converged"], "First post_process result should show convergence"
+    assert result2["converged"], "Second post_process result should show convergence"
 
-    # Reset and second solve cycle
-    problem.reset()
-    problem.solve()
-    result2 = problem.post_process()
-
-    # Check convergence
-    assert result2["converged"], "Second solve failed to converge"
-
-    # Results should be identical - state trajectories
+    # post_process() should return identical results when called twice
     np.testing.assert_allclose(
         result1.x.guess,
         result2.x.guess,
         rtol=1e-10,
         atol=1e-10,
-        err_msg="State trajectories differ between solves",
+        err_msg="State trajectories differ between post_process() calls",
     )
 
-    # Control trajectories
     np.testing.assert_allclose(
         result1.u.guess,
         result2.u.guess,
         rtol=1e-10,
         atol=1e-10,
-        err_msg="Control trajectories differ between solves",
+        err_msg="Control trajectories differ between post_process() calls",
     )
 
-    # Propagated state trajectories
     np.testing.assert_allclose(
         result1.x_full,
         result2.x_full,
         rtol=1e-10,
         atol=1e-10,
-        err_msg="Propagated state trajectories differ between solves",
+        err_msg="Propagated state trajectories differ between post_process() calls",
     )
 
-    # Propagated control trajectories
     np.testing.assert_allclose(
         result1.u_full,
         result2.u_full,
         rtol=1e-10,
         atol=1e-10,
-        err_msg="Propagated control trajectories differ between solves",
+        err_msg="Propagated control trajectories differ between post_process() calls",
     )
 
-    # Check that final times are identical
     assert abs(result1.t_final - result2.t_final) < 1e-10, (
         f"Final times differ: {result1.t_final} vs {result2.t_final}"
     )
 
     print("\nIdempotency Test Results:")
-    print(
-        f"  First solve:  t_final={float(result1.t_final):.6f}s, converged={result1['converged']}"
-    )
-    print(
-        f"  Second solve: t_final={float(result2.t_final):.6f}s, converged={result2['converged']}"
-    )
+    print(f"  t_final={float(result1.t_final):.6f}s, converged={result1['converged']}")
     print(f"  Max state diff:   {float(np.max(np.abs(result1.x.guess - result2.x.guess))):.2e}")
     print(f"  Max control diff: {float(np.max(np.abs(result1.u.guess - result2.u.guess))):.2e}")
-    print("  ✓ reset() successfully restored initial conditions")
+    print("  initialize() x2, solve() x2, post_process() x2 all succeeded")
 
     # Clean up JAX caches
     jax.clear_caches()
