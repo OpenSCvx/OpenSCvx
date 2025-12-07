@@ -1,8 +1,8 @@
 import numpy as np
 
 from openscvx.config import Config
-from openscvx.lowered import Dynamics
 from openscvx.integrators import solve_ivp_diffrax_prop
+from openscvx.lowered import Dynamics
 
 
 def prop_aug_dy(

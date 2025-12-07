@@ -1,9 +1,10 @@
 import jax.numpy as jnp
 import numpy as np
 
+from openscvx.config import Config
 from openscvx.integrators import solve_ivp_diffrax, solve_ivp_rk45
 from openscvx.lowered import Dynamics
-from openscvx.config import Config
+
 
 def dVdt(
     tau: float,
