@@ -314,18 +314,21 @@ def optimization_loop():
     problem.initialize()
     try:
         while not running["stop"]:
-            # Warm start: set guess to last solution if available
-            if latest_results["results"] is not None:
-                problem.settings.sim.x.guess = latest_results["results"]["x"].guess
-                problem.settings.sim.u.guess = latest_results["results"]["u"].guess
-            # Perform a single SCP step
-            results = problem.step()
-            # step() now returns: converged, scp_k, scp_J_tr, scp_J_vb, scp_J_vc
-            # Rename keys for consistency with legacy code
-            results["iter"] = results["scp_k"] - 1
-            results["J_tr"] = results["scp_J_tr"]
-            results["J_vb"] = results["scp_J_vb"]
-            results["J_vc"] = results["scp_J_vc"]
+            # Perform a single SCP step (automatically warm-starts from previous iteration)
+            step_result = problem.step()
+
+            # Build results dict for visualization
+            results = {
+                "iter": step_result["scp_k"] - 1,  # Display iteration (0-indexed)
+                "J_tr": step_result["scp_J_tr"],
+                "J_vb": step_result["scp_J_vb"],
+                "J_vc": step_result["scp_J_vc"],
+                "converged": step_result["converged"],
+                "V_multi_shoot": problem.state.V_history[-1] if problem.state.V_history else [],
+                "x": problem.state.x,  # Current state trajectory
+                "u": problem.state.u,  # Current control trajectory
+            }
+
             # Get timing from the print queue (emitted data)
             try:
                 if hasattr(problem, "print_queue") and not problem.print_queue.empty():
@@ -345,8 +348,7 @@ def optimization_loop():
                 results["solve_time"] = 0.0
                 results["prob_stat"] = "--"
                 results["cost"] = 0.0
-            # Optionally skip post_process for speed
-            # results = problem.post_process()
+
             results.update(plotting_dict)
             latest_results["results"] = results
             new_result_event.set()
@@ -415,7 +417,7 @@ def plot_thread_func():
             except Exception as e:
                 print(f"Plot update error: {e}")
                 if "x" in latest_results["results"]:
-                    x_traj = latest_results["results"]["x"].guess
+                    x_traj = latest_results["results"]["x"]  # Now a numpy array
                     if HAS_OPENGL:
                         plot_widget.traj_scatter.setData(pos=x_traj[:, :3])
                     else:

@@ -66,15 +66,24 @@ class OptimizationWorker(QObject):
         while self.running:
             try:
                 start_time = time.time()
-                results = self.problem.step()
+                step_result = self.problem.step()
                 solve_time = time.time() - start_time
-                # step() now returns: converged, scp_k, scp_J_tr, scp_J_vb, scp_J_vc
-                # Rename keys for consistency with legacy code
-                results["iter"] = results["scp_k"] - 1
-                results["J_tr"] = results["scp_J_tr"]
-                results["J_vb"] = results["scp_J_vb"]
-                results["J_vc"] = results["scp_J_vc"]
-                results["solve_time"] = solve_time * 1000  # Convert to milliseconds
+
+                # Build results dict for visualization
+                results = {
+                    "iter": step_result["scp_k"] - 1,  # Display iteration (0-indexed)
+                    "J_tr": step_result["scp_J_tr"],
+                    "J_vb": step_result["scp_J_vb"],
+                    "J_vc": step_result["scp_J_vc"],
+                    "converged": step_result["converged"],
+                    "solve_time": solve_time * 1000,  # Convert to milliseconds
+                    "V_multi_shoot": self.problem.state.V_history[-1]
+                    if self.problem.state.V_history
+                    else [],
+                    "x": self.problem.state.x,  # Current state trajectory
+                    "u": self.problem.state.u,  # Current control trajectory
+                }
+
                 # Get timing from the print queue (emitted data) if available
                 try:
                     if (
@@ -89,11 +98,11 @@ class OptimizationWorker(QObject):
                     else:
                         results["dis_time"] = 0.0
                         results["prob_stat"] = "--"
-                        results["cost"] = results.get("cost", 0.0)
+                        results["cost"] = 0.0
                 except Exception:
                     results["dis_time"] = 0.0
                     results["prob_stat"] = "--"
-                    results["cost"] = results.get("cost", 0.0)
+                    results["cost"] = 0.0
                 # Update vertices for visualization
                 radii = np.array([2.5, 1e-4, 2.5])
                 vertices = []
