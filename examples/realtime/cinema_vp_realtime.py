@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPushButton,
     QSlider,
     QVBoxLayout,
     QWidget,
@@ -47,6 +48,7 @@ except ImportError:
 from scipy.spatial.transform import Rotation as R
 
 running = {"stop": False}
+reset_requested = {"reset": False}
 latest_results = {"results": None}
 new_result_event = threading.Event()
 
@@ -162,6 +164,14 @@ class CinemaVPPlotWidget(QWidget):
         lam_tr_layout.addStretch()  # Push everything to the left
         weights_layout.addLayout(lam_tr_layout)
         control_layout.addWidget(weights_group)
+        # Reset Button
+        reset_group = QGroupBox("Problem Control")
+        reset_layout = QVBoxLayout()
+        reset_group.setLayout(reset_layout)
+        reset_button = QPushButton("Reset Problem")
+        reset_button.clicked.connect(self.on_reset_clicked)
+        reset_layout.addWidget(reset_button)
+        control_layout.addWidget(reset_group)
         # Keypoint Position Controls
         kp_group = QGroupBox("Keypoint Position (Line-of-Sight Target)")
         kp_layout = QVBoxLayout()
@@ -264,6 +274,11 @@ class CinemaVPPlotWidget(QWidget):
             label.setText(f"{value:.2f}")
         except ValueError:
             print(f"Invalid input for axis {axis}")
+
+    def on_reset_clicked(self):
+        """Handle reset button click"""
+        reset_requested["reset"] = True
+        print("Reset requested - problem will reset on next iteration")
 
     def keyPressEvent(self, event):
         """Handle keyboard shortcuts"""
@@ -411,6 +426,12 @@ def optimization_loop():
     problem.initialize()
     try:
         while not running["stop"]:
+            # Check if reset was requested
+            if reset_requested["reset"]:
+                problem.reset()
+                reset_requested["reset"] = False
+                print("Problem reset to initial conditions")
+
             # Perform a single SCP step (automatically warm-starts from previous iteration)
             step_result = problem.step()
 

@@ -47,6 +47,7 @@ class OptimizationWorker(QObject):
     def __init__(self):
         super().__init__()
         self.running = False
+        self.reset_requested = False
         self.problem = problem
         self.gate_center_params = gate_center_params
 
@@ -65,6 +66,13 @@ class OptimizationWorker(QObject):
         iteration = 0
         while self.running:
             try:
+                # Check if reset was requested
+                if self.reset_requested:
+                    self.problem.reset()
+                    self.reset_requested = False
+                    iteration = 0
+                    print("Problem reset to initial conditions")
+
                 start_time = time.time()
                 step_result = self.problem.step()
                 solve_time = time.time() - start_time
@@ -295,6 +303,14 @@ class DroneRacingGUI(QMainWindow):
         self.camera_status_label.setStyleSheet("font-size: 10px; color: #666;")
         camera_layout.addWidget(self.camera_status_label)
         left_layout.addWidget(camera_group)
+        # Problem Control
+        problem_control_group = QGroupBox("Problem Control")
+        problem_control_layout = QVBoxLayout()
+        problem_control_group.setLayout(problem_control_layout)
+        reset_problem_button = QPushButton("Reset Problem")
+        reset_problem_button.clicked.connect(self.reset_problem)
+        problem_control_layout.addWidget(reset_problem_button)
+        left_layout.addWidget(problem_control_group)
         # Gate Controls
         gate_group = QGroupBox("Gate Positions")
         gate_layout = QVBoxLayout()
@@ -543,6 +559,11 @@ class DroneRacingGUI(QMainWindow):
         # This method is kept for compatibility but the main update is done
         # in update_optimization_metrics
         pass
+
+    def reset_problem(self):
+        """Reset the optimization problem"""
+        self.worker.reset_requested = True
+        print("Problem reset requested")
 
     def reset_gate_positions(self):
         """Reset gate positions to their original values"""

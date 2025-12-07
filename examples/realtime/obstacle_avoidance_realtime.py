@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPushButton,
     QSlider,
     QVBoxLayout,
     QWidget,
@@ -41,6 +42,7 @@ except ImportError:
     print("PyQtGraph OpenGL not available, falling back to 2D")
     HAS_OPENGL = False
 running = {"stop": False}
+reset_requested = {"reset": False}
 latest_results = {"results": None}
 new_result_event = threading.Event()
 
@@ -146,6 +148,14 @@ class Obstacle3DPlotWidget(QWidget):
         lam_tr_layout.addStretch()  # Push everything to the left
         weights_layout.addLayout(lam_tr_layout)
         control_layout.addWidget(weights_group)
+        # Problem Control
+        problem_control_group = QGroupBox("Problem Control")
+        problem_control_layout = QVBoxLayout()
+        problem_control_group.setLayout(problem_control_layout)
+        reset_problem_button = QPushButton("Reset Problem")
+        reset_problem_button.clicked.connect(self.on_reset_clicked)
+        problem_control_layout.addWidget(reset_problem_button)
+        control_layout.addWidget(problem_control_group)
         # Sliders for each obstacle
         for i in range(3):
             obs_group = QGroupBox(f"Obstacle {i + 1} Position")
@@ -248,6 +258,11 @@ class Obstacle3DPlotWidget(QWidget):
             slider.setValue(slider_value)
             label.setText(f"{center[i]:.2f}")
 
+    def on_reset_clicked(self):
+        """Handle reset button click"""
+        reset_requested["reset"] = True
+        print("Problem reset requested")
+
     def keyPressEvent(self, event):
         """Handle keyboard shortcuts"""
         if event.key() == Qt.Key_Escape:
@@ -314,6 +329,12 @@ def optimization_loop():
     problem.initialize()
     try:
         while not running["stop"]:
+            # Check if reset was requested
+            if reset_requested["reset"]:
+                problem.reset()
+                reset_requested["reset"] = False
+                print("Problem reset to initial conditions")
+
             # Perform a single SCP step (automatically warm-starts from previous iteration)
             step_result = problem.step()
 
