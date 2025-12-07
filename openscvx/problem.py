@@ -453,12 +453,6 @@ class Problem:
         if self._state is None:
             raise ValueError("Solver state not initialized. Call initialize() before solve()")
 
-        # Sync state weights with (re-)normalized settings
-        self._state.w_tr = self.settings.scp.w_tr
-        self._state.lam_cost = self.settings.scp.lam_cost
-        self._state.lam_vc = self.settings.scp.lam_vc
-        self._state.lam_vb = self.settings.scp.lam_vb
-
         # Enable the profiler
         pr = profiling_start(self.settings.dev.profiling)
 
