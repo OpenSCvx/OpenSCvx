@@ -17,8 +17,10 @@ class OptimizationResults:
     Attributes:
         converged (bool): Whether the optimization successfully converged
         t_final (float): Final time of the optimized trajectory
-        x_guess (np.ndarray): Optimized state trajectory at discretization nodes, shape (N, n_states)
-        u_guess (np.ndarray): Optimized control trajectory at discretization nodes, shape (N, n_controls)
+        x_guess (np.ndarray): Optimized state trajectory at discretization nodes,
+            shape (N, n_states)
+        u_guess (np.ndarray): Optimized control trajectory at discretization nodes,
+            shape (N, n_controls)
 
         # Dictionary-based Access
         nodes (dict[str, np.ndarray]): Dictionary mapping state/control names to arrays

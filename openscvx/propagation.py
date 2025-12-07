@@ -143,9 +143,7 @@ def t_to_tau(u: np.ndarray, t, t_nodal, settings: Config):
     elif settings.dis.dis_type == "FOH":
         # First-Order Hold: linear interpolation
         def u_lam(new_t):
-            return np.array(
-                [np.interp(new_t, t_nodal, u[:, i]) for i in range(u.shape[1])]
-            ).T
+            return np.array([np.interp(new_t, t_nodal, u[:, i]) for i in range(u.shape[1])]).T
     else:
         raise ValueError("Currently unsupported discretization type")
 

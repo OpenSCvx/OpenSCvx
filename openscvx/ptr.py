@@ -11,7 +11,6 @@ from openscvx.autotuning import update_scp_weights
 from openscvx.config import Config
 from openscvx.results import OptimizationResults
 from openscvx.solver_state import SolverState
-from openscvx.utils import calculate_cost_from_boundaries
 
 if TYPE_CHECKING:
     from openscvx.lowered import LoweredJaxConstraints
@@ -302,8 +301,7 @@ def PTR_subproblem(
     # Calculate J_tr_vec using the JAX-compatible block diagonal matrix
     J_tr_vec = (
         la.norm(
-            inv_block_diag
-            @ np.hstack((x_new_guess - state.x, u_new_guess - state.u)).T,
+            inv_block_diag @ np.hstack((x_new_guess - state.x, u_new_guess - state.u)).T,
             axis=0,
         )
         ** 2
