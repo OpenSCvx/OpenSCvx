@@ -39,7 +39,7 @@ class SolverState:
         lam_vb: Current virtual buffer penalty weight
         X: List of state trajectory iterates
         U: List of control trajectory iterates
-        V_sequence: List of discretization error history
+        V_history: List of discretization history
     """
 
     k: int
@@ -52,7 +52,7 @@ class SolverState:
     lam_vb: float
     X: List[np.ndarray] = field(default_factory=list)
     U: List[np.ndarray] = field(default_factory=list)
-    V_sequence: List[np.ndarray] = field(default_factory=list)
+    V_history: List[np.ndarray] = field(default_factory=list)
 
     @property
     def x(self) -> np.ndarray:
@@ -96,5 +96,5 @@ class SolverState:
             lam_vb=settings.scp.lam_vb,
             X=[settings.sim.x.guess.copy()],
             U=[settings.sim.u.guess.copy()],
-            V_sequence=[],
+            V_history=[],
         )

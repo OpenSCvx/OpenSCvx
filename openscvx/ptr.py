@@ -96,7 +96,7 @@ def format_result(problem, state: "SolverState", converged: bool) -> Optimizatio
         _controls=problem.symbolic.controls,
         X=state.X,  # Single source of truth - x and u are properties
         U=state.U,
-        discretization_history=state.V_sequence,
+        discretization_history=state.V_history,
         J_tr_history=state.J_tr,
         J_vb_history=state.J_vb,
         J_vc_history=state.J_vc,
@@ -153,7 +153,7 @@ def PTR_step(
 
     # Update state in place by appending to history
     # The x_guess/u_guess properties will automatically return the latest entry
-    state.V_sequence.append(V_multi_shoot)
+    state.V_history.append(V_multi_shoot)
     state.X.append(x_sol)
     state.U.append(u_sol)
 
