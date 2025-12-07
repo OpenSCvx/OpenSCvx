@@ -401,6 +401,9 @@ class Problem:
         # Create fresh solver state from settings
         self._state = SolverState.from_settings(self.settings)
 
+        # Reset solution
+        self._solution = None
+
         # Reset timing
         self.timing_solve = None
         self.timing_post = None
