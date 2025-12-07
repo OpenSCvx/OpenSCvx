@@ -293,7 +293,7 @@ plotting_dict = {
 if __name__ == "__main__":
     problem.initialize()
     results = problem.solve()
-    results = problem.post_process(results)
+    results = problem.post_process()
 
     results.update(plotting_dict)
 

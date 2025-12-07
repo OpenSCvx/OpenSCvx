@@ -91,7 +91,7 @@ def optimization_loop():
                 f"Status={results['prob_stat']}"
             )
             # Optionally skip post_process for speed
-            # results = problem.post_process(results)
+            # results = problem.post_process()
             results.update(plotting_dict)
             latest_results["results"] = results
             new_result_event.set()

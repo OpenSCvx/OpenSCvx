@@ -215,7 +215,7 @@ def test_pyqtgraph_functions_with_real_data():
         # Solve problem
         problem.initialize()
         result = problem.solve()
-        result = problem.post_process(result)
+        result = problem.post_process()
         result.update(obstacle_avoidance_plotting_dict)
 
         # Mock Qt application and widgets

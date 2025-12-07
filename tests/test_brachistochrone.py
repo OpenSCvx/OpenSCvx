@@ -100,7 +100,7 @@ def test_example():
     # Run optimization
     problem.initialize()
     result = problem.solve()
-    result = problem.post_process(result)
+    result = problem.post_process()
 
     # Check convergence
     assert result["converged"], "Brachistochrone failed to converge"
@@ -211,7 +211,7 @@ def test_monolithic():
     # Run optimization
     problem.initialize()
     result = problem.solve()
-    result = problem.post_process(result)
+    result = problem.post_process()
 
     # Check convergence
     assert result["converged"], "Problem failed to converge"
@@ -343,7 +343,7 @@ def test_constraint_types(constraint_type):
     # Run optimization
     problem.initialize()
     result = problem.solve()
-    result = problem.post_process(result)
+    result = problem.post_process()
 
     # Check convergence
     assert result["converged"], "Problem failed to converge"
@@ -497,7 +497,7 @@ def test_cross_nodal(max_step, should_converge, is_convex):
         # Solvable or non-convex infeasible case
         problem.initialize()
         result = problem.solve()
-        result = problem.post_process(result)
+        result = problem.post_process()
 
         # Check convergence based on parameter
         assert result["converged"] == should_converge, (
@@ -628,7 +628,7 @@ def test_parameters():
     # Run optimization with initial gravity parameter
     problem.initialize()
     result = problem.solve()
-    result = problem.post_process(result)
+    result = problem.post_process()
 
     # Check convergence
     assert result["converged"], "Problem failed to converge (first run)"
@@ -669,8 +669,8 @@ def test_parameters():
     problem.settings.scp.lam_vc = original_lam_vc
 
     # Solve again without re-initialization (parameters are updated)
-    result2 = problem.solve()
-    result2 = problem.post_process(result2)
+    problem.solve()
+    result2 = problem.post_process()
 
     # Check convergence
     assert result2["converged"], "Problem failed to converge (second run with Moon gravity)"
@@ -815,7 +815,7 @@ def test_propagation():
     # Run optimization
     problem.initialize()
     result = problem.solve()
-    result = problem.post_process(result)
+    result = problem.post_process()
 
     # Check convergence
     assert result["converged"], "Problem failed to converge"
@@ -898,16 +898,16 @@ def test_idempotency():
     problem.initialize()
     # TODO: (norrisg) should check `problem.initialze()` a second time
     # -> May break jitting of constraints
-    result1 = problem.solve()
-    result1 = problem.post_process(result1)
+    problem.solve()
+    result1 = problem.post_process()
 
     # Check convergence
     assert result1["converged"], "First solve failed to converge"
 
     # Reset and second solve cycle
     problem.reset()
-    result2 = problem.solve()
-    result2 = problem.post_process(result2)
+    problem.solve()
+    result2 = problem.post_process()
 
     # Check convergence
     assert result2["converged"], "Second solve failed to converge"

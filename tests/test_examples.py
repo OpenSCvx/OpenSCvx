@@ -122,7 +122,7 @@ def test_example(name, metadata):
     # Run the optimization pipeline
     problem.initialize()
     result = problem.solve()
-    result = problem.post_process(result)
+    result = problem.post_process()
 
     # Check convergence
     assert result["converged"], f"Example {name} ({metadata['path']}) failed to converge"
