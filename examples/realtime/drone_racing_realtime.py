@@ -68,11 +68,12 @@ class OptimizationWorker(QObject):
                 start_time = time.time()
                 results = self.problem.step()
                 solve_time = time.time() - start_time
-                # Add timing information to results
-                results["iter"] = self.problem.scp_k - 1
-                results["J_tr"] = self.problem.scp_J_tr
-                results["J_vb"] = self.problem.scp_J_vb
-                results["J_vc"] = self.problem.scp_J_vc
+                # step() now returns: converged, scp_k, scp_J_tr, scp_J_vb, scp_J_vc
+                # Rename keys for consistency with legacy code
+                results["iter"] = results["scp_k"] - 1
+                results["J_tr"] = results["scp_J_tr"]
+                results["J_vb"] = results["scp_J_vb"]
+                results["J_vc"] = results["scp_J_vc"]
                 results["solve_time"] = solve_time * 1000  # Convert to milliseconds
                 # Get timing from the print queue (emitted data) if available
                 try:
