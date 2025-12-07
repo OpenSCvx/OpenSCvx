@@ -153,8 +153,8 @@ class Problem:
 
         # OCP construction happens in initialize() so users can modify
         # settings (like uniform_time_grid) between __init__ and initialize()
-        self.optimal_control_problem: cp.Problem = None
-        self.discretization_solver: callable = None
+        self._optimal_control_problem: cp.Problem = None
+        self._discretization_solver: callable = None
         self.cpg_solve = None
 
         # Set up emitter & thread only if printing is enabled
@@ -176,8 +176,8 @@ class Problem:
         self.timing_post = None
 
         # Compiled dynamics (vmapped versions, set in initialize())
-        self._compiled: Optional[Dynamics] = None
-        self._compiled_prop: Optional[Dynamics] = None
+        self._compiled_dynamics: Optional[Dynamics] = None
+        self._compiled_dynamics_prop: Optional[Dynamics] = None
 
         # Compiled constraints (JIT-compiled versions, set in initialize())
         self._compiled_constraints: Optional[LoweredJaxConstraints] = None
@@ -271,13 +271,13 @@ class Problem:
 
         # Create compiled (vmapped) dynamics as new instances
         # This preserves the original un-vmapped versions in _lowered
-        self._compiled = Dynamics(
+        self._compiled_dynamics = Dynamics(
             f=jax.vmap(self._lowered.dynamics.f, in_axes=(0, 0, 0, None)),
             A=jax.vmap(self._lowered.dynamics.A, in_axes=(0, 0, 0, None)),
             B=jax.vmap(self._lowered.dynamics.B, in_axes=(0, 0, 0, None)),
         )
 
-        self._compiled_prop = Dynamics(
+        self._compiled_dynamics_prop = Dynamics(
             f=jax.vmap(self._lowered.dynamics_prop.f, in_axes=(0, 0, 0, None)),
         )
 
@@ -310,15 +310,15 @@ class Problem:
         )
 
         # Generate solvers using compiled (vmapped) dynamics
-        self.discretization_solver = get_discretization_solver(
-            self._compiled, self.settings, self.parameters
+        self._discretization_solver = get_discretization_solver(
+            self._compiled_dynamics, self.settings, self.parameters
         )
-        self.propagation_solver = get_propagation_solver(
-            self._compiled_prop.f, self.settings, self.parameters
+        self._propagation_solver = get_propagation_solver(
+            self._compiled_dynamics_prop.f, self.settings, self.parameters
         )
 
         # Build optimal control problem using LoweredProblem
-        self.optimal_control_problem = OptimalControlProblem(self.settings, self._lowered)
+        self._optimal_control_problem = OptimalControlProblem(self.settings, self._lowered)
 
         # Get cache file paths using symbolic AST hashing
         # This is more stable than hashing lowered JAX code
@@ -329,8 +329,8 @@ class Problem:
         )
 
         # Compile the discretization solver
-        self.discretization_solver = load_or_compile_discretization_solver(
-            self.discretization_solver,
+        self._discretization_solver = load_or_compile_discretization_solver(
+            self._discretization_solver,
             dis_solver_file,
             self._parameters,  # Plain dict for JAX
             self.settings.scp.n,
@@ -346,8 +346,8 @@ class Problem:
         self.settings.prp.max_tau_len = int(dt_max / self.settings.prp.dt) + 2
 
         # Compile the propagation solver
-        self.propagation_solver = load_or_compile_propagation_solver(
-            self.propagation_solver,
+        self._propagation_solver = load_or_compile_propagation_solver(
+            self._propagation_solver,
             prop_solver_file,
             self._parameters,  # Plain dict for JAX
             self.settings.sim.n_states_prop,
@@ -360,8 +360,8 @@ class Problem:
         print("Initializing the SCvx Subproblem Solver...")
         self.cpg_solve = PTR_init(
             self._parameters,  # Plain dict for JAX/CVXPy
-            self.optimal_control_problem,
-            self.discretization_solver,
+            self._optimal_control_problem,
+            self._discretization_solver,
             self.settings,
             self._compiled_constraints,
         )
@@ -375,7 +375,7 @@ class Problem:
         print("Total Initialization Time: ", self.timing_init)
 
         # Prime the propagation solver
-        prime_propagation_solver(self.propagation_solver, self._parameters, self.settings)
+        prime_propagation_solver(self._propagation_solver, self._parameters, self.settings)
 
         profiling_end(pr, "initialize")
 
@@ -395,7 +395,7 @@ class Problem:
             >>> problem.reset()  # Reset to initial state
             >>> result2 = problem.solve()  # Run again from scratch
         """
-        if self._compiled is None:
+        if self._compiled_dynamics is None:
             raise ValueError("Problem has not been initialized. Call initialize() first")
 
         # Create fresh solver state from settings
@@ -425,8 +425,8 @@ class Problem:
             self._parameters,  # Plain dict for JAX/CVXPy
             self.settings,
             self._state,
-            self.optimal_control_problem,
-            self.discretization_solver,
+            self._optimal_control_problem,
+            self._discretization_solver,
             self.cpg_solve,
             self.emitter_function,
             self._compiled_constraints,
@@ -448,10 +448,10 @@ class Problem:
         self._sync_parameters()
 
         required = [
-            self._compiled,
+            self._compiled_dynamics,
             self._compiled_constraints,
-            self.optimal_control_problem,
-            self.discretization_solver,
+            self._optimal_control_problem,
+            self._discretization_solver,
             self._state,
         ]
         if any(r is None for r in required):
@@ -517,7 +517,7 @@ class Problem:
 
         t_0_post = time.time()
         result = propagate_trajectory_results(
-            self._parameters, self.settings, result, self.propagation_solver
+            self._parameters, self.settings, result, self._propagation_solver
         )
         t_f_post = time.time()
 
