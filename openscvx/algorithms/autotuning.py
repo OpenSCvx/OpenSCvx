@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from openscvx.config import Config
 
 if TYPE_CHECKING:
-    from openscvx.scvx.solver_state import SolverState
+    from openscvx.algorithms.solver_state import SolverState
 
 
 def update_scp_weights(state: "SolverState", settings: Config, scp_k: int):

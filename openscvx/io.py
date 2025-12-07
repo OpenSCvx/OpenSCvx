@@ -8,7 +8,7 @@ import jax
 import numpy as np
 from termcolor import colored
 
-from openscvx.scvx.optimization_results import OptimizationResults
+from openscvx.algorithms.optimization_results import OptimizationResults
 
 warnings.filterwarnings("ignore")
 

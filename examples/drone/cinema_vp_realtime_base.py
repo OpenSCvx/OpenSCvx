@@ -9,6 +9,7 @@ The problem includes:
 - Sensor cone constraints for camera pointing
 - Configured for real-time re-optimization with moving targets
 """
+
 import jax.numpy as jnp
 import numpy as np
 import numpy.linalg as la
