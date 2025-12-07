@@ -485,7 +485,7 @@ class Problem:
         # Store solution state
         self._solution = copy.deepcopy(self._state)
 
-        return format_result(self, self._state.k <= k_max)
+        return format_result(self, self._state, self._state.k <= k_max)
 
     def post_process(self) -> OptimizationResults:
         """Propagate the solution trajectory through the full nonlinear dynamics.
@@ -513,7 +513,7 @@ class Problem:
         pr = profiling_start(self.settings.dev.profiling)
 
         # Create result from stored solution state
-        result = format_result(self, converged=(self._solution.k <= self.settings.scp.k_max))
+        result = format_result(self, self._solution, self._solution.k <= self.settings.scp.k_max)
 
         t_0_post = time.time()
         result = propagate_trajectory_results(

@@ -62,13 +62,17 @@ def PTR_init(
     return cpg_solve
 
 
-def format_result(problem, converged: bool) -> OptimizationResults:
-    """Formats the final result as an OptimizationResults object from the problem's state.
+def format_result(problem, state: "SolverState", converged: bool) -> OptimizationResults:
+    """Formats the solver state as an OptimizationResults object.
 
-    The State/Control objects from the solver state already contain the final trajectories
-    and all necessary metadata, so we pass them directly without copying.
+    Args:
+        problem: The Problem instance (for symbolic metadata and settings).
+        state: The SolverState to extract results from.
+        converged: Whether the optimization converged.
+
+    Returns:
+        OptimizationResults containing the solution data.
     """
-    state = problem._state
 
     # Build nodes dictionary with all states and controls
     nodes_dict = {}
