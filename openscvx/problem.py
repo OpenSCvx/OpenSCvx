@@ -3,12 +3,16 @@
 This module provides the Problem class, the main entry point for defining
 and solving trajectory optimization problems using Sequential Convex Programming (SCP).
 
-Typical usage:
-    problem = Problem(dynamics, constraints, states, controls, N, time)
-    problem.initialize()
-    result = problem.solve()
-    result = problem.post_process()
+Example:
+    The prototypical flow is to define a problem, then initialize, solve, and post-process the
+    results
+
+        problem = Problem(dynamics, constraints, states, controls, N, time)
+        problem.initialize()
+        result = problem.solve()
+        result = problem.post_process()
 """
+
 import copy
 import os
 import queue
@@ -241,9 +245,11 @@ class Problem:
             SolverState if initialized, None otherwise
 
         Example:
-            >>> problem.initialize()
-            >>> problem.step()
-            >>> print(f"Iteration {problem.state.k}, J_tr={problem.state.J_tr}")
+            When using `Problem.step()` can use the state to check convergence _etc._
+
+                problem.initialize()
+                problem.step()
+                print(f"Iteration {problem.state.k}, J_tr={problem.state.J_tr}")
         """
         return self._state
 
@@ -273,9 +279,11 @@ class Problem:
         subproblem, and initializes the solver state. Must be called before solve().
 
         Example:
-            >>> problem = Problem(dynamics, constraints, states, controls, N, time)
-            >>> problem.initialize()  # Compile and prepare
-            >>> problem.solve()       # Run optimization
+            Prior to calling the `.solve()` method it is necessary to initialize the problem
+
+                problem = Problem(dynamics, constraints, states, controls, N, time)
+                problem.initialize()  # Compile and prepare
+                problem.solve()       # Run optimization
         """
         io.intro()
 
@@ -410,10 +418,13 @@ class Problem:
             ValueError: If initialize() has not been called yet.
 
         Example:
-            >>> problem.initialize()
-            >>> result1 = problem.solve()
-            >>> problem.reset()
-            >>> result2 = problem.solve()  # Fresh run with same setup
+            After calling `.step()` it may be necessary to reset the problem back to the initial
+            conditions
+
+                problem.initialize()
+                result1 = problem.step()
+                problem.reset()
+                result2 = problem.solve()  # Fresh run with same setup
         """
         if self._compiled_dynamics is None:
             raise ValueError("Problem has not been initialized. Call initialize() first")
@@ -434,13 +445,19 @@ class Problem:
         Designed for real-time plotting and interactive optimization. Performs one
         iteration including subproblem solve, state update, and progress emission.
 
+        Note:
+            This method is NOT idempotent - it mutates internal state and advances
+            the iteration counter. Use reset() to return to initial conditions.
+
         Returns:
             dict: Contains "converged" (bool) and current iteration state
 
         Example:
-            >>> problem.initialize()
-            >>> while not problem.step()["converged"]:
-            ...     plot_trajectory(problem.state.trajs[-1])
+            Call `.step()` manually in a loop to control the algorithm directly
+
+                problem.initialize()
+                while not problem.step()["converged"]:
+                    plot_trajectory(problem.state.trajs[-1])
         """
         if self._state is None:
             raise ValueError("Problem has not been initialized. Call initialize() first")
@@ -475,12 +492,8 @@ class Problem:
             continuous: If True, run all iterations regardless of convergence
 
         Returns:
-            OptimizationResults with trajectory and convergence info (call post_process() for full propagation)
-
-        Example:
-            >>> problem.initialize()
-            >>> result = problem.solve(max_iters=50)
-            >>> result = problem.post_process()  # High-fidelity propagation
+            OptimizationResults with trajectory and convergence info
+                (call post_process() for full propagation)
         """
         # Sync parameters before solving
         self._sync_parameters()
@@ -536,12 +549,6 @@ class Problem:
 
         Raises:
             ValueError: If solve() has not been called yet.
-
-        Example:
-            >>> problem.initialize()
-            >>> problem.solve()
-            >>> result = problem.post_process()
-            >>> print(result.x_full.shape)  # High-fidelity trajectory
         """
         if self._solution is None:
             raise ValueError("No solution available. Call solve() first.")
