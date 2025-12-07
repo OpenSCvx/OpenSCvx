@@ -97,25 +97,25 @@ def get_propagation_solver(state_dot: Dynamics, settings: Config):
     return propagation_solver
 
 
-def s_to_t(x, u, settings: Config):
+def s_to_t(x: np.ndarray, u: np.ndarray, settings: Config):
     """Convert normalized time s to real time t.
 
     This function converts the normalized time variable s to real time t
     based on the discretization type and time dilation factors.
 
     Args:
-        x: State trajectory.
-        u: Control trajectory.
+        x: State trajectory array, shape (N, n_states).
+        u: Control trajectory array, shape (N, n_controls).
         settings (Config): Configuration settings.
 
     Returns:
         list: List of real time points.
     """
-    t = [x.guess[:, settings.sim.time_slice][0]]
+    t = [x[:, settings.sim.time_slice][0]]
     tau = np.linspace(0, 1, settings.scp.n)
     for k in range(1, settings.scp.n):
-        s_kp = u.guess[k - 1, -1]
-        s_k = u.guess[k, -1]
+        s_kp = u[k - 1, -1]
+        s_k = u[k, -1]
         if settings.dis.dis_type == "ZOH":
             t.append(t[k - 1] + (tau[k] - tau[k - 1]) * (s_kp))
         else:
@@ -123,14 +123,14 @@ def s_to_t(x, u, settings: Config):
     return t
 
 
-def t_to_tau(u, t, t_nodal, settings: Config):
+def t_to_tau(u: np.ndarray, t, t_nodal, settings: Config):
     """Convert real time t to normalized time tau.
 
     This function converts real time t to normalized time tau and interpolates
     the control inputs accordingly.
 
     Args:
-        u: Control trajectory.
+        u (np.ndarray): Control trajectory array, shape (N, n_controls).
         t (np.ndarray): Real time points.
         t_nodal (np.ndarray): Nodal time points.
         settings (Config): Configuration settings.
@@ -138,21 +138,17 @@ def t_to_tau(u, t, t_nodal, settings: Config):
     Returns:
         tuple: (tau, u_interp) where tau is normalized time and u_interp is interpolated controls.
     """
-    u_guess = u.guess
-
     if settings.dis.dis_type == "ZOH":
         # Zero-Order Hold: step interpolation (hold previous value)
         def u_lam(new_t):
             # Find the index of the last nodal time <= new_t
             idx = np.searchsorted(t_nodal, new_t, side="right") - 1
             idx = np.clip(idx, 0, len(t_nodal) - 1)
-            return u_guess[idx, :]
+            return u[idx, :]
     elif settings.dis.dis_type == "FOH":
         # First-Order Hold: linear interpolation
         def u_lam(new_t):
-            return np.array(
-                [np.interp(new_t, t_nodal, u_guess[:, i]) for i in range(u_guess.shape[1])]
-            ).T
+            return np.array([np.interp(new_t, t_nodal, u[:, i]) for i in range(u.shape[1])]).T
     else:
         raise ValueError("Currently unsupported discretization type")
 
@@ -162,7 +158,7 @@ def t_to_tau(u, t, t_nodal, settings: Config):
     tau_nodal = np.linspace(0, 1, settings.scp.n)
     for k in range(1, len(t)):
         k_nodal = np.where(t_nodal < t[k])[0][-1]
-        s_kp = u_guess[k_nodal, -1]
+        s_kp = u[k_nodal, -1]
         tp = t_nodal[k_nodal]
         tau_p = tau_nodal[k_nodal]
 
@@ -182,8 +178,8 @@ def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_sol
 
     Args:
         params: System parameters.
-        x: State trajectory.
-        u: Control trajectory.
+        x: State trajectory array, shape (N, n_states).
+        u: Control trajectory array, shape (N, n_controls).
         tau_vals (np.ndarray): Normalized time points for simulation.
         t (np.ndarray): Real time points.
         settings: Configuration settings.
@@ -202,7 +198,7 @@ def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_sol
     tau = np.linspace(0, 1, settings.scp.n)
 
     # Precompute control interpolation
-    u_interp = np.stack([np.interp(t, t, u.guess[:, i]) for i in range(u.guess.shape[1])], axis=-1)
+    u_interp = np.stack([np.interp(t, t, u[:, i]) for i in range(u.shape[1])], axis=-1)
 
     # Bin tau_vals into segments of tau
     tau_inds = np.digitize(tau_vals, tau) - 1

@@ -250,8 +250,8 @@ def plot_constraint_violation(result: OptimizationResults, params: Config):
 
 
 def plot_initial_guess(result: OptimizationResults, params: Config):
-    x_positions = result.x.guess[:, 0:3].T
-    x_attitude = result.x.guess[:, 6:10].T
+    x_positions = result.x[:, 0:3].T
+    x_attitude = result.x[:, 6:10].T
     subs_positions = result.plotting_data["sub_positions"]
 
     fig = go.Figure(
@@ -331,8 +331,8 @@ def plot_scp_animation(result: OptimizationResults, params=None, path=""):
     drone_positions = result.x_full[:, :3]
     drone_attitudes = result.x_full[:, 6:10]
     result.u_full[:, :3]
-    scp_traj_interp(result.x_history, params)
-    scp_ctcs_trajs = result.x_history
+    scp_traj_interp(result.X, params)
+    scp_ctcs_trajs = result.X
     scp_multi_shoot = result.discretization_history
     # obstacles = result_ctcs["obstacles"]
     # gates = result_ctcs["gates"]

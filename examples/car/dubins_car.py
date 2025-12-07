@@ -112,7 +112,7 @@ plotting_dict = {
 if __name__ == "__main__":
     problem.initialize()
     results = problem.solve()
-    results = problem.post_process(results)
+    results = problem.post_process()
     results.update(plotting_dict)
 
     plot_dubins_car(results, problem.settings).show()
@@ -131,6 +131,6 @@ if __name__ == "__main__":
     plotting_dict["obs_center"] = np.array([0.5, 0.0])
 
     results = problem.solve()
-    results = problem.post_process(results)
+    results = problem.post_process()
     results.update(plotting_dict)
     plot_dubins_car(results, problem.settings).show()

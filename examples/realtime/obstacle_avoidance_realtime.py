@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPushButton,
     QSlider,
     QVBoxLayout,
     QWidget,
@@ -41,6 +42,7 @@ except ImportError:
     print("PyQtGraph OpenGL not available, falling back to 2D")
     HAS_OPENGL = False
 running = {"stop": False}
+reset_requested = {"reset": False}
 latest_results = {"results": None}
 new_result_event = threading.Event()
 
@@ -146,6 +148,14 @@ class Obstacle3DPlotWidget(QWidget):
         lam_tr_layout.addStretch()  # Push everything to the left
         weights_layout.addLayout(lam_tr_layout)
         control_layout.addWidget(weights_group)
+        # Problem Control
+        problem_control_group = QGroupBox("Problem Control")
+        problem_control_layout = QVBoxLayout()
+        problem_control_group.setLayout(problem_control_layout)
+        reset_problem_button = QPushButton("Reset Problem")
+        reset_problem_button.clicked.connect(self.on_reset_clicked)
+        problem_control_layout.addWidget(reset_problem_button)
+        control_layout.addWidget(problem_control_group)
         # Sliders for each obstacle
         for i in range(3):
             obs_group = QGroupBox(f"Obstacle {i + 1} Position")
@@ -248,6 +258,11 @@ class Obstacle3DPlotWidget(QWidget):
             slider.setValue(slider_value)
             label.setText(f"{center[i]:.2f}")
 
+    def on_reset_clicked(self):
+        """Handle reset button click"""
+        reset_requested["reset"] = True
+        print("Problem reset requested")
+
     def keyPressEvent(self, event):
         """Handle keyboard shortcuts"""
         if event.key() == Qt.Key_Escape:
@@ -314,17 +329,27 @@ def optimization_loop():
     problem.initialize()
     try:
         while not running["stop"]:
-            # Warm start: set guess to last solution if available
-            if latest_results["results"] is not None:
-                problem.settings.sim.x.guess = latest_results["results"]["x"].guess
-                problem.settings.sim.u.guess = latest_results["results"]["u"].guess
-            # Perform a single SCP step
-            results = problem.step()
-            # Add timing information to results
-            results["iter"] = problem.scp_k - 1
-            results["J_tr"] = problem.scp_J_tr
-            results["J_vb"] = problem.scp_J_vb
-            results["J_vc"] = problem.scp_J_vc
+            # Check if reset was requested
+            if reset_requested["reset"]:
+                problem.reset()
+                reset_requested["reset"] = False
+                print("Problem reset to initial conditions")
+
+            # Perform a single SCP step (automatically warm-starts from previous iteration)
+            step_result = problem.step()
+
+            # Build results dict for visualization
+            results = {
+                "iter": step_result["scp_k"] - 1,  # Display iteration (0-indexed)
+                "J_tr": step_result["scp_J_tr"],
+                "J_vb": step_result["scp_J_vb"],
+                "J_vc": step_result["scp_J_vc"],
+                "converged": step_result["converged"],
+                "V_multi_shoot": problem.state.V_history[-1] if problem.state.V_history else [],
+                "x": problem.state.x,  # Current state trajectory
+                "u": problem.state.u,  # Current control trajectory
+            }
+
             # Get timing from the print queue (emitted data)
             try:
                 if hasattr(problem, "print_queue") and not problem.print_queue.empty():
@@ -344,8 +369,7 @@ def optimization_loop():
                 results["solve_time"] = 0.0
                 results["prob_stat"] = "--"
                 results["cost"] = 0.0
-            # Optionally skip post_process for speed
-            # results = problem.post_process(results)
+
             results.update(plotting_dict)
             latest_results["results"] = results
             new_result_event.set()
@@ -414,7 +438,7 @@ def plot_thread_func():
             except Exception as e:
                 print(f"Plot update error: {e}")
                 if "x" in latest_results["results"]:
-                    x_traj = latest_results["results"]["x"].guess
+                    x_traj = latest_results["results"]["x"]  # Now a numpy array
                     if HAS_OPENGL:
                         plot_widget.traj_scatter.setData(pos=x_traj[:, :3])
                     else:

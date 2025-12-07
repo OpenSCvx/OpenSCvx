@@ -100,7 +100,7 @@ def test_example():
     # Run optimization
     problem.initialize()
     result = problem.solve()
-    result = problem.post_process(result)
+    result = problem.post_process()
 
     # Check convergence
     assert result["converged"], "Brachistochrone failed to converge"
@@ -211,7 +211,7 @@ def test_monolithic():
     # Run optimization
     problem.initialize()
     result = problem.solve()
-    result = problem.post_process(result)
+    result = problem.post_process()
 
     # Check convergence
     assert result["converged"], "Problem failed to converge"
@@ -343,7 +343,7 @@ def test_constraint_types(constraint_type):
     # Run optimization
     problem.initialize()
     result = problem.solve()
-    result = problem.post_process(result)
+    result = problem.post_process()
 
     # Check convergence
     assert result["converged"], "Problem failed to converge"
@@ -497,7 +497,7 @@ def test_cross_nodal(max_step, should_converge, is_convex):
         # Solvable or non-convex infeasible case
         problem.initialize()
         result = problem.solve()
-        result = problem.post_process(result)
+        result = problem.post_process()
 
         # Check convergence based on parameter
         assert result["converged"] == should_converge, (
@@ -628,7 +628,7 @@ def test_parameters():
     # Run optimization with initial gravity parameter
     problem.initialize()
     result = problem.solve()
-    result = problem.post_process(result)
+    result = problem.post_process()
 
     # Check convergence
     assert result["converged"], "Problem failed to converge (first run)"
@@ -669,8 +669,8 @@ def test_parameters():
     problem.settings.scp.lam_vc = original_lam_vc
 
     # Solve again without re-initialization (parameters are updated)
-    result2 = problem.solve()
-    result2 = problem.post_process(result2)
+    problem.solve()
+    result2 = problem.post_process()
 
     # Check convergence
     assert result2["converged"], "Problem failed to converge (second run with Moon gravity)"
@@ -815,7 +815,7 @@ def test_propagation():
     # Run optimization
     problem.initialize()
     result = problem.solve()
-    result = problem.post_process(result)
+    result = problem.post_process()
 
     # Check convergence
     assert result["converged"], "Problem failed to converge"
@@ -874,6 +874,81 @@ def test_propagation():
     print(f"  Distance error:        {distance_error_pct:.2f}%")
     print(f"  Straight-line dist:    {straight_line_distance:.4f} m")
     print(f"  Ratio (arc/line):      {analytical_arc_length / straight_line_distance:.4f}")
+
+    # Clean up JAX caches
+    jax.clear_caches()
+
+
+def test_idempotency():
+    """
+    Test that each step of the pipeline is idempotent.
+
+    Calling initialize(), solve(), and post_process() twice in a row should
+    not break anything and should produce identical results.
+
+    This validates that:
+    1. initialize() can be called multiple times without double-wrapping vmap/jit
+    2. solve() can be called multiple times without corrupting state
+    3. post_process() can be called multiple times without mutating solution/settings
+    """
+    from examples.abstract.brachistochrone import problem
+
+    # Disable printing for cleaner test output
+    if hasattr(problem.settings, "dev"):
+        problem.settings.dev.printing = False
+
+    # Problem parameters for analytical comparison
+    x0, y0 = 0.0, 10.0
+    x1, y1 = 10.0, 5.0
+    g = 9.81
+
+    # Call each step twice to test idempotency
+    problem.initialize()
+    problem.initialize()  # Should not double-wrap vmap/jit
+
+    problem.solve()
+    problem.solve()  # Should not corrupt state (likely converges immediately)
+
+    result1 = problem.post_process()
+    result2 = problem.post_process()  # Should return identical results
+
+    # Check convergence
+    assert result1["converged"], "First post_process result should show convergence"
+    assert result2["converged"], "Second post_process result should show convergence"
+
+    # Compare both results to analytical solution
+    comparison1 = compare_trajectory_to_analytical(
+        result1.t_full,
+        result1.trajectory["position"],
+        result1.trajectory["velocity"],
+        x0,
+        y0,
+        x1,
+        y1,
+        g,
+    )
+    comparison2 = compare_trajectory_to_analytical(
+        result2.t_full,
+        result2.trajectory["position"],
+        result2.trajectory["velocity"],
+        x0,
+        y0,
+        x1,
+        y1,
+        g,
+    )
+
+    # Comparisons should be identical
+    assert comparison1["analytical_time"] == comparison2["analytical_time"]
+    assert comparison1["numerical_time"] == comparison2["numerical_time"]
+    assert comparison1["time_error_pct"] == comparison2["time_error_pct"]
+    assert comparison1["position_rmse"] == comparison2["position_rmse"]
+    assert comparison1["position_max_error"] == comparison2["position_max_error"]
+    assert comparison1["velocity_rmse"] == comparison2["velocity_rmse"]
+
+    print("\nIdempotency Test Results:")
+    _print_comparison_metrics(comparison1, "Idempotency")
+    print("  initialize() x2, solve() x2, post_process() x2 all succeeded")
 
     # Clean up JAX caches
     jax.clear_caches()

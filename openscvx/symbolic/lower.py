@@ -60,9 +60,9 @@ import numpy as np
 from jax import jacfwd
 
 from openscvx.lowered import (
-    CrossNodeConstraintLowered,
     CVXPyVariables,
     Dynamics,
+    LoweredCrossNodeConstraint,
     LoweredCvxpyConstraints,
     LoweredJaxConstraints,
     LoweredNodalConstraint,
@@ -510,7 +510,7 @@ def _lower_jax_constraints(
         LoweredJaxConstraints with nodal, cross_node, and ctcs lists
     """
     lowered_nodal: List[LoweredNodalConstraint] = []
-    lowered_cross_node: List[CrossNodeConstraintLowered] = []
+    lowered_cross_node: List[LoweredCrossNodeConstraint] = []
 
     # Lower regular nodal constraints
     if len(constraints.nodal) > 0:
@@ -537,7 +537,7 @@ def _lower_jax_constraints(
         grad_g_X = jacfwd(constraint_fn, argnums=0)  # dg/dX - shape (N, n_x)
         grad_g_U = jacfwd(constraint_fn, argnums=1)  # dg/dU - shape (N, n_u)
 
-        cross_node_lowered = CrossNodeConstraintLowered(
+        cross_node_lowered = LoweredCrossNodeConstraint(
             func=constraint_fn,
             grad_g_X=grad_g_X,
             grad_g_U=grad_g_U,

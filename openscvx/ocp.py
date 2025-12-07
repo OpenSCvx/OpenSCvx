@@ -19,7 +19,7 @@ except ImportError:
     cpg = None
 
 
-def OptimalControlProblem(settings: Config, lowered: "LoweredProblem"):
+def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
     """Build the complete optimal control problem with all constraints.
 
     Args:

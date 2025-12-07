@@ -1,3 +1,19 @@
+"""Core optimization problem interface for trajectory optimization.
+
+This module provides the Problem class, the main entry point for defining
+and solving trajectory optimization problems using Sequential Convex Programming (SCP).
+
+Example:
+    The prototypical flow is to define a problem, then initialize, solve, and post-process the
+    results
+
+        problem = Problem(dynamics, constraints, states, controls, N, time)
+        problem.initialize()
+        result = problem.solve()
+        result = problem.post_process()
+"""
+
+import copy
 import os
 import queue
 import threading
@@ -26,11 +42,18 @@ from openscvx.config import (
 )
 from openscvx.discretization import get_discretization_solver
 from openscvx.lowered import LoweredProblem, ParameterDict
-from openscvx.ocp import OptimalControlProblem
+from openscvx.lowered.dynamics import Dynamics
+from openscvx.lowered.jax_constraints import (
+    LoweredCrossNodeConstraint,
+    LoweredJaxConstraints,
+    LoweredNodalConstraint,
+)
+from openscvx.ocp import optimal_control_problem
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
 from openscvx.ptr import PTR_init, PTR_step, format_result
 from openscvx.results import OptimizationResults
+from openscvx.solver_state import SolverState
 from openscvx.symbolic.builder import preprocess_symbolic_problem
 from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import CTCS, Constraint
@@ -39,6 +62,7 @@ from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.lower import lower_symbolic_problem
 from openscvx.symbolic.problem import SymbolicProblem
 from openscvx.time import Time
+from openscvx.utils import profiling_end, profiling_start
 
 if TYPE_CHECKING:
     import cvxpy as cp
@@ -144,8 +168,8 @@ class Problem:
 
         # OCP construction happens in initialize() so users can modify
         # settings (like uniform_time_grid) between __init__ and initialize()
-        self.optimal_control_problem: cp.Problem = None
-        self.discretization_solver: callable = None
+        self._optimal_control_problem: cp.Problem = None
+        self._discretization_solver: callable = None
         self.cpg_solve = None
 
         # Set up emitter & thread only if printing is enabled
@@ -166,14 +190,18 @@ class Problem:
         self.timing_solve = None
         self.timing_post = None
 
-        # SCP state variables
-        self.scp_k = 0
-        self.scp_J_tr = 1e2
-        self.scp_J_vb = 1e2
-        self.scp_J_vc = 1e2
-        self.scp_trajs = []
-        self.scp_controls = []
-        self.scp_V_multi_shoot_traj = []
+        # Compiled dynamics (vmapped versions, set in initialize())
+        self._compiled_dynamics: Optional[Dynamics] = None
+        self._compiled_dynamics_prop: Optional[Dynamics] = None
+
+        # Compiled constraints (JIT-compiled versions, set in initialize())
+        self._compiled_constraints: Optional[LoweredJaxConstraints] = None
+
+        # Solver state (created fresh for each solve)
+        self._state: Optional[SolverState] = None
+
+        # Final solution state (saved after successful solve)
+        self._solution: Optional[SolverState] = None
 
     @property
     def parameters(self):
@@ -207,6 +235,25 @@ class Problem:
                     self._lowered.cvxpy_params[name].value = value
 
     @property
+    def state(self) -> Optional[SolverState]:
+        """Access the current solver state.
+
+        The solver state contains all mutable state from the SCP iterations,
+        including current guesses, costs, weights, and history.
+
+        Returns:
+            SolverState if initialized, None otherwise
+
+        Example:
+            When using `Problem.step()` can use the state to check convergence _etc._
+
+                problem.initialize()
+                problem.step()
+                print(f"Iteration {problem.state.k}, J_tr={problem.state.J_tr}")
+        """
+        return self._state
+
+    @property
     def lowered(self) -> LoweredProblem:
         """Access the lowered problem containing JAX/CVXPy objects.
 
@@ -226,54 +273,81 @@ class Problem:
         return self._lowered.u_unified
 
     def initialize(self):
+        """Compile dynamics, constraints, and solvers; prepare for optimization.
+
+        This method vmaps dynamics, JIT-compiles constraints, builds the convex
+        subproblem, and initializes the solver state. Must be called before solve().
+
+        Example:
+            Prior to calling the `.solve()` method it is necessary to initialize the problem
+
+                problem = Problem(dynamics, constraints, states, controls, N, time)
+                problem.initialize()  # Compile and prepare
+                problem.solve()       # Run optimization
+        """
         io.intro()
 
         # Print problem summary
         io.print_problem_summary(self.settings, self._lowered)
 
         # Enable the profiler
-        if self.settings.dev.profiling:
-            import cProfile
-
-            pr = cProfile.Profile()
-            pr.enable()
+        pr = profiling_start(self.settings.dev.profiling)
 
         t_0_while = time.time()
         # Ensure parameter sizes and normalization are correct
         self.settings.scp.__post_init__()
         self.settings.sim.__post_init__()
 
-        # Compile dynamics and jacobians
-        self._lowered.dynamics.f = jax.vmap(self._lowered.dynamics.f, in_axes=(0, 0, 0, None))
-        self._lowered.dynamics.A = jax.vmap(self._lowered.dynamics.A, in_axes=(0, 0, 0, None))
-        self._lowered.dynamics.B = jax.vmap(self._lowered.dynamics.B, in_axes=(0, 0, 0, None))
-
-        self._lowered.dynamics_prop.f = jax.vmap(
-            self._lowered.dynamics_prop.f, in_axes=(0, 0, 0, None)
+        # Create compiled (vmapped) dynamics as new instances
+        # This preserves the original un-vmapped versions in _lowered
+        self._compiled_dynamics = Dynamics(
+            f=jax.vmap(self._lowered.dynamics.f, in_axes=(0, 0, 0, None)),
+            A=jax.vmap(self._lowered.dynamics.A, in_axes=(0, 0, 0, None)),
+            B=jax.vmap(self._lowered.dynamics.B, in_axes=(0, 0, 0, None)),
         )
 
-        for constraint in self._lowered.jax_constraints.nodal:
-            # TODO: (haynec) switch to AOT instead of JIT
-            constraint.func = jax.jit(constraint.func)
-            constraint.grad_g_x = jax.jit(constraint.grad_g_x)
-            constraint.grad_g_u = jax.jit(constraint.grad_g_u)
-
-        # JIT compile cross-node constraints
-        for constraint in self._lowered.jax_constraints.cross_node:
-            constraint.func = jax.jit(constraint.func)
-            constraint.grad_g_X = jax.jit(constraint.grad_g_X)
-            constraint.grad_g_U = jax.jit(constraint.grad_g_U)
-
-        # Generate solvers
-        self.discretization_solver = get_discretization_solver(
-            self._lowered.dynamics, self.settings
+        self._compiled_dynamics_prop = Dynamics(
+            f=jax.vmap(self._lowered.dynamics_prop.f, in_axes=(0, 0, 0, None)),
         )
-        self.propagation_solver = get_propagation_solver(
-            self._lowered.dynamics_prop.f, self.settings
+
+        # Create compiled (JIT-compiled) constraints as new instances
+        # This preserves the original un-JIT'd versions in _lowered
+        # TODO: (haynec) switch to AOT instead of JIT
+        compiled_nodal = [
+            LoweredNodalConstraint(
+                func=jax.jit(c.func),
+                grad_g_x=jax.jit(c.grad_g_x),
+                grad_g_u=jax.jit(c.grad_g_u),
+                nodes=c.nodes,
+            )
+            for c in self._lowered.jax_constraints.nodal
+        ]
+
+        compiled_cross_node = [
+            LoweredCrossNodeConstraint(
+                func=jax.jit(c.func),
+                grad_g_X=jax.jit(c.grad_g_X),
+                grad_g_U=jax.jit(c.grad_g_U),
+            )
+            for c in self._lowered.jax_constraints.cross_node
+        ]
+
+        self._compiled_constraints = LoweredJaxConstraints(
+            nodal=compiled_nodal,
+            cross_node=compiled_cross_node,
+            ctcs=self._lowered.jax_constraints.ctcs,  # CTCS aren't JIT-compiled here
+        )
+
+        # Generate solvers using compiled (vmapped) dynamics
+        self._discretization_solver = get_discretization_solver(
+            self._compiled_dynamics, self.settings
+        )
+        self._propagation_solver = get_propagation_solver(
+            self._compiled_dynamics_prop.f, self.settings
         )
 
         # Build optimal control problem using LoweredProblem
-        self.optimal_control_problem = OptimalControlProblem(self.settings, self._lowered)
+        self._optimal_control_problem = optimal_control_problem(self.settings, self._lowered)
 
         # Get cache file paths using symbolic AST hashing
         # This is more stable than hashing lowered JAX code
@@ -284,8 +358,8 @@ class Problem:
         )
 
         # Compile the discretization solver
-        self.discretization_solver = load_or_compile_discretization_solver(
-            self.discretization_solver,
+        self._discretization_solver = load_or_compile_discretization_solver(
+            self._discretization_solver,
             dis_solver_file,
             self._parameters,  # Plain dict for JAX
             self.settings.scp.n,
@@ -301,8 +375,8 @@ class Problem:
         self.settings.prp.max_tau_len = int(dt_max / self.settings.prp.dt) + 2
 
         # Compile the propagation solver
-        self.propagation_solver = load_or_compile_propagation_solver(
-            self.propagation_solver,
+        self._propagation_solver = load_or_compile_propagation_solver(
+            self._propagation_solver,
             prop_solver_file,
             self._parameters,  # Plain dict for JAX
             self.settings.sim.n_states_prop,
@@ -315,88 +389,127 @@ class Problem:
         print("Initializing the SCvx Subproblem Solver...")
         self.cpg_solve = PTR_init(
             self._parameters,  # Plain dict for JAX/CVXPy
-            self.optimal_control_problem,
-            self.discretization_solver,
+            self._optimal_control_problem,
+            self._discretization_solver,
             self.settings,
-            self._lowered.jax_constraints,
+            self._compiled_constraints,
         )
         print("✓ SCvx Subproblem Solver initialized")
 
-        # Reset SCP state
-        self.scp_k = 1
-        self.scp_J_tr = 1e2
-        self.scp_J_vb = 1e2
-        self.scp_J_vc = 1e2
-        self.scp_trajs = [self.settings.sim.x.guess]
-        self.scp_controls = [self.settings.sim.u.guess]
-        self.scp_V_multi_shoot_traj = []
+        # Create fresh solver state
+        self._state = SolverState.from_settings(self.settings)
 
         t_f_while = time.time()
         self.timing_init = t_f_while - t_0_while
         print("Total Initialization Time: ", self.timing_init)
 
         # Prime the propagation solver
-        prime_propagation_solver(self.propagation_solver, self._parameters, self.settings)
+        prime_propagation_solver(self._propagation_solver, self._parameters, self.settings)
 
-        if self.settings.dev.profiling:
-            pr.disable()
-            # Save results so it can be viusualized with snakeviz
-            pr.dump_stats("profiling_initialize.prof")
+        profiling_end(pr, "initialize")
 
-    def step(self):
-        """Performs a single SCP iteration.
+    def reset(self):
+        """Reset solver state to re-run optimization from initial conditions.
 
-        This method is designed for real-time plotting and interactive optimization.
-        It performs one complete SCP iteration including subproblem solving,
-        state updates, and progress emission for real-time visualization.
+        Creates fresh SolverState while preserving compiled dynamics and solvers.
+        Use this to run multiple optimizations without re-initializing.
+
+        Raises:
+            ValueError: If initialize() has not been called yet.
+
+        Example:
+            After calling `.step()` it may be necessary to reset the problem back to the initial
+            conditions
+
+                problem.initialize()
+                result1 = problem.step()
+                problem.reset()
+                result2 = problem.solve()  # Fresh run with same setup
+        """
+        if self._compiled_dynamics is None:
+            raise ValueError("Problem has not been initialized. Call initialize() first")
+
+        # Create fresh solver state from settings
+        self._state = SolverState.from_settings(self.settings)
+
+        # Reset solution
+        self._solution = None
+
+        # Reset timing
+        self.timing_solve = None
+        self.timing_post = None
+
+    def step(self) -> dict:
+        """Perform a single SCP iteration.
+
+        Designed for real-time plotting and interactive optimization. Performs one
+        iteration including subproblem solve, state update, and progress emission.
+
+        Note:
+            This method is NOT idempotent - it mutates internal state and advances
+            the iteration counter. Use reset() to return to initial conditions.
 
         Returns:
-            dict: Dictionary containing convergence status and current state
+            dict: Contains "converged" (bool) and current iteration state
+
+        Example:
+            Call `.step()` manually in a loop to control the algorithm directly
+
+                problem.initialize()
+                while not problem.step()["converged"]:
+                    plot_trajectory(problem.state.trajs[-1])
         """
-        result = PTR_step(
+        if self._state is None:
+            raise ValueError("Problem has not been initialized. Call initialize() first")
+
+        converged = PTR_step(
             self._parameters,  # Plain dict for JAX/CVXPy
             self.settings,
-            self.optimal_control_problem,
-            self.discretization_solver,
+            self._state,
+            self._optimal_control_problem,
+            self._discretization_solver,
             self.cpg_solve,
             self.emitter_function,
-            self.scp_k,
-            self.scp_J_tr,
-            self.scp_J_vb,
-            self.scp_J_vc,
-            self.scp_trajs,
-            self.scp_controls,
-            self.scp_V_multi_shoot_traj,
-            self._lowered.jax_constraints,
+            self._compiled_constraints,
         )
 
-        # Update instance state from result
-        self.scp_k = result["scp_k"]
-        self.scp_J_tr = result["scp_J_tr"]
-        self.scp_J_vb = result["scp_J_vb"]
-        self.scp_J_vc = result["scp_J_vc"]
-
-        return result
+        # Return dict matching original API
+        return {
+            "converged": converged,
+            "scp_k": self._state.k,
+            "scp_J_tr": self._state.J_tr,
+            "scp_J_vb": self._state.J_vb,
+            "scp_J_vc": self._state.J_vc,
+        }
 
     def solve(
         self, max_iters: Optional[int] = None, continuous: bool = False
     ) -> OptimizationResults:
+        """Run the SCP algorithm until convergence or iteration limit.
+
+        Args:
+            max_iters: Maximum iterations (default: settings.scp.k_max)
+            continuous: If True, run all iterations regardless of convergence
+
+        Returns:
+            OptimizationResults with trajectory and convergence info
+                (call post_process() for full propagation)
+        """
         # Sync parameters before solving
         self._sync_parameters()
 
-        # Ensure parameter sizes and normalization are correct
-        self.settings.scp.__post_init__()
-        self.settings.sim.__post_init__()
-
-        if self.optimal_control_problem is None or self.discretization_solver is None:
+        required = [
+            self._compiled_dynamics,
+            self._compiled_constraints,
+            self._optimal_control_problem,
+            self._discretization_solver,
+            self._state,
+        ]
+        if any(r is None for r in required):
             raise ValueError("Problem has not been initialized. Call initialize() before solve()")
 
         # Enable the profiler
-        if self.settings.dev.profiling:
-            import cProfile
-
-            pr = cProfile.Profile()
-            pr.enable()
+        pr = profiling_start(self.settings.dev.profiling)
 
         t_0_while = time.time()
         # Print top header for solver results
@@ -404,7 +517,7 @@ class Problem:
 
         k_max = max_iters if max_iters is not None else self.settings.scp.k_max
 
-        while self.scp_k <= k_max:
+        while self._state.k <= k_max:
             result = self.step()
             if result["converged"] and not continuous:
                 break
@@ -418,25 +531,37 @@ class Problem:
         # Print bottom footer for solver results as well as total computation time
         io.footer()
 
-        # Disable the profiler
-        if self.settings.dev.profiling:
-            pr.disable()
-            # Save results so it can be viusualized with snakeviz
-            pr.dump_stats("profiling_solve.prof")
+        profiling_end(pr, "solve")
 
-        return format_result(self, self.scp_k <= k_max)
+        # Store solution state
+        self._solution = copy.deepcopy(self._state)
 
-    def post_process(self, result: OptimizationResults) -> OptimizationResults:
+        return format_result(self, self._state, self._state.k <= k_max)
+
+    def post_process(self) -> OptimizationResults:
+        """Propagate solution through full nonlinear dynamics for high-fidelity trajectory.
+
+        Integrates the converged SCP solution through the nonlinear dynamics to
+        produce x_full, u_full, and t_full. Call after solve() for final results.
+
+        Returns:
+            OptimizationResults with propagated trajectory fields
+
+        Raises:
+            ValueError: If solve() has not been called yet.
+        """
+        if self._solution is None:
+            raise ValueError("No solution available. Call solve() first.")
+
         # Enable the profiler
-        if self.settings.dev.profiling:
-            import cProfile
+        pr = profiling_start(self.settings.dev.profiling)
 
-            pr = cProfile.Profile()
-            pr.enable()
+        # Create result from stored solution state
+        result = format_result(self, self._solution, self._solution.k <= self.settings.scp.k_max)
 
         t_0_post = time.time()
         result = propagate_trajectory_results(
-            self._parameters, self.settings, result, self.propagation_solver
+            self._parameters, self.settings, result, self._propagation_solver
         )
         t_f_post = time.time()
 
@@ -445,9 +570,5 @@ class Problem:
         # Print results summary
         io.print_results_summary(result, self.timing_post, self.timing_init, self.timing_solve)
 
-        # Disable the profiler
-        if self.settings.dev.profiling:
-            pr.disable()
-            # Save results so it can be viusualized with snakeviz
-            pr.dump_stats("profiling_postprocess.prof")
+        profiling_end(pr, "postprocess")
         return result

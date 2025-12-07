@@ -18,7 +18,7 @@ from openscvx.lowered.cvxpy_constraints import LoweredCvxpyConstraints
 from openscvx.lowered.cvxpy_variables import CVXPyVariables
 from openscvx.lowered.dynamics import Dynamics
 from openscvx.lowered.jax_constraints import (
-    CrossNodeConstraintLowered,
+    LoweredCrossNodeConstraint,
     LoweredJaxConstraints,
     LoweredNodalConstraint,
 )
@@ -31,7 +31,7 @@ __all__ = [
     "LoweredJaxConstraints",
     "LoweredCvxpyConstraints",
     "LoweredNodalConstraint",
-    "CrossNodeConstraintLowered",
+    "LoweredCrossNodeConstraint",
     "CVXPyVariables",
     "ParameterDict",
     "Dynamics",

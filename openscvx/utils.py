@@ -1,6 +1,12 @@
+from datetime import datetime
+from typing import TYPE_CHECKING, Optional
+
 import jax
 import jax.numpy as jnp
 import numpy as np
+
+if TYPE_CHECKING:
+    import cProfile
 
 
 def generate_orthogonal_unit_vectors(vectors=None):
@@ -55,3 +61,78 @@ def get_kp_pose(t, init_pose):
     y = x * jnp.cos(t_angle)
     z = 0.5 * x * jnp.sin(t_angle)
     return jnp.array([x, y, z]).T + init_pose
+
+
+def profiling_start(profiling_enabled: bool) -> "Optional[cProfile.Profile]":
+    """Start profiling if enabled.
+
+    Args:
+        profiling_enabled: Whether to enable profiling.
+
+    Returns:
+        Profile object if enabled, None otherwise.
+    """
+    if profiling_enabled:
+        import cProfile
+
+        pr = cProfile.Profile()
+        pr.enable()
+        return pr
+    return None
+
+
+def profiling_end(pr: "Optional[cProfile.Profile]", identifier: str):
+    """Stop profiling and save results with timestamp.
+
+    Args:
+        pr: Profile object from profiling_start, or None.
+        identifier: Identifier for the profiling session (e.g., "solve", "initialize").
+    """
+    if pr is not None:
+        pr.disable()
+        # Save results so it can be visualized with snakeviz
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        pr.dump_stats(f"profiling/{timestamp}_{identifier}.prof")
+
+
+def calculate_cost_from_boundaries(
+    x: np.ndarray, initial_type: np.ndarray, final_type: np.ndarray
+) -> float:
+    """Calculate cost from boundary condition objectives.
+
+    This function computes the total cost contribution from state boundary conditions
+    marked as "Minimize" or "Maximize" at initial and final times.
+
+    Args:
+        x: State trajectory array of shape (N, n_states)
+        initial_type: Array of boundary condition types for initial states
+        final_type: Array of boundary condition types for final states
+
+    Returns:
+        Total cost from minimize/maximize boundary conditions
+
+    Example:
+        >>> # State with final time to minimize
+        >>> x = np.array([[0.0, 5.0], [10.0, 20.0]])  # 2 nodes, 2 states
+        >>> initial_type = np.array(["Fix", "Free"])
+        >>> final_type = np.array(["Minimize", "Free"])
+        >>> cost = calculate_cost_from_boundaries(x, initial_type, final_type)
+        >>> cost  # Returns x[-1, 0] = 10.0
+    """
+    cost = 0.0
+
+    # Add costs from initial boundary conditions
+    for i, bc_type in enumerate(initial_type):
+        if bc_type == "Minimize":
+            cost += x[0, i]
+        elif bc_type == "Maximize":
+            cost -= x[0, i]
+
+    # Add costs from final boundary conditions
+    for i, bc_type in enumerate(final_type):
+        if bc_type == "Minimize":
+            cost += x[-1, i]
+        elif bc_type == "Maximize":
+            cost -= x[-1, i]
+
+    return cost

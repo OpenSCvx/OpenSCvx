@@ -3,9 +3,6 @@ from typing import Any, Optional
 
 import numpy as np
 
-from openscvx.symbolic.expr.control import Control
-from openscvx.symbolic.expr.state import State
-
 
 @dataclass
 class OptimizationResults:
@@ -20,8 +17,10 @@ class OptimizationResults:
     Attributes:
         converged (bool): Whether the optimization successfully converged
         t_final (float): Final time of the optimized trajectory
-        u (Control): Optimized control trajectory at discretization nodes
-        x (State): Optimized state trajectory at discretization nodes
+        x_guess (np.ndarray): Optimized state trajectory at discretization nodes,
+            shape (N, n_states)
+        u_guess (np.ndarray): Optimized control trajectory at discretization nodes,
+            shape (N, n_controls)
 
         # Dictionary-based Access
         nodes (dict[str, np.ndarray]): Dictionary mapping state/control names to arrays
@@ -51,8 +50,6 @@ class OptimizationResults:
     # Core optimization results
     converged: bool
     t_final: float
-    u: Control
-    x: State
 
     # Dictionary-based access to states and controls
     nodes: dict[str, np.ndarray] = field(default_factory=dict)
@@ -62,13 +59,35 @@ class OptimizationResults:
     _states: list = field(default_factory=list, repr=False)
     _controls: list = field(default_factory=list, repr=False)
 
-    # History of SCP iterations
-    x_history: list[np.ndarray] = field(default_factory=list)
-    u_history: list[np.ndarray] = field(default_factory=list)
+    # History of SCP iterations (single source of truth)
+    X: list[np.ndarray] = field(default_factory=list)
+    U: list[np.ndarray] = field(default_factory=list)
     discretization_history: list[np.ndarray] = field(default_factory=list)
     J_tr_history: list[np.ndarray] = field(default_factory=list)
     J_vb_history: list[np.ndarray] = field(default_factory=list)
     J_vc_history: list[np.ndarray] = field(default_factory=list)
+
+    @property
+    def x(self) -> np.ndarray:
+        """Optimal state trajectory at discretization nodes.
+
+        Returns the final converged solution from the SCP iteration history.
+
+        Returns:
+            State trajectory array, shape (N, n_states)
+        """
+        return self.X[-1]
+
+    @property
+    def u(self) -> np.ndarray:
+        """Optimal control trajectory at discretization nodes.
+
+        Returns the final converged solution from the SCP iteration history.
+
+        Returns:
+            Control trajectory array, shape (N, n_controls)
+        """
+        return self.U[-1]
 
     # Post-processing results (added by propagate_trajectory_results)
     t_full: Optional[np.ndarray] = None

@@ -47,6 +47,7 @@ class OptimizationWorker(QObject):
     def __init__(self):
         super().__init__()
         self.running = False
+        self.reset_requested = False
         self.problem = problem
         self.gate_center_params = gate_center_params
 
@@ -65,15 +66,32 @@ class OptimizationWorker(QObject):
         iteration = 0
         while self.running:
             try:
+                # Check if reset was requested
+                if self.reset_requested:
+                    self.problem.reset()
+                    self.reset_requested = False
+                    iteration = 0
+                    print("Problem reset to initial conditions")
+
                 start_time = time.time()
-                results = self.problem.step()
+                step_result = self.problem.step()
                 solve_time = time.time() - start_time
-                # Add timing information to results
-                results["iter"] = self.problem.scp_k - 1
-                results["J_tr"] = self.problem.scp_J_tr
-                results["J_vb"] = self.problem.scp_J_vb
-                results["J_vc"] = self.problem.scp_J_vc
-                results["solve_time"] = solve_time * 1000  # Convert to milliseconds
+
+                # Build results dict for visualization
+                results = {
+                    "iter": step_result["scp_k"] - 1,  # Display iteration (0-indexed)
+                    "J_tr": step_result["scp_J_tr"],
+                    "J_vb": step_result["scp_J_vb"],
+                    "J_vc": step_result["scp_J_vc"],
+                    "converged": step_result["converged"],
+                    "solve_time": solve_time * 1000,  # Convert to milliseconds
+                    "V_multi_shoot": self.problem.state.V_history[-1]
+                    if self.problem.state.V_history
+                    else [],
+                    "x": self.problem.state.x,  # Current state trajectory
+                    "u": self.problem.state.u,  # Current control trajectory
+                }
+
                 # Get timing from the print queue (emitted data) if available
                 try:
                     if (
@@ -88,11 +106,11 @@ class OptimizationWorker(QObject):
                     else:
                         results["dis_time"] = 0.0
                         results["prob_stat"] = "--"
-                        results["cost"] = results.get("cost", 0.0)
+                        results["cost"] = 0.0
                 except Exception:
                     results["dis_time"] = 0.0
                     results["prob_stat"] = "--"
-                    results["cost"] = results.get("cost", 0.0)
+                    results["cost"] = 0.0
                 # Update vertices for visualization
                 radii = np.array([2.5, 1e-4, 2.5])
                 vertices = []
@@ -285,6 +303,14 @@ class DroneRacingGUI(QMainWindow):
         self.camera_status_label.setStyleSheet("font-size: 10px; color: #666;")
         camera_layout.addWidget(self.camera_status_label)
         left_layout.addWidget(camera_group)
+        # Problem Control
+        problem_control_group = QGroupBox("Problem Control")
+        problem_control_layout = QVBoxLayout()
+        problem_control_group.setLayout(problem_control_layout)
+        reset_problem_button = QPushButton("Reset Problem")
+        reset_problem_button.clicked.connect(self.reset_problem)
+        problem_control_layout.addWidget(reset_problem_button)
+        left_layout.addWidget(problem_control_group)
         # Gate Controls
         gate_group = QGroupBox("Gate Positions")
         gate_layout = QVBoxLayout()
@@ -533,6 +559,11 @@ class DroneRacingGUI(QMainWindow):
         # This method is kept for compatibility but the main update is done
         # in update_optimization_metrics
         pass
+
+    def reset_problem(self):
+        """Reset the optimization problem"""
+        self.worker.reset_requested = True
+        print("Problem reset requested")
 
     def reset_gate_positions(self):
         """Reset gate positions to their original values"""

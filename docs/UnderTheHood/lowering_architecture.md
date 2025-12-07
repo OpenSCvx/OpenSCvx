@@ -118,7 +118,7 @@ Non-convex constraints become JAX functions with gradients:
 @dataclass
 class LoweredJaxConstraints:
     nodal: List[LoweredNodalConstraint]      # func, grad_g_x, grad_g_u
-    cross_node: List[CrossNodeConstraintLowered]  # func, grad_g_X, grad_g_U
+    cross_node: List[LoweredCrossNodeConstraint]  # func, grad_g_X, grad_g_U
     ctcs: List[CTCS]                         # Handled via dynamics augmentation
 ```
 

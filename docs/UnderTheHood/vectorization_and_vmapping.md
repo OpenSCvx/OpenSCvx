@@ -365,7 +365,7 @@ Cross-node constraints are **not vmapped** because they already operate on full 
 **Evaluation:** During SCP iterations, each cross-node constraint receives the full trajectory arrays and returns a scalar residual:
 
 ```python
-# Each CrossNodeConstraintLowered operates on full trajectories
+# Each LoweredCrossNodeConstraint operates on full trajectories
 residual = constraint.func(X, U, params)      # scalar
 grad_X = constraint.grad_g_X(X, U, params)    # (N, n_x) - sparse, mostly zeros
 grad_U = constraint.grad_g_U(X, U, params)    # (N, n_u) - sparse, mostly zeros
@@ -471,7 +471,7 @@ Here's a complete reference for shapes at each stage, shown with symbolic dimens
 | `openscvx/problem.py` | `initialize` | Applies vmap to dynamics |
 | `openscvx/discretization.py` | `dVdt`, `calculate_discretization` | Uses vmapped dynamics |
 | `openscvx/constraints/lowered.py` | `LoweredNodalConstraint` | Container for vmapped nodal constraints |
-| `openscvx/constraints/cross_node.py` | `CrossNodeConstraintLowered` | Container for trajectory-level cross-node constraints |
+| `openscvx/constraints/cross_node.py` | `LoweredCrossNodeConstraint` | Container for trajectory-level cross-node constraints |
 | `openscvx/symbolic/expr/constraint.py` | `CrossNodeConstraint` | Expression type for cross-node constraints |
 | `openscvx/symbolic/expr/expr.py` | `NodeReference` | Expression for referencing specific trajectory nodes |
 | `openscvx/symbolic/lowerers/jax.py` | `JaxLowerer._visit_cross_node_constraint` | Lowers CrossNodeConstraint to trajectory-level function |
