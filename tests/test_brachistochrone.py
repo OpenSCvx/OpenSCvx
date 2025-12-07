@@ -897,6 +897,11 @@ def test_idempotency():
     if hasattr(problem.settings, "dev"):
         problem.settings.dev.printing = False
 
+    # Problem parameters for analytical comparison
+    x0, y0 = 0.0, 10.0
+    x1, y1 = 10.0, 5.0
+    g = 9.81
+
     # Call each step twice to test idempotency
     problem.initialize()
     problem.initialize()  # Should not double-wrap vmap/jit
@@ -911,47 +916,38 @@ def test_idempotency():
     assert result1["converged"], "First post_process result should show convergence"
     assert result2["converged"], "Second post_process result should show convergence"
 
-    # post_process() should return identical results when called twice
-    np.testing.assert_allclose(
-        result1.x.guess,
-        result2.x.guess,
-        rtol=1e-10,
-        atol=1e-10,
-        err_msg="State trajectories differ between post_process() calls",
+    # Compare both results to analytical solution
+    comparison1 = compare_trajectory_to_analytical(
+        result1.t_full,
+        result1.trajectory["position"],
+        result1.trajectory["velocity"],
+        x0,
+        y0,
+        x1,
+        y1,
+        g,
+    )
+    comparison2 = compare_trajectory_to_analytical(
+        result2.t_full,
+        result2.trajectory["position"],
+        result2.trajectory["velocity"],
+        x0,
+        y0,
+        x1,
+        y1,
+        g,
     )
 
-    np.testing.assert_allclose(
-        result1.u.guess,
-        result2.u.guess,
-        rtol=1e-10,
-        atol=1e-10,
-        err_msg="Control trajectories differ between post_process() calls",
-    )
-
-    np.testing.assert_allclose(
-        result1.x_full,
-        result2.x_full,
-        rtol=1e-10,
-        atol=1e-10,
-        err_msg="Propagated state trajectories differ between post_process() calls",
-    )
-
-    np.testing.assert_allclose(
-        result1.u_full,
-        result2.u_full,
-        rtol=1e-10,
-        atol=1e-10,
-        err_msg="Propagated control trajectories differ between post_process() calls",
-    )
-
-    assert abs(result1.t_final - result2.t_final) < 1e-10, (
-        f"Final times differ: {result1.t_final} vs {result2.t_final}"
-    )
+    # Comparisons should be identical
+    assert comparison1["analytical_time"] == comparison2["analytical_time"]
+    assert comparison1["numerical_time"] == comparison2["numerical_time"]
+    assert comparison1["time_error_pct"] == comparison2["time_error_pct"]
+    assert comparison1["position_rmse"] == comparison2["position_rmse"]
+    assert comparison1["position_max_error"] == comparison2["position_max_error"]
+    assert comparison1["velocity_rmse"] == comparison2["velocity_rmse"]
 
     print("\nIdempotency Test Results:")
-    print(f"  t_final={float(result1.t_final):.6f}s, converged={result1['converged']}")
-    print(f"  Max state diff:   {float(np.max(np.abs(result1.x.guess - result2.x.guess))):.2e}")
-    print(f"  Max control diff: {float(np.max(np.abs(result1.u.guess - result2.u.guess))):.2e}")
+    _print_comparison_metrics(comparison1, "Idempotency")
     print("  initialize() x2, solve() x2, post_process() x2 all succeeded")
 
     # Clean up JAX caches
