@@ -103,7 +103,7 @@ class SolverState:
         V_final = V[:, -1].reshape(-1, i4)
 
         # Extract propagated state (first n_x elements of each row)
-        return V_final[:, :self.n_x]
+        return V_final[:, : self.n_x]
 
     @property
     def A_d(self) -> np.ndarray:
