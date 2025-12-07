@@ -461,9 +461,33 @@ class Problem:
 
         return format_result(self, self._state.k <= k_max)
 
-    def post_process(self, result: OptimizationResults) -> OptimizationResults:
+    def post_process(self) -> OptimizationResults:
+        """Propagate the solution trajectory through the full nonlinear dynamics.
+
+        This method takes the converged SCP solution and propagates it through
+        the nonlinear dynamics to produce a high-fidelity trajectory. It populates
+        the trajectory fields (x_full, u_full, t_full, cost) on the result.
+
+        Returns:
+            OptimizationResults: Complete results with propagated trajectory fields.
+
+        Raises:
+            ValueError: If solve() has not been called yet.
+
+        Example:
+            >>> problem.initialize()
+            >>> problem.solve()
+            >>> result = problem.post_process()
+            >>> print(result.x_full.shape)  # Full propagated state trajectory
+        """
+        if self._solution is None:
+            raise ValueError("No solution available. Call solve() first.")
+
         # Enable the profiler
         pr = profiling_start(self.settings.dev.profiling)
+
+        # Create result from stored solution state
+        result = format_result(self, converged=(self._solution.k <= self.settings.scp.k_max))
 
         t_0_post = time.time()
         result = propagate_trajectory_results(
