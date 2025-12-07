@@ -3,7 +3,7 @@ import numpy as np
 
 from openscvx.integrators import solve_ivp_diffrax, solve_ivp_rk45
 from openscvx.lowered import Dynamics
-
+from openscvx.config import Config
 
 def dVdt(
     tau: float,
@@ -110,7 +110,7 @@ def calculate_discretization(
     state_dot: callable,
     A: callable,
     B: callable,
-    settings,
+    settings: Config,
     params: dict,
 ):
     """Calculate the discretized system matrices.
@@ -211,7 +211,7 @@ def calculate_discretization(
     return A_bar, B_bar, C_bar, x_prop, Vmulti
 
 
-def get_discretization_solver(dyn: Dynamics, settings):
+def get_discretization_solver(dyn: Dynamics, settings: Config):
     """Create a discretization solver function.
 
     This function creates a solver that computes the discretized system matrices
