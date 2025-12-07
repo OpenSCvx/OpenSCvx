@@ -1,3 +1,4 @@
+import copy
 import os
 import queue
 import threading
@@ -456,8 +457,8 @@ class Problem:
 
         profiling_end(pr, "solve")
 
-        # Store final solution state for reference
-        self._solution = self._state
+        # Store solution state
+        self._solution = copy.deepcopy(self._state)
 
         return format_result(self, self._state.k <= k_max)
 
