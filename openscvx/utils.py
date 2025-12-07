@@ -96,7 +96,7 @@ def profiling_end(pr: "Optional[cProfile.Profile]", identifier: str):
 
 
 def calculate_cost_from_boundaries(
-    x_guess: np.ndarray, initial_type: np.ndarray, final_type: np.ndarray
+    x: np.ndarray, initial_type: np.ndarray, final_type: np.ndarray
 ) -> float:
     """Calculate cost from boundary condition objectives.
 
@@ -104,7 +104,7 @@ def calculate_cost_from_boundaries(
     marked as "Minimize" or "Maximize" at initial and final times.
 
     Args:
-        x_guess: State trajectory array of shape (N, n_states)
+        x: State trajectory array of shape (N, n_states)
         initial_type: Array of boundary condition types for initial states
         final_type: Array of boundary condition types for final states
 
@@ -124,15 +124,15 @@ def calculate_cost_from_boundaries(
     # Add costs from initial boundary conditions
     for i, bc_type in enumerate(initial_type):
         if bc_type == "Minimize":
-            cost += x_guess[0, i]
+            cost += x[0, i]
         elif bc_type == "Maximize":
-            cost -= x_guess[0, i]
+            cost -= x[0, i]
 
     # Add costs from final boundary conditions
     for i, bc_type in enumerate(final_type):
         if bc_type == "Minimize":
-            cost += x_guess[-1, i]
+            cost += x[-1, i]
         elif bc_type == "Maximize":
-            cost -= x_guess[-1, i]
+            cost -= x[-1, i]
 
     return cost

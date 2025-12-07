@@ -32,35 +32,35 @@ def propagate_trajectory_results(
             - ctcs_violation: CTCS constraint violation
     """
     # Get arrays from result
-    x_guess = result.x_guess
-    u_guess = result.u_guess
+    x = result.x_guess
+    u = result.u_guess
 
-    t = np.array(s_to_t(x_guess, u_guess, settings)).squeeze()
+    t = np.array(s_to_t(x, u, settings)).squeeze()
 
     t_full = np.arange(t[0], t[-1], settings.prp.dt)
 
-    tau_vals, u_full = t_to_tau(u_guess, t_full, t, settings)
+    tau_vals, u_full = t_to_tau(u, t_full, t, settings)
 
     # Create a copy of x_prop for propagation to avoid mutating settings
     # Match free values from initial state to the initial value from the result
     x_prop_for_propagation = copy.copy(settings.sim.x_prop)
 
     # Only copy for states that exist in optimization (propagation may have extra states at the end)
-    n_opt_states = x_guess.shape[1]
+    n_opt_states = x.shape[1]
     n_prop_states = settings.sim.x_prop.initial.shape[0]
 
     if n_opt_states == n_prop_states:
         # Same size - copy all
         # Use metadata from settings (immutable configuration)
         mask = jnp.array([t == "Free" for t in settings.sim.x.initial_type], dtype=bool)
-        x_prop_for_propagation.initial = jnp.where(mask, x_guess[0, :], settings.sim.x_prop.initial)
+        x_prop_for_propagation.initial = jnp.where(mask, x[0, :], settings.sim.x_prop.initial)
     else:
         # Propagation has extra states - only copy the overlapping portion
         # Use metadata from settings (immutable configuration)
         mask = jnp.array([t == "Free" for t in settings.sim.x.initial_type], dtype=bool)
         x_prop_initial_updated = settings.sim.x_prop.initial.copy()
         x_prop_initial_updated[:n_opt_states] = jnp.where(
-            mask, x_guess[0, :], settings.sim.x_prop.initial[:n_opt_states]
+            mask, x[0, :], settings.sim.x_prop.initial[:n_opt_states]
         )
         x_prop_for_propagation.initial = x_prop_initial_updated
 
@@ -70,14 +70,14 @@ def propagate_trajectory_results(
     settings.sim.x_prop = x_prop_for_propagation
 
     try:
-        x_full = simulate_nonlinear_time(params, x_guess, u_guess, tau_vals, t, settings, propagation_solver)
+        x_full = simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_solver)
     finally:
         # Always restore original x_prop, even if propagation fails
         settings.sim.x_prop = original_x_prop
 
     # Calculate cost using utility function and metadata from settings
     cost = calculate_cost_from_boundaries(
-        x_guess, settings.sim.x.initial_type, settings.sim.x.final_type
+        x, settings.sim.x.initial_type, settings.sim.x.final_type
     )
 
     # Calculate CTCS constraint violation
