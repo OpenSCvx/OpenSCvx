@@ -5,7 +5,7 @@ import numpy as np
 
 from openscvx.config import Config
 from openscvx.propagation import s_to_t, simulate_nonlinear_time, t_to_tau
-from openscvx.results import OptimizationResults
+from openscvx.scvx.optimization_results import OptimizationResults
 from openscvx.utils import calculate_cost_from_boundaries
 
 

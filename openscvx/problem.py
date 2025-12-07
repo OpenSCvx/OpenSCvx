@@ -51,9 +51,9 @@ from openscvx.lowered.jax_constraints import (
 from openscvx.ocp import optimal_control_problem
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
-from openscvx.ptr import PTR_init, PTR_step, format_result
-from openscvx.results import OptimizationResults
-from openscvx.solver_state import SolverState
+from openscvx.scvx.optimization_results import OptimizationResults
+from openscvx.scvx.ptr import PTR_init, PTR_step, format_result
+from openscvx.scvx.solver_state import SolverState
 from openscvx.symbolic.builder import preprocess_symbolic_problem
 from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import CTCS, Constraint
