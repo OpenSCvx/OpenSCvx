@@ -80,6 +80,7 @@ Note:
     (ZOH/FOH) used during optimization for consistency.
 """
 
+from .post_processing import propagate_trajectory_results
 from .propagation import (
     get_propagation_solver,
     prop_aug_dy,
@@ -94,4 +95,5 @@ __all__ = [
     "prop_aug_dy",
     "s_to_t",
     "t_to_tau",
+    "propagate_trajectory_results",
 ]
