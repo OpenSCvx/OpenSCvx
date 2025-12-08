@@ -55,7 +55,7 @@ from openscvx.lowered.jax_constraints import (
     LoweredJaxConstraints,
     LoweredNodalConstraint,
 )
-from openscvx.ocp import optimal_control_problem
+from openscvx.solvers.cvxpy import optimal_control_problem
 from openscvx.post_processing import propagate_trajectory_results
 from openscvx.propagation import get_propagation_solver
 from openscvx.symbolic.builder import preprocess_symbolic_problem

@@ -23,7 +23,7 @@ def test_cvxpygen_optional_import():
     # This should not raise an ImportError
     try:
         from openscvx.algorithms import PTR_init  # noqa: F401
-        from openscvx.ocp import optimal_control_problem  # noqa: F401
+        from openscvx.solvers.cvxpy import optimal_control_problem  # noqa: F401
 
         assert True
     except ImportError as e:
