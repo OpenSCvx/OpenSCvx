@@ -32,7 +32,7 @@ class Integrator(ABC):
 ```
 """
 
-from .rk4 import (
+from .runge_kutta import (
     SOLVER_MAP,
     rk45_step,
     solve_ivp_diffrax,
