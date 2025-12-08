@@ -7,10 +7,11 @@ import cvxpy as cp
 import numpy as np
 import numpy.linalg as la
 
-from openscvx.algorithms.autotuning import update_scp_weights
-from openscvx.algorithms.optimization_results import OptimizationResults
-from openscvx.algorithms.solver_state import SolverState
 from openscvx.config import Config
+
+from .autotuning import update_scp_weights
+from .optimization_results import OptimizationResults
+from .solver_state import SolverState
 
 if TYPE_CHECKING:
     from openscvx.lowered import LoweredJaxConstraints

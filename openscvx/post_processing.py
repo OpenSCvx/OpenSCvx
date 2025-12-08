@@ -3,7 +3,7 @@ import copy
 import jax.numpy as jnp
 import numpy as np
 
-from openscvx.algorithms.optimization_results import OptimizationResults
+from openscvx.algorithms import OptimizationResults
 from openscvx.config import Config
 from openscvx.propagation import s_to_t, simulate_nonlinear_time, t_to_tau
 from openscvx.utils import calculate_cost_from_boundaries

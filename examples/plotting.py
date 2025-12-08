@@ -17,7 +17,7 @@ except ImportError:
     gl = None
     QtWidgets = None
 
-from openscvx.algorithms.optimization_results import OptimizationResults
+from openscvx.algorithms import OptimizationResults
 from openscvx.config import Config
 from openscvx.utils import get_kp_pose
 

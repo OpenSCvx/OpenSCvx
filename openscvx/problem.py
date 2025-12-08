@@ -25,9 +25,13 @@ import jax
 os.environ["EQX_ON_ERROR"] = "nan"
 
 from openscvx import io
-from openscvx.algorithms.optimization_results import OptimizationResults
-from openscvx.algorithms.ptr import PTR_init, PTR_step, format_result
-from openscvx.algorithms.solver_state import SolverState
+from openscvx.algorithms import (
+    OptimizationResults,
+    PTR_init,
+    PTR_step,
+    SolverState,
+    format_result,
+)
 from openscvx.caching import (
     get_solver_cache_paths,
     load_or_compile_discretization_solver,
