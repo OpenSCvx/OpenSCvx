@@ -8,7 +8,6 @@ os.environ["EQX_ON_ERROR"] = "nan"
 import openscvx.symbolic.expr.linalg as linalg
 import openscvx.symbolic.expr.spatial as spatial
 import openscvx.symbolic.expr.stl as stl
-from openscvx.cache import clear_cache, get_cache_dir, get_cache_size
 from openscvx.problem import Problem
 from openscvx.symbolic.expr import (
     CTCS,
@@ -49,6 +48,7 @@ from openscvx.symbolic.expr import (
     ctcs,
 )
 from openscvx.time import Time
+from openscvx.utils.cache import clear_cache, get_cache_dir, get_cache_size
 
 __all__ = [
     # Main Trajectory Optimization Entrypoint

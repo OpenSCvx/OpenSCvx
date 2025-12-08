@@ -24,19 +24,12 @@ import jax
 
 os.environ["EQX_ON_ERROR"] = "nan"
 
-from openscvx import io
 from openscvx.algorithms import (
     OptimizationResults,
     PTR_init,
     PTR_step,
     SolverState,
     format_result,
-)
-from openscvx.caching import (
-    get_solver_cache_paths,
-    load_or_compile_discretization_solver,
-    load_or_compile_propagation_solver,
-    prime_propagation_solver,
 )
 from openscvx.config import (
     Config,
@@ -65,7 +58,13 @@ from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.lower import lower_symbolic_problem
 from openscvx.symbolic.problem import SymbolicProblem
 from openscvx.time import Time
-from openscvx.utils import profiling_end, profiling_start
+from openscvx.utils import io, profiling_end, profiling_start
+from openscvx.utils.caching import (
+    get_solver_cache_paths,
+    load_or_compile_discretization_solver,
+    load_or_compile_propagation_solver,
+    prime_propagation_solver,
+)
 
 if TYPE_CHECKING:
     import cvxpy as cp
