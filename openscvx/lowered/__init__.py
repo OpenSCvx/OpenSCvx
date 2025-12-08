@@ -2,16 +2,6 @@
 
 This module contains dataclasses representing the outputs of the lowering phase,
 where symbolic expressions are converted to executable JAX and CVXPy code.
-
-Classes:
-    LoweredProblem: Container for all lowering outputs
-    LoweredJaxConstraints: JAX-lowered non-convex constraints with gradients
-    LoweredCvxpyConstraints: CVXPy-lowered convex constraints
-    CVXPyVariables: CVXPy variables and parameters for the OCP
-    ParameterDict: Dictionary that syncs parameters between JAX and CVXPy
-    Dynamics: JAX-lowered dynamics functions (f, A, B)
-    UnifiedState: Unified state vector metadata for the lowered representation
-    UnifiedControl: Unified control vector metadata for the lowered representation
 """
 
 from openscvx.lowered.cvxpy_constraints import LoweredCvxpyConstraints
