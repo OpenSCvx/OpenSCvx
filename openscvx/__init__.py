@@ -47,7 +47,7 @@ from openscvx.symbolic.expr import (
     Variable,
     ctcs,
 )
-from openscvx.time import Time
+from openscvx.symbolic.time import Time
 from openscvx.utils.cache import clear_cache, get_cache_dir, get_cache_size
 
 __all__ = [

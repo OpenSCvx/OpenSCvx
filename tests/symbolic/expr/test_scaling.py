@@ -9,7 +9,7 @@ import pytest
 
 from openscvx.symbolic.expr import Control, State
 from openscvx.symbolic.unified import unify_controls, unify_states
-from openscvx.time import Time
+from openscvx.symbolic.time import Time
 
 # =============================================================================
 # State scaling tests

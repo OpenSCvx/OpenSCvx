@@ -40,7 +40,7 @@ Example:
 from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Set, Tuple, Union
 
 if TYPE_CHECKING:
-    from openscvx.time import Time
+    from openscvx.symbolic.time import Time
 
 import numpy as np
 
@@ -662,7 +662,7 @@ def validate_time_parameters(
             validate_time_parameters([x, time_state], time_obj)
         (True, None, None, None, None, None)
     """
-    from openscvx.time import Time
+    from openscvx.symbolic.time import Time
 
     if not isinstance(time, Time):
         raise ValueError(f"Expected Time object, but got {type(time).__name__}")

@@ -57,7 +57,7 @@ from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.lower import lower_symbolic_problem
 from openscvx.symbolic.problem import SymbolicProblem
-from openscvx.time import Time
+from openscvx.symbolic.time import Time
 from openscvx.utils import printing, profiling
 from openscvx.utils.caching import (
     get_solver_cache_paths,

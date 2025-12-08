@@ -55,7 +55,7 @@ from openscvx.symbolic.preprocessing import (
     validate_variable_names,
 )
 from openscvx.symbolic.problem import SymbolicProblem
-from openscvx.time import Time
+from openscvx.symbolic.time import Time
 
 
 def preprocess_symbolic_problem(
