@@ -58,7 +58,7 @@ from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.lower import lower_symbolic_problem
 from openscvx.symbolic.problem import SymbolicProblem
 from openscvx.time import Time
-from openscvx.utils import printing, profiling_end, profiling_start
+from openscvx.utils import printing, profiling
 from openscvx.utils.caching import (
     get_solver_cache_paths,
     load_or_compile_discretization_solver,
@@ -293,7 +293,7 @@ class Problem:
         printing.print_problem_summary(self.settings, self._lowered)
 
         # Enable the profiler
-        pr = profiling_start(self.settings.dev.profiling)
+        pr = profiling.profiling_start(self.settings.dev.profiling)
 
         t_0_while = time.time()
         # Ensure parameter sizes and normalization are correct
@@ -408,7 +408,7 @@ class Problem:
         # Prime the propagation solver
         prime_propagation_solver(self._propagation_solver, self._parameters, self.settings)
 
-        profiling_end(pr, "initialize")
+        profiling.profiling_end(pr, "initialize")
 
     def reset(self):
         """Reset solver state to re-run optimization from initial conditions.
@@ -511,7 +511,7 @@ class Problem:
             raise ValueError("Problem has not been initialized. Call initialize() before solve()")
 
         # Enable the profiler
-        pr = profiling_start(self.settings.dev.profiling)
+        pr = profiling.profiling_start(self.settings.dev.profiling)
 
         t_0_while = time.time()
         # Print top header for solver results
@@ -533,7 +533,7 @@ class Problem:
         # Print bottom footer for solver results as well as total computation time
         printing.footer()
 
-        profiling_end(pr, "solve")
+        profiling.profiling_end(pr, "solve")
 
         # Store solution state
         self._solution = copy.deepcopy(self._state)
@@ -556,7 +556,7 @@ class Problem:
             raise ValueError("No solution available. Call solve() first.")
 
         # Enable the profiler
-        pr = profiling_start(self.settings.dev.profiling)
+        pr = profiling.profiling_start(self.settings.dev.profiling)
 
         # Create result from stored solution state
         result = format_result(self, self._solution, self._solution.k <= self.settings.scp.k_max)
@@ -570,7 +570,9 @@ class Problem:
         self.timing_post = t_f_post - t_0_post
 
         # Print results summary
-        printing.print_results_summary(result, self.timing_post, self.timing_init, self.timing_solve)
+        printing.print_results_summary(
+            result, self.timing_post, self.timing_init, self.timing_solve
+        )
 
-        profiling_end(pr, "postprocess")
+        profiling.profiling_end(pr, "postprocess")
         return result
