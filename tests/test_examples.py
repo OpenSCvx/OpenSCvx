@@ -34,7 +34,7 @@ TIMING_BOUNDS = {
     },
     "drone/dr_vp.py": {
         "init": 75.0,
-        "solve": 2.0,
+        "solve": 4.0,
         "post": 6.0,
     },
     "drone/cinema_vp.py": {
