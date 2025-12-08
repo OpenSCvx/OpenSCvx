@@ -12,19 +12,19 @@
         <meta name="author" content="Chris Hayner">
       
       
-        <link rel="canonical" href="https://haynec.github.io/OpenSCvx/nightly/reference/solver_state/">
+        <link rel="canonical" href="https://haynec.github.io/OpenSCvx/nightly/reference/algorithms/solver_state/">
       
       
-        <link rel="prev" href="../results/">
+        <link rel="prev" href="../ptr/">
       
       
-        <link rel="next" href="../symbolic/">
+        <link rel="next" href="../../config/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/favicon.png">
+      <link rel="icon" href="../../../assets/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
     
     
@@ -34,16 +34,16 @@
     
     
   
-      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.618322db.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
 
     
-  <link rel="stylesheet" href="../../assets/stylesheets/custom.css">
+  <link rel="stylesheet" href="../../../assets/stylesheets/custom.css">
 
     
       
@@ -58,9 +58,9 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -85,7 +85,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#openscvx.solver_state" class="md-skip">
+        <a href="#openscvx.algorithms.solver_state" class="md-skip">
           Skip to content
         </a>
       
@@ -103,9 +103,9 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="OpenSCvx" class="md-header__button md-logo" aria-label="OpenSCvx" data-md-component="logo">
+    <a href="../../.." title="OpenSCvx" class="md-header__button md-logo" aria-label="OpenSCvx" data-md-component="logo">
       
-  <img src="../../assets/logo.svg" alt="logo">
+  <img src="../../../assets/logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -250,7 +250,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../.." class="md-tabs__link">
+      <a href="../../.." class="md-tabs__link">
         
   
   
@@ -269,7 +269,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../getting-started/" class="md-tabs__link">
+      <a href="../../../getting-started/" class="md-tabs__link">
         
   
   
@@ -288,7 +288,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../Usage/basic_problem_setup/" class="md-tabs__link">
+      <a href="../../../Usage/basic_problem_setup/" class="md-tabs__link">
         
   
   
@@ -316,7 +316,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../examples/abstract/3DoF_pdg/" class="md-tabs__link">
+        <a href="../../../examples/abstract/3DoF_pdg/" class="md-tabs__link">
           
   
   
@@ -343,7 +343,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../autotuning/" class="md-tabs__link">
+        <a href="../" class="md-tabs__link">
           
   
   
@@ -363,7 +363,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../Overview/scvx/" class="md-tabs__link">
+      <a href="../../../Overview/scvx/" class="md-tabs__link">
         
   
   
@@ -382,7 +382,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../UnderTheHood/vectorization_and_vmapping/" class="md-tabs__link">
+      <a href="../../../UnderTheHood/vectorization_and_vmapping/" class="md-tabs__link">
         
   
   
@@ -417,9 +417,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="OpenSCvx" class="md-nav__button md-logo" aria-label="OpenSCvx" data-md-component="logo">
+    <a href="../../.." title="OpenSCvx" class="md-nav__button md-logo" aria-label="OpenSCvx" data-md-component="logo">
       
-  <img src="../../assets/logo.svg" alt="logo">
+  <img src="../../../assets/logo.svg" alt="logo">
 
     </a>
     OpenSCvx
@@ -446,7 +446,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href="../../.." class="md-nav__link">
         
   
   
@@ -498,7 +498,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../getting-started/" class="md-nav__link ">
+            <a href="../../../getting-started/" class="md-nav__link ">
               
   
   
@@ -540,7 +540,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/" class="md-nav__link">
+      <a href="../../../examples/" class="md-nav__link">
         
   
   
@@ -568,7 +568,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../citation/" class="md-nav__link">
+      <a href="../../../citation/" class="md-nav__link">
         
   
   
@@ -630,7 +630,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../Usage/basic_problem_setup/" class="md-nav__link ">
+            <a href="../../../Usage/basic_problem_setup/" class="md-nav__link ">
               
   
   
@@ -672,7 +672,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../Usage/advanced_problem_setup/" class="md-nav__link">
+      <a href="../../../Usage/advanced_problem_setup/" class="md-nav__link">
         
   
   
@@ -772,7 +772,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../Usage/api_state/" class="md-nav__link">
+      <a href="../../../Usage/api_state/" class="md-nav__link">
         
   
   
@@ -800,7 +800,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../Usage/api_control/" class="md-nav__link">
+      <a href="../../../Usage/api_control/" class="md-nav__link">
         
   
   
@@ -828,7 +828,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../Usage/api_variable/" class="md-nav__link">
+      <a href="../../../Usage/api_variable/" class="md-nav__link">
         
   
   
@@ -856,7 +856,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../Usage/api_dynamics.md" class="md-nav__link">
+      <a href="../../../Usage/api_dynamics.md" class="md-nav__link">
         
   
   
@@ -884,7 +884,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../Usage/api_constraints/" class="md-nav__link">
+      <a href="../../../Usage/api_constraints/" class="md-nav__link">
         
   
   
@@ -912,7 +912,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../Usage/api_integrators/" class="md-nav__link">
+      <a href="../../../Usage/api_integrators/" class="md-nav__link">
         
   
   
@@ -940,7 +940,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../Usage/api_problem.md" class="md-nav__link">
+      <a href="../../../Usage/api_problem.md" class="md-nav__link">
         
   
   
@@ -968,7 +968,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../Usage/api_results/" class="md-nav__link">
+      <a href="../../../Usage/api_results.md" class="md-nav__link">
         
   
   
@@ -1027,7 +1027,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../Usage/tutorial_6dof_obstacle_avoidance/" class="md-nav__link ">
+            <a href="../../../Usage/tutorial_6dof_obstacle_avoidance/" class="md-nav__link ">
               
   
   
@@ -1069,7 +1069,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../Usage/tutorial_6dof_los_guidance/" class="md-nav__link">
+      <a href="../../../Usage/tutorial_6dof_los_guidance/" class="md-nav__link">
         
   
   
@@ -1236,7 +1236,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/abstract/3DoF_pdg/" class="md-nav__link">
+      <a href="../../../examples/abstract/3DoF_pdg/" class="md-nav__link">
         
   
   
@@ -1264,7 +1264,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/abstract/brachistochrone/" class="md-nav__link">
+      <a href="../../../examples/abstract/brachistochrone/" class="md-nav__link">
         
   
   
@@ -1362,7 +1362,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/car/dubins_car/" class="md-nav__link">
+      <a href="../../../examples/car/dubins_car/" class="md-nav__link">
         
   
   
@@ -1390,7 +1390,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/car/dubins_car_disjoint/" class="md-nav__link">
+      <a href="../../../examples/car/dubins_car_disjoint/" class="md-nav__link">
         
   
   
@@ -1418,7 +1418,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/car/dubins_car_stljax/" class="md-nav__link">
+      <a href="../../../examples/car/dubins_car_stljax/" class="md-nav__link">
         
   
   
@@ -1530,7 +1530,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/drone/cinema_vp/" class="md-nav__link">
+      <a href="../../../examples/drone/cinema_vp/" class="md-nav__link">
         
   
   
@@ -1558,7 +1558,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/drone/cinema_vp_realtime_base/" class="md-nav__link">
+      <a href="../../../examples/drone/cinema_vp_realtime_base/" class="md-nav__link">
         
   
   
@@ -1586,7 +1586,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/drone/dr_double_integrator/" class="md-nav__link">
+      <a href="../../../examples/drone/dr_double_integrator/" class="md-nav__link">
         
   
   
@@ -1614,7 +1614,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/drone/dr_vp/" class="md-nav__link">
+      <a href="../../../examples/drone/dr_vp/" class="md-nav__link">
         
   
   
@@ -1642,7 +1642,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/drone/dr_vp_nodal/" class="md-nav__link">
+      <a href="../../../examples/drone/dr_vp_nodal/" class="md-nav__link">
         
   
   
@@ -1670,7 +1670,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/drone/dr_vp_polytope/" class="md-nav__link">
+      <a href="../../../examples/drone/dr_vp_polytope/" class="md-nav__link">
         
   
   
@@ -1698,7 +1698,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/drone/drone_racing/" class="md-nav__link">
+      <a href="../../../examples/drone/drone_racing/" class="md-nav__link">
         
   
   
@@ -1726,7 +1726,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/drone/obstacle_avoidance/" class="md-nav__link">
+      <a href="../../../examples/drone/obstacle_avoidance/" class="md-nav__link">
         
   
   
@@ -1754,7 +1754,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/drone/obstacle_avoidance_nodal/" class="md-nav__link">
+      <a href="../../../examples/drone/obstacle_avoidance_nodal/" class="md-nav__link">
         
   
   
@@ -1782,7 +1782,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/drone/obstacle_avoidance_realtime_base/" class="md-nav__link">
+      <a href="../../../examples/drone/obstacle_avoidance_realtime_base/" class="md-nav__link">
         
   
   
@@ -1882,7 +1882,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/realtime/cinema_vp_realtime/" class="md-nav__link">
+      <a href="../../../examples/realtime/cinema_vp_realtime/" class="md-nav__link">
         
   
   
@@ -1910,7 +1910,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/realtime/drone_racing_realtime/" class="md-nav__link">
+      <a href="../../../examples/realtime/drone_racing_realtime/" class="md-nav__link">
         
   
   
@@ -1938,7 +1938,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/realtime/dubins_car_realtime/" class="md-nav__link">
+      <a href="../../../examples/realtime/dubins_car_realtime/" class="md-nav__link">
         
   
   
@@ -1966,7 +1966,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../examples/realtime/obstacle_avoidance_realtime/" class="md-nav__link">
+      <a href="../../../examples/realtime/obstacle_avoidance_realtime/" class="md-nav__link">
         
   
   
@@ -2014,23 +2014,7 @@
     
       
         
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-        
           
-        
-      
         
       
         
@@ -2073,7 +2057,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../lowered/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -2109,32 +2093,6 @@
           <ul class="md-nav__list" data-md-scrollfix>
             
               
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../autotuning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    autotuning
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -2143,63 +2101,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cache/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    cache
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../caching/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    caching
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../config/" class="md-nav__link">
+      <a href="../../config/" class="md-nav__link">
         
   
   
@@ -2226,8 +2128,76 @@
   
   
   
+    
+    
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../discretization/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    discretization
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_3" id="__nav_5_3_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    discretization
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
     <li class="md-nav__item">
-      <a href="../discretization/" class="md-nav__link">
+      <a href="../../discretization/discretization/" class="md-nav__link">
         
   
   
@@ -2248,15 +2218,49 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
               
                 
   
   
   
   
-    <li class="md-nav__item">
-      <a href="../integrators/" class="md-nav__link">
+    
+    
+      
         
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../integrators/" class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
@@ -2270,7 +2274,57 @@
   
   
 
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_4" id="__nav_5_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    integrators
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrators/runge_kutta/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    runge_kutta
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -2282,15 +2336,95 @@
   
   
   
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../lowered/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    lowered
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_5" id="__nav_5_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    lowered
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
     <li class="md-nav__item">
-      <a href="../io/" class="md-nav__link">
+      <a href="../../lowered/cvxpy_constraints/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    io
+    cvxpy_constraints
   
 
     
@@ -2305,22 +2439,20 @@
               
             
               
-            
-              
                 
   
   
   
   
     <li class="md-nav__item">
-      <a href="../ocp/" class="md-nav__link">
+      <a href="../../lowered/cvxpy_variables/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    ocp
+    cvxpy_variables
   
 
     
@@ -2341,14 +2473,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../plotting/" class="md-nav__link">
+      <a href="../../lowered/dynamics/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    plotting
+    dynamics
   
 
     
@@ -2369,14 +2501,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../post_processing/" class="md-nav__link">
+      <a href="../../lowered/jax_constraints/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    post_processing
+    jax_constraints
   
 
     
@@ -2397,7 +2529,35 @@
   
   
     <li class="md-nav__item">
-      <a href="../problem/" class="md-nav__link">
+      <a href="../../lowered/parameters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    parameters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../lowered/problem/" class="md-nav__link">
         
   
   
@@ -2425,7 +2585,273 @@
   
   
     <li class="md-nav__item">
-      <a href="../propagation/" class="md-nav__link">
+      <a href="../../lowered/unified/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    unified
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../plotting/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    plotting
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_6" id="__nav_5_6_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    plotting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plotting/plotting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    plotting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../problem/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    problem
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_8" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../propagation/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    propagation
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_8" id="__nav_5_8_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    propagation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../propagation/post_processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    post_processing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../propagation/propagation/" class="md-nav__link">
         
   
   
@@ -2446,29 +2872,9 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../ptr/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    ptr
-  
-
-    
-  </span>
-  
-  
-
-      </a>
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -2480,50 +2886,41 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../results/" class="md-nav__link">
+    
+    
+      
         
-  
-  
-  <span class="md-ellipsis">
+      
     
-  
-    results
-  
-
     
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
     
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
       
       
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
+        
           
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_9" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../solvers/" class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
     
   
-    solver_state
+    solvers
   
 
     
@@ -2531,17 +2928,41 @@
   
   
 
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_9" id="__nav_5_9_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    solvers
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solvers/cvxpy/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    solver_state
+    cvxpy
   
 
     
@@ -2550,128 +2971,13 @@
   
 
       </a>
-      
-        
+    </li>
+  
 
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#openscvx.solver_state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        solver_state
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SolverState
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="SolverState">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState.A_d" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A_d
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState.B_d" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        B_d
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState.C_d" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        C_d
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState.u" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        u
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState.x" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        x
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState.x_prop" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        x_prop
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState.from_settings" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        from_settings
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
+              
+            
+          </ul>
+        </nav>
       
     </li>
   
@@ -2686,6 +2992,8 @@
   
     
     
+      
+        
       
         
       
@@ -2725,11 +3033,11 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_17" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_10" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../symbolic/" class="md-nav__link ">
+            <a href="../../symbolic/" class="md-nav__link ">
               
   
   
@@ -2747,14 +3055,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_17" id="__nav_5_17_label" tabindex="">
+              <label class="md-nav__link " for="__nav_5_10" id="__nav_5_10_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_17_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_17">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2771,7 +3079,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/augmentation/" class="md-nav__link">
+      <a href="../../symbolic/augmentation/" class="md-nav__link">
         
   
   
@@ -2799,7 +3107,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/builder/" class="md-nav__link">
+      <a href="../../symbolic/builder/" class="md-nav__link">
         
   
   
@@ -2827,7 +3135,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/constraint_set/" class="md-nav__link">
+      <a href="../../symbolic/constraint_set/" class="md-nav__link">
         
   
   
@@ -2894,11 +3202,11 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_17_4" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_10_4" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../symbolic/expr/" class="md-nav__link ">
+            <a href="../../symbolic/expr/" class="md-nav__link ">
               
   
   
@@ -2916,14 +3224,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_17_4" id="__nav_5_17_4_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_10_4" id="__nav_5_10_4_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_17_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_17_4">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_10_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_10_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2940,7 +3248,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/expr/arithmetic/" class="md-nav__link">
+      <a href="../../symbolic/expr/arithmetic/" class="md-nav__link">
         
   
   
@@ -2968,7 +3276,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/expr/array/" class="md-nav__link">
+      <a href="../../symbolic/expr/array/" class="md-nav__link">
         
   
   
@@ -2996,7 +3304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/expr/constraint/" class="md-nav__link">
+      <a href="../../symbolic/expr/constraint/" class="md-nav__link">
         
   
   
@@ -3024,7 +3332,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/expr/control/" class="md-nav__link">
+      <a href="../../symbolic/expr/control/" class="md-nav__link">
         
   
   
@@ -3052,7 +3360,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/expr/expr/" class="md-nav__link">
+      <a href="../../symbolic/expr/expr/" class="md-nav__link">
         
   
   
@@ -3080,7 +3388,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/expr/linalg/" class="md-nav__link">
+      <a href="../../symbolic/expr/linalg/" class="md-nav__link">
         
   
   
@@ -3108,7 +3416,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/expr/math/" class="md-nav__link">
+      <a href="../../symbolic/expr/math/" class="md-nav__link">
         
   
   
@@ -3136,7 +3444,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/expr/spatial/" class="md-nav__link">
+      <a href="../../symbolic/expr/spatial/" class="md-nav__link">
         
   
   
@@ -3164,7 +3472,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/expr/state/" class="md-nav__link">
+      <a href="../../symbolic/expr/state/" class="md-nav__link">
         
   
   
@@ -3192,7 +3500,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/expr/stl/" class="md-nav__link">
+      <a href="../../symbolic/expr/stl/" class="md-nav__link">
         
   
   
@@ -3220,7 +3528,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/expr/variable/" class="md-nav__link">
+      <a href="../../symbolic/expr/variable/" class="md-nav__link">
         
   
   
@@ -3256,7 +3564,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/hashing/" class="md-nav__link">
+      <a href="../../symbolic/hashing/" class="md-nav__link">
         
   
   
@@ -3284,7 +3592,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/lower/" class="md-nav__link">
+      <a href="../../symbolic/lower/" class="md-nav__link">
         
   
   
@@ -3333,11 +3641,11 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_17_7" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_10_7" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../symbolic/lowerers/" class="md-nav__link ">
+            <a href="../../symbolic/lowerers/" class="md-nav__link ">
               
   
   
@@ -3355,14 +3663,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5_17_7" id="__nav_5_17_7_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_5_10_7" id="__nav_5_10_7_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_17_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_17_7">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_10_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_10_7">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -3379,7 +3687,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/lowerers/cvxpy/" class="md-nav__link">
+      <a href="../../symbolic/lowerers/cvxpy/" class="md-nav__link">
         
   
   
@@ -3407,7 +3715,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/lowerers/jax/" class="md-nav__link">
+      <a href="../../symbolic/lowerers/jax/" class="md-nav__link">
         
   
   
@@ -3443,7 +3751,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/preprocessing/" class="md-nav__link">
+      <a href="../../symbolic/preprocessing/" class="md-nav__link">
         
   
   
@@ -3471,7 +3779,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/problem/" class="md-nav__link">
+      <a href="../../symbolic/problem/" class="md-nav__link">
         
   
   
@@ -3499,7 +3807,35 @@
   
   
     <li class="md-nav__item">
-      <a href="../symbolic/unified/" class="md-nav__link">
+      <a href="../../symbolic/time/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    time
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../symbolic/unified/" class="md-nav__link">
         
   
   
@@ -3534,15 +3870,91 @@
   
   
   
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_11" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../utils/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    utils
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_11" id="__nav_5_11_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    utils
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
     <li class="md-nav__item">
-      <a href="../time/" class="md-nav__link">
+      <a href="../../utils/cache/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    time
+    cache
   
 
     
@@ -3563,7 +3975,91 @@
   
   
     <li class="md-nav__item">
-      <a href="../utils/" class="md-nav__link">
+      <a href="../../utils/caching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    caching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../utils/printing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    printing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../utils/profiling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    profiling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../utils/utils/" class="md-nav__link">
         
   
   
@@ -3579,6 +4075,14 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -3629,7 +4133,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../Overview/scvx/" class="md-nav__link ">
+            <a href="../../../Overview/scvx/" class="md-nav__link ">
               
   
   
@@ -3671,7 +4175,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../Overview/ocp/" class="md-nav__link">
+      <a href="../../../Overview/ocp/" class="md-nav__link">
         
   
   
@@ -3699,7 +4203,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../Overview/constraint_reformulation/" class="md-nav__link">
+      <a href="../../../Overview/constraint_reformulation/" class="md-nav__link">
         
   
   
@@ -3727,7 +4231,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../Overview/control_parameterization/" class="md-nav__link">
+      <a href="../../../Overview/control_parameterization/" class="md-nav__link">
         
   
   
@@ -3755,7 +4259,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../Overview/time_dilation/" class="md-nav__link">
+      <a href="../../../Overview/time_dilation/" class="md-nav__link">
         
   
   
@@ -3783,7 +4287,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../Overview/discretization/" class="md-nav__link">
+      <a href="../../../Overview/discretization/" class="md-nav__link">
         
   
   
@@ -3841,7 +4345,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../UnderTheHood/vectorization_and_vmapping/" class="md-nav__link ">
+            <a href="../../../UnderTheHood/vectorization_and_vmapping/" class="md-nav__link ">
               
   
   
@@ -3883,7 +4387,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../UnderTheHood/lowering_architecture/" class="md-nav__link">
+      <a href="../../../UnderTheHood/lowering_architecture/" class="md-nav__link">
         
   
   
@@ -3936,7 +4440,7 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#openscvx.solver_state" class="md-nav__link">
+  <a href="#openscvx.algorithms.solver_state" class="md-nav__link">
     <span class="md-ellipsis">
       
         solver_state
@@ -3947,7 +4451,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState" class="md-nav__link">
+  <a href="#openscvx.algorithms.solver_state.SolverState" class="md-nav__link">
     <span class="md-ellipsis">
       
         SolverState
@@ -3959,7 +4463,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState.A_d" class="md-nav__link">
+  <a href="#openscvx.algorithms.solver_state.SolverState.A_d" class="md-nav__link">
     <span class="md-ellipsis">
       
         A_d
@@ -3970,7 +4474,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState.B_d" class="md-nav__link">
+  <a href="#openscvx.algorithms.solver_state.SolverState.B_d" class="md-nav__link">
     <span class="md-ellipsis">
       
         B_d
@@ -3981,7 +4485,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState.C_d" class="md-nav__link">
+  <a href="#openscvx.algorithms.solver_state.SolverState.C_d" class="md-nav__link">
     <span class="md-ellipsis">
       
         C_d
@@ -3992,7 +4496,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState.u" class="md-nav__link">
+  <a href="#openscvx.algorithms.solver_state.SolverState.u" class="md-nav__link">
     <span class="md-ellipsis">
       
         u
@@ -4003,7 +4507,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState.x" class="md-nav__link">
+  <a href="#openscvx.algorithms.solver_state.SolverState.x" class="md-nav__link">
     <span class="md-ellipsis">
       
         x
@@ -4014,7 +4518,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState.x_prop" class="md-nav__link">
+  <a href="#openscvx.algorithms.solver_state.SolverState.x_prop" class="md-nav__link">
     <span class="md-ellipsis">
       
         x_prop
@@ -4025,7 +4529,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#openscvx.solver_state.SolverState.from_settings" class="md-nav__link">
+  <a href="#openscvx.algorithms.solver_state.SolverState.from_settings" class="md-nav__link">
     <span class="md-ellipsis">
       
         from_settings
@@ -4057,7 +4561,7 @@
 
 
   
-    <a href="https://github.com/haynec/OpenSCvx/edit/master/docs/openscvx/solver_state.py" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/haynec/OpenSCvx/edit/master/docs/openscvx/algorithms/solver_state.py" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -4066,7 +4570,7 @@
     
       
     
-    <a href="https://github.com/haynec/OpenSCvx/raw/master/docs/openscvx/solver_state.py" title="View source of this page" class="md-content__button md-icon">
+    <a href="https://github.com/haynec/OpenSCvx/raw/master/docs/openscvx/algorithms/solver_state.py" title="View source of this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.2 8.2 0 0 1-1.23-2"/></svg>
     </a>
@@ -4079,7 +4583,7 @@
 
 
 
-<a id="openscvx.solver_state"></a>
+<a id="openscvx.algorithms.solver_state"></a>
     <div class="doc doc-contents first">
 
         <p>Solver state management for SCP iterations.</p>
@@ -4111,7 +4615,7 @@ accidental mutation of initial conditions.</p>
 
 
 
-<h4 id="openscvx.solver_state.SolverState" class="doc doc-heading">
+<h4 id="openscvx.algorithms.solver_state.SolverState" class="doc doc-heading">
             <code>SolverState</code>
 
 
@@ -4119,7 +4623,7 @@ accidental mutation of initial conditions.</p>
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
   </span>
 
-<a href="#openscvx.solver_state.SolverState" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#openscvx.algorithms.solver_state.SolverState" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -4146,7 +4650,7 @@ accessed via properties that return the latest entry.</p>
       </thead>
       <tbody>
           <tr class="doc-section-item">
-            <td><code><span title="openscvx.solver_state.SolverState.k">k</span></code></td>
+            <td><code><span title="openscvx.algorithms.solver_state.SolverState.k">k</span></code></td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
@@ -4157,7 +4661,7 @@ accessed via properties that return the latest entry.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="openscvx.solver_state.SolverState.J_tr">J_tr</span></code></td>
+            <td><code><span title="openscvx.algorithms.solver_state.SolverState.J_tr">J_tr</span></code></td>
             <td>
                   <code><span title="float">float</span></code>
             </td>
@@ -4168,7 +4672,7 @@ accessed via properties that return the latest entry.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="openscvx.solver_state.SolverState.J_vb">J_vb</span></code></td>
+            <td><code><span title="openscvx.algorithms.solver_state.SolverState.J_vb">J_vb</span></code></td>
             <td>
                   <code><span title="float">float</span></code>
             </td>
@@ -4179,7 +4683,7 @@ accessed via properties that return the latest entry.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="openscvx.solver_state.SolverState.J_vc">J_vc</span></code></td>
+            <td><code><span title="openscvx.algorithms.solver_state.SolverState.J_vc">J_vc</span></code></td>
             <td>
                   <code><span title="float">float</span></code>
             </td>
@@ -4190,7 +4694,7 @@ accessed via properties that return the latest entry.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="openscvx.solver_state.SolverState.w_tr">w_tr</span></code></td>
+            <td><code><span title="openscvx.algorithms.solver_state.SolverState.w_tr">w_tr</span></code></td>
             <td>
                   <code><span title="float">float</span></code>
             </td>
@@ -4201,7 +4705,7 @@ accessed via properties that return the latest entry.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="openscvx.solver_state.SolverState.lam_cost">lam_cost</span></code></td>
+            <td><code><span title="openscvx.algorithms.solver_state.SolverState.lam_cost">lam_cost</span></code></td>
             <td>
                   <code><span title="float">float</span></code>
             </td>
@@ -4212,7 +4716,7 @@ accessed via properties that return the latest entry.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="openscvx.solver_state.SolverState.lam_vc">lam_vc</span></code></td>
+            <td><code><span title="openscvx.algorithms.solver_state.SolverState.lam_vc">lam_vc</span></code></td>
             <td>
                   <code><span title="typing.Union">Union</span>[<span title="float">float</span>, <span title="numpy.ndarray">ndarray</span>]</code>
             </td>
@@ -4223,7 +4727,7 @@ accessed via properties that return the latest entry.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="openscvx.solver_state.SolverState.lam_vb">lam_vb</span></code></td>
+            <td><code><span title="openscvx.algorithms.solver_state.SolverState.lam_vb">lam_vb</span></code></td>
             <td>
                   <code><span title="float">float</span></code>
             </td>
@@ -4234,7 +4738,7 @@ accessed via properties that return the latest entry.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="openscvx.solver_state.SolverState.n_x">n_x</span></code></td>
+            <td><code><span title="openscvx.algorithms.solver_state.SolverState.n_x">n_x</span></code></td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
@@ -4245,7 +4749,7 @@ accessed via properties that return the latest entry.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="openscvx.solver_state.SolverState.n_u">n_u</span></code></td>
+            <td><code><span title="openscvx.algorithms.solver_state.SolverState.n_u">n_u</span></code></td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
@@ -4256,7 +4760,7 @@ accessed via properties that return the latest entry.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="openscvx.solver_state.SolverState.N">N</span></code></td>
+            <td><code><span title="openscvx.algorithms.solver_state.SolverState.N">N</span></code></td>
             <td>
                   <code><span title="int">int</span></code>
             </td>
@@ -4267,7 +4771,7 @@ accessed via properties that return the latest entry.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="openscvx.solver_state.SolverState.X">X</span></code></td>
+            <td><code><span title="openscvx.algorithms.solver_state.SolverState.X">X</span></code></td>
             <td>
                   <code><span title="typing.List">List</span>[<span title="numpy.ndarray">ndarray</span>]</code>
             </td>
@@ -4278,7 +4782,7 @@ accessed via properties that return the latest entry.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="openscvx.solver_state.SolverState.U">U</span></code></td>
+            <td><code><span title="openscvx.algorithms.solver_state.SolverState.U">U</span></code></td>
             <td>
                   <code><span title="typing.List">List</span>[<span title="numpy.ndarray">ndarray</span>]</code>
             </td>
@@ -4289,7 +4793,7 @@ accessed via properties that return the latest entry.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
-            <td><code><span title="openscvx.solver_state.SolverState.V_history">V_history</span></code></td>
+            <td><code><span title="openscvx.algorithms.solver_state.SolverState.V_history">V_history</span></code></td>
             <td>
                   <code><span title="typing.List">List</span>[<span title="numpy.ndarray">ndarray</span>]</code>
             </td>
@@ -4310,7 +4814,7 @@ accessed via properties that return the latest entry.</p>
 
 
               <details class="mkdocstrings-source">
-                <summary>Source code in <code>openscvx/solver_state.py</code></summary>
+                <summary>Source code in <code>openscvx/algorithms/solver_state.py</code></summary>
                 <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-18"> 18</a></span>
 <span class="normal"><a href="#__codelineno-0-19"> 19</a></span>
 <span class="normal"><a href="#__codelineno-0-20"> 20</a></span>
@@ -4749,14 +5253,14 @@ accessed via properties that return the latest entry.</p>
 
 
 
-<h5 id="openscvx.solver_state.SolverState.A_d" class="doc doc-heading">
+<h5 id="openscvx.algorithms.solver_state.SolverState.A_d" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">A_d</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#openscvx.solver_state.SolverState.A_d" class="headerlink" title="Permanent link">&para;</a></h5>
+<a href="#openscvx.algorithms.solver_state.SolverState.A_d" class="headerlink" title="Permanent link">&para;</a></h5>
 
 
     <div class="doc doc-contents ">
@@ -4802,14 +5306,14 @@ accessed via properties that return the latest entry.</p>
 
 
 
-<h5 id="openscvx.solver_state.SolverState.B_d" class="doc doc-heading">
+<h5 id="openscvx.algorithms.solver_state.SolverState.B_d" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">B_d</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#openscvx.solver_state.SolverState.B_d" class="headerlink" title="Permanent link">&para;</a></h5>
+<a href="#openscvx.algorithms.solver_state.SolverState.B_d" class="headerlink" title="Permanent link">&para;</a></h5>
 
 
     <div class="doc doc-contents ">
@@ -4855,14 +5359,14 @@ accessed via properties that return the latest entry.</p>
 
 
 
-<h5 id="openscvx.solver_state.SolverState.C_d" class="doc doc-heading">
+<h5 id="openscvx.algorithms.solver_state.SolverState.C_d" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">C_d</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#openscvx.solver_state.SolverState.C_d" class="headerlink" title="Permanent link">&para;</a></h5>
+<a href="#openscvx.algorithms.solver_state.SolverState.C_d" class="headerlink" title="Permanent link">&para;</a></h5>
 
 
     <div class="doc doc-contents ">
@@ -4908,14 +5412,14 @@ accessed via properties that return the latest entry.</p>
 
 
 
-<h5 id="openscvx.solver_state.SolverState.u" class="doc doc-heading">
+<h5 id="openscvx.algorithms.solver_state.SolverState.u" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">u</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#openscvx.solver_state.SolverState.u" class="headerlink" title="Permanent link">&para;</a></h5>
+<a href="#openscvx.algorithms.solver_state.SolverState.u" class="headerlink" title="Permanent link">&para;</a></h5>
 
 
     <div class="doc doc-contents ">
@@ -4953,14 +5457,14 @@ accessed via properties that return the latest entry.</p>
 
 
 
-<h5 id="openscvx.solver_state.SolverState.x" class="doc doc-heading">
+<h5 id="openscvx.algorithms.solver_state.SolverState.x" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#openscvx.solver_state.SolverState.x" class="headerlink" title="Permanent link">&para;</a></h5>
+<a href="#openscvx.algorithms.solver_state.SolverState.x" class="headerlink" title="Permanent link">&para;</a></h5>
 
 
     <div class="doc doc-contents ">
@@ -4998,14 +5502,14 @@ accessed via properties that return the latest entry.</p>
 
 
 
-<h5 id="openscvx.solver_state.SolverState.x_prop" class="doc doc-heading">
+<h5 id="openscvx.algorithms.solver_state.SolverState.x_prop" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">x_prop</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#openscvx.solver_state.SolverState.x_prop" class="headerlink" title="Permanent link">&para;</a></h5>
+<a href="#openscvx.algorithms.solver_state.SolverState.x_prop" class="headerlink" title="Permanent link">&para;</a></h5>
 
 
     <div class="doc doc-contents ">
@@ -5053,14 +5557,14 @@ accessed via properties that return the latest entry.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="openscvx.solver_state.SolverState.from_settings" class="doc doc-heading">
+<h5 id="openscvx.algorithms.solver_state.SolverState.from_settings" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">from_settings</span><span class="p">(</span><span class="n">settings</span><span class="p">:</span> <span class="n">Config</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SolverState</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
   </span>
 
-<a href="#openscvx.solver_state.SolverState.from_settings" class="headerlink" title="Permanent link">&para;</a></h5>
+<a href="#openscvx.algorithms.solver_state.SolverState.from_settings" class="headerlink" title="Permanent link">&para;</a></h5>
 
 
     <div class="doc doc-contents ">
@@ -5112,7 +5616,7 @@ accessed via properties that return the latest entry.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-internal" href="#openscvx.solver_state.SolverState">SolverState</a></code>
+                  <code><a class="autorefs autorefs-internal" href="#openscvx.algorithms.solver_state.SolverState">SolverState</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5125,7 +5629,7 @@ accessed via properties that return the latest entry.</p>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>openscvx/solver_state.py</code></summary>
+              <summary>Source code in <code>openscvx/algorithms/solver_state.py</code></summary>
               <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-200">200</a></span>
 <span class="normal"><a href="#__codelineno-0-201">201</a></span>
 <span class="normal"><a href="#__codelineno-0-202">202</a></span>
@@ -5240,7 +5744,7 @@ accessed via properties that return the latest entry.</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../results/" class="md-footer__link md-footer__link--prev" aria-label="Previous: results">
+          <a href="../ptr/" class="md-footer__link md-footer__link--prev" aria-label="Previous: ptr">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -5250,20 +5754,20 @@ accessed via properties that return the latest entry.</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                results
+                ptr
               </div>
             </div>
           </a>
         
         
           
-          <a href="../symbolic/" class="md-footer__link md-footer__link--next" aria-label="Next: symbolic">
+          <a href="../../config/" class="md-footer__link md-footer__link--next" aria-label="Next: config">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                symbolic
+                config
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -5322,12 +5826,12 @@ accessed via properties that return the latest entry.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.code.select", "content.footnote.tooltips", "content.tooltips", "header.autohide", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.instant.preview", "navigation.sections", "navigation.tabs", "navigation.top", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.code.select", "content.footnote.tooltips", "content.tooltips", "header.autohide", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.instant.preview", "navigation.sections", "navigation.tabs", "navigation.top", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.e71a0d61.min.js"></script>
       
-        <script src="../../javascripts/mathjax.js"></script>
+        <script src="../../../javascripts/mathjax.js"></script>
       
         <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
       
