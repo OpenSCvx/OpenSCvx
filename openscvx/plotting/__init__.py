@@ -1,6 +1,6 @@
 """Trajectory visualization and plotting utilities.
 
-.. warning::
+!!! danger "Important"
     **THIS MODULE IS IN MAJOR NEED OF REFACTORING AND SHOULD NOT BE USED.**
 
     The plotting module is currently undergoing significant restructuring and
