@@ -6,7 +6,6 @@ suitable for numerical optimization. Discretization is a critical step in
 trajectory optimization that linearizes the nonlinear dynamics around a
 reference trajectory.
 
-
 Planned Architecture (ABC-based):
 
 A base class will be introduced to enable pluggable discretization methods.

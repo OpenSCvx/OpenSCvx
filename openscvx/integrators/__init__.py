@@ -1,8 +1,7 @@
 """Numerical integration schemes for trajectory optimization.
 
 This module provides implementations of numerical integrators used for simulating
-continuous-time dynamics and discretizing optimal control problems. Integrators
-are foundational components used by both the discretization and propagation modules.
+continuous-time dynamics.
 
 Current Implementations:
     RK45 Integration: Explicit Runge-Kutta-Fehlberg method (4th/5th order)
