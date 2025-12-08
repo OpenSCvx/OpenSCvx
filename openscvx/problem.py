@@ -58,7 +58,7 @@ from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.lower import lower_symbolic_problem
 from openscvx.symbolic.problem import SymbolicProblem
 from openscvx.time import Time
-from openscvx.utils import io, profiling_end, profiling_start
+from openscvx.utils import printing, profiling_end, profiling_start
 from openscvx.utils.caching import (
     get_solver_cache_paths,
     load_or_compile_discretization_solver,
@@ -179,7 +179,7 @@ class Problem:
             self.print_queue = queue.Queue()
             self.emitter_function = lambda data: self.print_queue.put(data)
             self.print_thread = threading.Thread(
-                target=io.intermediate,
+                target=printing.intermediate,
                 args=(self.print_queue, self.settings),
                 daemon=True,
             )
@@ -287,10 +287,10 @@ class Problem:
                 problem.initialize()  # Compile and prepare
                 problem.solve()       # Run optimization
         """
-        io.intro()
+        printing.intro()
 
         # Print problem summary
-        io.print_problem_summary(self.settings, self._lowered)
+        printing.print_problem_summary(self.settings, self._lowered)
 
         # Enable the profiler
         pr = profiling_start(self.settings.dev.profiling)
@@ -515,7 +515,7 @@ class Problem:
 
         t_0_while = time.time()
         # Print top header for solver results
-        io.header()
+        printing.header()
 
         k_max = max_iters if max_iters is not None else self.settings.scp.k_max
 
@@ -531,7 +531,7 @@ class Problem:
             time.sleep(0.1)
 
         # Print bottom footer for solver results as well as total computation time
-        io.footer()
+        printing.footer()
 
         profiling_end(pr, "solve")
 
@@ -570,7 +570,7 @@ class Problem:
         self.timing_post = t_f_post - t_0_post
 
         # Print results summary
-        io.print_results_summary(result, self.timing_post, self.timing_init, self.timing_solve)
+        printing.print_results_summary(result, self.timing_post, self.timing_init, self.timing_solve)
 
         profiling_end(pr, "postprocess")
         return result
