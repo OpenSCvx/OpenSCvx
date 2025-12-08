@@ -6,7 +6,7 @@ import jax
 import numpy as np
 from jax import export
 
-from openscvx.cache import get_cache_dir
+from openscvx.utils.cache import get_cache_dir
 
 if TYPE_CHECKING:
     from openscvx.symbolic.problem import SymbolicProblem

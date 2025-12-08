@@ -8,7 +8,7 @@ import jax
 import numpy as np
 from termcolor import colored
 
-from openscvx.results import OptimizationResults
+from openscvx.algorithms import OptimizationResults
 
 warnings.filterwarnings("ignore")
 
@@ -73,7 +73,7 @@ def print_problem_summary(settings, lowered):
     n_augmented = settings.sim.n_states - settings.sim.true_state_slice.stop
 
     # Count CVXPy variables, parameters, and constraints
-    from openscvx.ocp import optimal_control_problem
+    from openscvx.solvers import optimal_control_problem
 
     try:
         # Build OCP using LoweredProblem

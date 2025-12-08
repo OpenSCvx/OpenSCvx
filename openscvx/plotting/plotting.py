@@ -5,8 +5,8 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from openscvx.algorithms import OptimizationResults
 from openscvx.config import Config
-from openscvx.results import OptimizationResults
 from openscvx.utils import get_kp_pose
 
 

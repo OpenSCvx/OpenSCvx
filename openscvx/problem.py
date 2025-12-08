@@ -24,12 +24,12 @@ import jax
 
 os.environ["EQX_ON_ERROR"] = "nan"
 
-from openscvx import io
-from openscvx.caching import (
-    get_solver_cache_paths,
-    load_or_compile_discretization_solver,
-    load_or_compile_propagation_solver,
-    prime_propagation_solver,
+from openscvx.algorithms import (
+    OptimizationResults,
+    PTR_init,
+    PTR_step,
+    SolverState,
+    format_result,
 )
 from openscvx.config import (
     Config,
@@ -48,12 +48,8 @@ from openscvx.lowered.jax_constraints import (
     LoweredJaxConstraints,
     LoweredNodalConstraint,
 )
-from openscvx.ocp import optimal_control_problem
-from openscvx.post_processing import propagate_trajectory_results
-from openscvx.propagation import get_propagation_solver
-from openscvx.ptr import PTR_init, PTR_step, format_result
-from openscvx.results import OptimizationResults
-from openscvx.solver_state import SolverState
+from openscvx.propagation import get_propagation_solver, propagate_trajectory_results
+from openscvx.solvers import optimal_control_problem
 from openscvx.symbolic.builder import preprocess_symbolic_problem
 from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import CTCS, Constraint
@@ -61,8 +57,14 @@ from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.lower import lower_symbolic_problem
 from openscvx.symbolic.problem import SymbolicProblem
-from openscvx.time import Time
-from openscvx.utils import profiling_end, profiling_start
+from openscvx.symbolic.time import Time
+from openscvx.utils import printing, profiling
+from openscvx.utils.caching import (
+    get_solver_cache_paths,
+    load_or_compile_discretization_solver,
+    load_or_compile_propagation_solver,
+    prime_propagation_solver,
+)
 
 if TYPE_CHECKING:
     import cvxpy as cp
@@ -177,7 +179,7 @@ class Problem:
             self.print_queue = queue.Queue()
             self.emitter_function = lambda data: self.print_queue.put(data)
             self.print_thread = threading.Thread(
-                target=io.intermediate,
+                target=printing.intermediate,
                 args=(self.print_queue, self.settings),
                 daemon=True,
             )
@@ -285,13 +287,13 @@ class Problem:
                 problem.initialize()  # Compile and prepare
                 problem.solve()       # Run optimization
         """
-        io.intro()
+        printing.intro()
 
         # Print problem summary
-        io.print_problem_summary(self.settings, self._lowered)
+        printing.print_problem_summary(self.settings, self._lowered)
 
         # Enable the profiler
-        pr = profiling_start(self.settings.dev.profiling)
+        pr = profiling.profiling_start(self.settings.dev.profiling)
 
         t_0_while = time.time()
         # Ensure parameter sizes and normalization are correct
@@ -406,7 +408,7 @@ class Problem:
         # Prime the propagation solver
         prime_propagation_solver(self._propagation_solver, self._parameters, self.settings)
 
-        profiling_end(pr, "initialize")
+        profiling.profiling_end(pr, "initialize")
 
     def reset(self):
         """Reset solver state to re-run optimization from initial conditions.
@@ -509,11 +511,11 @@ class Problem:
             raise ValueError("Problem has not been initialized. Call initialize() before solve()")
 
         # Enable the profiler
-        pr = profiling_start(self.settings.dev.profiling)
+        pr = profiling.profiling_start(self.settings.dev.profiling)
 
         t_0_while = time.time()
         # Print top header for solver results
-        io.header()
+        printing.header()
 
         k_max = max_iters if max_iters is not None else self.settings.scp.k_max
 
@@ -529,9 +531,9 @@ class Problem:
             time.sleep(0.1)
 
         # Print bottom footer for solver results as well as total computation time
-        io.footer()
+        printing.footer()
 
-        profiling_end(pr, "solve")
+        profiling.profiling_end(pr, "solve")
 
         # Store solution state
         self._solution = copy.deepcopy(self._state)
@@ -554,7 +556,7 @@ class Problem:
             raise ValueError("No solution available. Call solve() first.")
 
         # Enable the profiler
-        pr = profiling_start(self.settings.dev.profiling)
+        pr = profiling.profiling_start(self.settings.dev.profiling)
 
         # Create result from stored solution state
         result = format_result(self, self._solution, self._solution.k <= self.settings.scp.k_max)
@@ -568,7 +570,9 @@ class Problem:
         self.timing_post = t_f_post - t_0_post
 
         # Print results summary
-        io.print_results_summary(result, self.timing_post, self.timing_init, self.timing_solve)
+        printing.print_results_summary(
+            result, self.timing_post, self.timing_init, self.timing_solve
+        )
 
-        profiling_end(pr, "postprocess")
+        profiling.profiling_end(pr, "postprocess")
         return result
