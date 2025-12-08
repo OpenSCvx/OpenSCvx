@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from openscvx.integrators.rk4 import (
+from openscvx.integrators import (
     solve_ivp_diffrax,
     solve_ivp_diffrax_prop,
     solve_ivp_rk45,
