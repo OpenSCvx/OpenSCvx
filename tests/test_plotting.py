@@ -7,7 +7,7 @@ Tests the plotting functions:
 - plot_scp_iteration_animation: Create animated plot showing SCP iteration convergence
 """
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -384,7 +384,9 @@ class TestPlotSCPIterationAnimationFunction:
         n_iterations = len(mock_result_with_animation.X)
         assert len(fig.frames) == n_iterations
 
-    def test_plot_scp_animation_has_animation_controls(self, mock_result_with_animation, mock_config):
+    def test_plot_scp_animation_has_animation_controls(
+        self, mock_result_with_animation, mock_config
+    ):
         """Test that animation has play/pause controls."""
         fig = plot_scp_iteration_animation(mock_result_with_animation, mock_config)
         
@@ -608,7 +610,9 @@ class TestPlottingIntegration:
         assert fig_control is not None
         assert fig_animation is not None
 
-    def test_plotting_functions_produce_different_figures(self, complete_mock_result, complete_mock_config):
+    def test_plotting_functions_produce_different_figures(
+        self, complete_mock_result, complete_mock_config
+    ):
         """Test that different plotting functions produce visually different outputs."""
         fig_state = plot_state(complete_mock_result, complete_mock_config)
         fig_control = plot_control(complete_mock_result, complete_mock_config)
@@ -621,4 +625,7 @@ class TestPlottingIntegration:
         assert "Control" in fig_control.layout.title.text
         
         # Animation should have SCP in title
-        assert "SCP" in fig_animation.layout.title.text or "Iteration" in fig_animation.layout.title.text
+        assert (
+            "SCP" in fig_animation.layout.title.text
+            or "Iteration" in fig_animation.layout.title.text
+        )
