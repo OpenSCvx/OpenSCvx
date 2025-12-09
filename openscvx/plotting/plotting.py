@@ -30,38 +30,39 @@ def plot_state(
     if problem is not None:
         if result is None:
             # Check if post_process() was called and use propagated result
-            if hasattr(problem._solution, '_propagated_result'):
+            if hasattr(problem._solution, "_propagated_result"):
                 result = problem._solution._propagated_result
             else:
                 from openscvx.algorithms import format_result
+
                 result = format_result(problem, problem._solution, True)
         if params is None:
             params = problem.settings
-    
+
     if result is None or params is None:
         raise ValueError("Must provide either (result, params) or problem")
 
     # Optional filtering of which states to plot
     state_filter = set(state_names) if state_names else None
-    
+
     # Get time values at nodes from the nodes dictionary
-    t_nodes = result.nodes['time'].flatten()
-    
+    t_nodes = result.nodes["time"].flatten()
+
     # Check if full propagation trajectory is available
     has_full_trajectory = result.trajectory and len(result.trajectory) > 0
 
     # Get time for full trajectory
     if has_full_trajectory:
-        t_full = result.trajectory['time'].flatten()
-    
+        t_full = result.trajectory["time"].flatten()
+
     # Get all states (both user-defined and augmented)
-    states = result._states if hasattr(result, '_states') and result._states else []
+    states = result._states if hasattr(result, "_states") and result._states else []
 
     # Filter out CTCS augmentation states
     filtered_states = []
     for state in states:
         # Check if this is a CTCS augmentation state (names like _ctcs_aug_0, _ctcs_aug_1, etc.)
-        if 'ctcs_aug' not in state.name.lower():
+        if "ctcs_aug" not in state.name.lower():
             filtered_states.append(state)
 
     states = filtered_states
@@ -84,12 +85,14 @@ def plot_state(
         # Create a separate entry for each component
         if n_components > 1:
             for i in range(n_components):
+
                 class ComponentState:
                     def __init__(self, name: str, idx: int, parent_name: str, comp_idx: int):
                         self.name = f"{parent_name}_{comp_idx}"
                         self._slice = slice(idx, idx + 1)
                         self.parent_name = parent_name
                         self.component_index = comp_idx
+
                 expanded_states.append(ComponentState(state.name, slice_start + i, state.name, i))
         else:
             # Single component, keep as is
@@ -99,6 +102,7 @@ def plot_state(
                     self._slice = slice(idx, idx + 1)
                     self.parent_name = name
                     self.component_index = 0
+
             expanded_states.append(SingleState(state.name, slice_start))
 
     # Calculate grid dimensions based on expanded states
@@ -135,7 +139,7 @@ def plot_state(
             x_max = np.inf
 
         # Show legend only on first subplot
-        show_legend = (idx == 0)
+        show_legend = idx == 0
 
         # Plot full nonlinear propagation if available
         if has_full_trajectory and state.parent_name in result.trajectory and t_full is not None:
@@ -287,17 +291,9 @@ def plot_trust_region_heatmap(result: OptimizationResults, problem=None):
     else:
         x_labels = list(range(x_len))
 
-    fig = go.Figure(
-        data=go.Heatmap(
-            z=z, 
-            x=x_labels, 
-            y=var_names, 
-            colorscale="Viridis"
-        )
-    )
+    fig = go.Figure(data=go.Heatmap(z=z, x=x_labels, y=var_names, colorscale="Viridis"))
     fig.update_layout(
-        title="Trust Region Delta Magnitudes (last iteration)",
-        template="plotly_dark"
+        title="Trust Region Delta Magnitudes (last iteration)", template="plotly_dark"
     )
     fig.update_xaxes(title_text="Node / Time", side="bottom")
     fig.update_yaxes(title_text="State / Control component", side="left")
@@ -321,9 +317,7 @@ def plot_virtual_control_heatmap(result: OptimizationResults, problem=None):
 
     vc_mat = result.VC_history[-1]
     # Virtual control only applies to states, not controls
-    state_names = _expanded_variable_names(
-        getattr(result, "_states", []) or [], []
-    )
+    state_names = _expanded_variable_names(getattr(result, "_states", []) or [], [])
 
     # Align so rows = states, cols = nodes
     if vc_mat.shape[1] == len(state_names):
@@ -379,29 +373,30 @@ def plot_control(
     if problem is not None:
         if result is None:
             # Check if post_process() was called and use propagated result
-            if hasattr(problem._solution, '_propagated_result'):
+            if hasattr(problem._solution, "_propagated_result"):
                 result = problem._solution._propagated_result
             else:
                 from openscvx.algorithms import format_result
+
                 result = format_result(problem, problem._solution, True)
         if params is None:
             params = problem.settings
-    
+
     if result is None or params is None:
         raise ValueError("Must provide either (result, params) or problem")
-    
+
     # Get time values at nodes from the nodes dictionary
-    t_nodes = result.nodes['time'].flatten()
-    
+    t_nodes = result.nodes["time"].flatten()
+
     # Check if full propagation trajectory is available
     has_full_trajectory = result.trajectory and len(result.trajectory) > 0
 
     # Get time for full trajectory
     if has_full_trajectory:
-        t_full = result.trajectory['time'].flatten()
-    
+        t_full = result.trajectory["time"].flatten()
+
     # Get all controls (both user-defined and augmented)
-    controls = result._controls if hasattr(result, '_controls') and result._controls else []
+    controls = result._controls if hasattr(result, "_controls") and result._controls else []
 
     # Optional filtering of which controls to plot
     control_filter = set(control_names) if control_names else None
@@ -423,12 +418,14 @@ def plot_control(
         # Create a separate entry for each component
         if n_components > 1:
             for i in range(n_components):
+
                 class ComponentControl:
                     def __init__(self, idx: int, parent_name: str, comp_idx: int):
                         self.name = f"{parent_name}_{comp_idx}"
                         self._slice = slice(idx, idx + 1)
                         self.parent_name = parent_name
                         self.component_index = comp_idx
+
                 expanded_controls.append(ComponentControl(slice_start + i, control.name, i))
         else:
             # Single component, keep as is
@@ -438,6 +435,7 @@ def plot_control(
                     self._slice = slice(idx, idx + 1)
                     self.parent_name = name
                     self.component_index = 0
+
             expanded_controls.append(SingleControl(control.name, slice_start))
 
     # Calculate grid dimensions based on expanded controls
@@ -470,7 +468,7 @@ def plot_control(
         u_max = params.sim.u.max[control_idx]
 
         # Show legend only on first subplot
-        show_legend = (idx == 0)
+        show_legend = idx == 0
 
         # Plot full propagated control trajectory if available
         if has_full_trajectory and control.parent_name in result.trajectory and t_full is not None:
@@ -557,6 +555,7 @@ def plot_control(
 
     return fig
 
+
 def plot_scp_iteration_animation(
     result: OptimizationResults = None,
     params: Config = None,
@@ -580,21 +579,22 @@ def plot_scp_iteration_animation(
     if problem is not None:
         if result is None:
             # Check if post_process() was called and use propagated result
-            if hasattr(problem._solution, '_propagated_result'):
+            if hasattr(problem._solution, "_propagated_result"):
                 result = problem._solution._propagated_result
             else:
                 from openscvx.algorithms import format_result
+
                 result = format_result(problem, problem._solution, True)
         if params is None:
             params = problem.settings
-    
+
     if result is None or params is None:
         raise ValueError("Must provide either (result, params) or problem")
-    
+
     # Get iteration history
     V_history = (
         result.discretization_history
-        if hasattr(result, 'discretization_history') and result.discretization_history
+        if hasattr(result, "discretization_history") and result.discretization_history
         else []
     )
     U_history = result.U
@@ -629,11 +629,11 @@ def plot_scp_iteration_animation(
 
     # Get states and controls, filter CTCS
     # For propagated states, use x_prop metadata
-    states = result._states if hasattr(result, '_states') and result._states else []
-    controls = result._controls if hasattr(result, '_controls') and result._controls else []
+    states = result._states if hasattr(result, "_states") and result._states else []
+    controls = result._controls if hasattr(result, "_controls") and result._controls else []
 
     # Filter out augmented states
-    filtered_states = [s for s in states if 'ctcs_aug' not in s.name.lower()]
+    filtered_states = [s for s in states if "ctcs_aug" not in s.name.lower()]
     states = filtered_states
     controls = controls if controls else []
 
@@ -667,16 +667,20 @@ def plot_scp_iteration_animation(
 
             if n_comp > 1:
                 for i in range(n_comp):
+
                     class Component:
                         def __init__(self, idx, parent, comp_idx):
                             self.name = f"{parent}_{comp_idx}"
                             self._slice = slice(idx, idx + 1)
+
                     expanded.append(Component(start + i, var.name, i))
             else:
+
                 class Single:
                     def __init__(self, name, idx):
                         self.name = name
                         self._slice = slice(idx, idx + 1)
+
                 expanded.append(Single(var.name, start))
         return expanded
 
@@ -694,31 +698,38 @@ def plot_scp_iteration_animation(
     total_rows = n_state_rows + n_control_rows
     # Use n_state_cols for state rows, n_control_cols for control rows - don't pad to max
     actual_cols = n_state_cols if n_state_rows > 0 else n_control_cols
-    
+
     # Create figure with proper column counts per section
     subplot_titles = [s.name for s in expanded_states] + [c.name for c in expanded_controls]
     # For mixed grids, we need to handle states and controls separately
     if n_states > 0 and n_controls > 0:
         # Create a grid that can accommodate both sections
         fig = make_subplots(
-            rows=total_rows, cols=max(n_state_cols, n_control_cols),
+            rows=total_rows,
+            cols=max(n_state_cols, n_control_cols),
             subplot_titles=subplot_titles,
-            vertical_spacing=0.1, horizontal_spacing=0.05,
+            vertical_spacing=0.1,
+            horizontal_spacing=0.05,
             specs=[
                 [{"secondary_y": False}] * max(n_state_cols, n_control_cols)
                 for _ in range(total_rows)
-            ]
+            ],
         )
     else:
-        fig = make_subplots(rows=total_rows, cols=actual_cols, subplot_titles=subplot_titles,
-                           vertical_spacing=0.1, horizontal_spacing=0.05)
+        fig = make_subplots(
+            rows=total_rows,
+            cols=actual_cols,
+            subplot_titles=subplot_titles,
+            vertical_spacing=0.1,
+            horizontal_spacing=0.05,
+        )
 
     # Add 500 blank traces for animation placeholder
     for _ in range(2000):
         fig.add_trace(go.Scatter(x=[], y=[], mode="lines", showlegend=False))
 
     time_slice = params.sim.time_slice
-    
+
     # Prepare bounds data for each subplot
     state_bounds_data = {}
     for state_idx, state in enumerate(expanded_states):
@@ -726,7 +737,7 @@ def plot_scp_iteration_animation(
         x_min = params.sim.x.min[idx] if params.sim.x.min is not None else -np.inf
         x_max = params.sim.x.max[idx] if params.sim.x.max is not None else np.inf
         state_bounds_data[state_idx] = (x_min, x_max)
-    
+
     control_bounds_data = {}
     for control_idx, control in enumerate(expanded_controls):
         idx = control._slice.start
@@ -742,7 +753,8 @@ def plot_scp_iteration_animation(
 
         # Time for nodes (N points)
         t_nodes = (
-            X_nodes[:, time_slice].flatten() if time_slice is not None
+            X_nodes[:, time_slice].flatten()
+            if time_slice is not None
             else np.linspace(0, params.sim.total_time, X_nodes.shape[0])
         )
 
@@ -764,24 +776,30 @@ def plot_scp_iteration_animation(
                     segment_states = pos_traj[:, j, idx]  # Shape: (n_timesteps,)
                     segment_times = pos_traj[:, j, time_slice].flatten()
 
-                    frame_data.append(go.Scatter(
-                        x=segment_times,
-                        y=segment_states,
-                        mode="lines",
-                        line={"color": "blue", "width": 2},
-                        showlegend=False,
-                        xaxis=f"x{1 if (row == 1 and col == 1) else state_idx + 1}",
-                        yaxis=f"y{1 if (row == 1 and col == 1) else state_idx + 1}"
-                    ))
+                    frame_data.append(
+                        go.Scatter(
+                            x=segment_times,
+                            y=segment_states,
+                            mode="lines",
+                            line={"color": "blue", "width": 2},
+                            showlegend=False,
+                            xaxis=f"x{1 if (row == 1 and col == 1) else state_idx + 1}",
+                            yaxis=f"y{1 if (row == 1 and col == 1) else state_idx + 1}",
+                        )
+                    )
 
             # Optimization nodes (markers only)
-            frame_data.append(go.Scatter(
-                x=t_nodes, y=X_nodes[:, idx], mode="markers",
-                marker={"color": "cyan", "size": 6, "symbol": "circle"},
-                showlegend=False,
-                xaxis=f"x{1 if (row == 1 and col == 1) else state_idx + 1}",
-                yaxis=f"y{1 if (row == 1 and col == 1) else state_idx + 1}"
-            ))
+            frame_data.append(
+                go.Scatter(
+                    x=t_nodes,
+                    y=X_nodes[:, idx],
+                    mode="markers",
+                    marker={"color": "cyan", "size": 6, "symbol": "circle"},
+                    showlegend=False,
+                    xaxis=f"x{1 if (row == 1 and col == 1) else state_idx + 1}",
+                    yaxis=f"y{1 if (row == 1 and col == 1) else state_idx + 1}",
+                )
+            )
 
         # Controls: plot on separate subplots
         for control_idx, control in enumerate(expanded_controls):
@@ -789,13 +807,17 @@ def plot_scp_iteration_animation(
             row = n_state_rows + (control_idx // n_control_cols) + 1
             col = (control_idx % n_control_cols) + 1
 
-            frame_data.append(go.Scatter(
-                x=t_nodes, y=U_iter[:, idx], mode="markers",
-                marker={"color": "orange", "size": 6, "symbol": "circle"},
-                showlegend=False,
-                xaxis=f"x{1 if (row == 1 and col == 1) else n_states + control_idx + 1}",
-                yaxis=f"y{1 if (row == 1 and col == 1) else n_states + control_idx + 1}"
-            ))
+            frame_data.append(
+                go.Scatter(
+                    x=t_nodes,
+                    y=U_iter[:, idx],
+                    mode="markers",
+                    marker={"color": "orange", "size": 6, "symbol": "circle"},
+                    showlegend=False,
+                    xaxis=f"x{1 if (row == 1 and col == 1) else n_states + control_idx + 1}",
+                    yaxis=f"y{1 if (row == 1 and col == 1) else n_states + control_idx + 1}",
+                )
+            )
 
         # Time range for bounds spans (use t_nodes for the full time range)
         t_min = t_nodes.min() if len(t_nodes) > 0 else 0
@@ -806,33 +828,57 @@ def plot_scp_iteration_animation(
         for state_idx, (x_min, x_max) in state_bounds_data.items():
             axis_num = state_idx + 1
             if not np.isinf(x_min):
-                frame_data.append(go.Scatter(x=[t_min, t_max], y=[x_min, x_min], mode="lines",
-                                            line={"color": "red", "width": 1, "dash": "dot"},
-                                            showlegend=False,
-                                            xaxis=f"x{axis_num}",
-                                            yaxis=f"y{axis_num}"))
+                frame_data.append(
+                    go.Scatter(
+                        x=[t_min, t_max],
+                        y=[x_min, x_min],
+                        mode="lines",
+                        line={"color": "red", "width": 1, "dash": "dot"},
+                        showlegend=False,
+                        xaxis=f"x{axis_num}",
+                        yaxis=f"y{axis_num}",
+                    )
+                )
             if not np.isinf(x_max):
-                frame_data.append(go.Scatter(x=[t_min, t_max], y=[x_max, x_max], mode="lines",
-                                            line={"color": "red", "width": 1, "dash": "dot"},
-                                            showlegend=False,
-                                            xaxis=f"x{axis_num}",
-                                            yaxis=f"y{axis_num}"))
-        
+                frame_data.append(
+                    go.Scatter(
+                        x=[t_min, t_max],
+                        y=[x_max, x_max],
+                        mode="lines",
+                        line={"color": "red", "width": 1, "dash": "dot"},
+                        showlegend=False,
+                        xaxis=f"x{axis_num}",
+                        yaxis=f"y{axis_num}",
+                    )
+                )
+
         # Control bounds
         for control_idx, (u_min, u_max) in control_bounds_data.items():
             axis_num = n_states + control_idx + 1
             if not np.isinf(u_min):
-                frame_data.append(go.Scatter(x=[t_min, t_max], y=[u_min, u_min], mode="lines",
-                                            line={"color": "red", "width": 1, "dash": "dot"},
-                                            showlegend=False,
-                                            xaxis=f"x{axis_num}",
-                                            yaxis=f"y{axis_num}"))
+                frame_data.append(
+                    go.Scatter(
+                        x=[t_min, t_max],
+                        y=[u_min, u_min],
+                        mode="lines",
+                        line={"color": "red", "width": 1, "dash": "dot"},
+                        showlegend=False,
+                        xaxis=f"x{axis_num}",
+                        yaxis=f"y{axis_num}",
+                    )
+                )
             if not np.isinf(u_max):
-                frame_data.append(go.Scatter(x=[t_min, t_max], y=[u_max, u_max], mode="lines",
-                                            line={"color": "red", "width": 1, "dash": "dot"},
-                                            showlegend=False,
-                                            xaxis=f"x{axis_num}",
-                                            yaxis=f"y{axis_num}"))
+                frame_data.append(
+                    go.Scatter(
+                        x=[t_min, t_max],
+                        y=[u_max, u_max],
+                        mode="lines",
+                        line={"color": "red", "width": 1, "dash": "dot"},
+                        showlegend=False,
+                        xaxis=f"x{axis_num}",
+                        yaxis=f"y{axis_num}",
+                    )
+                )
 
         frames.append(go.Frame(data=frame_data, name=f"Iteration {iter_idx}"))
 
@@ -841,53 +887,112 @@ def plot_scp_iteration_animation(
     fig.update_layout(
         title_text=f"SCP Iteration History ({n_iterations} iterations)",
         template="plotly_dark",
-        updatemenus=[{
-            "type": "buttons", "direction": "left", "x": 0.1, "y": -0.15,
-            "buttons": [
-                {"label": "Play", "method": "animate",
-                 "args": [None, {"frame": {"duration": 17, "redraw": True}, "fromcurrent": True,
-                                 "mode": "immediate", "transition": {"duration": 0}}]},
-                {"label": "Pause", "method": "animate",
-                 "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate",
-                                   "transition": {"duration": 0}}]},
-            ]}],
-        sliders=[{
-            "active": 0, "yanchor": "top", "y": -0.1, "xanchor": "left", "x": 0.4,
-            "currentvalue": {"prefix": "Iteration: ", "visible": True, "xanchor": "right"},
-            "pad": {"b": 10, "t": 50}, "len": 0.5,
-            "steps": [
-                {
-                    "args": [
-                        [f"Iteration {i}"],
-                        {
-                            "frame": {"duration": 17, "redraw": True},
-                            "mode": "immediate",
-                            "transition": {"duration": 0}
-                        }
-                    ],
-                    "label": str(i),
-                    "method": "animate"
-                }
-                for i in range(n_iterations)
-            ]}],
+        updatemenus=[
+            {
+                "type": "buttons",
+                "direction": "left",
+                "x": 0.1,
+                "y": -0.15,
+                "buttons": [
+                    {
+                        "label": "Play",
+                        "method": "animate",
+                        "args": [
+                            None,
+                            {
+                                "frame": {"duration": 17, "redraw": True},
+                                "fromcurrent": True,
+                                "mode": "immediate",
+                                "transition": {"duration": 0},
+                            },
+                        ],
+                    },
+                    {
+                        "label": "Pause",
+                        "method": "animate",
+                        "args": [
+                            [None],
+                            {
+                                "frame": {"duration": 0, "redraw": False},
+                                "mode": "immediate",
+                                "transition": {"duration": 0},
+                            },
+                        ],
+                    },
+                ],
+            }
+        ],
+        sliders=[
+            {
+                "active": 0,
+                "yanchor": "top",
+                "y": -0.1,
+                "xanchor": "left",
+                "x": 0.4,
+                "currentvalue": {"prefix": "Iteration: ", "visible": True, "xanchor": "right"},
+                "pad": {"b": 10, "t": 50},
+                "len": 0.5,
+                "steps": [
+                    {
+                        "args": [
+                            [f"Iteration {i}"],
+                            {
+                                "frame": {"duration": 17, "redraw": True},
+                                "mode": "immediate",
+                                "transition": {"duration": 0},
+                            },
+                        ],
+                        "label": str(i),
+                        "method": "animate",
+                    }
+                    for i in range(n_iterations)
+                ],
+            }
+        ],
     )
 
     # Add legend entries for the traces
     # Add dummy traces for legend
-    fig.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name="Multishot Trajectory",
-                            line={"color": "blue", "width": 2}, showlegend=True))
-    fig.add_trace(go.Scatter(
-        x=[None], y=[None], mode="markers", name="State Nodes",
-        marker={"color": "cyan", "size": 6, "symbol": "circle"},
-        showlegend=True
-    ))
-    fig.add_trace(go.Scatter(
-        x=[None], y=[None], mode="markers", name="Control Nodes",
-        marker={"color": "orange", "size": 6, "symbol": "circle"},
-        showlegend=True
-    ))
-    fig.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name="Bounds",
-                            line={"color": "red", "width": 1, "dash": "dot"}, showlegend=True))
+    fig.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="lines",
+            name="Multishot Trajectory",
+            line={"color": "blue", "width": 2},
+            showlegend=True,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="markers",
+            name="State Nodes",
+            marker={"color": "cyan", "size": 6, "symbol": "circle"},
+            showlegend=True,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="markers",
+            name="Control Nodes",
+            marker={"color": "orange", "size": 6, "symbol": "circle"},
+            showlegend=True,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="lines",
+            name="Bounds",
+            line={"color": "red", "width": 1, "dash": "dot"},
+            showlegend=True,
+        )
+    )
 
     # Update legend configuration
     fig.update_layout(
@@ -898,7 +1003,7 @@ def plot_scp_iteration_animation(
             x=1.02,
             bgcolor="rgba(0, 0, 0, 0.5)",
             bordercolor="white",
-            borderwidth=1
+            borderwidth=1,
         )
     )
 
@@ -937,7 +1042,7 @@ class ProblemPlotMixin:
             results = problem.solve()
             fig = problem.plot_state()  # Uses internal solution
             fig.show()
-            
+
             # Or explicitly pass a result
             results = problem.post_process()
             fig = problem.plot_state(results)
@@ -964,7 +1069,7 @@ class ProblemPlotMixin:
             results = problem.solve()
             fig = problem.plot_control()  # Uses internal solution
             fig.show()
-            
+
             # Or explicitly pass a result
             results = problem.post_process()
             fig = problem.plot_control(results)
@@ -1018,7 +1123,7 @@ class ProblemPlotMixin:
             results = problem.solve()
             fig = problem.plot_scp_animation()  # Uses internal solution
             fig.show()
-            
+
             # Or explicitly pass a result
             fig = problem.plot_scp_animation(results)
             fig.show()
