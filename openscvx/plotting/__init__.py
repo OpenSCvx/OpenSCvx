@@ -13,34 +13,16 @@ violations, and creating animations of the optimization process.
 """
 
 from .plotting import (
-    frame_args,
-    full_subject_traj_time,
-    plot_constraint_violation,
     plot_control,
-    plot_initial_guess,
-    plot_losses,
-    plot_scp_animation,
     plot_state,
-    qdcm,
-    save_gate_parameters,
-    scp_traj_interp,
+    plot_scp_iteration_animation,
 )
 
 __all__ = [
     # Core plotting functions
     "plot_state",
     "plot_control",
-    "plot_constraint_violation",
-    "plot_losses",
-    "plot_scp_animation",
-    "plot_initial_guess",
-    # Trajectory utilities
-    "full_subject_traj_time",
-    "scp_traj_interp",
-    # Helper functions
-    "qdcm",
-    "save_gate_parameters",
-    "frame_args",
+    "plot_scp_iteration_animation",
 ]
 
 # Mark module as unstable/deprecated

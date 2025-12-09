@@ -40,6 +40,7 @@ from openscvx.config import (
     ScpConfig,
     SimConfig,
 )
+from openscvx.plotting.plotting import ProblemPlotMixin
 from openscvx.discretization import get_discretization_solver
 from openscvx.lowered import LoweredProblem, ParameterDict
 from openscvx.lowered.dynamics import Dynamics
@@ -70,7 +71,7 @@ if TYPE_CHECKING:
     import cvxpy as cp
 
 
-class Problem:
+class Problem(ProblemPlotMixin):
     def __init__(
         self,
         dynamics: dict,
