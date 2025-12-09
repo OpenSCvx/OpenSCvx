@@ -570,6 +570,10 @@ class Problem(ProblemPlotMixin):
 
         self.timing_post = t_f_post - t_0_post
 
+        # Store the propagated result back into _solution for plotting
+        # Store as a cached attribute on the _solution object
+        self._solution._propagated_result = result
+
         # Print results summary
         printing.print_results_summary(
             result, self.timing_post, self.timing_init, self.timing_solve

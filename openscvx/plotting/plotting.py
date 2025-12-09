@@ -9,19 +9,35 @@ from openscvx.algorithms import OptimizationResults
 from openscvx.config import Config
 
 
-def plot_state(result: OptimizationResults, params: Config):
+def plot_state(result: OptimizationResults = None, params: Config = None, problem=None):
     """Plot state trajectories over time with bounds.
 
     Shows the optimized state trajectory (nodes and full propagation if available),
     initial guess, and constraint bounds for all state variables.
 
     Args:
-        result: Optimization results containing state trajectories
-        params: Configuration with state bounds and metadata
+        result: Optimization results containing state trajectories (optional if problem provided)
+        params: Configuration with state bounds and metadata (optional if problem provided)
+        problem: Problem instance to extract result and params from (optional)
 
     Returns:
         Plotly figure with state trajectory subplots
     """
+    # If problem provided, extract result and params from it
+    if problem is not None:
+        if result is None:
+            # Check if post_process() was called and use propagated result
+            if hasattr(problem._solution, '_propagated_result'):
+                result = problem._solution._propagated_result
+            else:
+                from openscvx.algorithms import format_result
+                result = format_result(problem, problem._solution, True)
+        if params is None:
+            params = problem.settings
+    
+    if result is None or params is None:
+        raise ValueError("Must provide either (result, params) or problem")
+    
     # Get time values at nodes from the nodes dictionary
     t_nodes = result.nodes['time'].flatten()
     
@@ -199,19 +215,35 @@ def plot_state(result: OptimizationResults, params: Config):
     return fig
 
 
-def plot_control(result: OptimizationResults, params: Config):
+def plot_control(result: OptimizationResults = None, params: Config = None, problem=None):
     """Plot control trajectories over time with bounds.
 
     Shows the optimized control trajectory (nodes and full propagation if available),
     initial guess, and constraint bounds for all control variables.
 
     Args:
-        result: Optimization results containing control trajectories
-        params: Configuration with control bounds and metadata
+        result: Optimization results containing control trajectories (optional if problem provided)
+        params: Configuration with control bounds and metadata (optional if problem provided)
+        problem: Problem instance to extract result and params from (optional)
 
     Returns:
         Plotly figure with control trajectory subplots
     """
+    # If problem provided, extract result and params from it
+    if problem is not None:
+        if result is None:
+            # Check if post_process() was called and use propagated result
+            if hasattr(problem._solution, '_propagated_result'):
+                result = problem._solution._propagated_result
+            else:
+                from openscvx.algorithms import format_result
+                result = format_result(problem, problem._solution, True)
+        if params is None:
+            params = problem.settings
+    
+    if result is None or params is None:
+        raise ValueError("Must provide either (result, params) or problem")
+    
     # Get time values at nodes from the nodes dictionary
     t_nodes = result.nodes['time'].flatten()
     
@@ -374,16 +406,32 @@ def plot_control(result: OptimizationResults, params: Config):
 
     return fig
 
-def plot_scp_iteration_animation(result: OptimizationResults, params: Config):
+def plot_scp_iteration_animation(result: OptimizationResults = None, params: Config = None, problem=None):
     """Create an animated plot showing SCP iteration convergence.
 
     Args:
-        result: Optimization results containing iteration history
-        params: Configuration with state/control bounds and metadata
+        result: Optimization results containing iteration history (optional if problem provided)
+        params: Configuration with state/control bounds and metadata (optional if problem provided)
+        problem: Problem instance to extract result and params from (optional)
 
     Returns:
         Plotly figure with animation frames for each SCP iteration
     """
+    # If problem provided, extract result and params from it
+    if problem is not None:
+        if result is None:
+            # Check if post_process() was called and use propagated result
+            if hasattr(problem._solution, '_propagated_result'):
+                result = problem._solution._propagated_result
+            else:
+                from openscvx.algorithms import format_result
+                result = format_result(problem, problem._solution, True)
+        if params is None:
+            params = problem.settings
+    
+    if result is None or params is None:
+        raise ValueError("Must provide either (result, params) or problem")
+    
     # Get iteration history
     V_history = result.discretization_history if hasattr(result, 'discretization_history') and result.discretization_history else []
     U_history = result.U
@@ -671,64 +719,76 @@ class ProblemPlotMixin:
 
     settings: Config  # Type hint for the settings attribute from Problem class
 
-    def plot_state(self, result: OptimizationResults):
+    def plot_state(self, result: OptimizationResults = None):
         """Plot state trajectories with bounds.
 
         Shows the optimized state trajectory (nodes and full propagation if available),
         initial guess, and constraint bounds for all state variables.
 
         Args:
-            result: OptimizationResults object from solve() or post_process()
+            result: OptimizationResults object from solve() or post_process() (optional, uses internal solution if not provided)
 
         Returns:
             Plotly figure with state trajectory subplots
 
         Example:
             results = problem.solve()
-            results = problem.post_process(results, params, propagation_solver)
+            fig = problem.plot_state()  # Uses internal solution
+            fig.show()
+            
+            # Or explicitly pass a result
+            results = problem.post_process()
             fig = problem.plot_state(results)
             fig.show()
         """
-        return plot_state(result, self.settings)
+        return plot_state(result=result, params=self.settings, problem=self)
 
-    def plot_control(self, result: OptimizationResults):
+    def plot_control(self, result: OptimizationResults = None):
         """Plot control trajectories with bounds.
 
         Shows the optimized control trajectory (nodes and full propagation if available),
         initial guess, and constraint bounds for all control variables.
 
         Args:
-            result: OptimizationResults object from solve() or post_process()
+            result: OptimizationResults object from solve() or post_process() (optional, uses internal solution if not provided)
 
         Returns:
             Plotly figure with control trajectory subplots
 
         Example:
             results = problem.solve()
-            results = problem.post_process(results, params, propagation_solver)
+            fig = problem.plot_control()  # Uses internal solution
+            fig.show()
+            
+            # Or explicitly pass a result
+            results = problem.post_process()
             fig = problem.plot_control(results)
             fig.show()
         """
-        return plot_control(result, self.settings)
+        return plot_control(result=result, params=self.settings, problem=self)
 
-    def plot_scp_animation(self, result: OptimizationResults):
+    def plot_scp_animation(self, result: OptimizationResults = None):
         """Create an animated plot showing SCP iteration convergence.
 
         This function creates a Plotly animation that shows how the state and control
         trajectories evolve through each SCP iteration using the discretization history.
 
         Args:
-            result: OptimizationResults object from solve() containing iteration history
+            result: OptimizationResults object from solve() containing iteration history (optional, uses internal solution if not provided)
 
         Returns:
             Plotly figure with animation frames for each SCP iteration
 
         Example:
             results = problem.solve()
+            fig = problem.plot_scp_animation()  # Uses internal solution
+            fig.show()
+            
+            # Or explicitly pass a result
             fig = problem.plot_scp_animation(results)
             fig.show()
         """
-        return plot_scp_iteration_animation(result, self.settings)
+        return plot_scp_iteration_animation(result=result, params=self.settings, problem=self)
 
 
 def register_plotting_methods(problem_class):
