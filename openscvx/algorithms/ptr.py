@@ -101,6 +101,8 @@ def format_result(problem, state: "SolverState", converged: bool) -> Optimizatio
         J_tr_history=state.J_tr,
         J_vb_history=state.J_vb,
         J_vc_history=state.J_vc,
+        TR_history=state.TR_history,
+        VC_history=state.VC_history,
     )
 
 
@@ -142,6 +144,8 @@ def PTR_step(
         V_multi_shoot,
         subprop_time,
         dis_time,
+        vc_mat,
+        tr_mat,
     ) = PTR_subproblem(
         params.items(),
         cpg_solve,
@@ -157,6 +161,8 @@ def PTR_step(
     state.V_history.append(V_multi_shoot)
     state.X.append(x_sol)
     state.U.append(u_sol)
+    state.VC_history.append(vc_mat)
+    state.TR_history.append(tr_mat)
 
     state.J_tr = np.sum(np.array(J_tr_vec))
     state.J_vb = np.sum(np.array(J_vb_vec))
@@ -300,14 +306,10 @@ def PTR_subproblem(
     )
 
     # Calculate J_tr_vec using the JAX-compatible block diagonal matrix
-    J_tr_vec = (
-        la.norm(
-            inv_block_diag @ np.hstack((x_new_guess - state.x, u_new_guess - state.u)).T,
-            axis=0,
-        )
-        ** 2
-    )
-    J_vc_vec = np.sum(np.abs(prob.var_dict["nu"].value), axis=1)
+    tr_mat = inv_block_diag @ np.hstack((x_new_guess - state.x, u_new_guess - state.u)).T
+    J_tr_vec = la.norm(tr_mat, axis=0) ** 2
+    vc_mat = np.abs(prob.var_dict["nu"].value)
+    J_vc_vec = np.sum(vc_mat, axis=1)
 
     id_ncvx = 0
     J_vb_vec = 0
@@ -336,4 +338,6 @@ def PTR_subproblem(
         V_multi_shoot,
         subprop_time,
         dis_time,
+        vc_mat,
+        abs(tr_mat),
     )

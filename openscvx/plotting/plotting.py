@@ -227,6 +227,134 @@ def plot_state(
     return fig
 
 
+def _expanded_variable_names(states, controls):
+    names = []
+
+    def expand(items):
+        expanded = []
+        for item in items:
+            var_slice = item._slice
+            if isinstance(var_slice, slice):
+                start = var_slice.start if var_slice.start is not None else 0
+                stop = var_slice.stop if var_slice.stop is not None else start + 1
+                n_comp = stop - start
+            else:
+                start = var_slice
+                n_comp = 1
+
+            if n_comp > 1:
+                for i in range(n_comp):
+                    expanded.append((f"{item.name}_{i}", start + i))
+            else:
+                expanded.append((item.name, start))
+        return expanded
+
+    names.extend(expand(states))
+    names.extend(expand(controls))
+    return [n for n, _ in names]
+
+
+def plot_trust_region_heatmap(result: OptimizationResults, problem=None):
+    """Plot heatmap of the final trust-region deltas (TR_history[-1])."""
+
+    if result is None:
+        if problem is None:
+            raise ValueError("Provide a result or a problem with a cached solution")
+        if not hasattr(problem, "_solution") or problem._solution is None:
+            raise ValueError("Problem has no cached solution; run solve() first")
+        from openscvx.algorithms import format_result
+
+        result = format_result(problem, problem._solution, True)
+
+    if not getattr(result, "TR_history", None):
+        raise ValueError("Result has no TR_history to plot")
+
+    tr_mat = result.TR_history[-1]
+    var_names = _expanded_variable_names(
+        getattr(result, "_states", []) or [], getattr(result, "_controls", []) or []
+    )
+
+    # TR matrix is (n_states+n_controls, n_nodes): rows = variables, cols = nodes
+    if tr_mat.shape[0] == len(var_names):
+        z = tr_mat
+    elif tr_mat.shape[1] == len(var_names):
+        z = tr_mat.T
+    else:
+        raise ValueError("TR matrix dimensions do not align with state/control components")
+
+    x_len = z.shape[1]
+
+    # Node labels
+    if result.nodes and "time" in result.nodes and len(result.nodes["time"]) == x_len:
+        x_labels = result.nodes["time"].flatten()
+    else:
+        x_labels = list(range(x_len))
+
+    fig = go.Figure(
+        data=go.Heatmap(
+            z=z, 
+            x=x_labels, 
+            y=var_names, 
+            colorscale="Viridis"
+        )
+    )
+    fig.update_layout(title="Trust Region Delta Magnitudes (last iteration)", template="plotly_dark")
+    fig.update_xaxes(title_text="Node / Time", side="bottom")
+    fig.update_yaxes(title_text="State / Control component", side="left")
+    return fig
+
+
+def plot_virtual_control_heatmap(result: OptimizationResults, problem=None):
+    """Plot heatmap of the final virtual control magnitudes (VC_history[-1])."""
+
+    if result is None:
+        if problem is None:
+            raise ValueError("Provide a result or a problem with a cached solution")
+        if not hasattr(problem, "_solution") or problem._solution is None:
+            raise ValueError("Problem has no cached solution; run solve() first")
+        from openscvx.algorithms import format_result
+
+        result = format_result(problem, problem._solution, True)
+
+    if not getattr(result, "VC_history", None):
+        raise ValueError("Result has no VC_history to plot")
+
+    vc_mat = result.VC_history[-1]
+    # Virtual control only applies to states, not controls
+    state_names = _expanded_variable_names(
+        getattr(result, "_states", []) or [], []
+    )
+
+    # Align so rows = states, cols = nodes
+    if vc_mat.shape[1] == len(state_names):
+        z = vc_mat.T  # (states, nodes)
+    elif vc_mat.shape[0] == len(state_names):
+        z = vc_mat
+    else:
+        raise ValueError("VC matrix shape does not align with state components")
+
+    x_len = z.shape[1]
+
+    # Node labels - virtual control uses N-1 nodes (between nodes)
+    if result.nodes and "time" in result.nodes:
+        t_all = result.nodes["time"].flatten()
+        if len(t_all) == x_len + 1:
+            # Use midpoints between nodes or just first N-1 time values
+            x_labels = t_all[:-1]  # First N-1 nodes
+        elif len(t_all) == x_len:
+            x_labels = t_all
+        else:
+            x_labels = list(range(x_len))
+    else:
+        x_labels = list(range(x_len))
+
+    fig = go.Figure(data=go.Heatmap(z=z, x=x_labels, y=state_names, colorscale="Magma"))
+    fig.update_layout(title="Virtual Control Magnitudes (last iteration)", template="plotly_dark")
+    fig.update_xaxes(title_text="Node Interval (N-1)")
+    fig.update_yaxes(title_text="State component")
+    return fig
+
+
 def plot_control(
     result: OptimizationResults = None,
     params: Config = None,
@@ -813,6 +941,28 @@ class ProblemPlotMixin:
             fig.show()
         """
         return plot_control(result=result, params=self.settings, problem=self, control_names=control_names)
+
+    def plot_trust_region_heatmap(self, result: OptimizationResults = None):
+        """Plot heatmap of trust-region deltas (last iteration)."""
+        if result is None:
+            if hasattr(self, "_solution") and self._solution is not None:
+                from openscvx.algorithms import format_result
+
+                result = format_result(self, self._solution, True)
+            else:
+                raise ValueError("Provide a result or solve the problem first")
+        return plot_trust_region_heatmap(result=result, problem=self)
+
+    def plot_virtual_control_heatmap(self, result: OptimizationResults = None):
+        """Plot heatmap of virtual control magnitudes (last iteration)."""
+        if result is None:
+            if hasattr(self, "_solution") and self._solution is not None:
+                from openscvx.algorithms import format_result
+
+                result = format_result(self, self._solution, True)
+            else:
+                raise ValueError("Provide a result or solve the problem first")
+        return plot_virtual_control_heatmap(result=result, problem=self)
 
     def plot_scp_animation(
         self,
