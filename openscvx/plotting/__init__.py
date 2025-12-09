@@ -14,8 +14,8 @@ violations, and creating animations of the optimization process.
 
 from .plotting import (
     plot_control,
-    plot_state,
     plot_scp_iteration_animation,
+    plot_state,
 )
 
 __all__ = [

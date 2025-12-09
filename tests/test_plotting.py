@@ -7,17 +7,18 @@ Tests the plotting functions:
 - plot_scp_iteration_animation: Create animated plot showing SCP iteration convergence
 """
 
+from unittest.mock import MagicMock, Mock, patch
+
 import numpy as np
 import pytest
-from unittest.mock import Mock, MagicMock, patch
 
-from openscvx.plotting.plotting import (
-    plot_state,
-    plot_control,
-    plot_scp_iteration_animation,
-)
 from openscvx.algorithms import OptimizationResults
 from openscvx.config import Config
+from openscvx.plotting.plotting import (
+    plot_control,
+    plot_scp_iteration_animation,
+    plot_state,
+)
 
 
 class TestPlotStateFunction:

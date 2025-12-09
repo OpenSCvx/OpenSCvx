@@ -1,6 +1,3 @@
-import pickle
-import random
-
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -298,7 +295,10 @@ def plot_trust_region_heatmap(result: OptimizationResults, problem=None):
             colorscale="Viridis"
         )
     )
-    fig.update_layout(title="Trust Region Delta Magnitudes (last iteration)", template="plotly_dark")
+    fig.update_layout(
+        title="Trust Region Delta Magnitudes (last iteration)",
+        template="plotly_dark"
+    )
     fig.update_xaxes(title_text="Node / Time", side="bottom")
     fig.update_yaxes(title_text="State / Control component", side="left")
     return fig
@@ -592,7 +592,11 @@ def plot_scp_iteration_animation(
         raise ValueError("Must provide either (result, params) or problem")
     
     # Get iteration history
-    V_history = result.discretization_history if hasattr(result, 'discretization_history') and result.discretization_history else []
+    V_history = (
+        result.discretization_history
+        if hasattr(result, 'discretization_history') and result.discretization_history
+        else []
+    )
     U_history = result.U
 
     # Extract multi-shot propagation trajectories from V_history
@@ -600,7 +604,6 @@ def plot_scp_iteration_animation(
     if V_history:
         n_x = params.sim.n_states
         n_u = params.sim.n_controls
-        N = params.scp.n
         i4 = n_x + n_x * n_x + 2 * n_x * n_u
 
         for V in V_history:
@@ -629,9 +632,7 @@ def plot_scp_iteration_animation(
     states = result._states if hasattr(result, '_states') and result._states else []
     controls = result._controls if hasattr(result, '_controls') and result._controls else []
 
-    # Use true state slice to get non-augmented states
-    true_state_slice = params.sim.true_state_slice_prop
-
+    # Filter out augmented states
     filtered_states = [s for s in states if 'ctcs_aug' not in s.name.lower()]
     states = filtered_states
     controls = controls if controls else []
@@ -703,7 +704,10 @@ def plot_scp_iteration_animation(
             rows=total_rows, cols=max(n_state_cols, n_control_cols),
             subplot_titles=subplot_titles,
             vertical_spacing=0.1, horizontal_spacing=0.05,
-            specs=[[{"secondary_y": False}] * max(n_state_cols, n_control_cols) for _ in range(total_rows)]
+            specs=[
+                [{"secondary_y": False}] * max(n_state_cols, n_control_cols)
+                for _ in range(total_rows)
+            ]
         )
     else:
         fig = make_subplots(rows=total_rows, cols=actual_cols, subplot_titles=subplot_titles,
@@ -737,7 +741,10 @@ def plot_scp_iteration_animation(
         U_iter = U_history[iter_idx]
 
         # Time for nodes (N points)
-        t_nodes = X_nodes[:, time_slice].flatten() if time_slice is not None else np.linspace(0, params.sim.total_time, X_nodes.shape[0])
+        t_nodes = (
+            X_nodes[:, time_slice].flatten() if time_slice is not None
+            else np.linspace(0, params.sim.total_time, X_nodes.shape[0])
+        )
 
         frame_data = []
 
@@ -768,11 +775,13 @@ def plot_scp_iteration_animation(
                     ))
 
             # Optimization nodes (markers only)
-            frame_data.append(go.Scatter(x=t_nodes, y=X_nodes[:, idx], mode="markers",
-                                        marker={"color": "cyan", "size": 6, "symbol": "circle"},
-                                        showlegend=False,
-                                        xaxis=f"x{1 if (row == 1 and col == 1) else state_idx + 1}",
-                                        yaxis=f"y{1 if (row == 1 and col == 1) else state_idx + 1}"))
+            frame_data.append(go.Scatter(
+                x=t_nodes, y=X_nodes[:, idx], mode="markers",
+                marker={"color": "cyan", "size": 6, "symbol": "circle"},
+                showlegend=False,
+                xaxis=f"x{1 if (row == 1 and col == 1) else state_idx + 1}",
+                yaxis=f"y{1 if (row == 1 and col == 1) else state_idx + 1}"
+            ))
 
         # Controls: plot on separate subplots
         for control_idx, control in enumerate(expanded_controls):
@@ -780,11 +789,13 @@ def plot_scp_iteration_animation(
             row = n_state_rows + (control_idx // n_control_cols) + 1
             col = (control_idx % n_control_cols) + 1
 
-            frame_data.append(go.Scatter(x=t_nodes, y=U_iter[:, idx], mode="markers",
-                                        marker={"color": "orange", "size": 6, "symbol": "circle"},
-                                        showlegend=False,
-                                        xaxis=f"x{1 if (row == 1 and col == 1) else n_states + control_idx + 1}",
-                                        yaxis=f"y{1 if (row == 1 and col == 1) else n_states + control_idx + 1}"))
+            frame_data.append(go.Scatter(
+                x=t_nodes, y=U_iter[:, idx], mode="markers",
+                marker={"color": "orange", "size": 6, "symbol": "circle"},
+                showlegend=False,
+                xaxis=f"x{1 if (row == 1 and col == 1) else n_states + control_idx + 1}",
+                yaxis=f"y{1 if (row == 1 and col == 1) else n_states + control_idx + 1}"
+            ))
 
         # Time range for bounds spans (use t_nodes for the full time range)
         t_min = t_nodes.min() if len(t_nodes) > 0 else 0
@@ -845,9 +856,18 @@ def plot_scp_iteration_animation(
             "currentvalue": {"prefix": "Iteration: ", "visible": True, "xanchor": "right"},
             "pad": {"b": 10, "t": 50}, "len": 0.5,
             "steps": [
-                {"args": [[f"Iteration {i}"], {"frame": {"duration": 17, "redraw": True},
-                                                "mode": "immediate", "transition": {"duration": 0}}],
-                 "label": str(i), "method": "animate"}
+                {
+                    "args": [
+                        [f"Iteration {i}"],
+                        {
+                            "frame": {"duration": 17, "redraw": True},
+                            "mode": "immediate",
+                            "transition": {"duration": 0}
+                        }
+                    ],
+                    "label": str(i),
+                    "method": "animate"
+                }
                 for i in range(n_iterations)
             ]}],
     )
@@ -856,10 +876,16 @@ def plot_scp_iteration_animation(
     # Add dummy traces for legend
     fig.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name="Multishot Trajectory",
                             line={"color": "blue", "width": 2}, showlegend=True))
-    fig.add_trace(go.Scatter(x=[None], y=[None], mode="markers", name="State Nodes",
-                            marker={"color": "cyan", "size": 6, "symbol": "circle"}, showlegend=True))
-    fig.add_trace(go.Scatter(x=[None], y=[None], mode="markers", name="Control Nodes",
-                            marker={"color": "orange", "size": 6, "symbol": "circle"}, showlegend=True))
+    fig.add_trace(go.Scatter(
+        x=[None], y=[None], mode="markers", name="State Nodes",
+        marker={"color": "cyan", "size": 6, "symbol": "circle"},
+        showlegend=True
+    ))
+    fig.add_trace(go.Scatter(
+        x=[None], y=[None], mode="markers", name="Control Nodes",
+        marker={"color": "orange", "size": 6, "symbol": "circle"},
+        showlegend=True
+    ))
     fig.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name="Bounds",
                             line={"color": "red", "width": 1, "dash": "dot"}, showlegend=True))
 
@@ -901,7 +927,8 @@ class ProblemPlotMixin:
         initial guess, and constraint bounds for all state variables.
 
         Args:
-            result: OptimizationResults object from solve() or post_process() (optional, uses internal solution if not provided)
+            result: OptimizationResults object from solve() or post_process()
+                (optional, uses internal solution if not provided)
 
         Returns:
             Plotly figure with state trajectory subplots
@@ -916,7 +943,9 @@ class ProblemPlotMixin:
             fig = problem.plot_state(results)
             fig.show()
         """
-        return plot_state(result=result, params=self.settings, problem=self, state_names=state_names)
+        return plot_state(
+            result=result, params=self.settings, problem=self, state_names=state_names
+        )
 
     def plot_control(self, result: OptimizationResults = None, control_names=None):
         """Plot control trajectories with bounds.
@@ -925,7 +954,8 @@ class ProblemPlotMixin:
         initial guess, and constraint bounds for all control variables.
 
         Args:
-            result: OptimizationResults object from solve() or post_process() (optional, uses internal solution if not provided)
+            result: OptimizationResults object from solve() or post_process()
+                (optional, uses internal solution if not provided)
 
         Returns:
             Plotly figure with control trajectory subplots
@@ -940,7 +970,9 @@ class ProblemPlotMixin:
             fig = problem.plot_control(results)
             fig.show()
         """
-        return plot_control(result=result, params=self.settings, problem=self, control_names=control_names)
+        return plot_control(
+            result=result, params=self.settings, problem=self, control_names=control_names
+        )
 
     def plot_trust_region_heatmap(self, result: OptimizationResults = None):
         """Plot heatmap of trust-region deltas (last iteration)."""
@@ -976,7 +1008,8 @@ class ProblemPlotMixin:
         trajectories evolve through each SCP iteration using the discretization history.
 
         Args:
-            result: OptimizationResults object from solve() containing iteration history (optional, uses internal solution if not provided)
+            result: OptimizationResults object from solve() containing iteration history
+                (optional, uses internal solution if not provided)
 
         Returns:
             Plotly figure with animation frames for each SCP iteration

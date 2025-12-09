@@ -40,7 +40,6 @@ from openscvx.config import (
     ScpConfig,
     SimConfig,
 )
-from openscvx.plotting.plotting import ProblemPlotMixin
 from openscvx.discretization import get_discretization_solver
 from openscvx.lowered import LoweredProblem, ParameterDict
 from openscvx.lowered.dynamics import Dynamics
@@ -49,6 +48,7 @@ from openscvx.lowered.jax_constraints import (
     LoweredJaxConstraints,
     LoweredNodalConstraint,
 )
+from openscvx.plotting.plotting import ProblemPlotMixin
 from openscvx.propagation import get_propagation_solver, propagate_trajectory_results
 from openscvx.solvers import optimal_control_problem
 from openscvx.symbolic.builder import preprocess_symbolic_problem
