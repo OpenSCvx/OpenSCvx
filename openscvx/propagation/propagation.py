@@ -152,7 +152,7 @@ def t_to_tau(u: np.ndarray, t, t_nodal, settings: Config):
     else:
         raise ValueError("Currently unsupported discretization type")
 
-    u = np.array([u_lam(t_i) for t_i in t])
+    u_interp = np.array([u_lam(t_i) for t_i in t])
 
     tau = np.zeros(len(t))
     tau_nodal = np.linspace(0, 1, settings.scp.n)
@@ -162,12 +162,12 @@ def t_to_tau(u: np.ndarray, t, t_nodal, settings: Config):
         tp = t_nodal[k_nodal]
         tau_p = tau_nodal[k_nodal]
 
-        s_k = u[k, -1]
+        s_k = u[k_nodal + 1, -1]
         if settings.dis.dis_type == "ZOH":
             tau[k] = tau_p + (t[k] - tp) / s_kp
         else:
             tau[k] = tau_p + 2 * (t[k] - tp) / (s_k + s_kp)
-    return tau, u
+    return tau, u_interp
 
 
 def simulate_nonlinear_time(params, x, u, tau_vals, t, settings, propagation_solver):
