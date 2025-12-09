@@ -9,7 +9,12 @@ from openscvx.algorithms import OptimizationResults
 from openscvx.config import Config
 
 
-def plot_state(result: OptimizationResults = None, params: Config = None, problem=None):
+def plot_state(
+    result: OptimizationResults = None,
+    params: Config = None,
+    problem=None,
+    state_names=None,
+):
     """Plot state trajectories over time with bounds.
 
     Shows the optimized state trajectory (nodes and full propagation if available),
@@ -19,6 +24,7 @@ def plot_state(result: OptimizationResults = None, params: Config = None, proble
         result: Optimization results containing state trajectories (optional if problem provided)
         params: Configuration with state bounds and metadata (optional if problem provided)
         problem: Problem instance to extract result and params from (optional)
+        state_names: Optional list of state names to plot; defaults to all non-CTCS states
 
     Returns:
         Plotly figure with state trajectory subplots
@@ -37,6 +43,9 @@ def plot_state(result: OptimizationResults = None, params: Config = None, proble
     
     if result is None or params is None:
         raise ValueError("Must provide either (result, params) or problem")
+
+    # Optional filtering of which states to plot
+    state_filter = set(state_names) if state_names else None
     
     # Get time values at nodes from the nodes dictionary
     t_nodes = result.nodes['time'].flatten()
@@ -59,6 +68,9 @@ def plot_state(result: OptimizationResults = None, params: Config = None, proble
             filtered_states.append(state)
 
     states = filtered_states
+
+    if state_filter:
+        states = [s for s in states if s.name in state_filter]
 
     # Expand states into individual components for multi-dimensional states
     expanded_states = []
@@ -215,7 +227,12 @@ def plot_state(result: OptimizationResults = None, params: Config = None, proble
     return fig
 
 
-def plot_control(result: OptimizationResults = None, params: Config = None, problem=None):
+def plot_control(
+    result: OptimizationResults = None,
+    params: Config = None,
+    problem=None,
+    control_names=None,
+):
     """Plot control trajectories over time with bounds.
 
     Shows the optimized control trajectory (nodes and full propagation if available),
@@ -225,6 +242,7 @@ def plot_control(result: OptimizationResults = None, params: Config = None, prob
         result: Optimization results containing control trajectories (optional if problem provided)
         params: Configuration with control bounds and metadata (optional if problem provided)
         problem: Problem instance to extract result and params from (optional)
+        control_names: Optional list of control names to plot; defaults to all controls
 
     Returns:
         Plotly figure with control trajectory subplots
@@ -256,6 +274,11 @@ def plot_control(result: OptimizationResults = None, params: Config = None, prob
     
     # Get all controls (both user-defined and augmented)
     controls = result._controls if hasattr(result, '_controls') and result._controls else []
+
+    # Optional filtering of which controls to plot
+    control_filter = set(control_names) if control_names else None
+    if control_filter:
+        controls = [c for c in controls if c.name in control_filter]
 
     # Expand controls into individual components for multi-dimensional controls
     expanded_controls = []
@@ -406,13 +429,21 @@ def plot_control(result: OptimizationResults = None, params: Config = None, prob
 
     return fig
 
-def plot_scp_iteration_animation(result: OptimizationResults = None, params: Config = None, problem=None):
+def plot_scp_iteration_animation(
+    result: OptimizationResults = None,
+    params: Config = None,
+    problem=None,
+    state_names=None,
+    control_names=None,
+):
     """Create an animated plot showing SCP iteration convergence.
 
     Args:
         result: Optimization results containing iteration history (optional if problem provided)
         params: Configuration with state/control bounds and metadata (optional if problem provided)
         problem: Problem instance to extract result and params from (optional)
+        state_names: Optional list of state names to include in the animation
+        control_names: Optional list of control names to include in the animation
 
     Returns:
         Plotly figure with animation frames for each SCP iteration
@@ -475,6 +506,22 @@ def plot_scp_iteration_animation(result: OptimizationResults = None, params: Con
 
     filtered_states = [s for s in states if 'ctcs_aug' not in s.name.lower()]
     states = filtered_states
+    controls = controls if controls else []
+
+    # Optional filtering by provided names
+    state_filter = set(state_names) if state_names else None
+    control_filter = set(control_names) if control_names else None
+
+    # If only one group is specified, drop the other entirely
+    if state_filter and control_filter is None:
+        controls = []
+    if control_filter and state_filter is None:
+        states = []
+
+    if state_filter:
+        states = [s for s in states if s.name in state_filter]
+    if control_filter:
+        controls = [c for c in controls if c.name in control_filter]
 
     # Expand multi-dimensional states/controls
     def expand_variables(variables):
@@ -719,7 +766,7 @@ class ProblemPlotMixin:
 
     settings: Config  # Type hint for the settings attribute from Problem class
 
-    def plot_state(self, result: OptimizationResults = None):
+    def plot_state(self, result: OptimizationResults = None, state_names=None):
         """Plot state trajectories with bounds.
 
         Shows the optimized state trajectory (nodes and full propagation if available),
@@ -741,9 +788,9 @@ class ProblemPlotMixin:
             fig = problem.plot_state(results)
             fig.show()
         """
-        return plot_state(result=result, params=self.settings, problem=self)
+        return plot_state(result=result, params=self.settings, problem=self, state_names=state_names)
 
-    def plot_control(self, result: OptimizationResults = None):
+    def plot_control(self, result: OptimizationResults = None, control_names=None):
         """Plot control trajectories with bounds.
 
         Shows the optimized control trajectory (nodes and full propagation if available),
@@ -765,9 +812,14 @@ class ProblemPlotMixin:
             fig = problem.plot_control(results)
             fig.show()
         """
-        return plot_control(result=result, params=self.settings, problem=self)
+        return plot_control(result=result, params=self.settings, problem=self, control_names=control_names)
 
-    def plot_scp_animation(self, result: OptimizationResults = None):
+    def plot_scp_animation(
+        self,
+        result: OptimizationResults = None,
+        state_names=None,
+        control_names=None,
+    ):
         """Create an animated plot showing SCP iteration convergence.
 
         This function creates a Plotly animation that shows how the state and control
@@ -788,7 +840,13 @@ class ProblemPlotMixin:
             fig = problem.plot_scp_animation(results)
             fig.show()
         """
-        return plot_scp_iteration_animation(result=result, params=self.settings, problem=self)
+        return plot_scp_iteration_animation(
+            result=result,
+            params=self.settings,
+            problem=self,
+            state_names=state_names,
+            control_names=control_names,
+        )
 
 
 def register_plotting_methods(problem_class):
