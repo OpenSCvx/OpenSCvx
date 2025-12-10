@@ -66,6 +66,8 @@ class OptimizationResults:
     J_tr_history: list[np.ndarray] = field(default_factory=list)
     J_vb_history: list[np.ndarray] = field(default_factory=list)
     J_vc_history: list[np.ndarray] = field(default_factory=list)
+    TR_history: list[np.ndarray] = field(default_factory=list)
+    VC_history: list[np.ndarray] = field(default_factory=list)
 
     @property
     def x(self) -> np.ndarray:

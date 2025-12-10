@@ -59,6 +59,8 @@ class SolverState:
     X: List[np.ndarray] = field(default_factory=list)
     U: List[np.ndarray] = field(default_factory=list)
     V_history: List[np.ndarray] = field(default_factory=list)
+    VC_history: List[np.ndarray] = field(default_factory=list)
+    TR_history: List[np.ndarray] = field(default_factory=list)
 
     @property
     def x(self) -> np.ndarray:
@@ -225,4 +227,6 @@ class SolverState:
             X=[settings.sim.x.guess.copy()],
             U=[settings.sim.u.guess.copy()],
             V_history=[],
+            VC_history=[],
+            TR_history=[],
         )

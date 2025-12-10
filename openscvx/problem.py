@@ -48,6 +48,7 @@ from openscvx.lowered.jax_constraints import (
     LoweredJaxConstraints,
     LoweredNodalConstraint,
 )
+from openscvx.plotting.plotting import ProblemPlotMixin
 from openscvx.propagation import get_propagation_solver, propagate_trajectory_results
 from openscvx.solvers import optimal_control_problem
 from openscvx.symbolic.builder import preprocess_symbolic_problem
@@ -70,7 +71,7 @@ if TYPE_CHECKING:
     import cvxpy as cp
 
 
-class Problem:
+class Problem(ProblemPlotMixin):
     def __init__(
         self,
         dynamics: dict,
@@ -568,6 +569,10 @@ class Problem:
         t_f_post = time.time()
 
         self.timing_post = t_f_post - t_0_post
+
+        # Store the propagated result back into _solution for plotting
+        # Store as a cached attribute on the _solution object
+        self._solution._propagated_result = result
 
         # Print results summary
         printing.print_results_summary(

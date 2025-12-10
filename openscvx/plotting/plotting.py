@@ -1,851 +1,1155 @@
-import pickle
-import random
-
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from openscvx.algorithms import OptimizationResults
 from openscvx.config import Config
-from openscvx.utils import get_kp_pose
 
 
-def qdcm(q: np.ndarray) -> np.ndarray:
-    """Convert a quaternion to a direction cosine matrix (DCM).
+def plot_state(
+    result: OptimizationResults = None,
+    params: Config = None,
+    problem=None,
+    state_names=None,
+):
+    """Plot state trajectories over time with bounds.
+
+    Shows the optimized state trajectory (nodes and full propagation if available),
+    initial guess, and constraint bounds for all state variables.
 
     Args:
-        q: Quaternion array [w, x, y, z] where w is the scalar part
+        result: Optimization results containing state trajectories (optional if problem provided)
+        params: Configuration with state bounds and metadata (optional if problem provided)
+        problem: Problem instance to extract result and params from (optional)
+        state_names: Optional list of state names to plot; defaults to all non-CTCS states
 
     Returns:
-        3x3 rotation matrix (direction cosine matrix)
+        Plotly figure with state trajectory subplots
     """
-    q_norm = (q[0] ** 2 + q[1] ** 2 + q[2] ** 2 + q[3] ** 2) ** 0.5
-    w, x, y, z = q / q_norm
-    return np.array(
-        [
-            [1 - 2 * (y**2 + z**2), 2 * (x * y - z * w), 2 * (x * z + y * w)],
-            [2 * (x * y + z * w), 1 - 2 * (x**2 + z**2), 2 * (y * z - x * w)],
-            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x**2 + y**2)],
-        ]
-    )
-
-
-def full_subject_traj_time(results: OptimizationResults, params: Config):
-    x_full = results.x_full
-    x_nodes = results.x
-    t_nodes = x_nodes[:, params.sim.time_slice]
-    t_full = results.t_full
-    subs_traj = []
-    subs_traj_node = []
-    subs_traj_sen = []
-    subs_traj_sen_node = []
-
-    # if hasattr(params.dyn, 'get_kp_pose'):
-    if "moving_subject" in results and "init_poses" in results:
-        init_poses = results.plotting_data["init_poses"]
-        subs_traj.append(get_kp_pose(t_full, init_poses))
-        subs_traj_node.append(get_kp_pose(t_nodes, init_poses))
-    elif "init_poses" in results:
-        init_poses = results.plotting_data["init_poses"]
-        for pose in init_poses:
-            # repeat the pose for all time steps
-            pose_full = np.repeat(pose[:, np.newaxis], x_full.shape[0], axis=1).T
-            subs_traj.append(pose_full)
-
-            pose_node = np.repeat(pose[:, np.newaxis], x_nodes.shape[0], axis=1).T
-            subs_traj_node.append(pose_node)
-    else:
-        raise ValueError("No valid method to get keypoint poses.")
-
-    if "R_sb" in results:
-        R_sb = results.plotting_data["R_sb"]
-        for sub_traj in subs_traj:
-            sub_traj_sen = []
-            for i in range(x_full.shape[0]):
-                sub_pose = sub_traj[i]
-                sub_traj_sen.append(R_sb @ qdcm(x_full[i, 6:10]).T @ (sub_pose - x_full[i, 0:3]))
-            subs_traj_sen.append(np.array(sub_traj_sen).squeeze())
-
-        for sub_traj_node in subs_traj_node:
-            sub_traj_sen_node = []
-            for i in range(x_nodes.shape[0]):
-                sub_pose = sub_traj_node[i]
-                sub_traj_sen_node.append(
-                    R_sb @ qdcm(x_nodes[i, 6:10]).T @ (sub_pose - x_nodes[i, 0:3]).T
-                )
-            subs_traj_sen_node.append(np.array(sub_traj_sen_node).squeeze())
-        return subs_traj, subs_traj_sen, subs_traj_node, subs_traj_sen_node
-    else:
-        raise ValueError("`R_sb` not found in results. Cannot compute sensor frame.")
-
-
-def save_gate_parameters(gates, params: Config):
-    gate_centers = []
-    gate_vertices = []
-    for gate in gates:
-        gate_centers.append(gate.center)
-        gate_vertices.append(gate.vertices)
-    gate_params = {"gate_centers": gate_centers, "gate_vertices": gate_vertices}
-
-    # Use pickle to save the gate parameters
-    with open("results/gate_params.pickle", "wb") as f:
-        pickle.dump(gate_params, f)
-
-
-def frame_args(duration):
-    return {
-        "frame": {"duration": duration},
-        "mode": "immediate",
-        "fromcurrent": True,
-        "transition": {"duration": duration, "easing": "linear"},
-    }
-
-
-def plot_constraint_violation(result: OptimizationResults, params: Config):
-    fig = make_subplots(
-        rows=2,
-        cols=3,
-        subplot_titles=(
-            r"$\text{Obstacle Violation}$",
-            r"$\text{Sub VP Violation}$",
-            r"$\text{Sub Min Violation}$",
-            r"$\text{Sub Max Violation}$",
-            r"$\text{Sub Direc Violation}$",
-            r"$\text{State Bound Violation}$",
-            r"$\text{Total Violation}$",
-        ),
-    )
-    fig.update_layout(template="plotly_dark", title=r"$\text{Constraint Violation}$")
-
-    if "obs_vio" in result:
-        obs_vio = result.plotting_data["obs_vio"]
-        for i in range(obs_vio.shape[0]):
-            color = (
-                f"rgb({random.randint(10, 255)}, {random.randint(10, 255)}, "
-                f"{random.randint(10, 255)})"
-            )
-            fig.add_trace(
-                go.Scatter(
-                    y=obs_vio[i], mode="lines", showlegend=False, line={"color": color, "width": 2}
-                ),
-                row=1,
-                col=1,
-            )
-        i = 0
-    else:
-        print("'obs_vio' not found in result.")
-
-    # Make names of each state in the state vector
-    state_names = [
-        "x",
-        "y",
-        "z",
-        "vx",
-        "vy",
-        "vz",
-        "q0",
-        "q1",
-        "q2",
-        "q3",
-        "wx",
-        "wy",
-        "wz",
-        "ctcs",
-    ]
-
-    if "sub_vp_vio" in result and "sub_min_vio" in result and "sub_max_vio" in result:
-        sub_vp_vio = result.plotting_data["sub_vp_vio"]
-        sub_min_vio = result.plotting_data["sub_min_vio"]
-        sub_max_vio = result.plotting_data["sub_max_vio"]
-        for i in range(sub_vp_vio.shape[0]):
-            color = (
-                f"rgb({random.randint(10, 255)}, {random.randint(10, 255)}, "
-                f"{random.randint(10, 255)})"
-            )
-            fig.add_trace(
-                go.Scatter(
-                    y=sub_vp_vio[i],
-                    mode="lines",
-                    showlegend=True,
-                    name="LoS " + str(i) + " Error",
-                    line={"color": color, "width": 2},
-                ),
-                row=1,
-                col=2,
-            )
-            if params.vp.tracking:
-                fig.add_trace(
-                    go.Scatter(
-                        y=sub_min_vio[i],
-                        mode="lines",
-                        showlegend=False,
-                        line={"color": color, "width": 2},
-                    ),
-                    row=1,
-                    col=3,
-                )
-                fig.add_trace(
-                    go.Scatter(
-                        y=sub_max_vio[i],
-                        mode="lines",
-                        showlegend=False,
-                        line={"color": color, "width": 2},
-                    ),
-                    row=2,
-                    col=1,
-                )
+    # If problem provided, extract result and params from it
+    if problem is not None:
+        if result is None:
+            # Check if post_process() was called and use propagated result
+            if hasattr(problem._solution, "_propagated_result"):
+                result = problem._solution._propagated_result
             else:
-                fig.add_trace(
-                    go.Scatter(
-                        y=[], mode="lines", showlegend=False, line={"color": color, "width": 2}
-                    ),
-                    row=1,
-                    col=3,
-                )
-                fig.add_trace(
-                    go.Scatter(
-                        y=[], mode="lines", showlegend=False, line={"color": color, "width": 2}
-                    ),
-                    row=2,
-                    col=1,
-                )
-        i = 0
-    else:
-        print("'sub_vp_vio', 'sub_min_vio', or 'sub_max_vio' not found in result.")
+                from openscvx.algorithms import format_result
 
-    if "sub_direc_vio" in result:
-        result.plotting_data["sub_direc_vio"]
-        # fig.add_trace(
-        #     go.Scatter(
-        #         y=sub_direc_vio, mode='lines', showlegend=False,
-        #         line=dict(color='red', width=2)
-        #     ),
-        #     row=2, col=2
-        # )
-    else:
-        print("'sub_direc_vio' not found in result.")
+                result = format_result(problem, problem._solution, True)
+        if params is None:
+            params = problem.settings
 
-    if "state_bound_vio" in result:
-        state_bound_vio = result.plotting_data["state_bound_vio"]
-        for i in range(state_bound_vio.shape[0]):
-            color = (
-                f"rgb({random.randint(10, 255)}, {random.randint(10, 255)}, "
-                f"{random.randint(10, 255)})"
-            )
-            fig.add_trace(
-                go.Scatter(
-                    y=state_bound_vio[:, i],
-                    mode="lines",
-                    showlegend=True,
-                    name=state_names[i] + " Error",
-                    line={"color": color, "width": 2},
-                ),
-                row=2,
-                col=3,
-            )
-    else:
-        print("'state_bound_vio' not found in result.")
+    if result is None or params is None:
+        raise ValueError("Must provide either (result, params) or problem")
 
-    fig.show()
+    # Optional filtering of which states to plot
+    state_filter = set(state_names) if state_names else None
 
+    # Get time values at nodes from the nodes dictionary
+    t_nodes = result.nodes["time"].flatten()
 
-def plot_initial_guess(result: OptimizationResults, params: Config):
-    x_positions = result.x[:, 0:3].T
-    x_attitude = result.x[:, 6:10].T
-    subs_positions = result.plotting_data["sub_positions"]
+    # Check if full propagation trajectory is available
+    has_full_trajectory = result.trajectory and len(result.trajectory) > 0
 
-    fig = go.Figure(
-        go.Scatter3d(x=[], y=[], z=[], mode="lines+markers", line={"color": "gray", "width": 2})
-    )
+    # Get time for full trajectory
+    if has_full_trajectory:
+        t_full = result.trajectory["time"].flatten()
 
-    # Plot the position of the drone
-    fig.add_trace(
-        go.Scatter3d(
-            x=x_positions[0],
-            y=x_positions[1],
-            z=x_positions[2],
-            mode="lines+markers",
-            line={"color": "green", "width": 5},
-        )
-    )
+    # Get all states (both user-defined and augmented)
+    states = result._states if hasattr(result, "_states") and result._states else []
 
-    # Plot the attitude of the drone
-    # Draw drone attitudes as axes
-    step = 1
-    indices = np.array(list(range(x_positions.shape[1])))
-    for i in range(0, len(indices), step):
-        att = x_attitude[:, indices[i]]
+    # Filter out CTCS augmentation states
+    filtered_states = []
+    for state in states:
+        # Check if this is a CTCS augmentation state (names like _ctcs_aug_0, _ctcs_aug_1, etc.)
+        if "ctcs_aug" not in state.name.lower():
+            filtered_states.append(state)
 
-        # Convert quaternion to rotation matrix
-        rotation_matrix = qdcm(att)
+    states = filtered_states
 
-        # Extract axes from rotation matrix
-        axes = 2 * np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-        rotated_axes = np.dot(rotation_matrix, axes).T
+    if state_filter:
+        states = [s for s in states if s.name in state_filter]
 
-        colors = ["#FF0000", "#00FF00", "#0000FF"]
-
-        for k in range(3):
-            axis = rotated_axes[k]
-            color = colors[k]
-
-            fig.add_trace(
-                go.Scatter3d(
-                    x=[x_positions[0, indices[i]], x_positions[0, indices[i]] + axis[0]],
-                    y=[x_positions[1, indices[i]], x_positions[1, indices[i]] + axis[1]],
-                    z=[x_positions[2, indices[i]], x_positions[2, indices[i]] + axis[2]],
-                    mode="lines+text",
-                    line={"color": color, "width": 4},
-                    showlegend=False,
-                )
-            )
-
-    fig.update_layout(template="plotly_dark")
-    fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 10, "y": 10, "z": 10}})
-    fig.update_layout(
-        scene={
-            "xaxis": {"range": [-200, 200]},
-            "yaxis": {"range": [-200, 200]},
-            "zaxis": {"range": [-200, 200]},
-        }
-    )
-
-    # Plot the keypoint
-    for sub_positions in subs_positions:
-        fig.add_trace(
-            go.Scatter3d(
-                x=sub_positions[:, 0],
-                y=sub_positions[:, 1],
-                z=sub_positions[:, 2],
-                mode="lines+markers",
-                line={"color": "red", "width": 5},
-                name="Subject",
-            )
-        )
-    fig.show()
-
-
-def plot_scp_animation(result: OptimizationResults, params=None, path=""):
-    tof = result.t_final
-    title = f"SCP Simulation: {tof} seconds"
-    drone_positions = result.x_full[:, :3]
-    drone_attitudes = result.x_full[:, 6:10]
-    result.u_full[:, :3]
-    scp_traj_interp(result.X, params)
-    scp_ctcs_trajs = result.X
-    scp_multi_shoot = result.discretization_history
-    # obstacles = result_ctcs["obstacles"]
-    # gates = result_ctcs["gates"]
-    if "moving_subject" in result or "init_poses" in result:
-        subs_positions, _, _, _ = full_subject_traj_time(result, params)
-    fig = go.Figure(
-        go.Scatter3d(
-            x=[],
-            y=[],
-            z=[],
-            mode="lines+markers",
-            line={"color": "gray", "width": 2},
-            name="SCP Iterations",
-        )
-    )
-    for j in range(200):
-        fig.add_trace(
-            go.Scatter3d(x=[], y=[], z=[], mode="lines+markers", line={"color": "gray", "width": 2})
-        )
-
-    # fig.update_layout(height=1000)
-
-    fig.add_trace(
-        go.Scatter3d(
-            x=drone_positions[:, 0],
-            y=drone_positions[:, 1],
-            z=drone_positions[:, 2],
-            mode="lines",
-            line={"color": "green", "width": 5},
-            name="Nonlinear Propagation",
-        )
-    )
-
-    fig.update_layout(template="plotly_dark", title=title)
-
-    fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 10, "y": 10, "z": 10}})
-    fig.update_layout(
-        scene={
-            "xaxis": {"range": [-200, 200]},
-            "yaxis": {"range": [-200, 200]},
-            "zaxis": {"range": [-200, 200]},
-        }
-    )
-
-    # Extract the number of states and controls from the parameters
-    n_x = params.sim.n_states
-    n_u = params.sim.n_controls
-
-    # Define indices for slicing the augmented state vector
-    i1 = n_x
-    i2 = i1 + n_x * n_x
-    i3 = i2 + n_x * n_u
-    i4 = i3 + n_x * n_u
-    i5 = i4 + n_x
-
-    # Plot the attitudes of the SCP Trajs
-    frames = []
-    traj_iter = 0
-
-    for scp_traj in scp_ctcs_trajs:
-        drone_positions = scp_traj[:, 0:3]
-        drone_attitudes = scp_traj[:, 6:10]
-        frame = go.Frame(name=str(traj_iter))
-        data = []
-        # Plot the multiple shooting trajectories
-        pos_traj = []
-        if traj_iter < len(scp_multi_shoot):
-            for i_multi in range(scp_multi_shoot[traj_iter].shape[1]):
-                pos_traj.append(scp_multi_shoot[traj_iter][:, i_multi].reshape(-1, i5)[:, 0:3])
-            pos_traj = np.array(pos_traj)
-
-            for j in range(pos_traj.shape[1]):
-                if j == 0:
-                    data.append(
-                        go.Scatter3d(
-                            x=pos_traj[:, j, 0],
-                            y=pos_traj[:, j, 1],
-                            z=pos_traj[:, j, 2],
-                            mode="lines",
-                            legendgroup="Multishot Trajectory",
-                            name="Multishot Trajectory " + str(traj_iter),
-                            showlegend=True,
-                            line={"color": "blue", "width": 5},
-                        )
-                    )
-                else:
-                    data.append(
-                        go.Scatter3d(
-                            x=pos_traj[:, j, 0],
-                            y=pos_traj[:, j, 1],
-                            z=pos_traj[:, j, 2],
-                            mode="lines",
-                            legendgroup="Multishot Trajectory",
-                            showlegend=False,
-                            line={"color": "blue", "width": 5},
-                        )
-                    )
-
-        for i in range(drone_attitudes.shape[0]):
-            att = drone_attitudes[i]
-
-            # Convert quaternion to rotation matrix
-            rotation_matrix = qdcm(att)
-
-            # Extract axes from rotation matrix
-            axes = 2 * np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-            rotated_axes = np.dot(rotation_matrix, axes.T).T
-
-            colors = ["#FF0000", "#00FF00", "#0000FF"]
-
-            for k in range(3):
-                axis = rotated_axes[k]
-                color = colors[k]
-
-                data.append(
-                    go.Scatter3d(
-                        x=[scp_traj[i, 0], scp_traj[i, 0] + axis[0]],
-                        y=[scp_traj[i, 1], scp_traj[i, 1] + axis[1]],
-                        z=[scp_traj[i, 2], scp_traj[i, 2] + axis[2]],
-                        mode="lines+text",
-                        line={"color": color, "width": 4},
-                        showlegend=False,
-                    )
-                )
-        traj_iter += 1
-        frame.data = data
-        frames.append(frame)
-    fig.frames = frames
-
-    i = 1
-    if "obstacles_centers" in result:
-        for center, axes, radius in zip(
-            result["obstacles_centers"], result["obstacles_axes"], result["obstacles_radii"]
-        ):
-            n = 20
-            # Generate points on the unit sphere
-            u = np.linspace(0, 2 * np.pi, n)
-            v = np.linspace(0, np.pi, n)
-
-            x = np.outer(np.cos(u), np.sin(v))
-            y = np.outer(np.sin(u), np.sin(v))
-            z = np.outer(np.ones(np.size(u)), np.cos(v))
-
-            # Scale points by radii
-            x = 1 / radius[0] * x
-            y = 1 / radius[1] * y
-            z = 1 / radius[2] * z
-
-            # Rotate and translate points
-            points = np.array([x.flatten(), y.flatten(), z.flatten()])
-            points = axes @ points
-            points = points.T + center
-
-            fig.add_trace(
-                go.Surface(
-                    x=points[:, 0].reshape(n, n),
-                    y=points[:, 1].reshape(n, n),
-                    z=points[:, 2].reshape(n, n),
-                    opacity=0.5,
-                    showscale=False,
-                )
-            )
-
-    if "vertices" in result:
-        for vertices in result.plotting_data["vertices"]:
-            # Plot a line through the vertices of the gate
-            fig.add_trace(
-                go.Scatter3d(
-                    x=[
-                        vertices[0][0],
-                        vertices[1][0],
-                        vertices[2][0],
-                        vertices[3][0],
-                        vertices[0][0],
-                    ],
-                    y=[
-                        vertices[0][1],
-                        vertices[1][1],
-                        vertices[2][1],
-                        vertices[3][1],
-                        vertices[0][1],
-                    ],
-                    z=[
-                        vertices[0][2],
-                        vertices[1][2],
-                        vertices[2][2],
-                        vertices[3][2],
-                        vertices[0][2],
-                    ],
-                    mode="lines",
-                    showlegend=False,
-                    line={"color": "blue", "width": 10},
-                )
-            )
-
-    # Add the subject positions
-    if "n_subs" in result and result.plotting_data["n_subs"] != 0:
-        if "moving_subject" in result:
-            if result.plotting_data["moving_subject"]:
-                for sub_positions in subs_positions:
-                    fig.add_trace(
-                        go.Scatter3d(
-                            x=sub_positions[:, 0],
-                            y=sub_positions[:, 1],
-                            z=sub_positions[:, 2],
-                            mode="lines",
-                            line={"color": "red", "width": 5},
-                            showlegend=False,
-                        )
-                    )
+    # Expand states into individual components for multi-dimensional states
+    expanded_states = []
+    for state in states:
+        state_slice = state._slice
+        if isinstance(state_slice, slice):
+            slice_start = state_slice.start if state_slice.start is not None else 0
+            slice_stop = state_slice.stop if state_slice.stop is not None else slice_start + 1
+            n_components = slice_stop - slice_start
         else:
-            # Plot the subject positions as points
-            for sub_positions in subs_positions:
-                fig.add_trace(
-                    go.Scatter3d(
-                        x=sub_positions[:, 0],
-                        y=sub_positions[:, 1],
-                        z=sub_positions[:, 2],
-                        mode="markers",
-                        marker={"size": 10, "color": "red"},
-                        showlegend=False,
-                    )
-                )
+            slice_start = state_slice
+            n_components = 1
 
-    fig.add_trace(
-        go.Surface(
-            x=[-200, 200, 200, -200],
-            y=[-200, -200, 200, 200],
-            z=[[0, 0], [0, 0], [0, 0], [0, 0]],
-            opacity=0.3,
-            showscale=False,
-            colorscale="Greys",
-            showlegend=True,
-            name="Ground Plane",
-        )
-    )
+        # Create a separate entry for each component
+        if n_components > 1:
+            for i in range(n_components):
 
-    fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 10, "y": 10, "z": 10}})
-    fig.update_layout(
-        scene={
-            "xaxis": {"range": [-200, 200]},
-            "yaxis": {"range": [-200, 200]},
-            "zaxis": {"range": [-200, 200]},
-        }
-    )
+                class ComponentState:
+                    def __init__(self, name: str, idx: int, parent_name: str, comp_idx: int):
+                        self.name = f"{parent_name}_{comp_idx}"
+                        self._slice = slice(idx, idx + 1)
+                        self.parent_name = parent_name
+                        self.component_index = comp_idx
 
-    sliders = [
-        {
-            "pad": {"b": 10, "t": 60},
-            "len": 0.8,
-            "x": 0.15,
-            "y": 0.32,
-            "steps": [
-                {
-                    "args": [[f.name], frame_args(0)],
-                    "label": f.name,
-                    "method": "animate",
-                }
-                for f in fig.frames
-            ],
-        }
-    ]
+                expanded_states.append(ComponentState(state.name, slice_start + i, state.name, i))
+        else:
+            # Single component, keep as is
+            class SingleState:
+                def __init__(self, name: str, idx: int):
+                    self.name = name
+                    self._slice = slice(idx, idx + 1)
+                    self.parent_name = name
+                    self.component_index = 0
 
-    fig.update_layout(
-        updatemenus=[
-            {
-                "buttons": [
-                    {
-                        "args": [None, frame_args(50)],
-                        "label": "Play",
-                        "method": "animate",
-                    },
-                    {
-                        "args": [[None], frame_args(0)],
-                        "label": "Pause",
-                        "method": "animate",
-                    },
-                ],
-                "direction": "left",
-                "pad": {"r": 10, "t": 70},
-                "type": "buttons",
-                "x": 0.15,
-                "y": 0.32,
-            }
-        ],
-        sliders=sliders,
-    )
-    fig.update_layout(sliders=sliders)
+            expanded_states.append(SingleState(state.name, slice_start))
 
-    fig.update_layout(scene={"aspectmode": "manual", "aspectratio": {"x": 10, "y": 10, "z": 10}})
-    fig.update_layout(
-        scene={
-            "xaxis": {"range": [-200, 200]},
-            "yaxis": {"range": [-200, 200]},
-            "zaxis": {"range": [-200, 200]},
-        }
-    )
+    # Calculate grid dimensions based on expanded states
+    n_states_total = len(expanded_states)
+    n_cols = min(7, n_states_total)  # Max 7 columns
+    n_rows = (n_states_total + n_cols - 1) // n_cols  # Ceiling division
 
-    # Overlay the title onto the plot
-    fig.update_layout(title_y=0.95, title_x=0.5)
-
-    # Overlay the sliders and buttons onto the plot
-    fig.update_layout(
-        updatemenus=[
-            {
-                "buttons": [
-                    {
-                        "args": [None, frame_args(50)],
-                        "label": "Play",
-                        "method": "animate",
-                    },
-                    {
-                        "args": [[None], frame_args(0)],
-                        "label": "Pause",
-                        "method": "animate",
-                    },
-                ],
-                "direction": "left",
-                "pad": {"r": 10, "t": 70},
-                "type": "buttons",
-                "x": 0.15,
-                "y": 0.32,
-            }
-        ],
-        sliders=sliders,
-    )
-
-    # Show the legend overlayed on the plot
-    fig.update_layout(legend={"yanchor": "top", "y": 0.9, "xanchor": "left", "x": 0.75})
-
-    # fig.update_layout(height=450, width = 800)
-
-    # Remove the black border around the fig
-    fig.update_layout(margin={"l": 0, "r": 0, "b": 0, "t": 0})
-
-    # Rmeove the background from the legend
-    fig.update_layout(legend={"bgcolor": "rgba(0,0,0,0)"})
-
-    fig.update_xaxes(dtick=1.0, showline=False)
-    fig.update_yaxes(scaleanchor="x", scaleratio=1, showline=False, dtick=1.0)
-
-    # Rotate the camera view to the left
-    if "moving_subject" not in result:
-        fig.update_layout(
-            scene_camera={
-                "up": {"x": 0, "y": 0, "z": 90},
-                "center": {"x": 1, "y": 0.3, "z": 1},
-                "eye": {"x": -1, "y": 2, "z": 1},
-            }
-        )
-
-    fig.show()
-
-
-def scp_traj_interp(scp_trajs, params: Config):
-    scp_prop_trajs = []
-    for traj in scp_trajs:
-        states = []
-        for k in range(params.scp.n):
-            traj_temp = np.repeat(
-                np.expand_dims(traj[k], axis=1), params.prp.inter_sample - 1, axis=1
-            )
-            for i in range(1, params.prp.inter_sample - 1):
-                states.append(traj_temp[:, i])
-        scp_prop_trajs.append(np.array(states))
-    return scp_prop_trajs
-
-
-def plot_state(result: OptimizationResults, params: Config):
-    x_full = result.x_full
-    t_full = result.t_full
-
-    n_x = params.sim.n_states
+    # Create subplot titles from expanded state names
+    subplot_titles = [state.name for state in expanded_states]
 
     fig = make_subplots(
-        rows=2,
-        cols=7,
-        subplot_titles=(
-            "X Position",
-            "Y Position",
-            "Z Position",
-            "X Velocity",
-            "Y Velocity",
-            "Z Velocity",
-            "CTCS Augmentation",
-            "Q1",
-            "Q2",
-            "Q3",
-            "Q4",
-            "X Angular Rate",
-            "Y Angular Rate",
-            "Z Angular Rate",
-        ),
+        rows=n_rows,
+        cols=n_cols,
+        subplot_titles=subplot_titles,
     )
     fig.update_layout(title_text="State Trajectories", template="plotly_dark")
 
-    # Plot the State
-    # for traj in dis_history:
-    for i in range(n_x):
-        x_min = params.sim.x.min[i]
-        x_max = params.sim.x.max[i]
-        # fig.add_trace(
-        #     go.Scatter(
-        #         y=traj[i], mode='lines', showlegend=False,
-        #         line=dict(color='gray', width=0.5)
-        #     ),
-        #     row=(i // 7) + 1, col=(i % 7) + 1
-        # )
+    # Plot each expanded state component
+    for idx, state in enumerate(expanded_states):
+        row = (idx // n_cols) + 1
+        col = (idx % n_cols) + 1
+
+        # Get state slice (now always a single index)
+        state_slice = state._slice
+        slice_start = state_slice.start if state_slice.start is not None else 0
+        state_idx = slice_start
+
+        # Get bounds for this state
+        if params.sim.x.min is not None and params.sim.x.max is not None:
+            x_min = params.sim.x.min[state_idx]
+            x_max = params.sim.x.max[state_idx]
+        else:
+            x_min = -np.inf
+            x_max = np.inf
+
+        # Show legend only on first subplot
+        show_legend = idx == 0
+
+        # Plot full nonlinear propagation if available
+        if has_full_trajectory and state.parent_name in result.trajectory and t_full is not None:
+            state_data = result.trajectory[state.parent_name]
+            # Handle both 1D and 2D trajectory data
+            if state_data.ndim == 1:
+                y_data = state_data
+            else:
+                # Extract the specific component for multi-dimensional states
+                y_data = state_data[:, state.component_index]
+
+            fig.add_trace(
+                go.Scatter(
+                    x=t_full,
+                    y=y_data,
+                    mode="lines",
+                    name="Propagated",
+                    showlegend=show_legend,
+                    legendgroup="propagated",
+                    line={"color": "green", "width": 2},
+                ),
+                row=row,
+                col=col,
+            )
+
+        # Plot nodes from optimization - use nodes dictionary if available
+        if result.nodes and state.parent_name in result.nodes:
+            node_data = result.nodes[state.parent_name]
+            # Handle both 1D and 2D node data
+            if node_data.ndim == 1:
+                y_nodes = node_data
+            else:
+                # Extract the specific component for multi-dimensional states
+                y_nodes = node_data[:, state.component_index]
+
         fig.add_trace(
             go.Scatter(
-                x=t_full,
-                y=x_full[:, i],
-                mode="lines",
-                showlegend=True,
-                line={"color": "green", "width": 2},
+                x=t_nodes,
+                y=y_nodes,
+                mode="markers",
+                name="Nodes",
+                showlegend=show_legend,
+                legendgroup="nodes",
+                marker={"color": "cyan", "size": 6, "symbol": "circle"},
             ),
-            row=(i // 7) + 1,
-            col=(i % 7) + 1,
+            row=row,
+            col=col,
         )
-        fig.add_trace(
-            go.Scatter(
-                x=params.sim.x.guess[:, 7],
-                y=params.sim.x.guess[:, i],
-                mode="lines",
-                showlegend=True,
-                line={"color": "blue", "width": 0.5},
-            ),
-            row=(i // 7) + 1,
-            col=(i % 7) + 1,
-        )
-        fig.add_hline(y=x_min, line={"color": "red", "width": 2}, row=(i // 7) + 1, col=(i % 7) + 1)
-        fig.add_hline(y=x_max, line={"color": "red", "width": 2}, row=(i // 7) + 1, col=(i % 7) + 1)
+
+        # Add constraint bounds (hlines don't support legend, so we add invisible scatter traces)
+        if not np.isinf(x_min):
+            fig.add_hline(
+                y=x_min,
+                line={"color": "red", "width": 1, "dash": "dot"},
+                row=row,
+                col=col,
+            )
+        if not np.isinf(x_max):
+            fig.add_hline(
+                y=x_max,
+                line={"color": "red", "width": 1, "dash": "dot"},
+                row=row,
+                col=col,
+            )
+
+        # Add bounds to legend (only once)
+        if show_legend and (not np.isinf(x_min) or not np.isinf(x_max)):
+            fig.add_trace(
+                go.Scatter(
+                    x=[None],
+                    y=[None],
+                    mode="lines",
+                    name="Bounds",
+                    showlegend=True,
+                    legendgroup="bounds",
+                    line={"color": "red", "width": 1, "dash": "dot"},
+                ),
+                row=row,
+                col=col,
+            )
+
+    # Update axis labels
+    for i in range(1, n_rows + 1):
+        fig.update_xaxes(title_text="Time (s)", row=i, col=1)
 
     return fig
 
 
-def plot_control(result: OptimizationResults, params: Config):
-    u_full = result.u_full
-    t_full = result.t_full
+def _expanded_variable_names(states, controls):
+    names = []
 
-    u = params.sim.u
-    x = params.sim.x
+    def expand(items):
+        expanded = []
+        for item in items:
+            var_slice = item._slice
+            if isinstance(var_slice, slice):
+                start = var_slice.start if var_slice.start is not None else 0
+                stop = var_slice.stop if var_slice.stop is not None else start + 1
+                n_comp = stop - start
+            else:
+                start = var_slice
+                n_comp = 1
 
-    n_u = params.sim.n_controls
+            if n_comp > 1:
+                for i in range(n_comp):
+                    expanded.append((f"{item.name}_{i}", start + i))
+            else:
+                expanded.append((item.name, start))
+        return expanded
+
+    names.extend(expand(states))
+    names.extend(expand(controls))
+    return [n for n, _ in names]
+
+
+def plot_trust_region_heatmap(result: OptimizationResults, problem=None):
+    """Plot heatmap of the final trust-region deltas (TR_history[-1])."""
+
+    if result is None:
+        if problem is None:
+            raise ValueError("Provide a result or a problem with a cached solution")
+        if not hasattr(problem, "_solution") or problem._solution is None:
+            raise ValueError("Problem has no cached solution; run solve() first")
+        from openscvx.algorithms import format_result
+
+        result = format_result(problem, problem._solution, True)
+
+    if not getattr(result, "TR_history", None):
+        raise ValueError("Result has no TR_history to plot")
+
+    tr_mat = result.TR_history[-1]
+    var_names = _expanded_variable_names(
+        getattr(result, "_states", []) or [], getattr(result, "_controls", []) or []
+    )
+
+    # TR matrix is (n_states+n_controls, n_nodes): rows = variables, cols = nodes
+    if tr_mat.shape[0] == len(var_names):
+        z = tr_mat
+    elif tr_mat.shape[1] == len(var_names):
+        z = tr_mat.T
+    else:
+        raise ValueError("TR matrix dimensions do not align with state/control components")
+
+    x_len = z.shape[1]
+
+    # Node labels
+    if result.nodes and "time" in result.nodes and len(result.nodes["time"]) == x_len:
+        x_labels = result.nodes["time"].flatten()
+    else:
+        x_labels = list(range(x_len))
+
+    fig = go.Figure(data=go.Heatmap(z=z, x=x_labels, y=var_names, colorscale="Viridis"))
+    fig.update_layout(
+        title="Trust Region Delta Magnitudes (last iteration)", template="plotly_dark"
+    )
+    fig.update_xaxes(title_text="Node / Time", side="bottom")
+    fig.update_yaxes(title_text="State / Control component", side="left")
+    return fig
+
+
+def plot_virtual_control_heatmap(result: OptimizationResults, problem=None):
+    """Plot heatmap of the final virtual control magnitudes (VC_history[-1])."""
+
+    if result is None:
+        if problem is None:
+            raise ValueError("Provide a result or a problem with a cached solution")
+        if not hasattr(problem, "_solution") or problem._solution is None:
+            raise ValueError("Problem has no cached solution; run solve() first")
+        from openscvx.algorithms import format_result
+
+        result = format_result(problem, problem._solution, True)
+
+    if not getattr(result, "VC_history", None):
+        raise ValueError("Result has no VC_history to plot")
+
+    vc_mat = result.VC_history[-1]
+    # Virtual control only applies to states, not controls
+    state_names = _expanded_variable_names(getattr(result, "_states", []) or [], [])
+
+    # Align so rows = states, cols = nodes
+    if vc_mat.shape[1] == len(state_names):
+        z = vc_mat.T  # (states, nodes)
+    elif vc_mat.shape[0] == len(state_names):
+        z = vc_mat
+    else:
+        raise ValueError("VC matrix shape does not align with state components")
+
+    x_len = z.shape[1]
+
+    # Node labels - virtual control uses N-1 nodes (between nodes)
+    if result.nodes and "time" in result.nodes:
+        t_all = result.nodes["time"].flatten()
+        if len(t_all) == x_len + 1:
+            # Use midpoints between nodes or just first N-1 time values
+            x_labels = t_all[:-1]  # First N-1 nodes
+        elif len(t_all) == x_len:
+            x_labels = t_all
+        else:
+            x_labels = list(range(x_len))
+    else:
+        x_labels = list(range(x_len))
+
+    fig = go.Figure(data=go.Heatmap(z=z, x=x_labels, y=state_names, colorscale="Magma"))
+    fig.update_layout(title="Virtual Control Magnitudes (last iteration)", template="plotly_dark")
+    fig.update_xaxes(title_text="Node Interval (N-1)")
+    fig.update_yaxes(title_text="State component")
+    return fig
+
+
+def plot_control(
+    result: OptimizationResults = None,
+    params: Config = None,
+    problem=None,
+    control_names=None,
+):
+    """Plot control trajectories over time with bounds.
+
+    Shows the optimized control trajectory (nodes and full propagation if available),
+    initial guess, and constraint bounds for all control variables.
+
+    Args:
+        result: Optimization results containing control trajectories (optional if problem provided)
+        params: Configuration with control bounds and metadata (optional if problem provided)
+        problem: Problem instance to extract result and params from (optional)
+        control_names: Optional list of control names to plot; defaults to all controls
+
+    Returns:
+        Plotly figure with control trajectory subplots
+    """
+    # If problem provided, extract result and params from it
+    if problem is not None:
+        if result is None:
+            # Check if post_process() was called and use propagated result
+            if hasattr(problem._solution, "_propagated_result"):
+                result = problem._solution._propagated_result
+            else:
+                from openscvx.algorithms import format_result
+
+                result = format_result(problem, problem._solution, True)
+        if params is None:
+            params = problem.settings
+
+    if result is None or params is None:
+        raise ValueError("Must provide either (result, params) or problem")
+
+    # Get time values at nodes from the nodes dictionary
+    t_nodes = result.nodes["time"].flatten()
+
+    # Check if full propagation trajectory is available
+    has_full_trajectory = result.trajectory and len(result.trajectory) > 0
+
+    # Get time for full trajectory
+    if has_full_trajectory:
+        t_full = result.trajectory["time"].flatten()
+
+    # Get all controls (both user-defined and augmented)
+    controls = result._controls if hasattr(result, "_controls") and result._controls else []
+
+    # Optional filtering of which controls to plot
+    control_filter = set(control_names) if control_names else None
+    if control_filter:
+        controls = [c for c in controls if c.name in control_filter]
+
+    # Expand controls into individual components for multi-dimensional controls
+    expanded_controls = []
+    for control in controls:
+        control_slice = control._slice
+        if isinstance(control_slice, slice):
+            slice_start = control_slice.start if control_slice.start is not None else 0
+            slice_stop = control_slice.stop if control_slice.stop is not None else slice_start + 1
+            n_components = slice_stop - slice_start
+        else:
+            slice_start = control_slice
+            n_components = 1
+
+        # Create a separate entry for each component
+        if n_components > 1:
+            for i in range(n_components):
+
+                class ComponentControl:
+                    def __init__(self, idx: int, parent_name: str, comp_idx: int):
+                        self.name = f"{parent_name}_{comp_idx}"
+                        self._slice = slice(idx, idx + 1)
+                        self.parent_name = parent_name
+                        self.component_index = comp_idx
+
+                expanded_controls.append(ComponentControl(slice_start + i, control.name, i))
+        else:
+            # Single component, keep as is
+            class SingleControl:
+                def __init__(self, name: str, idx: int):
+                    self.name = name
+                    self._slice = slice(idx, idx + 1)
+                    self.parent_name = name
+                    self.component_index = 0
+
+            expanded_controls.append(SingleControl(control.name, slice_start))
+
+    # Calculate grid dimensions based on expanded controls
+    n_controls_total = len(expanded_controls)
+    n_cols = min(3, n_controls_total)  # Max 3 columns
+    n_rows = (n_controls_total + n_cols - 1) // n_cols  # Ceiling division
+
+    # Create subplot titles from expanded control names
+    subplot_titles = [control.name for control in expanded_controls]
 
     fig = make_subplots(
-        rows=2,
-        cols=3,
-        subplot_titles=("X Force", "Y Force", "Z Force", "X Torque", "Y Torque", "Z Torque"),
+        rows=n_rows,
+        cols=n_cols,
+        subplot_titles=subplot_titles,
     )
     fig.update_layout(title_text="Control Trajectories", template="plotly_dark")
 
-    for i in range(n_u):
-        u_min = u.min[i]
-        u_max = u.max[i]
+    # Plot each expanded control component
+    for idx, control in enumerate(expanded_controls):
+        row = (idx // n_cols) + 1
+        col = (idx % n_cols) + 1
+
+        # Get control slice (now always a single index)
+        control_slice = control._slice
+        slice_start = control_slice.start if control_slice.start is not None else 0
+        control_idx = slice_start
+
+        # Get bounds for this control
+        u_min = params.sim.u.min[control_idx]
+        u_max = params.sim.u.max[control_idx]
+
+        # Show legend only on first subplot
+        show_legend = idx == 0
+
+        # Plot full propagated control trajectory if available
+        if has_full_trajectory and control.parent_name in result.trajectory and t_full is not None:
+            control_data = result.trajectory[control.parent_name]
+            # Handle both 1D and 2D trajectory data
+            if control_data.ndim == 1:
+                y_data = control_data
+            else:
+                # Extract the specific component for multi-dimensional controls
+                y_data = control_data[:, control.component_index]
+
+            fig.add_trace(
+                go.Scatter(
+                    x=t_full,
+                    y=y_data,
+                    mode="lines",
+                    name="Propagated",
+                    showlegend=show_legend,
+                    legendgroup="propagated",
+                    line={"color": "green", "width": 2},
+                ),
+                row=row,
+                col=col,
+            )
+
+        # Plot nodes from optimization - use nodes dictionary if available
+        node_data = result.nodes[control.parent_name]
+        # Handle both 1D and 2D node data
+        if node_data.ndim == 1:
+            y_nodes = node_data
+        else:
+            # Extract the specific component for multi-dimensional controls
+            y_nodes = node_data[:, control.component_index]
+
         fig.add_trace(
             go.Scatter(
-                x=t_full,
-                y=u_full[:, i],
-                mode="lines",
-                showlegend=True,
-                line={"color": "green", "width": 2},
+                x=t_nodes,
+                y=y_nodes,
+                mode="markers",
+                name="Nodes",
+                showlegend=show_legend,
+                legendgroup="nodes",
+                marker={"color": "cyan", "size": 6, "symbol": "circle"},
             ),
-            row=(i // 3) + 1,
-            col=(i % 3) + 1,
+            row=row,
+            col=col,
         )
-        fig.add_trace(
-            go.Scatter(
-                x=x.guess[:, 7],
-                y=u.guess[:, i],
-                mode="lines",
-                showlegend=True,
-                line={"color": "blue", "width": 0.5},
-            ),
-            row=(i // 3) + 1,
-            col=(i % 3) + 1,
-        )
-        fig.add_hline(y=u_min, line={"color": "red", "width": 2}, row=(i // 3) + 1, col=(i % 3) + 1)
-        fig.add_hline(y=u_max, line={"color": "red", "width": 2}, row=(i // 3) + 1, col=(i % 3) + 1)
+
+        # Add constraint bounds (hlines don't support legend, so we add invisible scatter traces)
+        if not np.isinf(u_min):
+            fig.add_hline(
+                y=u_min,
+                line={"color": "red", "width": 1, "dash": "dot"},
+                row=row,
+                col=col,
+            )
+        if not np.isinf(u_max):
+            fig.add_hline(
+                y=u_max,
+                line={"color": "red", "width": 1, "dash": "dot"},
+                row=row,
+                col=col,
+            )
+
+        # Add bounds to legend (only once)
+        if show_legend and (not np.isinf(u_min) or not np.isinf(u_max)):
+            fig.add_trace(
+                go.Scatter(
+                    x=[None],
+                    y=[None],
+                    mode="lines",
+                    name="Bounds",
+                    showlegend=True,
+                    legendgroup="bounds",
+                    line={"color": "red", "width": 1, "dash": "dot"},
+                ),
+                row=row,
+                col=col,
+            )
+
+    # Update axis labels
+    for i in range(1, n_rows + 1):
+        fig.update_xaxes(title_text="Time (s)", row=i, col=1)
 
     return fig
 
 
-def plot_losses(result: OptimizationResults, params: Config):
-    # Plot J_tr, J_vb, J_vc, J_vc_ctcs
-    J_tr = result.J_tr_history
-    J_vb = result.J_vb_history
-    J_vc = result.J_vc_history
-    result.plotting_data["J_vc_ctcs_vec"]
+def plot_scp_iteration_animation(
+    result: OptimizationResults = None,
+    params: Config = None,
+    problem=None,
+    state_names=None,
+    control_names=None,
+):
+    """Create an animated plot showing SCP iteration convergence.
 
-    fig = make_subplots(rows=2, cols=2, subplot_titles=("J_tr", "J_vb", "J_vc", "J_vc_ctcs"))
-    fig.update_layout(title_text="Losses", template="plotly_dark")
+    Args:
+        result: Optimization results containing iteration history (optional if problem provided)
+        params: Configuration with state/control bounds and metadata (optional if problem provided)
+        problem: Problem instance to extract result and params from (optional)
+        state_names: Optional list of state names to include in the animation
+        control_names: Optional list of control names to include in the animation
 
+    Returns:
+        Plotly figure with animation frames for each SCP iteration
+    """
+    # If problem provided, extract result and params from it
+    if problem is not None:
+        if result is None:
+            # Check if post_process() was called and use propagated result
+            if hasattr(problem._solution, "_propagated_result"):
+                result = problem._solution._propagated_result
+            else:
+                from openscvx.algorithms import format_result
+
+                result = format_result(problem, problem._solution, True)
+        if params is None:
+            params = problem.settings
+
+    if result is None or params is None:
+        raise ValueError("Must provide either (result, params) or problem")
+
+    # Get iteration history
+    V_history = (
+        result.discretization_history
+        if hasattr(result, "discretization_history") and result.discretization_history
+        else []
+    )
+    U_history = result.U
+
+    # Extract multi-shot propagation trajectories from V_history
+    X_prop_history = []  # Multi-shot propagated trajectories
+    if V_history:
+        n_x = params.sim.n_states
+        n_u = params.sim.n_controls
+        i4 = n_x + n_x * n_x + 2 * n_x * n_u
+
+        for V in V_history:
+            # V shape: (flattened_size, n_timesteps) where flattened_size = (N-1) * i4
+            # Extract positions for each time step in the multi-shoot
+            pos_traj = []
+            for i_multi in range(V.shape[1]):
+                # Reshape each time column to (N-1, i4) and extract position (first n_x columns)
+                pos_traj.append(V[:, i_multi].reshape(-1, i4)[:, :n_x])
+            X_prop_history.append(np.array(pos_traj))  # Shape: (n_timesteps, N-1, n_x)
+    else:
+        # Fallback to X history if V_history not available
+        X_prop_history = None
+
+    n_iterations = len(result.X)
+
+    if n_iterations == 0:
+        raise ValueError("No iteration history available")
+
+    # Limit iterations to those with available propagation history
+    if X_prop_history:
+        n_iterations = min(n_iterations, len(X_prop_history))
+
+    # Get states and controls, filter CTCS
+    # For propagated states, use x_prop metadata
+    states = result._states if hasattr(result, "_states") and result._states else []
+    controls = result._controls if hasattr(result, "_controls") and result._controls else []
+
+    # Filter out augmented states
+    filtered_states = [s for s in states if "ctcs_aug" not in s.name.lower()]
+    states = filtered_states
+    controls = controls if controls else []
+
+    # Optional filtering by provided names
+    state_filter = set(state_names) if state_names else None
+    control_filter = set(control_names) if control_names else None
+
+    # If only one group is specified, drop the other entirely
+    if state_filter and control_filter is None:
+        controls = []
+    if control_filter and state_filter is None:
+        states = []
+
+    if state_filter:
+        states = [s for s in states if s.name in state_filter]
+    if control_filter:
+        controls = [c for c in controls if c.name in control_filter]
+
+    # Expand multi-dimensional states/controls
+    def expand_variables(variables):
+        expanded = []
+        for var in variables:
+            var_slice = var._slice
+            if isinstance(var_slice, slice):
+                start = var_slice.start if var_slice.start is not None else 0
+                stop = var_slice.stop if var_slice.stop is not None else start + 1
+                n_comp = stop - start
+            else:
+                start = var_slice
+                n_comp = 1
+
+            if n_comp > 1:
+                for i in range(n_comp):
+
+                    class Component:
+                        def __init__(self, idx, parent, comp_idx):
+                            self.name = f"{parent}_{comp_idx}"
+                            self._slice = slice(idx, idx + 1)
+
+                    expanded.append(Component(start + i, var.name, i))
+            else:
+
+                class Single:
+                    def __init__(self, name, idx):
+                        self.name = name
+                        self._slice = slice(idx, idx + 1)
+
+                expanded.append(Single(var.name, start))
+        return expanded
+
+    expanded_states = expand_variables(states)
+    expanded_controls = expand_variables(controls)
+
+    # Grid dimensions
+    n_states = len(expanded_states)
+    n_controls = len(expanded_controls)
+    n_state_cols = min(7, n_states) if n_states > 0 else 1
+    n_control_cols = min(3, n_controls) if n_controls > 0 else 1
+    n_state_rows = (n_states + n_state_cols - 1) // n_state_cols if n_states > 0 else 0
+    n_control_rows = (n_controls + n_control_cols - 1) // n_control_cols if n_controls > 0 else 0
+
+    total_rows = n_state_rows + n_control_rows
+    # Use n_state_cols for state rows, n_control_cols for control rows - don't pad to max
+    actual_cols = n_state_cols if n_state_rows > 0 else n_control_cols
+
+    # Create figure with proper column counts per section
+    subplot_titles = [s.name for s in expanded_states] + [c.name for c in expanded_controls]
+    # For mixed grids, we need to handle states and controls separately
+    if n_states > 0 and n_controls > 0:
+        # Create a grid that can accommodate both sections
+        fig = make_subplots(
+            rows=total_rows,
+            cols=max(n_state_cols, n_control_cols),
+            subplot_titles=subplot_titles,
+            vertical_spacing=0.1,
+            horizontal_spacing=0.05,
+            specs=[
+                [{"secondary_y": False}] * max(n_state_cols, n_control_cols)
+                for _ in range(total_rows)
+            ],
+        )
+    else:
+        fig = make_subplots(
+            rows=total_rows,
+            cols=actual_cols,
+            subplot_titles=subplot_titles,
+            vertical_spacing=0.1,
+            horizontal_spacing=0.05,
+        )
+
+    # Add 500 blank traces for animation placeholder
+    for _ in range(2000):
+        fig.add_trace(go.Scatter(x=[], y=[], mode="lines", showlegend=False))
+
+    time_slice = params.sim.time_slice
+
+    # Prepare bounds data for each subplot
+    state_bounds_data = {}
+    for state_idx, state in enumerate(expanded_states):
+        idx = state._slice.start
+        x_min = params.sim.x.min[idx] if params.sim.x.min is not None else -np.inf
+        x_max = params.sim.x.max[idx] if params.sim.x.max is not None else np.inf
+        state_bounds_data[state_idx] = (x_min, x_max)
+
+    control_bounds_data = {}
+    for control_idx, control in enumerate(expanded_controls):
+        idx = control._slice.start
+        u_min = params.sim.u.min[idx] if params.sim.u.min is not None else -np.inf
+        u_max = params.sim.u.max[idx] if params.sim.u.max is not None else np.inf
+        control_bounds_data[control_idx] = (u_min, u_max)
+
+    # Create animation frames
+    frames = []
+    for iter_idx in range(n_iterations):
+        X_nodes = result.X[iter_idx]  # Optimization nodes
+        U_iter = U_history[iter_idx]
+
+        # Time for nodes (N points)
+        t_nodes = (
+            X_nodes[:, time_slice].flatten()
+            if time_slice is not None
+            else np.linspace(0, params.sim.total_time, X_nodes.shape[0])
+        )
+
+        frame_data = []
+
+        # States: multi-shot trajectories + nodes
+        for state_idx, state in enumerate(expanded_states):
+            idx = state._slice.start
+            row = (state_idx // n_state_cols) + 1
+            col = (state_idx % n_state_cols) + 1
+
+            # Plot multi-shot trajectories (one line per time interval between nodes)
+            if X_prop_history and iter_idx < len(X_prop_history):
+                pos_traj = X_prop_history[iter_idx]  # Shape: (n_timesteps, N-1, n_x)
+
+                # Loop through each segment (N-1 segments between N nodes)
+                for j in range(pos_traj.shape[1]):
+                    # Extract time and state values for this segment across all timesteps
+                    segment_states = pos_traj[:, j, idx]  # Shape: (n_timesteps,)
+                    segment_times = pos_traj[:, j, time_slice].flatten()
+
+                    frame_data.append(
+                        go.Scatter(
+                            x=segment_times,
+                            y=segment_states,
+                            mode="lines",
+                            line={"color": "blue", "width": 2},
+                            showlegend=False,
+                            xaxis=f"x{1 if (row == 1 and col == 1) else state_idx + 1}",
+                            yaxis=f"y{1 if (row == 1 and col == 1) else state_idx + 1}",
+                        )
+                    )
+
+            # Optimization nodes (markers only)
+            frame_data.append(
+                go.Scatter(
+                    x=t_nodes,
+                    y=X_nodes[:, idx],
+                    mode="markers",
+                    marker={"color": "cyan", "size": 6, "symbol": "circle"},
+                    showlegend=False,
+                    xaxis=f"x{1 if (row == 1 and col == 1) else state_idx + 1}",
+                    yaxis=f"y{1 if (row == 1 and col == 1) else state_idx + 1}",
+                )
+            )
+
+        # Controls: plot on separate subplots
+        for control_idx, control in enumerate(expanded_controls):
+            idx = control._slice.start
+            row = n_state_rows + (control_idx // n_control_cols) + 1
+            col = (control_idx % n_control_cols) + 1
+
+            frame_data.append(
+                go.Scatter(
+                    x=t_nodes,
+                    y=U_iter[:, idx],
+                    mode="markers",
+                    marker={"color": "orange", "size": 6, "symbol": "circle"},
+                    showlegend=False,
+                    xaxis=f"x{1 if (row == 1 and col == 1) else n_states + control_idx + 1}",
+                    yaxis=f"y{1 if (row == 1 and col == 1) else n_states + control_idx + 1}",
+                )
+            )
+
+        # Time range for bounds spans (use t_nodes for the full time range)
+        t_min = t_nodes.min() if len(t_nodes) > 0 else 0
+        t_max = t_nodes.max() if len(t_nodes) > 0 else 1
+
+        # Add bounds to each frame
+        # State bounds
+        for state_idx, (x_min, x_max) in state_bounds_data.items():
+            axis_num = state_idx + 1
+            if not np.isinf(x_min):
+                frame_data.append(
+                    go.Scatter(
+                        x=[t_min, t_max],
+                        y=[x_min, x_min],
+                        mode="lines",
+                        line={"color": "red", "width": 1, "dash": "dot"},
+                        showlegend=False,
+                        xaxis=f"x{axis_num}",
+                        yaxis=f"y{axis_num}",
+                    )
+                )
+            if not np.isinf(x_max):
+                frame_data.append(
+                    go.Scatter(
+                        x=[t_min, t_max],
+                        y=[x_max, x_max],
+                        mode="lines",
+                        line={"color": "red", "width": 1, "dash": "dot"},
+                        showlegend=False,
+                        xaxis=f"x{axis_num}",
+                        yaxis=f"y{axis_num}",
+                    )
+                )
+
+        # Control bounds
+        for control_idx, (u_min, u_max) in control_bounds_data.items():
+            axis_num = n_states + control_idx + 1
+            if not np.isinf(u_min):
+                frame_data.append(
+                    go.Scatter(
+                        x=[t_min, t_max],
+                        y=[u_min, u_min],
+                        mode="lines",
+                        line={"color": "red", "width": 1, "dash": "dot"},
+                        showlegend=False,
+                        xaxis=f"x{axis_num}",
+                        yaxis=f"y{axis_num}",
+                    )
+                )
+            if not np.isinf(u_max):
+                frame_data.append(
+                    go.Scatter(
+                        x=[t_min, t_max],
+                        y=[u_max, u_max],
+                        mode="lines",
+                        line={"color": "red", "width": 1, "dash": "dot"},
+                        showlegend=False,
+                        xaxis=f"x{axis_num}",
+                        yaxis=f"y{axis_num}",
+                    )
+                )
+
+        frames.append(go.Frame(data=frame_data, name=f"Iteration {iter_idx}"))
+
+    # Animation controls (60 FPS = ~16.67ms per frame)
+    fig.frames = frames
+    fig.update_layout(
+        title_text=f"SCP Iteration History ({n_iterations} iterations)",
+        template="plotly_dark",
+        updatemenus=[
+            {
+                "type": "buttons",
+                "direction": "left",
+                "x": 0.1,
+                "y": -0.15,
+                "buttons": [
+                    {
+                        "label": "Play",
+                        "method": "animate",
+                        "args": [
+                            None,
+                            {
+                                "frame": {"duration": 17, "redraw": True},
+                                "fromcurrent": True,
+                                "mode": "immediate",
+                                "transition": {"duration": 0},
+                            },
+                        ],
+                    },
+                    {
+                        "label": "Pause",
+                        "method": "animate",
+                        "args": [
+                            [None],
+                            {
+                                "frame": {"duration": 0, "redraw": False},
+                                "mode": "immediate",
+                                "transition": {"duration": 0},
+                            },
+                        ],
+                    },
+                ],
+            }
+        ],
+        sliders=[
+            {
+                "active": 0,
+                "yanchor": "top",
+                "y": -0.1,
+                "xanchor": "left",
+                "x": 0.4,
+                "currentvalue": {"prefix": "Iteration: ", "visible": True, "xanchor": "right"},
+                "pad": {"b": 10, "t": 50},
+                "len": 0.5,
+                "steps": [
+                    {
+                        "args": [
+                            [f"Iteration {i}"],
+                            {
+                                "frame": {"duration": 17, "redraw": True},
+                                "mode": "immediate",
+                                "transition": {"duration": 0},
+                            },
+                        ],
+                        "label": str(i),
+                        "method": "animate",
+                    }
+                    for i in range(n_iterations)
+                ],
+            }
+        ],
+    )
+
+    # Add legend entries for the traces
+    # Add dummy traces for legend
     fig.add_trace(
-        go.Scatter(y=J_tr, mode="lines", showlegend=False, line={"color": "green", "width": 2}),
-        row=1,
-        col=1,
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="lines",
+            name="Multishot Trajectory",
+            line={"color": "blue", "width": 2},
+            showlegend=True,
+        )
     )
     fig.add_trace(
-        go.Scatter(y=J_vb, mode="lines", showlegend=False, line={"color": "green", "width": 2}),
-        row=1,
-        col=2,
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="markers",
+            name="State Nodes",
+            marker={"color": "cyan", "size": 6, "symbol": "circle"},
+            showlegend=True,
+        )
     )
     fig.add_trace(
-        go.Scatter(y=J_vc, mode="lines", showlegend=False, line={"color": "green", "width": 2}),
-        row=2,
-        col=1,
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="markers",
+            name="Control Nodes",
+            marker={"color": "orange", "size": 6, "symbol": "circle"},
+            showlegend=True,
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="lines",
+            name="Bounds",
+            line={"color": "red", "width": 1, "dash": "dot"},
+            showlegend=True,
+        )
     )
 
-    # Set y-axis to log scale for each subplot
-    fig.update_yaxes(type="log", row=1, col=1)
-    fig.update_yaxes(type="log", row=1, col=2)
-    fig.update_yaxes(type="log", row=2, col=1)
-    fig.update_yaxes(type="log", row=2, col=2)
+    # Update legend configuration
+    fig.update_layout(
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=1.02,
+            bgcolor="rgba(0, 0, 0, 0.5)",
+            bordercolor="white",
+            borderwidth=1,
+        )
+    )
 
-    fig.show()
+    for i in range(1, total_rows + 1):
+        fig.update_xaxes(title_text="Time (s)", row=i, col=1)
+
+    return fig
+
+
+class ProblemPlotMixin:
+    """Mixin class that adds plotting methods to Problem.
+
+    This can be inherited by the Problem class to add plotting functionality
+    without coupling the plotting module to the problem module.
+
+    Note: This mixin expects the class using it to have a `settings` attribute
+    of type Config.
+    """
+
+    settings: Config  # Type hint for the settings attribute from Problem class
+
+    def plot_state(self, result: OptimizationResults = None, state_names=None):
+        """Plot state trajectories with bounds.
+
+        Shows the optimized state trajectory (nodes and full propagation if available),
+        initial guess, and constraint bounds for all state variables.
+
+        Args:
+            result: OptimizationResults object from solve() or post_process()
+                (optional, uses internal solution if not provided)
+
+        Returns:
+            Plotly figure with state trajectory subplots
+
+        Example:
+            results = problem.solve()
+            fig = problem.plot_state()  # Uses internal solution
+            fig.show()
+
+            # Or explicitly pass a result
+            results = problem.post_process()
+            fig = problem.plot_state(results)
+            fig.show()
+        """
+        return plot_state(
+            result=result, params=self.settings, problem=self, state_names=state_names
+        )
+
+    def plot_control(self, result: OptimizationResults = None, control_names=None):
+        """Plot control trajectories with bounds.
+
+        Shows the optimized control trajectory (nodes and full propagation if available),
+        initial guess, and constraint bounds for all control variables.
+
+        Args:
+            result: OptimizationResults object from solve() or post_process()
+                (optional, uses internal solution if not provided)
+
+        Returns:
+            Plotly figure with control trajectory subplots
+
+        Example:
+            results = problem.solve()
+            fig = problem.plot_control()  # Uses internal solution
+            fig.show()
+
+            # Or explicitly pass a result
+            results = problem.post_process()
+            fig = problem.plot_control(results)
+            fig.show()
+        """
+        return plot_control(
+            result=result, params=self.settings, problem=self, control_names=control_names
+        )
+
+    def plot_trust_region_heatmap(self, result: OptimizationResults = None):
+        """Plot heatmap of trust-region deltas (last iteration)."""
+        if result is None:
+            if hasattr(self, "_solution") and self._solution is not None:
+                from openscvx.algorithms import format_result
+
+                result = format_result(self, self._solution, True)
+            else:
+                raise ValueError("Provide a result or solve the problem first")
+        return plot_trust_region_heatmap(result=result, problem=self)
+
+    def plot_virtual_control_heatmap(self, result: OptimizationResults = None):
+        """Plot heatmap of virtual control magnitudes (last iteration)."""
+        if result is None:
+            if hasattr(self, "_solution") and self._solution is not None:
+                from openscvx.algorithms import format_result
+
+                result = format_result(self, self._solution, True)
+            else:
+                raise ValueError("Provide a result or solve the problem first")
+        return plot_virtual_control_heatmap(result=result, problem=self)
+
+    def plot_scp_animation(
+        self,
+        result: OptimizationResults = None,
+        state_names=None,
+        control_names=None,
+    ):
+        """Create an animated plot showing SCP iteration convergence.
+
+        This function creates a Plotly animation that shows how the state and control
+        trajectories evolve through each SCP iteration using the discretization history.
+
+        Args:
+            result: OptimizationResults object from solve() containing iteration history
+                (optional, uses internal solution if not provided)
+
+        Returns:
+            Plotly figure with animation frames for each SCP iteration
+
+        Example:
+            results = problem.solve()
+            fig = problem.plot_scp_animation()  # Uses internal solution
+            fig.show()
+
+            # Or explicitly pass a result
+            fig = problem.plot_scp_animation(results)
+            fig.show()
+        """
+        return plot_scp_iteration_animation(
+            result=result,
+            params=self.settings,
+            problem=self,
+            state_names=state_names,
+            control_names=control_names,
+        )
+
+
+def register_plotting_methods(problem_class):
+    """Register plotting methods on a Problem class.
+
+    This function can be called from problem.py to add plotting methods
+    without creating a circular import dependency.
+
+    Args:
+        problem_class: The Problem class to add plotting methods to
+
+    Example:
+        from openscvx.plotting.plotting import register_plotting_methods
+        register_plotting_methods(Problem)
+    """
+    problem_class.plot_state = ProblemPlotMixin.plot_state
+    problem_class.plot_control = ProblemPlotMixin.plot_control
+    problem_class.plot_scp_animation = ProblemPlotMixin.plot_scp_animation
