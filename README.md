@@ -251,10 +251,10 @@ Check out the problem definitions inside `examples/` to see how to define your o
 - [X] Implement QOCOGen with CVPYGEN
 - [X] Non-Dilated Time Propagation
 - [X] Save and reload the compiled JAX code
+- [x] Unified Mathematical Interface
 - [ ] Auto-SCvx Weight Tuning
 - [ ] Compiled at the subproblem level with JAX
 - [ ] Single Shot propagation
-- [ ] Unified Mathematical Interface
 
 ## What is implemented
 
