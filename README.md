@@ -229,15 +229,18 @@ Dependencies can then be installed using Conda or Pip
 
 ### Running Trajectory Optimization
 
-See `examples/params/` folder for several example trajectory optimization problems.
+See `examples/` folder for several example trajectory optimization problems grouped by application.
 To run a problem simply run any of the examples directly, for example:
 
 ```sh
-python3 examples/params/brachistochrone.py
+python3 examples/abstract/brachistochrone.py
 ```
+
+> **Note:** To run the examples, you'll need to clone this repository and install OpenSCvx in editable mode (`pip install -e .`). See the [Local Development](#local-development) section above for detailed installation instructions.
+
 and adjust the plotting as needed.
 
-Check out the problem definitions inside `examples/params` to see how to define your own problems.
+Check out the problem definitions inside `examples/` to see how to define your own problems.
 
 ## Code Structure
 <img src="figures/oscvx_structure_full_dark.svg" width="1200"/>
