@@ -10,9 +10,16 @@ The problem includes:
 - Configured for real-time re-optimization with moving targets
 """
 
+import os
+import sys
+
 import jax.numpy as jnp
 import numpy as np
 import numpy.linalg as la
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_animation
