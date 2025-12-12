@@ -18,6 +18,7 @@ import jax.numpy as jnp
 import numpy as np
 import numpy.linalg as la
 
+# Add grandparent directory to path to import examples.plotting
 current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
