@@ -73,6 +73,7 @@ from openscvx.symbolic.expr import Expr, NodeReference
 
 if TYPE_CHECKING:
     from openscvx.lowered.unified import UnifiedState
+    from openscvx.symbolic.expr.state import State
     from openscvx.symbolic.problem import SymbolicProblem
 
 __all__ = [
@@ -676,26 +677,69 @@ def _apply_byof(
     jax_constraints: LoweredJaxConstraints,
     x_unified: "UnifiedState",
     x_prop_unified: "UnifiedState",
+    states: List["State"],
+    states_prop: List["State"],
 ) -> Tuple[Dynamics, Dynamics, LoweredJaxConstraints, "UnifiedState", "UnifiedState"]:
     """Apply bring-your-own-functions (byof) to augment lowered problem.
 
     Handles raw JAX functions provided by expert users, including:
+    - dynamics: Raw JAX functions for specific state derivatives
     - nodal_constraints: Point-wise constraints at each node
     - cross_nodal_constraints: Constraints coupling multiple nodes
     - ctcs_constraints: Continuous-time constraint satisfaction via dynamics augmentation
 
     Args:
-        byof: Dict with keys "nodal_constraints", "cross_nodal_constraints", "ctcs_constraints"
+        byof: Dict with keys "dynamics", "nodal_constraints", "cross_nodal_constraints",
+            "ctcs_constraints"
         dynamics: Lowered optimization dynamics to potentially augment
         dynamics_prop: Lowered propagation dynamics to potentially augment
         jax_constraints: Lowered JAX constraints to append to
         x_unified: Unified optimization state interface to potentially augment
         x_prop_unified: Unified propagation state interface to potentially augment
+        states: List of State objects for optimization (with _slice attributes)
+        states_prop: List of State objects for propagation (with _slice attributes)
 
     Returns:
         Tuple of (dynamics, dynamics_prop, jax_constraints, x_unified, x_prop_unified)
     """
     import jax.numpy as jnp
+
+    # Handle byof dynamics by splicing in raw JAX functions at the correct slices
+    byof_dynamics = byof.get("dynamics", {})
+    if byof_dynamics:
+        # Build mapping from state name to slice for optimization states
+        state_slices = {state.name: state._slice for state in states}
+        state_slices_prop = {state.name: state._slice for state in states_prop}
+
+        def make_composite_dynamics(orig_f, byof_fns, slices_map):
+            """Factory to create composite dynamics with byof functions spliced in."""
+
+            def composite_f(x, u, node, params):
+                xdot = orig_f(x, u, node, params)
+                for state_name, byof_fn in byof_fns.items():
+                    sl = slices_map[state_name]
+                    xdot = xdot.at[sl].set(byof_fn(x, u, node, params))
+                return xdot
+
+            return composite_f
+
+        # Create composite optimization dynamics
+        composite_f = make_composite_dynamics(dynamics.f, byof_dynamics, state_slices)
+        dynamics = Dynamics(
+            f=composite_f,
+            A=jacfwd(composite_f, argnums=0),
+            B=jacfwd(composite_f, argnums=1),
+        )
+
+        # Create composite propagation dynamics
+        composite_f_prop = make_composite_dynamics(
+            dynamics_prop.f, byof_dynamics, state_slices_prop
+        )
+        dynamics_prop = Dynamics(
+            f=composite_f_prop,
+            A=jacfwd(composite_f_prop, argnums=0),
+            B=jacfwd(composite_f_prop, argnums=1),
+        )
 
     # Handle nodal constraints
     for fn in byof.get("nodal_constraints", []):
@@ -852,7 +896,14 @@ def lower_symbolic_problem(
     # augment the state dimension
     if byof is not None:
         dynamics, dynamics_prop, jax_constraints, x_unified, x_prop_unified = _apply_byof(
-            byof, dynamics, dynamics_prop, jax_constraints, x_unified, x_prop_unified
+            byof,
+            dynamics,
+            dynamics_prop,
+            jax_constraints,
+            x_unified,
+            x_prop_unified,
+            problem.states,
+            problem.states_prop,
         )
 
     # Create CVXPy variables and lower convex constraints

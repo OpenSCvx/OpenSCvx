@@ -117,6 +117,10 @@ class Problem(ProblemPlotMixin):
             byof (dict, optional): Bring-your-own functions. Raw JAX functions for expert users who
                 want to bypass the symbolic layer. The user is responsible for correct indexing
                 into the unified state/control vectors. Supported keys:
+                - "dynamics": Dict mapping state names to raw JAX functions with signature
+                  f(x, u, node, params) -> xdot_component. States in this dict should NOT
+                  appear in the symbolic dynamics dict. Allows mixing symbolic and raw JAX
+                  dynamics for different states.
                 - "nodal_constraints": List of functions with signature
                   f(x, u, node, params) -> residual. Applied to all nodes.
                   Constraints follow g(x,u) <= 0 convention.
@@ -158,6 +162,7 @@ class Problem(ProblemPlotMixin):
             time_dilation_factor_max=time_dilation_factor_max,
             dynamics_prop_extra=dynamics_prop,
             states_prop_extra=states_prop,
+            byof=byof,
         )
 
         # Lower to JAX and CVXPy (byof handling happens inside lower_symbolic_problem)

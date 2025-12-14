@@ -37,7 +37,7 @@ Example:
             print(f"Validation error: {e}")
 """
 
-from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Set, Tuple, Union
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 if TYPE_CHECKING:
     from openscvx.symbolic.time import Time
@@ -525,19 +525,26 @@ def validate_dynamics_dimension(
             )
 
 
-def validate_dynamics_dict(dynamics: Dict[str, Expr], states: List[State]) -> None:
+def validate_dynamics_dict(
+    dynamics: Dict[str, Expr],
+    states: List[State],
+    byof_dynamics: Optional[Dict[str, callable]] = None,
+) -> None:
     """Validate that dynamics dictionary keys match state names exactly.
 
-    Ensures that the dynamics dictionary has exactly the same keys as the state names,
-    with no missing states and no extra keys. This is required when using dictionary-based
-    dynamics specification.
+    Ensures that the dynamics dictionary (combined with optional byof dynamics) has
+    exactly the same keys as the state names, with no missing states, no extra keys,
+    and no overlap between symbolic and byof dynamics.
 
     Args:
         dynamics: Dictionary mapping state names to their dynamics expressions
         states: List of State objects
+        byof_dynamics: Optional dictionary mapping state names to raw JAX functions.
+            States in byof_dynamics should NOT appear in dynamics dict.
 
     Raises:
-        ValueError: If there's a mismatch between state names and dynamics keys
+        ValueError: If there's a mismatch between state names and dynamics keys,
+            or if a state appears in both dynamics and byof_dynamics.
 
     Example:
             x = ox.State("x", shape=(3,))
@@ -547,18 +554,35 @@ def validate_dynamics_dict(dynamics: Dict[str, Expr], states: List[State]) -> No
 
             bad_dynamics = {"x": x * 2}  # Missing "y"
             validate_dynamics_dict(bad_dynamics, [x, y])  # Raises ValueError
+
+            # With byof_dynamics (expert user mode)
+            dynamics = {"x": x * 2}  # Only symbolic for x
+            byof_dynamics = {"y": some_jax_fn}  # Raw JAX for y
+            validate_dynamics_dict(dynamics, [x, y], byof_dynamics)  # OK
     """
     state_names_set = set(state.name for state in states)
-    dynamics_names_set = set(dynamics.keys())
+    symbolic_keys = set(dynamics.keys())
+    byof_keys = set(byof_dynamics.keys()) if byof_dynamics else set()
 
-    if dynamics_names_set != state_names_set:
-        missing_in_dynamics = state_names_set - dynamics_names_set
-        extra_in_dynamics = dynamics_names_set - state_names_set
+    # Check for overlap - a state can't be defined in both
+    overlap = symbolic_keys & byof_keys
+    if overlap:
+        raise ValueError(
+            f"States defined in both symbolic and byof dynamics: {overlap}\n"
+            "Each state must have dynamics in exactly one place."
+        )
+
+    # Check coverage - all states must be covered
+    covered = symbolic_keys | byof_keys
+    missing = state_names_set - covered
+    extra = covered - state_names_set
+
+    if missing or extra:
         error_msg = "Mismatch between state names and dynamics keys.\n"
-        if missing_in_dynamics:
-            error_msg += f"  States missing from dynamics: {missing_in_dynamics}\n"
-        if extra_in_dynamics:
-            error_msg += f"  Extra keys in dynamics: {extra_in_dynamics}\n"
+        if missing:
+            error_msg += f"  States missing from dynamics: {missing}\n"
+        if extra:
+            error_msg += f"  Extra keys in dynamics: {extra}\n"
         raise ValueError(error_msg)
 
 
