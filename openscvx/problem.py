@@ -31,7 +31,6 @@ from openscvx.algorithms import (
     SolverState,
     format_result,
 )
-from openscvx.byof import ByofSpec
 from openscvx.config import (
     Config,
     ConvexSolverConfig,
@@ -42,6 +41,7 @@ from openscvx.config import (
     SimConfig,
 )
 from openscvx.discretization import get_discretization_solver
+from openscvx.expert import ByofSpec
 from openscvx.lowered import LoweredProblem, ParameterDict
 from openscvx.lowered.dynamics import Dynamics
 from openscvx.lowered.jax_constraints import (
@@ -117,7 +117,7 @@ class Problem(ProblemPlotMixin):
             time_dilation_factor_min: Minimum time dilation factor
             time_dilation_factor_max: Maximum time dilation factor
             byof: Expert mode only. Raw JAX functions to bypass symbolic layer.
-                See :class:`openscvx.byof.ByofSpec` for detailed documentation.
+                See :class:`openscvx.expert.ByofSpec` for detailed documentation.
 
         Returns:
             None

@@ -8,7 +8,7 @@ os.environ["EQX_ON_ERROR"] = "nan"
 import openscvx.symbolic.expr.linalg as linalg
 import openscvx.symbolic.expr.spatial as spatial
 import openscvx.symbolic.expr.stl as stl
-from openscvx.byof import ByofSpec
+from openscvx.expert import ByofSpec
 from openscvx.problem import Problem
 from openscvx.symbolic.expr import (
     CTCS,

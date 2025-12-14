@@ -903,7 +903,8 @@ def test_byof():
     import numpy as np
 
     import openscvx as ox
-    from openscvx import ByofSpec, Problem
+    from openscvx import Problem
+    from openscvx.expert import ByofSpec
 
     # Problem parameters
     n = 2
