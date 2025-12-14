@@ -120,6 +120,14 @@ class Problem(ProblemPlotMixin):
                 - "nodal_constraints": List of functions with signature
                   f(x, u, node, params) -> residual. Applied to all nodes.
                   Constraints follow g(x,u) <= 0 convention.
+                - "cross_nodal_constraints": List of functions with signature
+                  f(X, U, params) -> residual. X is (N, n_x), U is (N, n_u).
+                - "ctcs_constraints": List of dicts specifying CTCS penalty functions.
+                  Each dict should have:
+                    - "penalty_fn": f(x, u, node, params) -> scalar penalty value.
+                      This becomes the derivative of a new augmented state.
+                    - "bounds": (min, max) tuple for augmented state (default: (0.0, 1e-4))
+                    - "initial": Initial value for augmented state (default: bounds[0])
 
         Returns:
             None
