@@ -672,9 +672,11 @@ def _contains_node_reference(expr: Expr) -> bool:
 def _apply_byof(
     byof: dict,
     dynamics: Dynamics,
+    dynamics_prop: Dynamics,
     jax_constraints: LoweredJaxConstraints,
     x_unified: "UnifiedState",
-) -> Tuple[Dynamics, LoweredJaxConstraints, "UnifiedState"]:
+    x_prop_unified: "UnifiedState",
+) -> Tuple[Dynamics, Dynamics, LoweredJaxConstraints, "UnifiedState", "UnifiedState"]:
     """Apply bring-your-own-functions (byof) to augment lowered problem.
 
     Handles raw JAX functions provided by expert users, including:
@@ -684,12 +686,14 @@ def _apply_byof(
 
     Args:
         byof: Dict with keys "nodal_constraints", "cross_nodal_constraints", "ctcs_constraints"
-        dynamics: Lowered dynamics to potentially augment
+        dynamics: Lowered optimization dynamics to potentially augment
+        dynamics_prop: Lowered propagation dynamics to potentially augment
         jax_constraints: Lowered JAX constraints to append to
-        x_unified: Unified state interface to potentially augment
+        x_unified: Unified optimization state interface to potentially augment
+        x_prop_unified: Unified propagation state interface to potentially augment
 
     Returns:
-        Tuple of (augmented_dynamics, augmented_jax_constraints, augmented_x_unified)
+        Tuple of (dynamics, dynamics_prop, jax_constraints, x_unified, x_prop_unified)
     """
     import jax.numpy as jnp
 
@@ -742,51 +746,34 @@ def _apply_byof(
         else:
             penalty_func = _PENALTY_FUNCTIONS[penalty_spec]
 
-        # Wrap dynamics to concatenate penalty as new state derivative
-        original_f = dynamics.f
-        original_A = dynamics.A
-        original_B = dynamics.B
-
-        def make_augmented_dynamics(orig_f, orig_A, orig_B, cons_fn, pen_func):
+        def make_augmented_f(orig_f, cons_fn, pen_func):
             """Factory to capture current values in closure."""
-
-            def penalized_fn(x, u, node, params):
-                residual = cons_fn(x, u, node, params)
-                return pen_func(residual)
 
             def augmented_f(x, u, node, params):
                 xdot = orig_f(x, u, node, params)
-                penalty = penalized_fn(x, u, node, params)
+                residual = cons_fn(x, u, node, params)
+                penalty = pen_func(residual)
                 return jnp.concatenate([xdot, jnp.atleast_1d(penalty)])
 
-            def augmented_A(x, u, node, params):
-                A = orig_A(x, u, node, params)
-                # d(penalty)/dx - new row
-                d_penalty_dx = jacfwd(penalized_fn, argnums=0)(x, u, node, params)
-                # Add new column of zeros (augmented state doesn't affect dynamics)
-                n_x = A.shape[0]
-                A_with_col = jnp.concatenate([A, jnp.zeros((n_x, 1))], axis=1)
-                # Add new row for penalty gradient
-                new_row = jnp.concatenate(
-                    [jnp.atleast_1d(d_penalty_dx).flatten(), jnp.array([0.0])]
-                )
-                return jnp.concatenate([A_with_col, new_row[None, :]], axis=0)
+            return augmented_f
 
-            def augmented_B(x, u, node, params):
-                B = orig_B(x, u, node, params)
-                # d(penalty)/du - new row
-                d_penalty_du = jacfwd(penalized_fn, argnums=1)(x, u, node, params)
-                new_row = jnp.atleast_1d(d_penalty_du).flatten()
-                return jnp.concatenate([B, new_row[None, :]], axis=0)
-
-            return augmented_f, augmented_A, augmented_B
-
-        aug_f, aug_A, aug_B = make_augmented_dynamics(
-            original_f, original_A, original_B, constraint_fn, penalty_func
+        # Augment optimization dynamics
+        aug_f = make_augmented_f(dynamics.f, constraint_fn, penalty_func)
+        dynamics = Dynamics(
+            f=aug_f,
+            A=jacfwd(aug_f, argnums=0),
+            B=jacfwd(aug_f, argnums=1),
         )
-        dynamics = Dynamics(f=aug_f, A=aug_A, B=aug_B)
 
-        # Update unified state with new augmented state
+        # Augment propagation dynamics
+        aug_f_prop = make_augmented_f(dynamics_prop.f, constraint_fn, penalty_func)
+        dynamics_prop = Dynamics(
+            f=aug_f_prop,
+            A=jacfwd(aug_f_prop, argnums=0),
+            B=jacfwd(aug_f_prop, argnums=1),
+        )
+
+        # Update both unified states with new augmented state
         x_unified.append(
             min=bounds[0],
             max=bounds[1],
@@ -795,8 +782,16 @@ def _apply_byof(
             final=0.0,
             augmented=True,
         )
+        x_prop_unified.append(
+            min=bounds[0],
+            max=bounds[1],
+            guess=initial,
+            initial=initial,
+            final=0.0,
+            augmented=True,
+        )
 
-    return dynamics, jax_constraints, x_unified
+    return dynamics, dynamics_prop, jax_constraints, x_unified, x_prop_unified
 
 
 def lower_symbolic_problem(
@@ -856,8 +851,8 @@ def lower_symbolic_problem(
     # This must happen BEFORE CVXPy variable creation since CTCS constraints
     # augment the state dimension
     if byof is not None:
-        dynamics, jax_constraints, x_unified = _apply_byof(
-            byof, dynamics, jax_constraints, x_unified
+        dynamics, dynamics_prop, jax_constraints, x_unified, x_prop_unified = _apply_byof(
+            byof, dynamics, dynamics_prop, jax_constraints, x_unified, x_prop_unified
         )
 
     # Create CVXPy variables and lower convex constraints
