@@ -704,6 +704,12 @@ def _apply_byof(
     """
     import jax.numpy as jnp
 
+    # Validate byof keys
+    valid_keys = {"dynamics", "nodal_constraints", "cross_nodal_constraints", "ctcs_constraints"}
+    invalid_keys = set(byof.keys()) - valid_keys
+    if invalid_keys:
+        raise ValueError(f"Unknown byof keys: {invalid_keys}. Valid keys: {valid_keys}")
+
     # Handle byof dynamics by splicing in raw JAX functions at the correct slices
     byof_dynamics = byof.get("dynamics", {})
     if byof_dynamics:
