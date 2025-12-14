@@ -160,6 +160,13 @@ class Problem(ProblemPlotMixin):
                     nodes=None,  # Apply to all nodes
                 )
                 self._lowered.jax_constraints.nodal.append(constraint)
+            for fn in raw_jax.get("cross_nodal_constraints", []):
+                constraint = LoweredCrossNodeConstraint(
+                    func=fn,
+                    grad_g_X=jax.jacfwd(fn, argnums=0),
+                    grad_g_U=jax.jacfwd(fn, argnums=1),
+                )
+                self._lowered.jax_constraints.cross_node.append(constraint)
 
         # Store parameters in two forms:
         self._parameters = self.symbolic.parameters  # Plain dict for JAX functions
