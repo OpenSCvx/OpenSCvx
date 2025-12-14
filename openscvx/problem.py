@@ -81,6 +81,7 @@ class Problem(ProblemPlotMixin):
         controls: List[Control],
         N: int,
         time: Time,
+        *,
         dynamics_prop: Optional[dict] = None,
         states_prop: Optional[List[State]] = None,
         licq_min=0.0,
