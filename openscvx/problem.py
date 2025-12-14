@@ -18,7 +18,7 @@ import os
 import queue
 import threading
 import time
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Callable, List, Optional, Union
 
 import jax
 
@@ -86,6 +86,7 @@ class Problem(ProblemPlotMixin):
         licq_max=1e-4,
         time_dilation_factor_min=0.3,
         time_dilation_factor_max=3.0,
+        raw_jax_constraints: Optional[List[Callable]] = None,
     ):
         """
         The primary class in charge of compiling and exporting the solvers
@@ -113,6 +114,11 @@ class Problem(ProblemPlotMixin):
             licq_max: Maximum LICQ constraint value
             time_dilation_factor_min: Minimum time dilation factor
             time_dilation_factor_max: Maximum time dilation factor
+            raw_jax_constraints (List[Callable], optional): List of raw JAX constraint
+                functions for expert users. Each function must have signature
+                f(x, u, node, params) -> residual, where x and u are single-node vectors.
+                The user is responsible for correct indexing into the unified state/control.
+                Constraints follow g(x,u) <= 0 convention. Applied to all nodes.
 
         Returns:
             None
@@ -142,6 +148,17 @@ class Problem(ProblemPlotMixin):
 
         # Lower to JAX and CVXPy
         self._lowered: LoweredProblem = lower_symbolic_problem(self.symbolic)
+
+        # Append raw JAX constraints (expert user mode)
+        if raw_jax_constraints is not None:
+            for fn in raw_jax_constraints:
+                constraint = LoweredNodalConstraint(
+                    func=jax.vmap(fn, in_axes=(0, 0, None, None)),
+                    grad_g_x=jax.vmap(jax.jacfwd(fn, argnums=0), in_axes=(0, 0, None, None)),
+                    grad_g_u=jax.vmap(jax.jacfwd(fn, argnums=1), in_axes=(0, 0, None, None)),
+                    nodes=None,  # Apply to all nodes
+                )
+                self._lowered.jax_constraints.nodal.append(constraint)
 
         # Store parameters in two forms:
         self._parameters = self.symbolic.parameters  # Plain dict for JAX functions
