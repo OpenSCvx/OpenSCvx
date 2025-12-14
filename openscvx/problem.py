@@ -86,7 +86,7 @@ class Problem(ProblemPlotMixin):
         licq_max=1e-4,
         time_dilation_factor_min=0.3,
         time_dilation_factor_max=3.0,
-        raw_jax: Optional[dict] = None,
+        byof: Optional[dict] = None,
     ):
         """
         The primary class in charge of compiling and exporting the solvers
@@ -114,8 +114,8 @@ class Problem(ProblemPlotMixin):
             licq_max: Maximum LICQ constraint value
             time_dilation_factor_min: Minimum time dilation factor
             time_dilation_factor_max: Maximum time dilation factor
-            raw_jax (dict, optional): Raw JAX functions for expert users who want to
-                bypass the symbolic layer. The user is responsible for correct indexing
+            byof (dict, optional): Bring-your-own functions. Raw JAX functions for expert users who
+                want to bypass the symbolic layer. The user is responsible for correct indexing
                 into the unified state/control vectors. Supported keys:
                 - "nodal_constraints": List of functions with signature
                   f(x, u, node, params) -> residual. Applied to all nodes.
@@ -164,8 +164,8 @@ class Problem(ProblemPlotMixin):
         self._lowered: LoweredProblem = lower_symbolic_problem(self.symbolic)
 
         # Append raw JAX functions (expert user mode)
-        if raw_jax is not None:
-            for fn in raw_jax.get("nodal_constraints", []):
+        if byof is not None:
+            for fn in byof.get("nodal_constraints", []):
                 constraint = LoweredNodalConstraint(
                     func=jax.vmap(fn, in_axes=(0, 0, None, None)),
                     grad_g_x=jax.vmap(jax.jacfwd(fn, argnums=0), in_axes=(0, 0, None, None)),
@@ -173,7 +173,7 @@ class Problem(ProblemPlotMixin):
                     nodes=None,  # Apply to all nodes
                 )
                 self._lowered.jax_constraints.nodal.append(constraint)
-            for fn in raw_jax.get("cross_nodal_constraints", []):
+            for fn in byof.get("cross_nodal_constraints", []):
                 constraint = LoweredCrossNodeConstraint(
                     func=fn,
                     grad_g_X=jax.jacfwd(fn, argnums=0),
@@ -201,7 +201,7 @@ class Problem(ProblemPlotMixin):
                 "huber": _penalty_huber,
             }
 
-            for i, ctcs_spec in enumerate(raw_jax.get("ctcs_constraints", [])):
+            for i, ctcs_spec in enumerate(byof.get("ctcs_constraints", [])):
                 constraint_fn = ctcs_spec["constraint_fn"]
                 bounds = ctcs_spec.get("bounds", (0.0, 1e-4))
                 initial = ctcs_spec.get("initial", bounds[0])
