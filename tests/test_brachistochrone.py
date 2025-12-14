@@ -879,6 +879,151 @@ def test_propagation():
     jax.clear_caches()
 
 
+def test_byof():
+    """
+    Test brachistochrone using byof (bring-your-own-functions) for expert users.
+
+    This test demonstrates using raw JAX functions instead of the symbolic layer
+    for defining constraints. The byof parameter allows expert users to bypass
+    the symbolic layer and directly specify JAX functions for:
+    - nodal_constraints: Point-wise constraints at each node
+    - cross_nodal_constraints: Constraints coupling multiple nodes
+    - ctcs_constraints: Continuous-time constraint satisfaction
+
+    The unified state vector after augmentation is:
+    - x[0], x[1]: position (x, y)
+    - x[2]: velocity
+    - x[3]: time
+
+    The unified control vector after augmentation is:
+    - u[0]: theta (angle)
+    - u[1]: time_dilation
+    """
+    import jax.numpy as jnp
+    import numpy as np
+
+    import openscvx as ox
+    from openscvx import Problem
+
+    # Problem parameters
+    n = 2
+    total_time = 2.0
+    g = 9.81
+
+    # Boundary conditions
+    x0, y0 = 0.0, 10.0
+    x1, y1 = 10.0, 5.0
+
+    # Define state components
+    position = ox.State("position", shape=(2,))
+    position.max = np.array([10.0, 10.0])
+    position.min = np.array([0.0, 0.0])
+    position.initial = np.array([x0, y0])
+    position.final = [x1, y1]
+    position.guess = np.linspace(position.initial, position.final, n)
+
+    velocity = ox.State("velocity", shape=(1,))
+    velocity.max = np.array([10.0])
+    velocity.min = np.array([0.0])
+    velocity.initial = np.array([0.0])
+    velocity.final = [("free", 10.0)]
+    velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
+
+    # Define control
+    theta = ox.Control("theta", shape=(1,))
+    theta.max = np.array([100.5 * jnp.pi / 180])
+    theta.min = np.array([0.0])
+    theta.guess = np.linspace(5 * jnp.pi / 180, 100.5 * jnp.pi / 180, n).reshape(-1, 1)
+
+    states = [position, velocity]
+    controls = [theta]
+
+    # Define dynamics
+    dynamics = {
+        "position": ox.Concat(
+            velocity[0] * ox.Sin(theta[0]),
+            -velocity[0] * ox.Cos(theta[0]),
+        ),
+        "velocity": g * ox.Cos(theta[0]),
+    }
+
+    time = ox.Time(
+        initial=0.0,
+        final=("minimize", total_time),
+        min=0.0,
+        max=total_time,
+    )
+
+    # Define box constraints using byof instead of symbolic layer
+    # Unified state indices: [pos_x, pos_y, vel, time]
+    # Constraints follow g(x, u) <= 0 convention
+    byof = {
+        "ctcs_constraints": [
+            # position[0] <= 10.0  =>  position[0] - 10.0 <= 0
+            {"constraint_fn": lambda x, u, node, params: x[0] - 10.0, "penalty": "square"},
+            # position[0] >= 0.0  =>  -position[0] <= 0  =>  0.0 - position[0] <= 0
+            {"constraint_fn": lambda x, u, node, params: 0.0 - x[0], "penalty": "square"},
+            # position[1] <= 10.0
+            {"constraint_fn": lambda x, u, node, params: x[1] - 10.0, "penalty": "square"},
+            # position[1] >= 0.0
+            {"constraint_fn": lambda x, u, node, params: 0.0 - x[1], "penalty": "square"},
+            # velocity[0] <= 10.0
+            {"constraint_fn": lambda x, u, node, params: x[2] - 10.0, "penalty": "square"},
+            # velocity[0] >= 0.0
+            {"constraint_fn": lambda x, u, node, params: 0.0 - x[2], "penalty": "square"},
+        ],
+    }
+
+    problem = Problem(
+        dynamics=dynamics,
+        states=states,
+        controls=controls,
+        time=time,
+        constraints=[],  # No symbolic constraints - using byof instead
+        N=n,
+        licq_max=1e-8,
+        byof=byof,
+    )
+
+    problem.settings.prp.dt = 0.01
+    problem.settings.cvx.solver_args = {"abstol": 1e-6, "reltol": 1e-9}
+    problem.settings.scp.w_tr = 1e1
+    problem.settings.scp.lam_cost = 1e0
+    problem.settings.scp.lam_vc = 1e1
+    problem.settings.scp.uniform_time_grid = True
+    problem.settings.sim.save_compiled = False
+
+    # Disable printing for cleaner test output
+    if hasattr(problem.settings, "dev"):
+        problem.settings.dev.printing = False
+
+    # Run optimization
+    problem.initialize()
+    result = problem.solve()
+    result = problem.post_process()
+
+    # Check convergence
+    assert result["converged"], "BYOF problem failed to converge"
+
+    # Compare to analytical solution
+    comparison = compare_trajectory_to_analytical(
+        result.t_full,
+        result.trajectory["position"],
+        result.trajectory["velocity"],
+        x0,
+        y0,
+        x1,
+        y1,
+        g,
+    )
+
+    _print_comparison_metrics(comparison, "Brachistochrone BYOF")
+    _assert_brachistochrone_accuracy(comparison, problem, result)
+
+    # Clean up JAX caches
+    jax.clear_caches()
+
+
 def test_idempotency():
     """
     Test that each step of the pipeline is idempotent.
