@@ -903,7 +903,7 @@ def test_byof():
     import numpy as np
 
     import openscvx as ox
-    from openscvx import Problem
+    from openscvx import ByofSpec, Problem
 
     # Problem parameters
     n = 2
@@ -957,7 +957,7 @@ def test_byof():
     # Define box constraints using byof instead of symbolic layer
     # Unified state indices: [pos_x, pos_y, vel, time]
     # Constraints follow g(x, u) <= 0 convention
-    byof = {
+    byof: ByofSpec = {
         "ctcs_constraints": [
             # position[0] <= 10.0  =>  position[0] - 10.0 <= 0
             {"constraint_fn": lambda x, u, node, params: x[0] - 10.0, "penalty": "square"},

@@ -31,6 +31,7 @@ from openscvx.algorithms import (
     SolverState,
     format_result,
 )
+from openscvx.byof import ByofSpec
 from openscvx.config import (
     Config,
     ConvexSolverConfig,
@@ -86,7 +87,7 @@ class Problem(ProblemPlotMixin):
         licq_max=1e-4,
         time_dilation_factor_min=0.3,
         time_dilation_factor_max=3.0,
-        byof: Optional[dict] = None,
+        byof: Optional[ByofSpec] = None,
     ):
         """
         The primary class in charge of compiling and exporting the solvers
@@ -114,29 +115,8 @@ class Problem(ProblemPlotMixin):
             licq_max: Maximum LICQ constraint value
             time_dilation_factor_min: Minimum time dilation factor
             time_dilation_factor_max: Maximum time dilation factor
-            byof (dict, optional): Bring-your-own functions. Raw JAX functions for expert users who
-                want to bypass the symbolic layer. The user is responsible for correct indexing
-                into the unified state/control vectors. Supported keys:
-                - "dynamics": Dict mapping state names to raw JAX functions with signature
-                  f(x, u, node, params) -> xdot_component. States in this dict should NOT
-                  appear in the symbolic dynamics dict. Allows mixing symbolic and raw JAX
-                  dynamics for different states.
-                - "nodal_constraints": List of functions with signature
-                  f(x, u, node, params) -> residual. Applied to all nodes.
-                  Constraints follow g(x,u) <= 0 convention.
-                - "cross_nodal_constraints": List of functions with signature
-                  f(X, U, params) -> residual. X is (N, n_x), U is (N, n_u).
-                - "ctcs_constraints": List of dicts specifying CTCS constraints.
-                  Each dict should have:
-                    - "constraint_fn": f(x, u, node, params) -> scalar residual.
-                      Follows g(x,u) <= 0 convention.
-                    - "penalty": Penalty function to apply to the residual. Can be:
-                      - "square" (default): max(r, 0)^2
-                      - "l1": max(r, 0)
-                      - "huber": Huber penalty
-                      - callable: Custom function r -> penalty
-                    - "bounds": (min, max) tuple for augmented state (default: (0.0, 1e-4))
-                    - "initial": Initial value for augmented state (default: bounds[0])
+            byof: Expert mode only. Raw JAX functions to bypass symbolic layer.
+                See :class:`openscvx.byof.ByofSpec` for detailed documentation.
 
         Returns:
             None
