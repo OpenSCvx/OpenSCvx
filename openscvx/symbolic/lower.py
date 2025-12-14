@@ -52,7 +52,7 @@ Example:
         # Now have executable JAX functions with Jacobians
 """
 
-from typing import TYPE_CHECKING, Any, List, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Sequence, Tuple, Union
 
 import cvxpy as cp
 import jax
@@ -72,6 +72,7 @@ from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import Expr, NodeReference
 
 if TYPE_CHECKING:
+    from openscvx.lowered.unified import UnifiedState
     from openscvx.symbolic.problem import SymbolicProblem
 
 __all__ = [
@@ -668,7 +669,139 @@ def _contains_node_reference(expr: Expr) -> bool:
     return False
 
 
-def lower_symbolic_problem(problem: "SymbolicProblem") -> LoweredProblem:
+def _apply_byof(
+    byof: dict,
+    dynamics: Dynamics,
+    jax_constraints: LoweredJaxConstraints,
+    x_unified: "UnifiedState",
+) -> Tuple[Dynamics, LoweredJaxConstraints, "UnifiedState"]:
+    """Apply bring-your-own-functions (byof) to augment lowered problem.
+
+    Handles raw JAX functions provided by expert users, including:
+    - nodal_constraints: Point-wise constraints at each node
+    - cross_nodal_constraints: Constraints coupling multiple nodes
+    - ctcs_constraints: Continuous-time constraint satisfaction via dynamics augmentation
+
+    Args:
+        byof: Dict with keys "nodal_constraints", "cross_nodal_constraints", "ctcs_constraints"
+        dynamics: Lowered dynamics to potentially augment
+        jax_constraints: Lowered JAX constraints to append to
+        x_unified: Unified state interface to potentially augment
+
+    Returns:
+        Tuple of (augmented_dynamics, augmented_jax_constraints, augmented_x_unified)
+    """
+    import jax.numpy as jnp
+
+    # Handle nodal constraints
+    for fn in byof.get("nodal_constraints", []):
+        constraint = LoweredNodalConstraint(
+            func=jax.vmap(fn, in_axes=(0, 0, None, None)),
+            grad_g_x=jax.vmap(jacfwd(fn, argnums=0), in_axes=(0, 0, None, None)),
+            grad_g_u=jax.vmap(jacfwd(fn, argnums=1), in_axes=(0, 0, None, None)),
+            nodes=None,  # Apply to all nodes
+        )
+        jax_constraints.nodal.append(constraint)
+
+    # Handle cross-nodal constraints
+    for fn in byof.get("cross_nodal_constraints", []):
+        constraint = LoweredCrossNodeConstraint(
+            func=fn,
+            grad_g_X=jacfwd(fn, argnums=0),
+            grad_g_U=jacfwd(fn, argnums=1),
+        )
+        jax_constraints.cross_node.append(constraint)
+
+    # Handle CTCS constraints by augmenting dynamics
+    # Built-in penalty functions
+    def _penalty_square(r):
+        return jnp.maximum(r, 0.0) ** 2
+
+    def _penalty_l1(r):
+        return jnp.maximum(r, 0.0)
+
+    def _penalty_huber(r, delta=1.0):
+        abs_r = jnp.maximum(r, 0.0)
+        return jnp.where(abs_r <= delta, 0.5 * abs_r**2, delta * (abs_r - 0.5 * delta))
+
+    _PENALTY_FUNCTIONS = {
+        "square": _penalty_square,
+        "l1": _penalty_l1,
+        "huber": _penalty_huber,
+    }
+
+    for i, ctcs_spec in enumerate(byof.get("ctcs_constraints", [])):
+        constraint_fn = ctcs_spec["constraint_fn"]
+        bounds = ctcs_spec.get("bounds", (0.0, 1e-4))
+        initial = ctcs_spec.get("initial", bounds[0])
+
+        # Get penalty function (default: squared positive part)
+        penalty_spec = ctcs_spec.get("penalty", "square")
+        if callable(penalty_spec):
+            penalty_func = penalty_spec
+        else:
+            penalty_func = _PENALTY_FUNCTIONS[penalty_spec]
+
+        # Wrap dynamics to concatenate penalty as new state derivative
+        original_f = dynamics.f
+        original_A = dynamics.A
+        original_B = dynamics.B
+
+        def make_augmented_dynamics(orig_f, orig_A, orig_B, cons_fn, pen_func):
+            """Factory to capture current values in closure."""
+
+            def penalized_fn(x, u, node, params):
+                residual = cons_fn(x, u, node, params)
+                return pen_func(residual)
+
+            def augmented_f(x, u, node, params):
+                xdot = orig_f(x, u, node, params)
+                penalty = penalized_fn(x, u, node, params)
+                return jnp.concatenate([xdot, jnp.atleast_1d(penalty)])
+
+            def augmented_A(x, u, node, params):
+                A = orig_A(x, u, node, params)
+                # d(penalty)/dx - new row
+                d_penalty_dx = jacfwd(penalized_fn, argnums=0)(x, u, node, params)
+                # Add new column of zeros (augmented state doesn't affect dynamics)
+                n_x = A.shape[0]
+                A_with_col = jnp.concatenate([A, jnp.zeros((n_x, 1))], axis=1)
+                # Add new row for penalty gradient
+                new_row = jnp.concatenate(
+                    [jnp.atleast_1d(d_penalty_dx).flatten(), jnp.array([0.0])]
+                )
+                return jnp.concatenate([A_with_col, new_row[None, :]], axis=0)
+
+            def augmented_B(x, u, node, params):
+                B = orig_B(x, u, node, params)
+                # d(penalty)/du - new row
+                d_penalty_du = jacfwd(penalized_fn, argnums=1)(x, u, node, params)
+                new_row = jnp.atleast_1d(d_penalty_du).flatten()
+                return jnp.concatenate([B, new_row[None, :]], axis=0)
+
+            return augmented_f, augmented_A, augmented_B
+
+        aug_f, aug_A, aug_B = make_augmented_dynamics(
+            original_f, original_A, original_B, constraint_fn, penalty_func
+        )
+        dynamics = Dynamics(f=aug_f, A=aug_A, B=aug_B)
+
+        # Update unified state with new augmented state
+        x_unified.append(
+            min=bounds[0],
+            max=bounds[1],
+            guess=initial,
+            initial=initial,
+            final=0.0,
+            augmented=True,
+        )
+
+    return dynamics, jax_constraints, x_unified
+
+
+def lower_symbolic_problem(
+    problem: "SymbolicProblem", byof: Optional[dict] = None
+) -> LoweredProblem:
     """Lower symbolic problem specification to executable JAX and CVXPy code.
 
     This is the main orchestrator for converting a preprocessed SymbolicProblem
@@ -682,6 +815,10 @@ def lower_symbolic_problem(problem: "SymbolicProblem") -> LoweredProblem:
     Args:
         problem: Preprocessed SymbolicProblem from preprocess_symbolic_problem().
             Must have is_preprocessed == True.
+        byof: Optional dict of raw JAX functions for expert users. Supported keys:
+            - "nodal_constraints": List of f(x, u, node, params) -> residual
+            - "cross_nodal_constraints": List of f(X, U, params) -> residual
+            - "ctcs_constraints": List of dicts with "constraint_fn", "penalty", "bounds"
 
     Returns:
         LoweredProblem dataclass containing lowered problem
@@ -714,6 +851,14 @@ def lower_symbolic_problem(problem: "SymbolicProblem") -> LoweredProblem:
 
     # Lower non-convex constraints to JAX
     jax_constraints = _lower_jax_constraints(problem.constraints)
+
+    # Handle byof (bring-your-own-functions) for expert users
+    # This must happen BEFORE CVXPy variable creation since CTCS constraints
+    # augment the state dimension
+    if byof is not None:
+        dynamics, jax_constraints, x_unified = _apply_byof(
+            byof, dynamics, jax_constraints, x_unified
+        )
 
     # Create CVXPy variables and lower convex constraints
     ocp_vars, cvxpy_constraints, cvxpy_params = _lower_cvxpy(
