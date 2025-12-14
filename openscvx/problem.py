@@ -122,10 +122,15 @@ class Problem(ProblemPlotMixin):
                   Constraints follow g(x,u) <= 0 convention.
                 - "cross_nodal_constraints": List of functions with signature
                   f(X, U, params) -> residual. X is (N, n_x), U is (N, n_u).
-                - "ctcs_constraints": List of dicts specifying CTCS penalty functions.
+                - "ctcs_constraints": List of dicts specifying CTCS constraints.
                   Each dict should have:
-                    - "penalty_fn": f(x, u, node, params) -> scalar penalty value.
-                      This becomes the derivative of a new augmented state.
+                    - "constraint_fn": f(x, u, node, params) -> scalar residual.
+                      Follows g(x,u) <= 0 convention.
+                    - "penalty": Penalty function to apply to the residual. Can be:
+                      - "square" (default): max(r, 0)^2
+                      - "l1": max(r, 0)
+                      - "huber": Huber penalty
+                      - callable: Custom function r -> penalty
                     - "bounds": (min, max) tuple for augmented state (default: (0.0, 1e-4))
                     - "initial": Initial value for augmented state (default: bounds[0])
 
@@ -177,29 +182,58 @@ class Problem(ProblemPlotMixin):
                 self._lowered.jax_constraints.cross_node.append(constraint)
 
             # Handle CTCS constraints by augmenting dynamics
+            # Built-in penalty functions for convenience
+            import jax.numpy as jnp
+
+            def _penalty_square(r):
+                return jnp.maximum(r, 0.0) ** 2
+
+            def _penalty_l1(r):
+                return jnp.maximum(r, 0.0)
+
+            def _penalty_huber(r, delta=1.0):
+                abs_r = jnp.maximum(r, 0.0)
+                return jnp.where(abs_r <= delta, 0.5 * abs_r**2, delta * (abs_r - 0.5 * delta))
+
+            _PENALTY_FUNCTIONS = {
+                "square": _penalty_square,
+                "l1": _penalty_l1,
+                "huber": _penalty_huber,
+            }
+
             for i, ctcs_spec in enumerate(raw_jax.get("ctcs_constraints", [])):
-                penalty_fn = ctcs_spec["penalty_fn"]
+                constraint_fn = ctcs_spec["constraint_fn"]
                 bounds = ctcs_spec.get("bounds", (0.0, 1e-4))
                 initial = ctcs_spec.get("initial", bounds[0])
+
+                # Get penalty function (default: squared positive part)
+                penalty_spec = ctcs_spec.get("penalty", "square")
+                if callable(penalty_spec):
+                    penalty_func = penalty_spec
+                else:
+                    penalty_func = _PENALTY_FUNCTIONS[penalty_spec]
 
                 # Wrap dynamics to concatenate penalty as new state derivative
                 original_f = self._lowered.dynamics.f
                 original_A = self._lowered.dynamics.A
                 original_B = self._lowered.dynamics.B
 
-                def make_augmented_dynamics(orig_f, orig_A, orig_B, pen_fn):
+                def make_augmented_dynamics(orig_f, orig_A, orig_B, cons_fn, pen_func):
                     """Factory to capture current values in closure."""
-                    import jax.numpy as jnp
+
+                    def penalized_fn(x, u, node, params):
+                        residual = cons_fn(x, u, node, params)
+                        return pen_func(residual)
 
                     def augmented_f(x, u, node, params):
                         xdot = orig_f(x, u, node, params)
-                        penalty = pen_fn(x, u, node, params)
+                        penalty = penalized_fn(x, u, node, params)
                         return jnp.concatenate([xdot, jnp.atleast_1d(penalty)])
 
                     def augmented_A(x, u, node, params):
                         A = orig_A(x, u, node, params)
                         # d(penalty)/dx - new row
-                        d_penalty_dx = jax.jacfwd(pen_fn, argnums=0)(x, u, node, params)
+                        d_penalty_dx = jax.jacfwd(penalized_fn, argnums=0)(x, u, node, params)
                         # Add new column of zeros (augmented state doesn't affect dynamics)
                         n_x = A.shape[0]
                         A_with_col = jnp.concatenate([A, jnp.zeros((n_x, 1))], axis=1)
@@ -212,14 +246,14 @@ class Problem(ProblemPlotMixin):
                     def augmented_B(x, u, node, params):
                         B = orig_B(x, u, node, params)
                         # d(penalty)/du - new row
-                        d_penalty_du = jax.jacfwd(pen_fn, argnums=1)(x, u, node, params)
+                        d_penalty_du = jax.jacfwd(penalized_fn, argnums=1)(x, u, node, params)
                         new_row = jnp.atleast_1d(d_penalty_du).flatten()
                         return jnp.concatenate([B, new_row[None, :]], axis=0)
 
                     return augmented_f, augmented_A, augmented_B
 
                 aug_f, aug_A, aug_B = make_augmented_dynamics(
-                    original_f, original_A, original_B, penalty_fn
+                    original_f, original_A, original_B, constraint_fn, penalty_func
                 )
                 self._lowered.dynamics = Dynamics(f=aug_f, A=aug_A, B=aug_B)
 
