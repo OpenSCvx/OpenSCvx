@@ -290,6 +290,18 @@ def validate_byof(
                     f"or a callable, got {penalty_spec!r}"
                 )
 
+        # Validate idx if provided
+        if "idx" in ctcs_spec:
+            idx = ctcs_spec["idx"]
+            if not isinstance(idx, int):
+                raise TypeError(
+                    f"byof ctcs_constraints[{i}]['idx'] must be an integer, got {type(idx)}"
+                )
+            if idx < 0:
+                raise ValueError(
+                    f"byof ctcs_constraints[{i}]['idx'] must be non-negative, got {idx}"
+                )
+
         # Validate bounds if provided
         if "bounds" in ctcs_spec:
             bounds = ctcs_spec["bounds"]

@@ -160,6 +160,18 @@ class CtcsConstraintSpec(TypedDict, total=False):
         bounds: (min, max) bounds for augmented state accumulating penalties.
             Default: (0.0, 1e-4). Max acts as soft constraint on total violation.
         initial: Initial value for augmented state. Default: bounds[0] (usually 0.0).
+        idx: Constraint group index for sharing augmented states (default: 0).
+            All CTCS constraints (symbolic and byof) with the same idx share a single
+            augmented state. Their penalties are summed together. Use different idx values
+            to track different types of violations separately.
+
+            **Important**: If symbolic CTCS constraints exist with idx values [0, 1, 2],
+            then byof idx must either:
+            - Match an existing idx (e.g., 0, 1, or 2) to add to that augmented state
+            - Be sequential after them (e.g., 3, 4, 5) to create new augmented states
+
+            You cannot use idx values that create gaps (e.g., if symbolic has [0, 1],
+            you cannot use byof idx=3 without also using idx=2).
 
     Example:
         Enforce position[0] <= 10.0 continuously::
@@ -170,6 +182,31 @@ class CtcsConstraintSpec(TypedDict, total=False):
                 "penalty": "square",
                 "bounds": (0.0, 1e-4),
                 "initial": 0.0,
+                "idx": 0,  # Groups with other constraints having idx=0
+            }
+
+        Multiple constraints sharing an augmented state::
+
+            # If symbolic CTCS already has idx=[0, 1], then:
+
+            byof = {
+                "ctcs_constraints": [
+                    # Add to existing symbolic idx=0 augmented state
+                    {
+                        "constraint_fn": lambda x, u, node, params: x[pos.slice][0] - 10.0,
+                        "idx": 0,  # Shares with symbolic idx=0
+                    },
+                    # Add to existing symbolic idx=1 augmented state
+                    {
+                        "constraint_fn": lambda x, u, node, params: x[vel.slice][0] - 5.0,
+                        "idx": 1,  # Shares with symbolic idx=1
+                    },
+                    # Create NEW augmented state (sequential after symbolic)
+                    {
+                        "constraint_fn": lambda x, u, node, params: x[pos.slice][1] - 8.0,
+                        "idx": 2,  # New state (symbolic has 0,1, so next is 2)
+                    },
+                ]
             }
     """
 
@@ -177,6 +214,7 @@ class CtcsConstraintSpec(TypedDict, total=False):
     penalty: PenaltyFunction
     bounds: Tuple[float, float]
     initial: float
+    idx: int
 
 
 class ByofSpec(TypedDict, total=False):

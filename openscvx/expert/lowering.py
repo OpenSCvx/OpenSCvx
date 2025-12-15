@@ -168,82 +168,184 @@ def apply_byof(
         "huber": _penalty_huber,
     }
 
-    for i, ctcs_spec in enumerate(byof.get("ctcs_constraints", [])):
-        constraint_fn = ctcs_spec["constraint_fn"]
-        bounds = ctcs_spec.get("bounds", (0.0, 1e-4))
-        initial = ctcs_spec.get("initial", bounds[0])
+    # Determine which symbolic CTCS idx values already exist
+    # Symbolic augmented states are named "_ctcs_aug_{i}" where i is sequential
+    # and corresponds to sorted symbolic idx values (0, 1, 2, ...)
+    symbolic_ctcs_idx = []
+    for state in states:
+        if state.name.startswith("_ctcs_aug_"):
+            try:
+                aug_idx = int(state.name.split("_")[-1])
+                symbolic_ctcs_idx.append(aug_idx)
+            except (ValueError, IndexError):
+                pass
 
-        # Get penalty function (default: squared positive part)
-        penalty_spec = ctcs_spec.get("penalty", "square")
-        if callable(penalty_spec):
-            penalty_func = penalty_spec
+    # Symbolic CTCS creates augmented states with sequential idx: 0, 1, 2, ...
+    # so max_symbolic_idx = len(symbolic_ctcs_idx) - 1 (or -1 if none exist)
+    max_symbolic_idx = len(symbolic_ctcs_idx) - 1 if symbolic_ctcs_idx else -1
+
+    # Build idx -> augmented_state_slice mapping for existing symbolic CTCS
+    # Augmented states appear after regular states in the unified vector
+    # We'll determine the slice by finding the state in the states list
+    idx_to_aug_slice = {}
+    for state in states:
+        if state.name.startswith("_ctcs_aug_"):
+            try:
+                aug_idx = int(state.name.split("_")[-1])
+                # The actual idx value IS the sequential index for symbolic CTCS
+                # (they're created with idx 0, 1, 2, ... in sorted order)
+                idx_to_aug_slice[aug_idx] = state._slice
+            except (ValueError, IndexError, AttributeError):
+                pass
+
+    # Group BYOF CTCS constraints by idx (default to 0)
+    byof_ctcs_groups = {}
+    for ctcs_spec in byof.get("ctcs_constraints", []):
+        idx = ctcs_spec.get("idx", 0)
+        if idx not in byof_ctcs_groups:
+            byof_ctcs_groups[idx] = []
+        byof_ctcs_groups[idx].append(ctcs_spec)
+
+    # Validate that byof idx values don't create gaps
+    # All idx must form contiguous sequence: [0, 1, 2, ..., max_idx]
+    if byof_ctcs_groups:
+        all_idx = sorted(set(range(max_symbolic_idx + 1)) | set(byof_ctcs_groups.keys()))
+        expected_idx = list(range(len(all_idx)))
+        if all_idx != expected_idx:
+            raise ValueError(
+                f"BYOF CTCS idx values create non-contiguous sequence. "
+                f"Symbolic CTCS has idx=[{', '.join(map(str, range(max_symbolic_idx + 1)))}], "
+                f"combined with byof idx={sorted(byof_ctcs_groups.keys())} gives {all_idx}. "
+                f"Expected contiguous sequence {expected_idx}. "
+                f"Byof idx must either match existing symbolic idx or be sequential after them."
+            )
+
+    # Process each idx group
+    for idx in sorted(byof_ctcs_groups.keys()):
+        specs = byof_ctcs_groups[idx]
+
+        # Collect all penalty functions for this idx
+        penalty_fns = []
+        for spec in specs:
+            constraint_fn = spec["constraint_fn"]
+            penalty_spec = spec.get("penalty", "square")
+            if callable(penalty_spec):
+                penalty_func = penalty_spec
+            else:
+                penalty_func = _PENALTY_FUNCTIONS[penalty_spec]
+
+            # Create a combined constraint+penalty function
+            def _make_penalty_fn(cons_fn, pen_func):
+                """Factory to capture constraint and penalty functions."""
+
+                def penalty_fn(x, u, node, params):
+                    residual = cons_fn(x, u, node, params)
+                    return pen_func(residual)
+
+                return penalty_fn
+
+            penalty_fns.append(_make_penalty_fn(constraint_fn, penalty_func))
+
+        if idx in idx_to_aug_slice:
+            # This idx already exists from symbolic CTCS - add penalties to existing state
+            aug_slice = idx_to_aug_slice[idx]
+
+            def _make_ctcs_addition(orig_f, pen_fns, aug_sl):
+                """Create dynamics that adds penalties to existing augmented state.
+
+                Args:
+                    orig_f: Original dynamics function
+                    pen_fns: List of penalty functions to add
+                    aug_sl: Slice of the augmented state to modify
+
+                Returns:
+                    Modified dynamics function
+                """
+
+                def modified_f(x, u, node, params):
+                    xdot = orig_f(x, u, node, params)
+
+                    # Sum all penalties for this idx
+                    total_penalty = sum(pen_fn(x, u, node, params) for pen_fn in pen_fns)
+
+                    # Add to existing augmented state derivative
+                    current_deriv = xdot[aug_sl]
+                    xdot = xdot.at[aug_sl].set(current_deriv + total_penalty)
+
+                    return xdot
+
+                return modified_f
+
+            # Modify both optimization and propagation dynamics
+            dynamics.f = _make_ctcs_addition(dynamics.f, penalty_fns, aug_slice)
+            dynamics.A = jacfwd(dynamics.f, argnums=0)
+            dynamics.B = jacfwd(dynamics.f, argnums=1)
+
+            dynamics_prop.f = _make_ctcs_addition(dynamics_prop.f, penalty_fns, aug_slice)
+            dynamics_prop.A = jacfwd(dynamics_prop.f, argnums=0)
+            dynamics_prop.B = jacfwd(dynamics_prop.f, argnums=1)
+
         else:
-            penalty_func = _PENALTY_FUNCTIONS[penalty_spec]
+            # New idx - create new augmented state
+            # Use bounds/initial from first spec in this group
+            first_spec = specs[0]
+            bounds = first_spec.get("bounds", (0.0, 1e-4))
+            initial = first_spec.get("initial", bounds[0])
 
-        # IMPORTANT: We use a factory function here to avoid late-binding closure issues.
-        # Without the factory, all augmented dynamics would share references to the same
-        # constraint_fn and penalty_func variables, which would be overwritten on each
-        # loop iteration. The factory creates a new closure for each iteration, capturing
-        # the current values by passing them as function arguments.
-        # See: https://docs.python-guide.org/writing/gotchas/#late-binding-closures
-        def _make_ctcs_augmented_dynamics(orig_f, cons_fn, pen_func):
-            """Create dynamics augmented with a CTCS constraint penalty accumulator.
+            def _make_ctcs_new_state(orig_f, pen_fns):
+                """Create dynamics augmented with new CTCS state.
 
-            Args:
-                orig_f: Original dynamics function (x, u, node, params) -> xdot
-                cons_fn: Constraint function (x, u, node, params) -> scalar residual
-                pen_func: Penalty function (residual) -> penalty value
+                Args:
+                    orig_f: Original dynamics function
+                    pen_fns: List of penalty functions to sum
 
-            Returns:
-                Augmented dynamics function that appends penalty derivative to xdot
-            """
+                Returns:
+                    Augmented dynamics function
+                """
 
-            def augmented_f(x, u, node, params):
-                # Compute original state derivatives
-                xdot = orig_f(x, u, node, params)
+                def augmented_f(x, u, node, params):
+                    xdot = orig_f(x, u, node, params)
 
-                # Compute constraint residual and apply penalty
-                residual = cons_fn(x, u, node, params)
-                penalty = pen_func(residual)
+                    # Sum all penalties for this new idx
+                    total_penalty = sum(pen_fn(x, u, node, params) for pen_fn in pen_fns)
 
-                # Append penalty accumulation rate to state derivatives
-                # The penalty value becomes the derivative of the augmented state
-                return jnp.concatenate([xdot, jnp.atleast_1d(penalty)])
+                    # Append as new augmented state derivative
+                    return jnp.concatenate([xdot, jnp.atleast_1d(total_penalty)])
 
-            return augmented_f
+                return augmented_f
 
-        # Augment optimization dynamics with CTCS constraint
-        aug_f = _make_ctcs_augmented_dynamics(dynamics.f, constraint_fn, penalty_func)
-        dynamics = Dynamics(
-            f=aug_f,
-            A=jacfwd(aug_f, argnums=0),
-            B=jacfwd(aug_f, argnums=1),
-        )
+            # Augment optimization dynamics
+            aug_f = _make_ctcs_new_state(dynamics.f, penalty_fns)
+            dynamics = Dynamics(
+                f=aug_f,
+                A=jacfwd(aug_f, argnums=0),
+                B=jacfwd(aug_f, argnums=1),
+            )
 
-        # Augment propagation dynamics with CTCS constraint
-        aug_f_prop = _make_ctcs_augmented_dynamics(dynamics_prop.f, constraint_fn, penalty_func)
-        dynamics_prop = Dynamics(
-            f=aug_f_prop,
-            A=jacfwd(aug_f_prop, argnums=0),
-            B=jacfwd(aug_f_prop, argnums=1),
-        )
+            # Augment propagation dynamics
+            aug_f_prop = _make_ctcs_new_state(dynamics_prop.f, penalty_fns)
+            dynamics_prop = Dynamics(
+                f=aug_f_prop,
+                A=jacfwd(aug_f_prop, argnums=0),
+                B=jacfwd(aug_f_prop, argnums=1),
+            )
 
-        # Update both unified states with new augmented state
-        x_unified.append(
-            min=bounds[0],
-            max=bounds[1],
-            guess=initial,
-            initial=initial,
-            final=0.0,
-            augmented=True,
-        )
-        x_prop_unified.append(
-            min=bounds[0],
-            max=bounds[1],
-            guess=initial,
-            initial=initial,
-            final=0.0,
-            augmented=True,
-        )
+            # Add new augmented states to both unified state interfaces
+            x_unified.append(
+                min=bounds[0],
+                max=bounds[1],
+                guess=initial,
+                initial=initial,
+                final=0.0,
+                augmented=True,
+            )
+            x_prop_unified.append(
+                min=bounds[0],
+                max=bounds[1],
+                guess=initial,
+                initial=initial,
+                final=0.0,
+                augmented=True,
+            )
 
     return dynamics, dynamics_prop, jax_constraints, x_unified, x_prop_unified
