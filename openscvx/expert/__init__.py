@@ -5,5 +5,13 @@ and are willing to bypass higher-level abstractions.
 """
 
 from openscvx.expert.byof import ByofSpec, CtcsConstraintSpec, PenaltyFunction
+from openscvx.expert.lowering import apply_byof
+from openscvx.expert.validation import validate_byof
 
-__all__ = ["ByofSpec", "CtcsConstraintSpec", "PenaltyFunction"]
+__all__ = [
+    "ByofSpec",
+    "CtcsConstraintSpec",
+    "PenaltyFunction",
+    "apply_byof",
+    "validate_byof",
+]
