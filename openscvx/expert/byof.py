@@ -24,8 +24,10 @@ Function Signatures:
         - Returns: Constraint residual. Follows g(x,u) <= 0 convention
 
     - cross_nodal_constraints: ``(X, U, params) -> residual``
-        - X: State trajectory (N, n_x)
-        - U: Control trajectory (N, n_u)
+        - X: State trajectory (N, n_x) where N is number of trajectory nodes,
+            n_x is unified state dimension
+        - U: Control trajectory (N, n_u) where N is number of trajectory nodes,
+            n_u is unified control dimension
         - params: Dict of parameters
         - Returns: Constraint residual. Follows g(X,U) <= 0 convention
 
@@ -145,8 +147,9 @@ class ByofSpec(TypedDict, total=False):
         nodal_constraints: Point-wise constraints applied at each node independently.
             Signature: ``(x, u, node, params) -> residual``. Follows g(x,u) <= 0 convention.
             Applied to all nodes.
-        cross_nodal_constraints: Constraints coupling multiple nodes (e.g., smoothness).
-            Signature: ``(X, U, params) -> residual`` where X is (N, n_x), U is (N, n_u).
+        cross_nodal_constraints: Constraints coupling multiple nodes (smoothness, rate limits).
+            Signature: ``(X, U, params) -> residual`` where X is (N, n_x) and U is (N, n_u).
+            N is the number of trajectory nodes, n_x is state dimension, n_u is control dimension.
             Follows g(X,U) <= 0 convention.
         ctcs_constraints: Continuous-time constraint satisfaction via dynamics augmentation.
             Each adds an augmented state accumulating violation penalties.
@@ -170,6 +173,11 @@ class ByofSpec(TypedDict, total=False):
                 "nodal_constraints": [
                     lambda x, u, node, params: x[2] - 10.0,  # velocity <= 10
                     lambda x, u, node, params: -x[2],         # velocity >= 0
+                ],
+                "cross_nodal_constraints": [
+                    # Constrain total velocity across trajectory: sum(velocities) >= 5
+                    # X.shape = (N, n_x), extract velocity column and sum
+                    lambda X, U, params: 5.0 - jnp.sum(X[:, 2]),
                 ],
                 "ctcs_constraints": [
                     {
