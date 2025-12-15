@@ -58,8 +58,18 @@ Example:
         # more maintainable indexing instead of hardcoded indices.
         byof: ByofSpec = {
             "nodal_constraints": [
-                # Velocity must be positive: -velocity <= 0
-                lambda x, u, node, params: -x[velocity.slice][0],
+                # Velocity bounds (applied to all nodes)
+                {
+                    "func": lambda x, u, node, params: x[velocity.slice][0] - 10.0,
+                },
+                {
+                    "func": lambda x, u, node, params: -x[velocity.slice][0],
+                },
+                # Velocity must be exactly 0 at start (selective enforcement)
+                {
+                    "func": lambda x, u, node, params: x[velocity.slice][0],
+                    "nodes": [0],  # Only at first node
+                },
             ],
             "ctcs_constraints": [
                 {
@@ -80,7 +90,7 @@ if TYPE_CHECKING:
 else:
     JaxArray = Any
 
-__all__ = ["ByofSpec", "CtcsConstraintSpec", "PenaltyFunction"]
+__all__ = ["ByofSpec", "CtcsConstraintSpec", "NodalConstraintSpec", "PenaltyFunction"]
 
 
 # Type aliases for clarity
@@ -89,6 +99,42 @@ NodalConstraintFunction = Callable[[JaxArray, JaxArray, int, dict], JaxArray]
 CrossNodalConstraintFunction = Callable[[JaxArray, JaxArray, dict], JaxArray]
 CtcsConstraintFunction = Callable[[JaxArray, JaxArray, int, dict], float]
 PenaltyFunction = Union[Literal["square", "l1", "huber"], Callable[[float], float]]
+
+
+class NodalConstraintSpec(TypedDict, total=False):
+    """Specification for nodal constraint with optional node selection.
+
+    Nodal constraints are point-wise constraints evaluated at specific trajectory nodes.
+    By default, constraints apply to all nodes, but you can restrict enforcement to
+    specific nodes for boundary conditions, waypoints, or computational efficiency.
+
+    Attributes:
+        func: Constraint function with signature ``(x, u, node, params) -> residual``.
+            Follows g(x,u) <= 0 convention (negative = satisfied). Required field.
+        nodes: List of integer node indices where constraint is enforced.
+            If omitted, applies to all nodes. Negative indices supported (e.g., -1 for last).
+            Optional field.
+
+    Example:
+        Boundary constraint only at first and last nodes::
+
+            nodal_spec: NodalConstraintSpec = {
+                "func": lambda x, u, node, params: x[velocity.slice][0],
+                "nodes": [0, -1],  # Only at start and end
+            }
+
+        Waypoint constraint at middle of trajectory::
+
+            nodal_spec: NodalConstraintSpec = {
+                "func": lambda x, u, node, params: jnp.linalg.norm(
+                    x[position.slice] - jnp.array([5.0, 7.5])
+                ) - 0.1,
+                "nodes": [N // 2],
+            }
+    """
+
+    func: NodalConstraintFunction  # Required
+    nodes: List[int]
 
 
 class CtcsConstraintSpec(TypedDict, total=False):
@@ -147,9 +193,13 @@ class ByofSpec(TypedDict, total=False):
             with signature ``(x, u, node, params) -> xdot_component``. States here should
             NOT appear in symbolic dynamics dict. You can mix: some states symbolic,
             some in byof.
-        nodal_constraints: Point-wise constraints applied at each node independently.
-            Signature: ``(x, u, node, params) -> residual``. Follows g(x,u) <= 0 convention.
-            Applied to all nodes.
+        nodal_constraints: Point-wise constraints applied at specific nodes.
+            Each item is a :class:`NodalConstraintSpec` dict with:
+
+            - ``func``: Constraint function ``(x, u, node, params) -> residual`` (required)
+            - ``nodes``: List of node indices (optional, defaults to all nodes)
+
+            Follows g(x,u) <= 0 convention.
         cross_nodal_constraints: Constraints coupling multiple nodes (smoothness, rate limits).
             Signature: ``(X, U, params) -> residual`` where X is (N, n_x) and U is (N, n_u).
             N is the number of trajectory nodes, n_x is state dimension, n_u is control dimension.
@@ -180,8 +230,18 @@ class ByofSpec(TypedDict, total=False):
                     "velocity": custom_velocity_dynamics,
                 },
                 "nodal_constraints": [
-                    lambda x, u, node, params: x[velocity.slice][0] - 10.0,  # velocity <= 10
-                    lambda x, u, node, params: -x[velocity.slice][0],         # velocity >= 0
+                    # Applied to all nodes (no "nodes" field)
+                    {
+                        "func": lambda x, u, node, params: x[velocity.slice][0] - 10.0,
+                    },
+                    {
+                        "func": lambda x, u, node, params: -x[velocity.slice][0],
+                    },
+                    # Specify nodes for selective enforcement
+                    {
+                        "func": lambda x, u, node, params: x[velocity.slice][0],
+                        "nodes": [0],  # Velocity must be exactly 0 at start
+                    },
                 ],
                 "cross_nodal_constraints": [
                     # Constrain total velocity across trajectory: sum(velocities) >= 5
@@ -198,6 +258,6 @@ class ByofSpec(TypedDict, total=False):
     """
 
     dynamics: dict[str, DynamicsFunction]
-    nodal_constraints: List[NodalConstraintFunction]
+    nodal_constraints: List[NodalConstraintSpec]
     cross_nodal_constraints: List[CrossNodalConstraintFunction]
     ctcs_constraints: List[CtcsConstraintSpec]

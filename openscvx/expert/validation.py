@@ -104,15 +104,25 @@ def validate_byof(
                 ) from e
 
     # Validate nodal constraints
-    for i, fn in enumerate(byof.get("nodal_constraints", [])):
+    for i, constraint_spec in enumerate(byof.get("nodal_constraints", [])):
+        if not isinstance(constraint_spec, dict):
+            raise TypeError(
+                f"byof nodal_constraints[{i}] must be a dict (NodalConstraintSpec), "
+                f"got {type(constraint_spec)}"
+            )
+
+        if "func" not in constraint_spec:
+            raise ValueError(f"byof nodal_constraints[{i}] missing required key 'func'")
+
+        fn = constraint_spec["func"]
         if not callable(fn):
-            raise TypeError(f"byof nodal_constraints[{i}] must be callable, got {type(fn)}")
+            raise TypeError(f"byof nodal_constraints[{i}]['func'] must be callable, got {type(fn)}")
 
         # Check signature
         sig = inspect.signature(fn)
         if len(sig.parameters) != 4:
             raise ValueError(
-                f"byof nodal_constraints[{i}] must have signature f(x, u, node, params), "
+                f"byof nodal_constraints[{i}]['func'] must have signature f(x, u, node, params), "
                 f"got {len(sig.parameters)} parameters: {list(sig.parameters.keys())}"
             )
 
@@ -121,7 +131,7 @@ def validate_byof(
             result = fn(dummy_x, dummy_u, dummy_node, dummy_params)
         except Exception as e:
             raise ValueError(
-                f"byof nodal_constraints[{i}] failed on test call with "
+                f"byof nodal_constraints[{i}]['func'] failed on test call with "
                 f"x.shape={dummy_x.shape}, u.shape={dummy_u.shape}: {e}"
             ) from e
 
@@ -130,7 +140,8 @@ def validate_byof(
             result_array = jnp.asarray(result)
         except Exception as e:
             raise ValueError(
-                f"byof nodal_constraints[{i}] must return array-like value, got {type(result)}: {e}"
+                f"byof nodal_constraints[{i}]['func'] must return array-like value, "
+                f"got {type(result)}: {e}"
             ) from e
 
         # Test gradient
@@ -138,8 +149,21 @@ def validate_byof(
             jax.grad(lambda x: jnp.sum(fn(x, dummy_u, dummy_node, dummy_params)))(dummy_x)
         except Exception as e:
             raise ValueError(
-                f"byof nodal_constraints[{i}] is not differentiable with JAX: {e}"
+                f"byof nodal_constraints[{i}]['func'] is not differentiable with JAX: {e}"
             ) from e
+
+        # Validate nodes if provided
+        if "nodes" in constraint_spec:
+            nodes = constraint_spec["nodes"]
+            if not isinstance(nodes, (list, tuple)):
+                raise TypeError(
+                    f"byof nodal_constraints[{i}]['nodes'] must be a list or tuple, "
+                    f"got {type(nodes)}"
+                )
+            if len(nodes) == 0:
+                raise ValueError(f"byof nodal_constraints[{i}]['nodes'] cannot be empty")
+            # Note: Cannot validate actual node indices here since we don't have N yet
+            # That validation happens in lowering.py
 
     # Validate cross-nodal constraints
     dummy_X = jnp.zeros((10, n_x))  # Dummy trajectory with 10 nodes

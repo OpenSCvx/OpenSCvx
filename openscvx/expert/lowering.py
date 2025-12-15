@@ -125,12 +125,29 @@ def apply_byof(
         )
 
     # Handle nodal constraints
-    for fn in byof.get("nodal_constraints", []):
+    for constraint_spec in byof.get("nodal_constraints", []):
+        fn = constraint_spec["func"]
+        nodes = constraint_spec.get("nodes", list(range(N)))  # Default: all nodes
+
+        # Validate and normalize node indices
+        normalized_nodes = []
+        for node in nodes:
+            # Handle negative indices (e.g., -1 for last node)
+            if node < 0:
+                node = N + node
+            # Validate range
+            if not (0 <= node < N):
+                raise ValueError(
+                    f"byof nodal_constraint node index {nodes} (normalized: {node}) "
+                    f"out of range [0, {N})"
+                )
+            normalized_nodes.append(node)
+
         constraint = LoweredNodalConstraint(
             func=jax.vmap(fn, in_axes=(0, 0, None, None)),
             grad_g_x=jax.vmap(jacfwd(fn, argnums=0), in_axes=(0, 0, None, None)),
             grad_g_u=jax.vmap(jacfwd(fn, argnums=1), in_axes=(0, 0, None, None)),
-            nodes=list(range(N)),  # Apply to all nodes
+            nodes=normalized_nodes,
         )
         jax_constraints.nodal.append(constraint)
 
