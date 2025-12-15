@@ -280,6 +280,38 @@ class Problem(ProblemPlotMixin):
         """Unified control interface (delegates to lowered.u_unified)."""
         return self._lowered.u_unified
 
+    @property
+    def slices(self) -> dict[str, slice]:
+        """Get mapping of state and control names to their slices in unified vectors.
+
+        This property returns a dictionary mapping each state and control variable name
+        to its slice in the respective unified vector. This is particularly useful for
+        expert users working with byof (bring-your-own functions) who need to manually
+        index into the unified x and u vectors.
+
+        Returns:
+            dict[str, slice]: Dictionary mapping variable names to slice objects.
+                State variables map to slices in the x vector.
+                Control variables map to slices in the u vector.
+
+        Example:
+                problem = ox.Problem(dynamics, states, controls, ...)
+                print(problem.slices)
+                # {'position': slice(0, 3), 'velocity': slice(3, 6), 'theta': slice(0, 1)}
+
+                # Use in byof functions
+                byof = {
+                    "nodal_constraints": [
+                        lambda x, u, node, params: x[problem.slices["velocity"][0]] - 10.0,
+                        lambda x, u, node, params: u[problem.slices["theta"][0]] - 1.57,
+                    ]
+                }
+        """
+        slices = {}
+        slices.update({state.name: state.slice for state in self.symbolic.states})
+        slices.update({control.name: control.slice for control in self.symbolic.controls})
+        return slices
+
     def initialize(self):
         """Compile dynamics, constraints, and solvers; prepare for optimization.
 

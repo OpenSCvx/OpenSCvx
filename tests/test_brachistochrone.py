@@ -956,22 +956,51 @@ def test_byof():
     )
 
     # Define box constraints using byof instead of symbolic layer
-    # Unified state indices: [pos_x, pos_y, vel, time]
+    # Demonstrate two ways to access slices in byof functions:
+    #
+    # 1. Direct property access using .slice (preferred when you have the State/Control object)
+    #    The lambda captures the State/Control object reference, and .slice gets set during
+    #    Problem construction, so it's available when the function is called.
+    #
+    # 2. Name-based lookup using problem.slices["name"] (useful for introspection)
+    #    This can't be used in the byof dict definition since problem doesn't exist yet,
+    #    but you could construct byof functions after problem creation if needed.
+    #
     # Constraints follow g(x, u) <= 0 convention
     byof: ByofSpec = {
         "ctcs_constraints": [
             # position[0] <= 10.0  =>  position[0] - 10.0 <= 0
-            {"constraint_fn": lambda x, u, node, params: x[0] - 10.0, "penalty": "square"},
+            # Using .slice property for clean access
+            {
+                "constraint_fn": lambda x, u, node, params: x[position.slice][0] - 10.0,
+                "penalty": "square",
+            },
             # position[0] >= 0.0  =>  -position[0] <= 0  =>  0.0 - position[0] <= 0
-            {"constraint_fn": lambda x, u, node, params: 0.0 - x[0], "penalty": "square"},
+            {
+                "constraint_fn": lambda x, u, node, params: 0.0 - x[position.slice][0],
+                "penalty": "square",
+            },
             # position[1] <= 10.0
-            {"constraint_fn": lambda x, u, node, params: x[1] - 10.0, "penalty": "square"},
+            {
+                "constraint_fn": lambda x, u, node, params: x[position.slice][1] - 10.0,
+                "penalty": "square",
+            },
             # position[1] >= 0.0
-            {"constraint_fn": lambda x, u, node, params: 0.0 - x[1], "penalty": "square"},
+            {
+                "constraint_fn": lambda x, u, node, params: 0.0 - x[position.slice][1],
+                "penalty": "square",
+            },
             # velocity[0] <= 10.0
-            {"constraint_fn": lambda x, u, node, params: x[2] - 10.0, "penalty": "square"},
+            # Alternatively, for scalar states, can directly index: x[velocity.slice][0]
+            {
+                "constraint_fn": lambda x, u, node, params: x[velocity.slice][0] - 10.0,
+                "penalty": "square",
+            },
             # velocity[0] >= 0.0
-            {"constraint_fn": lambda x, u, node, params: 0.0 - x[2], "penalty": "square"},
+            {
+                "constraint_fn": lambda x, u, node, params: 0.0 - x[velocity.slice][0],
+                "penalty": "square",
+            },
         ],
     }
 
