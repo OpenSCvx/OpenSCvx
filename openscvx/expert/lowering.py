@@ -76,20 +76,37 @@ def apply_byof(
         state_slices = {state.name: state._slice for state in states}
         state_slices_prop = {state.name: state._slice for state in states_prop}
 
-        def make_composite_dynamics(orig_f, byof_fns, slices_map):
-            """Factory to create composite dynamics with byof functions spliced in."""
+        def _make_composite_dynamics(orig_f, byof_fns, slices_map):
+            """Create composite dynamics combining symbolic and byof state derivatives.
 
+            This factory splices user-provided byof dynamics into the unified dynamics
+            function at the appropriate slice indices, replacing the symbolic dynamics
+            for specific states while preserving the rest.
+
+            Args:
+                orig_f: Original unified dynamics (x, u, node, params) -> xdot
+                byof_fns: Dict mapping state names to byof dynamics functions
+                slices_map: Dict mapping state names to slice objects for indexing
+
+            Returns:
+                Composite dynamics function with byof derivatives spliced in
+            """
             def composite_f(x, u, node, params):
+                # Start with symbolic/default dynamics for all states
                 xdot = orig_f(x, u, node, params)
+
+                # Splice in byof dynamics for specific states
                 for state_name, byof_fn in byof_fns.items():
                     sl = slices_map[state_name]
+                    # Replace the derivative for this state with the byof result
                     xdot = xdot.at[sl].set(byof_fn(x, u, node, params))
+
                 return xdot
 
             return composite_f
 
         # Create composite optimization dynamics
-        composite_f = make_composite_dynamics(dynamics.f, byof_dynamics, state_slices)
+        composite_f = _make_composite_dynamics(dynamics.f, byof_dynamics, state_slices)
         dynamics = Dynamics(
             f=composite_f,
             A=jacfwd(composite_f, argnums=0),
@@ -97,7 +114,7 @@ def apply_byof(
         )
 
         # Create composite propagation dynamics
-        composite_f_prop = make_composite_dynamics(
+        composite_f_prop = _make_composite_dynamics(
             dynamics_prop.f, byof_dynamics, state_slices_prop
         )
         dynamics_prop = Dynamics(
@@ -155,27 +172,47 @@ def apply_byof(
         else:
             penalty_func = _PENALTY_FUNCTIONS[penalty_spec]
 
-        def make_augmented_f(orig_f, cons_fn, pen_func):
-            """Factory to capture current values in closure."""
+        # IMPORTANT: We use a factory function here to avoid late-binding closure issues.
+        # Without the factory, all augmented dynamics would share references to the same
+        # constraint_fn and penalty_func variables, which would be overwritten on each
+        # loop iteration. The factory creates a new closure for each iteration, capturing
+        # the current values by passing them as function arguments.
+        # See: https://docs.python-guide.org/writing/gotchas/#late-binding-closures
+        def _make_ctcs_augmented_dynamics(orig_f, cons_fn, pen_func):
+            """Create dynamics augmented with a CTCS constraint penalty accumulator.
 
+            Args:
+                orig_f: Original dynamics function (x, u, node, params) -> xdot
+                cons_fn: Constraint function (x, u, node, params) -> scalar residual
+                pen_func: Penalty function (residual) -> penalty value
+
+            Returns:
+                Augmented dynamics function that appends penalty derivative to xdot
+            """
             def augmented_f(x, u, node, params):
+                # Compute original state derivatives
                 xdot = orig_f(x, u, node, params)
+
+                # Compute constraint residual and apply penalty
                 residual = cons_fn(x, u, node, params)
                 penalty = pen_func(residual)
+
+                # Append penalty accumulation rate to state derivatives
+                # The penalty value becomes the derivative of the augmented state
                 return jnp.concatenate([xdot, jnp.atleast_1d(penalty)])
 
             return augmented_f
 
-        # Augment optimization dynamics
-        aug_f = make_augmented_f(dynamics.f, constraint_fn, penalty_func)
+        # Augment optimization dynamics with CTCS constraint
+        aug_f = _make_ctcs_augmented_dynamics(dynamics.f, constraint_fn, penalty_func)
         dynamics = Dynamics(
             f=aug_f,
             A=jacfwd(aug_f, argnums=0),
             B=jacfwd(aug_f, argnums=1),
         )
 
-        # Augment propagation dynamics
-        aug_f_prop = make_augmented_f(dynamics_prop.f, constraint_fn, penalty_func)
+        # Augment propagation dynamics with CTCS constraint
+        aug_f_prop = _make_ctcs_augmented_dynamics(dynamics_prop.f, constraint_fn, penalty_func)
         dynamics_prop = Dynamics(
             f=aug_f_prop,
             A=jacfwd(aug_f_prop, argnums=0),
