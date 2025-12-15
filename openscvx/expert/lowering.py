@@ -11,6 +11,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import jacfwd
+from jax.lax import cond
 
 if TYPE_CHECKING:
     from openscvx.lowered.unified import UnifiedState
@@ -230,22 +231,54 @@ def apply_byof(
         for spec in specs:
             constraint_fn = spec["constraint_fn"]
             penalty_spec = spec.get("penalty", "square")
+            over_interval = spec.get("over", None)  # Node interval (start, end) or None
+
             if callable(penalty_spec):
                 penalty_func = penalty_spec
             else:
                 penalty_func = _PENALTY_FUNCTIONS[penalty_spec]
 
             # Create a combined constraint+penalty function
-            def _make_penalty_fn(cons_fn, pen_func):
-                """Factory to capture constraint and penalty functions."""
+            def _make_penalty_fn(cons_fn, pen_func, over):
+                """Factory to capture constraint, penalty functions, and node interval.
+
+                Args:
+                    cons_fn: Constraint function (x, u, node, params) -> scalar residual
+                    pen_func: Penalty function (residual) -> penalty value
+                    over: Optional (start, end) tuple for conditional activation
+
+                Returns:
+                    Penalty function that conditionally activates based on node interval
+                """
 
                 def penalty_fn(x, u, node, params):
+                    # Compute penalty for the constraint violation
                     residual = cons_fn(x, u, node, params)
-                    return pen_func(residual)
+                    penalty_value = pen_func(residual)
+
+                    # Apply conditional logic if over interval is specified
+                    if over is not None:
+                        start_node, end_node = over
+                        # Extract scalar from node (which may be array or scalar)
+                        # Keep as JAX array for tracing compatibility
+                        node_scalar = jnp.atleast_1d(node)[0]
+                        is_active = (start_node <= node_scalar) & (node_scalar < end_node)
+
+                        # Use jax.lax.cond for JAX-traceable conditional evaluation
+                        # Penalty is active only when node is in [start, end)
+                        return cond(
+                            is_active,
+                            lambda _: penalty_value,
+                            lambda _: 0.0,
+                            operand=None,
+                        )
+                    else:
+                        # Always active if no interval specified
+                        return penalty_value
 
                 return penalty_fn
 
-            penalty_fns.append(_make_penalty_fn(constraint_fn, penalty_func))
+            penalty_fns.append(_make_penalty_fn(constraint_fn, penalty_func, over_interval))
 
         if idx in idx_to_aug_slice:
             # This idx already exists from symbolic CTCS - add penalties to existing state

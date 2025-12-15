@@ -1041,10 +1041,14 @@ def test_byof(byof_mode):
                 {
                     "constraint_fn": lambda x, u, node, params: x[velocity.slice][0] - 10.0,
                     "penalty": "square",
+                    "idx": 1,
+                    "over": (0, 1),
                 },
                 {
                     "constraint_fn": lambda x, u, node, params: 0.0 - x[velocity.slice][0],
                     "penalty": "square",
+                    "idx": 1,
+                    "over": (0, 1),
                 },
             ],
         }

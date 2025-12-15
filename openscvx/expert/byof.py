@@ -160,6 +160,9 @@ class CtcsConstraintSpec(TypedDict, total=False):
         bounds: (min, max) bounds for augmented state accumulating penalties.
             Default: (0.0, 1e-4). Max acts as soft constraint on total violation.
         initial: Initial value for augmented state. Default: bounds[0] (usually 0.0).
+        over: Node interval (start, end) where constraint is active. The constraint
+            is enforced for nodes in [start, end). If omitted, constraint is active
+            over all nodes. Matches symbolic `.over()` method behavior.
         idx: Constraint group index for sharing augmented states (default: 0).
             All CTCS constraints (symbolic and byof) with the same idx share a single
             augmented state. Their penalties are summed together. Use different idx values
@@ -183,6 +186,14 @@ class CtcsConstraintSpec(TypedDict, total=False):
                 "bounds": (0.0, 1e-4),
                 "initial": 0.0,
                 "idx": 0,  # Groups with other constraints having idx=0
+            }
+
+        Enforce constraint only over specific node range::
+
+            ctcs_spec: CtcsConstraintSpec = {
+                "constraint_fn": lambda x, u, node, params: x[position.slice][0] - 10.0,
+                "over": (10, 50),  # Active only for nodes 10-49
+                "penalty": "square",
             }
 
         Multiple constraints sharing an augmented state::
@@ -214,6 +225,7 @@ class CtcsConstraintSpec(TypedDict, total=False):
     penalty: PenaltyFunction
     bounds: Tuple[float, float]
     initial: float
+    over: Tuple[int, int]
     idx: int
 
 

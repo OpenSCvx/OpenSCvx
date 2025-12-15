@@ -141,13 +141,14 @@ def test_valid_byof_specifications(simple_states):
         N=50,
     )
 
-    # Valid CTCS with bounds
+    # Valid CTCS with bounds and over interval
     validate_byof(
         {
             "ctcs_constraints": [
                 {
                     "constraint_fn": lambda x, u, node, params: x[0] - 10.0,
                     "bounds": (0.0, 1e-4),
+                    "over": (10, 40),
                 }
             ]
         },

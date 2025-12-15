@@ -326,3 +326,32 @@ def validate_byof(
                     f"byof ctcs_constraints[{i}]['initial'] ({initial}) must be within "
                     f"bounds [{bounds[0]}, {bounds[1]}]"
                 )
+
+        # Validate over (node interval) if provided
+        if "over" in ctcs_spec:
+            over = ctcs_spec["over"]
+            if not isinstance(over, (tuple, list)) or len(over) != 2:
+                raise ValueError(
+                    f"byof ctcs_constraints[{i}]['over'] must be a (start, end) tuple, got {over}"
+                )
+            start, end = over
+            if not isinstance(start, int) or not isinstance(end, int):
+                raise TypeError(
+                    f"byof ctcs_constraints[{i}]['over'] indices must be integers, "
+                    f"got start={type(start)}, end={type(end)}"
+                )
+            if start >= end:
+                raise ValueError(
+                    f"byof ctcs_constraints[{i}]['over'] start ({start}) must be < end ({end})"
+                )
+            if start < 0:
+                raise ValueError(
+                    f"byof ctcs_constraints[{i}]['over'] start ({start}) must be non-negative"
+                )
+            # Validate against trajectory length if N is provided
+            if N is not None:
+                if end > N:
+                    raise ValueError(
+                        f"byof ctcs_constraints[{i}]['over'] end ({end}) exceeds "
+                        f"trajectory length ({N})"
+                    )
