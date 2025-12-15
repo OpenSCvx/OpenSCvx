@@ -260,6 +260,25 @@ class UnifiedState:
             else:
                 new_final_type = self.final_type
 
+            # Update scaling bounds (if present)
+            if (
+                self.scaling_min is not None
+                and hasattr(other, "scaling_min")
+                and other.scaling_min is not None
+            ):
+                new_scaling_min = np.concatenate([self.scaling_min, other.scaling_min])
+            else:
+                new_scaling_min = self.scaling_min
+
+            if (
+                self.scaling_max is not None
+                and hasattr(other, "scaling_max")
+                and other.scaling_max is not None
+            ):
+                new_scaling_max = np.concatenate([self.scaling_max, other.scaling_max])
+            else:
+                new_scaling_max = self.scaling_max
+
             # Update true dimension
             if not augmented:
                 new_true_dim = self._true_dim + getattr(other, "_true_dim", other.shape[0])
@@ -277,6 +296,8 @@ class UnifiedState:
             self._final = new__final
             self.initial_type = new_initial_type
             self.final_type = new_final_type
+            self.scaling_min = new_scaling_min
+            self.scaling_max = new_scaling_max
             self._true_dim = new_true_dim
             self._true_slice = slice(0, self._true_dim)
             self._augmented_slice = slice(self._true_dim, self.shape[0])
@@ -307,6 +328,10 @@ class UnifiedState:
                 )
             if self.final_type is not None:
                 self.final_type = np.concatenate([self.final_type, np.array(["Fix"], dtype=object)])
+            if self.scaling_min is not None:
+                self.scaling_min = np.concatenate([self.scaling_min, np.array([min])])
+            if self.scaling_max is not None:
+                self.scaling_max = np.concatenate([self.scaling_max, np.array([max])])
 
             # Update dimensions
             self.shape = new_shape
@@ -568,6 +593,25 @@ class UnifiedControl:
             else:
                 new_guess = self.guess
 
+            # Update scaling bounds (if present)
+            if (
+                self.scaling_min is not None
+                and hasattr(other, "scaling_min")
+                and other.scaling_min is not None
+            ):
+                new_scaling_min = np.concatenate([self.scaling_min, other.scaling_min])
+            else:
+                new_scaling_min = self.scaling_min
+
+            if (
+                self.scaling_max is not None
+                and hasattr(other, "scaling_max")
+                and other.scaling_max is not None
+            ):
+                new_scaling_max = np.concatenate([self.scaling_max, other.scaling_max])
+            else:
+                new_scaling_max = self.scaling_max
+
             # Update true dimension
             if not augmented:
                 new_true_dim = self._true_dim + getattr(other, "_true_dim", other.shape[0])
@@ -579,6 +623,8 @@ class UnifiedControl:
             self.min = new_min
             self.max = new_max
             self.guess = new_guess
+            self.scaling_min = new_scaling_min
+            self.scaling_max = new_scaling_max
             self._true_dim = new_true_dim
             self._true_slice = slice(0, self._true_dim)
             self._augmented_slice = slice(self._true_dim, self.shape[0])
@@ -595,6 +641,10 @@ class UnifiedControl:
             if self.guess is not None:
                 guess_arr = np.full((self.guess.shape[0], 1), guess)
                 self.guess = np.concatenate([self.guess, guess_arr], axis=1)
+            if self.scaling_min is not None:
+                self.scaling_min = np.concatenate([self.scaling_min, np.array([min])])
+            if self.scaling_max is not None:
+                self.scaling_max = np.concatenate([self.scaling_max, np.array([max])])
 
             # Update dimensions
             self.shape = new_shape

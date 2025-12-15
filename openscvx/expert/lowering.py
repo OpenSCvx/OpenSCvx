@@ -8,6 +8,8 @@ addition.
 from typing import TYPE_CHECKING, List, Tuple
 
 import jax
+import jax.numpy as jnp
+import numpy as np
 from jax import jacfwd
 
 if TYPE_CHECKING:
@@ -66,7 +68,6 @@ def apply_byof(
         ...     x_unified, x_prop_unified, u_unified, states, states_prop, N
         ... )
     """
-    import jax.numpy as jnp
 
     # Note: byof validation happens earlier in Problem.__init__ to fail fast
     # Handle byof dynamics by splicing in raw JAX functions at the correct slices
@@ -329,6 +330,40 @@ def apply_byof(
                 A=jacfwd(aug_f_prop, argnums=0),
                 B=jacfwd(aug_f_prop, argnums=1),
             )
+
+            # Create State objects for the new augmented states
+            # This is necessary for CVXPy variable creation and other bookkeeping
+            from openscvx.symbolic.expr.state import State
+
+            # Create augmented state for optimization
+            aug_state = State(f"_ctcs_aug_{idx}", shape=(1,))
+            aug_state.min = np.array([bounds[0]])
+            aug_state.max = np.array([bounds[1]])
+            aug_state.initial = np.array([initial])
+            aug_state.final = [("free", 0.0)]
+            aug_state.guess = np.full((N, 1), initial)
+
+            # Set _slice attribute for the new state
+            current_dim = x_unified.shape[0]
+            aug_state._slice = slice(current_dim, current_dim + 1)
+
+            # Append to states list (in-place modification visible to caller)
+            states.append(aug_state)
+
+            # Create augmented state for propagation
+            aug_state_prop = State(f"_ctcs_aug_{idx}", shape=(1,))
+            aug_state_prop.min = np.array([bounds[0]])
+            aug_state_prop.max = np.array([bounds[1]])
+            aug_state_prop.initial = np.array([initial])
+            aug_state_prop.final = [("free", 0.0)]
+            aug_state_prop.guess = np.full((N, 1), initial)
+
+            # Set _slice attribute for the propagation state
+            current_dim_prop = x_prop_unified.shape[0]
+            aug_state_prop._slice = slice(current_dim_prop, current_dim_prop + 1)
+
+            # Append to states_prop list
+            states_prop.append(aug_state_prop)
 
             # Add new augmented states to both unified state interfaces
             x_unified.append(
