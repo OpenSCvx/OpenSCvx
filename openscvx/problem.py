@@ -90,8 +90,7 @@ class Problem(ProblemPlotMixin):
         time_dilation_factor_max=3.0,
         byof: Optional[ByofSpec] = None,
     ):
-        """
-        The primary class in charge of compiling and exporting the solvers
+        """The primary class in charge of compiling and exporting the solvers.
 
         Args:
             dynamics (dict): Dictionary mapping state names to their dynamics expressions.
