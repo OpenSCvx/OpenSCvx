@@ -8,7 +8,7 @@ os.environ["EQX_ON_ERROR"] = "nan"
 import openscvx.symbolic.expr.linalg as linalg
 import openscvx.symbolic.expr.spatial as spatial
 import openscvx.symbolic.expr.stl as stl
-from openscvx.expert import ByofSpec, NodalConstraintSpec
+from openscvx.expert import ByofSpec
 from openscvx.problem import Problem
 from openscvx.symbolic.expr import (
     CTCS,
@@ -108,5 +108,4 @@ __all__ = [
     "linalg",
     # Expert mode types
     "ByofSpec",
-    "NodalConstraintSpec",
 ]
