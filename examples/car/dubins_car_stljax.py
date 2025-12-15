@@ -10,8 +10,16 @@ using the stljax library for STL constraint formulation. The problem includes:
 - Requires: pip install stljax
 """
 
+import os
+import sys
+
 import jax.numpy as jnp
 import numpy as np
+
+# Add grandparent directory to path to import examples.plotting
+current_dir = os.path.dirname(os.path.abspath(__file__))
+grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from examples.plotting import plot_dubins_car_disjoint
