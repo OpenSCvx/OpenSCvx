@@ -9,6 +9,11 @@ Important:
     responsible for correct indexing. Consider inspecting the symbolic problem
     to understand the layout.
 
+Warning:
+    **Constraint Sign Convention**: All constraints follow g(x,u) <= 0 convention.
+    Return **negative when satisfied**, **positive when violated**.
+    Example: for x <= 10 return ``x - 10``, for x >= 5 return ``5 - x``.
+
 Function Signatures:
     All byof functions must be JAX-compatible (use jax.numpy, avoid side effects).
 
@@ -21,7 +26,7 @@ Function Signatures:
 
     - nodal_constraints: ``(x, u, node, params) -> residual``
         - Same arguments as dynamics
-        - Returns: Constraint residual. Follows g(x,u) <= 0 convention
+        - Returns: Constraint residual (g <= 0: negative=satisfied, positive=violated)
 
     - cross_nodal_constraints: ``(X, U, params) -> residual``
         - X: State trajectory (N, n_x) where N is number of trajectory nodes,
@@ -29,11 +34,11 @@ Function Signatures:
         - U: Control trajectory (N, n_u) where N is number of trajectory nodes,
             n_u is unified control dimension
         - params: Dict of parameters
-        - Returns: Constraint residual. Follows g(X,U) <= 0 convention
+        - Returns: Constraint residual (g <= 0: negative=satisfied, positive=violated)
 
     - ctcs constraint_fn: ``(x, u, node, params) -> scalar``
         - Same as nodal_constraints but MUST return scalar
-        - Follows g(x,u) <= 0 convention
+        - Returns: Constraint residual (g <= 0: negative=satisfied, positive=violated)
 
     - ctcs penalty: ``(residual) -> penalty_value``
         - residual: Scalar constraint residual
