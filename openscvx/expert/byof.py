@@ -168,13 +168,14 @@ class CtcsConstraintSpec(TypedDict, total=False):
             augmented state. Their penalties are summed together. Use different idx values
             to track different types of violations separately.
 
-            **Important**: If symbolic CTCS constraints exist with idx values [0, 1, 2],
-            then byof idx must either:
-            - Match an existing idx (e.g., 0, 1, or 2) to add to that augmented state
-            - Be sequential after them (e.g., 3, 4, 5) to create new augmented states
+    Warning:
+        If symbolic CTCS constraints exist with idx values [0, 1, 2], then byof idx **must** either:
 
-            You cannot use idx values that create gaps (e.g., if symbolic has [0, 1],
-            you cannot use byof idx=3 without also using idx=2).
+        - Match an existing idx (e.g., 0, 1, or 2) to add to that augmented state
+        - Be sequential after them (e.g., 3, 4, 5) to create new augmented states
+
+        You cannot use idx values that create gaps (e.g., if symbolic has [0, 1],
+        you cannot use byof idx=3 without also using idx=2).
 
     Example:
         Enforce position[0] <= 10.0 continuously::
