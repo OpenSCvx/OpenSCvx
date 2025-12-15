@@ -1,5 +1,23 @@
 /* ===== ESSENTIAL STYLES FOR OPENSCVX ===== */
 
+/* --- OpenSCvx: API signature sizing (make signatures more readable) --- */
+.doc-heading code,
+.doc-heading .doc-signature,
+.doc-object-name {
+  font-size: 1.1em !important;
+  font-weight: 500 !important;
+}
+
+.doc-heading {
+  font-size: 1em !important;
+}
+
+/* Make parameter lists in signatures more readable */
+.doc-signature .n,
+.doc-signature .p {
+  font-size: 1em !important;
+}
+
 /* Code block and admonition basic styling */
 .md-typeset pre,
 .md-typeset .highlight {
