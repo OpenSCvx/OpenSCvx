@@ -54,14 +54,16 @@ Example:
         # Unified state: [position[0], position[1], velocity[0], time, augmented...]
         # Unified control: [theta[0], time_dilation]
 
+        # Tip: Use the .slice property on State/Control objects for cleaner,
+        # more maintainable indexing instead of hardcoded indices.
         byof: ByofSpec = {
             "nodal_constraints": [
                 # Velocity must be positive: -velocity <= 0
-                lambda x, u, node, params: -x[2],
+                lambda x, u, node, params: -x[velocity.slice][0],
             ],
             "ctcs_constraints": [
                 {
-                    "constraint_fn": lambda x, u, node, params: x[0] - 10.0,
+                    "constraint_fn": lambda x, u, node, params: x[position.slice][0] - 10.0,
                     "penalty": "square",
                     "bounds": (0.0, 1e-4),
                 }
@@ -111,8 +113,9 @@ class CtcsConstraintSpec(TypedDict, total=False):
     Example:
         Enforce position[0] <= 10.0 continuously::
 
+            # Assuming position = ox.State("position", shape=(2,))
             ctcs_spec: CtcsConstraintSpec = {
-                "constraint_fn": lambda x, u, node, params: x[0] - 10.0,
+                "constraint_fn": lambda x, u, node, params: x[position.slice][0] - 10.0,
                 "penalty": "square",
                 "bounds": (0.0, 1e-4),
                 "initial": 0.0,
@@ -159,29 +162,35 @@ class ByofSpec(TypedDict, total=False):
         Custom dynamics and constraints::
 
             import jax.numpy as jnp
+            import openscvx as ox
             from openscvx import ByofSpec
 
-            # Custom dynamics for one state
+            # Define states and controls
+            position = ox.State("position", shape=(2,))
+            velocity = ox.State("velocity", shape=(1,))
+            theta = ox.Control("theta", shape=(1,))
+
+            # Custom dynamics for one state using .slice property
             def custom_velocity_dynamics(x, u, node, params):
-                # x[2] is velocity, u[0] is theta, params["g"] is gravity
-                return params["g"] * jnp.cos(u[0])
+                # Use .slice property for clean indexing
+                return params["g"] * jnp.cos(u[theta.slice][0])
 
             byof: ByofSpec = {
                 "dynamics": {
                     "velocity": custom_velocity_dynamics,
                 },
                 "nodal_constraints": [
-                    lambda x, u, node, params: x[2] - 10.0,  # velocity <= 10
-                    lambda x, u, node, params: -x[2],         # velocity >= 0
+                    lambda x, u, node, params: x[velocity.slice][0] - 10.0,  # velocity <= 10
+                    lambda x, u, node, params: -x[velocity.slice][0],         # velocity >= 0
                 ],
                 "cross_nodal_constraints": [
                     # Constrain total velocity across trajectory: sum(velocities) >= 5
-                    # X.shape = (N, n_x), extract velocity column and sum
-                    lambda X, U, params: 5.0 - jnp.sum(X[:, 2]),
+                    # X.shape = (N, n_x), extract velocity column using slice
+                    lambda X, U, params: 5.0 - jnp.sum(X[:, velocity.slice]),
                 ],
                 "ctcs_constraints": [
                     {
-                        "constraint_fn": lambda x, u, node, params: x[0] - 5.0,
+                        "constraint_fn": lambda x, u, node, params: x[position.slice][0] - 5.0,
                         "penalty": "square",
                     }
                 ],
