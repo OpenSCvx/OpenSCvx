@@ -429,6 +429,45 @@ def test_ctcs_bounds_validation_errors(simple_states, bad_bounds, error_match):
         )
 
 
+def test_ctcs_initial_must_be_within_bounds(simple_states):
+    """Test CTCS initial value must be within bounds."""
+    from openscvx.expert import validate_byof
+
+    # Initial below bounds
+    with pytest.raises(ValueError, match="initial.*must be within bounds"):
+        validate_byof(
+            {
+                "ctcs_constraints": [
+                    {
+                        "constraint_fn": lambda x, u, node, params: x[0],
+                        "bounds": (0.0, 1.0),
+                        "initial": -0.5,
+                    }
+                ]
+            },
+            simple_states,
+            n_x=3,
+            n_u=1,
+        )
+
+    # Initial above bounds
+    with pytest.raises(ValueError, match="initial.*must be within bounds"):
+        validate_byof(
+            {
+                "ctcs_constraints": [
+                    {
+                        "constraint_fn": lambda x, u, node, params: x[0],
+                        "bounds": (0.0, 1.0),
+                        "initial": 1.5,
+                    }
+                ]
+            },
+            simple_states,
+            n_x=3,
+            n_u=1,
+        )
+
+
 # ===== Error Message Indexing =====
 
 

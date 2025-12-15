@@ -261,3 +261,15 @@ def validate_byof(
                     f"byof ctcs_constraints[{i}]['bounds'] min ({bounds[0]}) must be <= "
                     f"max ({bounds[1]})"
                 )
+        else:
+            # Use default bounds for initial value validation
+            bounds = (0.0, 1e-4)
+
+        # Validate initial value is within bounds
+        if "initial" in ctcs_spec:
+            initial = ctcs_spec["initial"]
+            if not (bounds[0] <= initial <= bounds[1]):
+                raise ValueError(
+                    f"byof ctcs_constraints[{i}]['initial'] ({initial}) must be within "
+                    f"bounds [{bounds[0]}, {bounds[1]}]"
+                )
