@@ -139,7 +139,6 @@ def test_monolithic():
     being defined as separate named states.
     """
     import jax.numpy as jnp
-    import numpy as np
 
     import openscvx as ox
     from openscvx import Problem
@@ -243,7 +242,6 @@ def test_constraint_types(constraint_type):
             constraints are defined.
     """
     import jax.numpy as jnp
-    import numpy as np
 
     import openscvx as ox
     from openscvx import Problem
@@ -368,27 +366,31 @@ def test_constraint_types(constraint_type):
 
 
 @pytest.mark.parametrize(
-    "max_step,should_converge,is_convex",
+    "test_case",
     [
-        # Non-convex tests
-        (np.sqrt(125), True, False),  # At exact limit - should converge
-        (np.sqrt(124.9), False, False),  # Below limit - should fail
-        # Convex tests
-        (np.sqrt(125), True, True),  # At exact limit - should converge (convex)
-        (np.sqrt(124.9), False, True),  # Below limit - should fail (convex)
+        "feasible-nonconvex",
+        "infeasible-nonconvex",
+        "feasible-convex",
+        "infeasible-convex",
     ],
 )
-def test_cross_nodal(max_step, should_converge, is_convex):
+def test_cross_nodal(test_case):
     """
     Test brachistochrone with a cross-nodal rate limit constraint.
-
-    Tests both convex and non-convex formulations of the cross-node constraint.
     """
     import jax.numpy as jnp
-    import numpy as np
 
     import openscvx as ox
     from openscvx import Problem
+
+    # Parse test case
+    is_feasible = test_case.startswith("feasible")
+    is_convex = test_case.endswith("convex")
+    should_converge = is_feasible
+
+    # Set max_step based on feasibility
+    # For n=2 nodes, the distance between (0,10) and (10,5) is sqrt(125)
+    max_step = np.sqrt(125) if is_feasible else np.sqrt(124.9)
 
     # Problem parameters
     n = 2
@@ -533,7 +535,6 @@ def test_parameters():
     and can be modified between solves without re-initialization.
     """
     import jax.numpy as jnp
-    import numpy as np
 
     import openscvx as ox
     from openscvx import Problem
@@ -712,7 +713,6 @@ def test_propagation():
     track the total arc length travelled along the brachistochrone curve.
     """
     import jax.numpy as jnp
-    import numpy as np
 
     import openscvx as ox
     from openscvx import Problem
@@ -911,7 +911,6 @@ def test_byof(byof_mode):
     - u[1]: time_dilation
     """
     import jax.numpy as jnp
-    import numpy as np
 
     import openscvx as ox
     from openscvx import Problem
