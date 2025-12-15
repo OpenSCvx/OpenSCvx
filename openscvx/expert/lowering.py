@@ -125,23 +125,13 @@ def apply_byof(
         )
 
     # Handle nodal constraints
+    # Note: Validation happens earlier in Problem.__init__ via validate_byof
     for constraint_spec in byof.get("nodal_constraints", []):
         fn = constraint_spec["func"]
         nodes = constraint_spec.get("nodes", list(range(N)))  # Default: all nodes
 
-        # Validate and normalize node indices
-        normalized_nodes = []
-        for node in nodes:
-            # Handle negative indices (e.g., -1 for last node)
-            if node < 0:
-                node = N + node
-            # Validate range
-            if not (0 <= node < N):
-                raise ValueError(
-                    f"byof nodal_constraint node index {nodes} (normalized: {node}) "
-                    f"out of range [0, {N})"
-                )
-            normalized_nodes.append(node)
+        # Normalize negative node indices (validation already done in validate_byof)
+        normalized_nodes = [node if node >= 0 else N + node for node in nodes]
 
         constraint = LoweredNodalConstraint(
             func=jax.vmap(fn, in_axes=(0, 0, None, None)),

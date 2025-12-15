@@ -160,7 +160,7 @@ class Problem(ProblemPlotMixin):
                 for control in self.symbolic.controls
             )
 
-            validate_byof(byof, self.symbolic.states, n_x, n_u)
+            validate_byof(byof, self.symbolic.states, n_x, n_u, N)
 
         # Lower to JAX and CVXPy (byof handling happens inside lower_symbolic_problem)
         self._lowered: LoweredProblem = lower_symbolic_problem(self.symbolic, byof=byof)

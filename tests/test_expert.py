@@ -29,7 +29,7 @@ def test_valid_byof_specifications(simple_states):
     from openscvx.expert import validate_byof
 
     # Empty byof
-    validate_byof({}, simple_states, n_x=3, n_u=1)
+    validate_byof({}, simple_states, n_x=3, n_u=1, N=50)
 
     # All valid keys
     validate_byof(
@@ -42,6 +42,7 @@ def test_valid_byof_specifications(simple_states):
         simple_states,
         n_x=3,
         n_u=1,
+        N=50,
     )
 
     # Valid dynamics
@@ -50,6 +51,7 @@ def test_valid_byof_specifications(simple_states):
         simple_states,
         n_x=3,
         n_u=1,
+        N=50,
     )
 
     # Valid nodal constraint (scalar, all nodes)
@@ -58,6 +60,7 @@ def test_valid_byof_specifications(simple_states):
         simple_states,
         n_x=3,
         n_u=1,
+        N=50,
     )
 
     # Valid nodal constraint (vector, all nodes)
@@ -70,6 +73,7 @@ def test_valid_byof_specifications(simple_states):
         simple_states,
         n_x=3,
         n_u=1,
+        N=50,
     )
 
     # Valid nodal constraint with specific nodes
@@ -82,6 +86,7 @@ def test_valid_byof_specifications(simple_states):
         simple_states,
         n_x=3,
         n_u=1,
+        N=50,
     )
 
     # Valid nodal constraint with negative node indices
@@ -90,6 +95,7 @@ def test_valid_byof_specifications(simple_states):
         simple_states,
         n_x=3,
         n_u=1,
+        N=50,
     )
 
     # Valid cross-nodal constraint
@@ -98,6 +104,7 @@ def test_valid_byof_specifications(simple_states):
         simple_states,
         n_x=3,
         n_u=1,
+        N=50,
     )
 
     # Valid CTCS constraint with different penalties
@@ -111,6 +118,7 @@ def test_valid_byof_specifications(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
     # Valid CTCS with custom penalty
@@ -126,6 +134,7 @@ def test_valid_byof_specifications(simple_states):
         simple_states,
         n_x=3,
         n_u=1,
+        N=50,
     )
 
     # Valid CTCS with bounds
@@ -141,6 +150,7 @@ def test_valid_byof_specifications(simple_states):
         simple_states,
         n_x=3,
         n_u=1,
+        N=50,
     )
 
 
@@ -152,10 +162,10 @@ def test_invalid_byof_keys(simple_states):
     from openscvx.expert import validate_byof
 
     with pytest.raises(ValueError, match="Unknown byof keys.*invalid_key"):
-        validate_byof({"invalid_key": []}, simple_states, n_x=3, n_u=1)
+        validate_byof({"invalid_key": []}, simple_states, n_x=3, n_u=1, N=50)
 
     with pytest.raises(ValueError, match="Unknown byof keys"):
-        validate_byof({"bad_key1": [], "bad_key2": {}}, simple_states, n_x=3, n_u=1)
+        validate_byof({"bad_key1": [], "bad_key2": {}}, simple_states, n_x=3, n_u=1, N=50)
 
 
 # ===== Dynamics Validation =====
@@ -187,7 +197,7 @@ def test_dynamics_validation_errors(simple_states, bad_dynamics, error_type, err
     from openscvx.expert import validate_byof
 
     with pytest.raises(error_type, match=error_match):
-        validate_byof({"dynamics": bad_dynamics}, simple_states, n_x=3, n_u=1)
+        validate_byof({"dynamics": bad_dynamics}, simple_states, n_x=3, n_u=1, N=50)
 
 
 def test_dynamics_runtime_errors(simple_states):
@@ -209,6 +219,7 @@ def test_dynamics_runtime_errors(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
     # Wrong output shape
@@ -218,6 +229,7 @@ def test_dynamics_runtime_errors(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
     # Not differentiable (using numpy.linalg)
@@ -231,6 +243,7 @@ def test_dynamics_runtime_errors(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
 
@@ -263,7 +276,7 @@ def test_nodal_constraint_validation_errors(simple_states, bad_spec, error_type,
     from openscvx.expert import validate_byof
 
     with pytest.raises(error_type, match=error_match):
-        validate_byof({"nodal_constraints": [bad_spec]}, simple_states, n_x=3, n_u=1)
+        validate_byof({"nodal_constraints": [bad_spec]}, simple_states, n_x=3, n_u=1, N=50)
 
 
 def test_nodal_constraint_runtime_errors(simple_states):
@@ -281,6 +294,7 @@ def test_nodal_constraint_runtime_errors(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
     # Not differentiable
@@ -290,7 +304,42 @@ def test_nodal_constraint_runtime_errors(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
+
+
+def test_nodal_constraint_node_index_validation(simple_states):
+    """Test that node indices are validated when N is provided."""
+    from openscvx.expert import validate_byof
+
+    # Out of range positive index
+    with pytest.raises(ValueError, match="invalid index 50.*Valid range is \\[0, 50\\)"):
+        validate_byof(
+            {"nodal_constraints": [{"func": lambda x, u, node, params: x[0], "nodes": [0, 50]}]},
+            simple_states,
+            n_x=3,
+            n_u=1,
+            N=50,
+        )
+
+    # Out of range negative index
+    with pytest.raises(ValueError, match="invalid index -51.*Valid range"):
+        validate_byof(
+            {"nodal_constraints": [{"func": lambda x, u, node, params: x[0], "nodes": [0, -51]}]},
+            simple_states,
+            n_x=3,
+            n_u=1,
+            N=50,
+        )
+
+    # Valid negative index should work
+    validate_byof(
+        {"nodal_constraints": [{"func": lambda x, u, node, params: x[0], "nodes": [0, -1, -50]}]},
+        simple_states,
+        n_x=3,
+        n_u=1,
+        N=50,
+    )
 
 
 # ===== Cross-Nodal Constraint Validation =====
@@ -312,7 +361,9 @@ def test_cross_nodal_constraint_validation_errors(
     from openscvx.expert import validate_byof
 
     with pytest.raises(error_type, match=error_match):
-        validate_byof({"cross_nodal_constraints": [bad_constraint]}, simple_states, n_x=3, n_u=1)
+        validate_byof(
+            {"cross_nodal_constraints": [bad_constraint]}, simple_states, n_x=3, n_u=1, N=50
+        )
 
 
 def test_cross_nodal_constraint_runtime_errors(simple_states):
@@ -330,6 +381,7 @@ def test_cross_nodal_constraint_runtime_errors(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
     # Not differentiable
@@ -339,6 +391,7 @@ def test_cross_nodal_constraint_runtime_errors(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
 
@@ -369,7 +422,7 @@ def test_ctcs_constraint_validation_errors(simple_states, bad_spec, error_type, 
     from openscvx.expert import validate_byof
 
     with pytest.raises(error_type, match=error_match):
-        validate_byof({"ctcs_constraints": [bad_spec]}, simple_states, n_x=3, n_u=1)
+        validate_byof({"ctcs_constraints": [bad_spec]}, simple_states, n_x=3, n_u=1, N=50)
 
 
 def test_ctcs_constraint_runtime_errors(simple_states):
@@ -393,6 +446,7 @@ def test_ctcs_constraint_runtime_errors(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
     # constraint_fn not scalar
@@ -406,6 +460,7 @@ def test_ctcs_constraint_runtime_errors(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
     # constraint_fn not differentiable
@@ -415,6 +470,7 @@ def test_ctcs_constraint_runtime_errors(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
     # Custom penalty fails
@@ -431,6 +487,7 @@ def test_ctcs_constraint_runtime_errors(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
 
@@ -462,6 +519,7 @@ def test_ctcs_bounds_validation_errors(simple_states, bad_bounds, error_match):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
 
@@ -484,6 +542,7 @@ def test_ctcs_initial_must_be_within_bounds(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
     # Initial above bounds
@@ -501,6 +560,7 @@ def test_ctcs_initial_must_be_within_bounds(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
 
@@ -524,6 +584,7 @@ def test_error_messages_index_correctly(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
     # Multiple CTCS constraints - error in second one
@@ -538,6 +599,7 @@ def test_error_messages_index_correctly(simple_states):
             simple_states,
             n_x=3,
             n_u=1,
+            N=50,
         )
 
 
@@ -607,7 +669,7 @@ def test_problem_accepts_valid_byof():
 
     # Direct validation should pass
     # n_x = 2 (position) + 1 (velocity) = 3, n_u = 1 (theta)
-    validate_byof(byof, states, n_x=3, n_u=1)
+    validate_byof(byof, states, n_x=3, n_u=1, N=50)
 
     # Note: Full end-to-end integration testing is covered by test_brachistochrone.py::test_byof
     # This test just verifies the validation layer accepts valid byof specifications

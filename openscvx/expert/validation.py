@@ -18,6 +18,7 @@ def validate_byof(
     states: List["State"],
     n_x: int,
     n_u: int,
+    N: int = None,
 ) -> None:
     """Validate byof function signatures and shapes.
 
@@ -30,13 +31,15 @@ def validate_byof(
         states: List of State objects for determining expected shapes
         n_x: Total dimension of the unified state vector
         n_u: Total dimension of the unified control vector
+        N: Number of nodes in the trajectory (optional). If provided, validates
+            node indices in nodal constraints.
 
     Raises:
         ValueError: If any function has invalid signature or returns wrong shape
         TypeError: If functions are not callable
 
     Example:
-        >>> validate_byof(byof, states, n_x=10, n_u=3)  # Raises if invalid
+        >>> validate_byof(byof, states, n_x=10, n_u=3, N=50)  # Raises if invalid
     """
     import jax
     import jax.numpy as jnp
@@ -162,8 +165,19 @@ def validate_byof(
                 )
             if len(nodes) == 0:
                 raise ValueError(f"byof nodal_constraints[{i}]['nodes'] cannot be empty")
-            # Note: Cannot validate actual node indices here since we don't have N yet
-            # That validation happens in lowering.py
+
+            # Validate node indices if N is provided
+            if N is not None:
+                for node in nodes:
+                    # Handle negative indices (e.g., -1 for last node)
+                    normalized_node = node if node >= 0 else N + node
+                    # Validate range
+                    if not (0 <= normalized_node < N):
+                        raise ValueError(
+                            f"byof nodal_constraints[{i}]['nodes'] contains invalid index {node} "
+                            f"(normalized: {normalized_node}). Valid range is [0, {N}) or "
+                            f"negative indices [-{N}, -1]."
+                        )
 
     # Validate cross-nodal constraints
     dummy_X = jnp.zeros((10, n_x))  # Dummy trajectory with 10 nodes
