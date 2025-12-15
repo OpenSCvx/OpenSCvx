@@ -91,6 +91,7 @@ def apply_byof(
             Returns:
                 Composite dynamics function with byof derivatives spliced in
             """
+
             def composite_f(x, u, node, params):
                 # Start with symbolic/default dynamics for all states
                 xdot = orig_f(x, u, node, params)
@@ -189,6 +190,7 @@ def apply_byof(
             Returns:
                 Augmented dynamics function that appends penalty derivative to xdot
             """
+
             def augmented_f(x, u, node, params):
                 # Compute original state derivatives
                 xdot = orig_f(x, u, node, params)
