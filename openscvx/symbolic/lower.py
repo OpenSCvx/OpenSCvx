@@ -559,6 +559,7 @@ def _lower_cvxpy(
     N: int,
     x_unified: UnifiedState,
     u_unified: UnifiedControl,
+    jax_constraints: LoweredJaxConstraints,
 ) -> Tuple[CVXPyVariables, LoweredCvxpyConstraints, dict]:
     """Create CVXPy variables and lower convex constraints.
 
@@ -569,6 +570,7 @@ def _lower_cvxpy(
         constraints: ConstraintSet containing convex constraints
         parameters: Dict of parameter values for constraint lowering
         N: Number of discretization nodes
+        jax_constraints: Lowered JAX constraints (for sizing CVXPy variables)
         x_unified: Unified state interface (for dimensions and scaling)
         u_unified: Unified control interface (for dimensions and scaling)
 
@@ -617,8 +619,8 @@ def _lower_cvxpy(
         c_x=c_x,
         S_u=S_u,
         c_u=c_u,
-        n_nodal_constraints=len(constraints.nodal),
-        n_cross_node_constraints=len(constraints.cross_node),
+        n_nodal_constraints=len(jax_constraints.nodal),
+        n_cross_node_constraints=len(jax_constraints.cross_node),
     )
 
     # Lower convex constraints to CVXPy
@@ -679,6 +681,7 @@ def _apply_byof(
     x_prop_unified: "UnifiedState",
     states: List["State"],
     states_prop: List["State"],
+    N: int,
 ) -> Tuple[Dynamics, Dynamics, LoweredJaxConstraints, "UnifiedState", "UnifiedState"]:
     """Apply bring-your-own-functions (byof) to augment lowered problem.
 
@@ -753,7 +756,7 @@ def _apply_byof(
             func=jax.vmap(fn, in_axes=(0, 0, None, None)),
             grad_g_x=jax.vmap(jacfwd(fn, argnums=0), in_axes=(0, 0, None, None)),
             grad_g_u=jax.vmap(jacfwd(fn, argnums=1), in_axes=(0, 0, None, None)),
-            nodes=None,  # Apply to all nodes
+            nodes=list(range(N)),  # Apply to all nodes
         )
         jax_constraints.nodal.append(constraint)
 
@@ -910,11 +913,12 @@ def lower_symbolic_problem(
             x_prop_unified,
             problem.states,
             problem.states_prop,
+            problem.N,
         )
 
     # Create CVXPy variables and lower convex constraints
     ocp_vars, cvxpy_constraints, cvxpy_params = _lower_cvxpy(
-        problem.constraints, problem.parameters, problem.N, x_unified, u_unified
+        problem.constraints, problem.parameters, problem.N, x_unified, u_unified, jax_constraints
     )
 
     return LoweredProblem(

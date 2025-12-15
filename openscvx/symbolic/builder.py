@@ -219,13 +219,15 @@ def preprocess_symbolic_problem(
     # Validate dynamics dict matches state names and dimensions
     # byof_dynamics states should not be in symbolic dynamics dict
     validate_dynamics_dict(dynamics, states, byof_dynamics=byof_dynamics)
-    validate_dynamics_dict_dimensions(dynamics, states)
 
     # Inject zero placeholders for byof dynamics states
     # These will be replaced with the actual byof functions at lowering time
     for state in states:
         if state.name in byof_dynamics:
             dynamics[state.name] = Constant(np.zeros(state.shape))
+
+    # Validate dynamics dimensions AFTER injecting placeholders
+    validate_dynamics_dict_dimensions(dynamics, states)
 
     # Convert dynamics dict to concatenated expression
     dynamics, dynamics_concat = convert_dynamics_dict_to_expr(dynamics, states)
