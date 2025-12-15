@@ -1066,27 +1066,29 @@ def test_byof(byof_mode):
             "nodal_constraints": [
                 # position bounds (applied to all nodes)
                 {
-                    "func": lambda x, u, node, params: x[position.slice][0] - 10.0
+                    "constraint_fn": lambda x, u, node, params: x[position.slice][0] - 10.0
                 },  # position[0] <= 10.0
                 {
-                    "func": lambda x, u, node, params: 0.0 - x[position.slice][0]
+                    "constraint_fn": lambda x, u, node, params: 0.0 - x[position.slice][0]
                 },  # position[0] >= 0.0
                 {
-                    "func": lambda x, u, node, params: x[position.slice][1] - 10.0
+                    "constraint_fn": lambda x, u, node, params: x[position.slice][1] - 10.0
                 },  # position[1] <= 10.0
                 {
-                    "func": lambda x, u, node, params: 0.0 - x[position.slice][1]
+                    "constraint_fn": lambda x, u, node, params: 0.0 - x[position.slice][1]
                 },  # position[1] >= 0.0
                 # velocity bounds (applied to all nodes)
                 {
-                    "func": lambda x, u, node, params: x[velocity.slice][0] - 10.0
+                    "constraint_fn": lambda x, u, node, params: x[velocity.slice][0] - 10.0
                 },  # velocity[0] <= 10.0
                 {
-                    "func": lambda x, u, node, params: 0.0 - x[velocity.slice][0]
+                    "constraint_fn": lambda x, u, node, params: 0.0 - x[velocity.slice][0]
                 },  # velocity[0] >= 0.0
                 # Demonstrate selective node enforcement: velocity must be exactly 0 at start
                 {
-                    "func": lambda x, u, node, params: x[velocity.slice][0],  # velocity == 0
+                    "constraint_fn": lambda x, u, node, params: x[velocity.slice][
+                        0
+                    ],  # velocity == 0
                     "nodes": [0],  # Only enforce at first node
                 },
             ],

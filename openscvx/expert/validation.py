@@ -114,18 +114,21 @@ def validate_byof(
                 f"got {type(constraint_spec)}"
             )
 
-        if "func" not in constraint_spec:
-            raise ValueError(f"byof nodal_constraints[{i}] missing required key 'func'")
+        if "constraint_fn" not in constraint_spec:
+            raise ValueError(f"byof nodal_constraints[{i}] missing required key 'constraint_fn'")
 
-        fn = constraint_spec["func"]
+        fn = constraint_spec["constraint_fn"]
         if not callable(fn):
-            raise TypeError(f"byof nodal_constraints[{i}]['func'] must be callable, got {type(fn)}")
+            raise TypeError(
+                f"byof nodal_constraints[{i}]['constraint_fn'] must be callable, got {type(fn)}"
+            )
 
         # Check signature
         sig = inspect.signature(fn)
         if len(sig.parameters) != 4:
             raise ValueError(
-                f"byof nodal_constraints[{i}]['func'] must have signature f(x, u, node, params), "
+                f"byof nodal_constraints[{i}]['constraint_fn'] must have signature "
+                f"f(x, u, node, params), "
                 f"got {len(sig.parameters)} parameters: {list(sig.parameters.keys())}"
             )
 
@@ -134,7 +137,7 @@ def validate_byof(
             result = fn(dummy_x, dummy_u, dummy_node, dummy_params)
         except Exception as e:
             raise ValueError(
-                f"byof nodal_constraints[{i}]['func'] failed on test call with "
+                f"byof nodal_constraints[{i}]['constraint_fn'] failed on test call with "
                 f"x.shape={dummy_x.shape}, u.shape={dummy_u.shape}: {e}"
             ) from e
 
@@ -143,7 +146,7 @@ def validate_byof(
             result_array = jnp.asarray(result)
         except Exception as e:
             raise ValueError(
-                f"byof nodal_constraints[{i}]['func'] must return array-like value, "
+                f"byof nodal_constraints[{i}]['constraint_fn'] must return array-like value, "
                 f"got {type(result)}: {e}"
             ) from e
 
@@ -152,7 +155,7 @@ def validate_byof(
             jax.grad(lambda x: jnp.sum(fn(x, dummy_u, dummy_node, dummy_params)))(dummy_x)
         except Exception as e:
             raise ValueError(
-                f"byof nodal_constraints[{i}]['func'] is not differentiable with JAX: {e}"
+                f"byof nodal_constraints[{i}]['constraint_fn'] is not differentiable with JAX: {e}"
             ) from e
 
         # Validate nodes if provided

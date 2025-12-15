@@ -65,14 +65,14 @@ Example:
             "nodal_constraints": [
                 # Velocity bounds (applied to all nodes)
                 {
-                    "func": lambda x, u, node, params: x[velocity.slice][0] - 10.0,
+                    "constraint_fn": lambda x, u, node, params: x[velocity.slice][0] - 10.0,
                 },
                 {
-                    "func": lambda x, u, node, params: -x[velocity.slice][0],
+                    "constraint_fn": lambda x, u, node, params: -x[velocity.slice][0],
                 },
                 # Velocity must be exactly 0 at start (selective enforcement)
                 {
-                    "func": lambda x, u, node, params: x[velocity.slice][0],
+                    "constraint_fn": lambda x, u, node, params: x[velocity.slice][0],
                     "nodes": [0],  # Only at first node
                 },
             ],
@@ -114,7 +114,7 @@ class NodalConstraintSpec(TypedDict, total=False):
     specific nodes for boundary conditions, waypoints, or computational efficiency.
 
     Attributes:
-        func: Constraint function with signature ``(x, u, node, params) -> residual``.
+        constraint_fn: Constraint function with signature ``(x, u, node, params) -> residual``.
             Follows g(x,u) <= 0 convention (negative = satisfied). Required field.
         nodes: List of integer node indices where constraint is enforced.
             If omitted, applies to all nodes. Negative indices supported (e.g., -1 for last).
@@ -124,21 +124,21 @@ class NodalConstraintSpec(TypedDict, total=False):
         Boundary constraint only at first and last nodes::
 
             nodal_spec: NodalConstraintSpec = {
-                "func": lambda x, u, node, params: x[velocity.slice][0],
+                "constraint_fn": lambda x, u, node, params: x[velocity.slice][0],
                 "nodes": [0, -1],  # Only at start and end
             }
 
         Waypoint constraint at middle of trajectory::
 
             nodal_spec: NodalConstraintSpec = {
-                "func": lambda x, u, node, params: jnp.linalg.norm(
+                "constraint_fn": lambda x, u, node, params: jnp.linalg.norm(
                     x[position.slice] - jnp.array([5.0, 7.5])
                 ) - 0.1,
                 "nodes": [N // 2],
             }
     """
 
-    func: NodalConstraintFunction  # Required
+    constraint_fn: NodalConstraintFunction  # Required
     nodes: List[int]
 
 
@@ -244,14 +244,14 @@ class ByofSpec(TypedDict, total=False):
                 "nodal_constraints": [
                     # Applied to all nodes (no "nodes" field)
                     {
-                        "func": lambda x, u, node, params: x[velocity.slice][0] - 10.0,
+                        "constraint_fn": lambda x, u, node, params: x[velocity.slice][0] - 10.0,
                     },
                     {
-                        "func": lambda x, u, node, params: -x[velocity.slice][0],
+                        "constraint_fn": lambda x, u, node, params: -x[velocity.slice][0],
                     },
                     # Specify nodes for selective enforcement
                     {
-                        "func": lambda x, u, node, params: x[velocity.slice][0],
+                        "constraint_fn": lambda x, u, node, params: x[velocity.slice][0],
                         "nodes": [0],  # Velocity must be exactly 0 at start
                     },
                 ],

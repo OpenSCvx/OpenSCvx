@@ -127,7 +127,7 @@ def apply_byof(
     # Handle nodal constraints
     # Note: Validation happens earlier in Problem.__init__ via validate_byof
     for constraint_spec in byof.get("nodal_constraints", []):
-        fn = constraint_spec["func"]
+        fn = constraint_spec["constraint_fn"]
         nodes = constraint_spec.get("nodes", list(range(N)))  # Default: all nodes
 
         # Normalize negative node indices (validation already done in validate_byof)

@@ -56,7 +56,7 @@ def test_valid_byof_specifications(simple_states):
 
     # Valid nodal constraint (scalar, all nodes)
     validate_byof(
-        {"nodal_constraints": [{"func": lambda x, u, node, params: x[0] - 10.0}]},
+        {"nodal_constraints": [{"constraint_fn": lambda x, u, node, params: x[0] - 10.0}]},
         simple_states,
         n_x=3,
         n_u=1,
@@ -67,7 +67,7 @@ def test_valid_byof_specifications(simple_states):
     validate_byof(
         {
             "nodal_constraints": [
-                {"func": lambda x, u, node, params: jnp.array([x[0] - 10.0, x[1] - 5.0])}
+                {"constraint_fn": lambda x, u, node, params: jnp.array([x[0] - 10.0, x[1] - 5.0])}
             ]
         },
         simple_states,
@@ -80,7 +80,7 @@ def test_valid_byof_specifications(simple_states):
     validate_byof(
         {
             "nodal_constraints": [
-                {"func": lambda x, u, node, params: x[0] - 10.0, "nodes": [0, 5, 10]}
+                {"constraint_fn": lambda x, u, node, params: x[0] - 10.0, "nodes": [0, 5, 10]}
             ]
         },
         simple_states,
@@ -91,7 +91,11 @@ def test_valid_byof_specifications(simple_states):
 
     # Valid nodal constraint with negative node indices
     validate_byof(
-        {"nodal_constraints": [{"func": lambda x, u, node, params: x[0], "nodes": [0, -1]}]},
+        {
+            "nodal_constraints": [
+                {"constraint_fn": lambda x, u, node, params: x[0], "nodes": [0, -1]}
+            ]
+        },
         simple_states,
         n_x=3,
         n_u=1,
@@ -255,20 +259,24 @@ def test_dynamics_runtime_errors(simple_states):
     [
         # Not a dict
         ("not a dict", TypeError, "must be a dict"),
-        # Missing 'func' key
-        ({"nodes": [0, 1]}, ValueError, "missing required key 'func'"),
-        # func not callable
-        ({"func": "not a function"}, TypeError, "must be callable"),
+        # Missing 'constraint_fn' key
+        ({"nodes": [0, 1]}, ValueError, "missing required key 'constraint_fn'"),
+        # constraint_fn not callable
+        ({"constraint_fn": "not a function"}, TypeError, "must be callable"),
         # Wrong signature
-        ({"func": lambda x, u: x[0]}, ValueError, "must have signature"),
+        ({"constraint_fn": lambda x, u: x[0]}, ValueError, "must have signature"),
         # nodes not a list
         (
-            {"func": lambda x, u, node, params: x[0], "nodes": "invalid"},
+            {"constraint_fn": lambda x, u, node, params: x[0], "nodes": "invalid"},
             TypeError,
             "must be a list",
         ),
         # Empty nodes list
-        ({"func": lambda x, u, node, params: x[0], "nodes": []}, ValueError, "cannot be empty"),
+        (
+            {"constraint_fn": lambda x, u, node, params: x[0], "nodes": []},
+            ValueError,
+            "cannot be empty",
+        ),
     ],
 )
 def test_nodal_constraint_validation_errors(simple_states, bad_spec, error_type, error_match):
@@ -288,7 +296,11 @@ def test_nodal_constraint_runtime_errors(simple_states):
         validate_byof(
             {
                 "nodal_constraints": [
-                    {"func": lambda x, u, node, params: (_ for _ in ()).throw(RuntimeError("fail"))}
+                    {
+                        "constraint_fn": lambda x, u, node, params: (_ for _ in ()).throw(
+                            RuntimeError("fail")
+                        )
+                    }
                 ]
             },
             simple_states,
@@ -300,7 +312,11 @@ def test_nodal_constraint_runtime_errors(simple_states):
     # Not differentiable
     with pytest.raises(ValueError, match="not differentiable with JAX"):
         validate_byof(
-            {"nodal_constraints": [{"func": lambda x, u, node, params: np.array([x[0] - 10.0])}]},
+            {
+                "nodal_constraints": [
+                    {"constraint_fn": lambda x, u, node, params: np.array([x[0] - 10.0])}
+                ]
+            },
             simple_states,
             n_x=3,
             n_u=1,
@@ -315,7 +331,11 @@ def test_nodal_constraint_node_index_validation(simple_states):
     # Out of range positive index
     with pytest.raises(ValueError, match="invalid index 50.*Valid range is \\[0, 50\\)"):
         validate_byof(
-            {"nodal_constraints": [{"func": lambda x, u, node, params: x[0], "nodes": [0, 50]}]},
+            {
+                "nodal_constraints": [
+                    {"constraint_fn": lambda x, u, node, params: x[0], "nodes": [0, 50]}
+                ]
+            },
             simple_states,
             n_x=3,
             n_u=1,
@@ -325,7 +345,11 @@ def test_nodal_constraint_node_index_validation(simple_states):
     # Out of range negative index
     with pytest.raises(ValueError, match="invalid index -51.*Valid range"):
         validate_byof(
-            {"nodal_constraints": [{"func": lambda x, u, node, params: x[0], "nodes": [0, -51]}]},
+            {
+                "nodal_constraints": [
+                    {"constraint_fn": lambda x, u, node, params: x[0], "nodes": [0, -51]}
+                ]
+            },
             simple_states,
             n_x=3,
             n_u=1,
@@ -334,7 +358,11 @@ def test_nodal_constraint_node_index_validation(simple_states):
 
     # Valid negative index should work
     validate_byof(
-        {"nodal_constraints": [{"func": lambda x, u, node, params: x[0], "nodes": [0, -1, -50]}]},
+        {
+            "nodal_constraints": [
+                {"constraint_fn": lambda x, u, node, params: x[0], "nodes": [0, -1, -50]}
+            ]
+        },
         simple_states,
         n_x=3,
         n_u=1,
@@ -577,8 +605,8 @@ def test_error_messages_index_correctly(simple_states):
         validate_byof(
             {
                 "nodal_constraints": [
-                    {"func": lambda x, u, node, params: x[0] - 10.0},  # Good
-                    {"func": lambda x, u: x[0]},  # Bad - wrong signature
+                    {"constraint_fn": lambda x, u, node, params: x[0] - 10.0},  # Good
+                    {"constraint_fn": lambda x, u: x[0]},  # Bad - wrong signature
                 ]
             },
             simple_states,
@@ -661,7 +689,7 @@ def test_problem_accepts_valid_byof():
     # Valid byof with proper dynamics signature
     byof = {
         "dynamics": {"velocity": lambda x, u, node, params: jnp.array([1.0])},
-        "nodal_constraints": [{"func": lambda x, u, node, params: x[0] - 10.0}],
+        "nodal_constraints": [{"constraint_fn": lambda x, u, node, params: x[0] - 10.0}],
         "ctcs_constraints": [
             {"constraint_fn": lambda x, u, node, params: x[1] - 5.0, "penalty": "square"}
         ],
