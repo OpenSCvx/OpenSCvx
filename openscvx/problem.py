@@ -145,6 +145,23 @@ class Problem(ProblemPlotMixin):
             byof=byof,
         )
 
+        # Validate byof early (after preprocessing, before lowering) to fail fast
+        if byof is not None:
+            from openscvx.expert.validation import validate_byof
+
+            # Calculate unified state and control dimensions from preprocessed states/controls
+            # These dimensions include symbolic augmentation (time, CTCS) but not byof CTCS
+            # augmentation, which is exactly what user byof functions will see
+            n_x = sum(
+                state.shape[0] if len(state.shape) > 0 else 1 for state in self.symbolic.states
+            )
+            n_u = sum(
+                control.shape[0] if len(control.shape) > 0 else 1
+                for control in self.symbolic.controls
+            )
+
+            validate_byof(byof, self.symbolic.states, n_x, n_u)
+
         # Lower to JAX and CVXPy (byof handling happens inside lower_symbolic_problem)
         self._lowered: LoweredProblem = lower_symbolic_problem(self.symbolic, byof=byof)
 

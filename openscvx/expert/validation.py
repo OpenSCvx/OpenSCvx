@@ -8,7 +8,6 @@ import inspect
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
-    from openscvx.lowered.unified import UnifiedState
     from openscvx.symbolic.expr.state import State
 
 __all__ = ["validate_byof"]
@@ -17,8 +16,8 @@ __all__ = ["validate_byof"]
 def validate_byof(
     byof: dict,
     states: List["State"],
-    x_unified: "UnifiedState",
-    u_unified: "UnifiedState",
+    n_x: int,
+    n_u: int,
 ) -> None:
     """Validate byof function signatures and shapes.
 
@@ -29,15 +28,15 @@ def validate_byof(
     Args:
         byof: Dictionary of user-provided functions to validate
         states: List of State objects for determining expected shapes
-        x_unified: Unified state for dimension information
-        u_unified: Unified control for dimension information
+        n_x: Total dimension of the unified state vector
+        n_u: Total dimension of the unified control vector
 
     Raises:
         ValueError: If any function has invalid signature or returns wrong shape
         TypeError: If functions are not callable
 
     Example:
-        >>> validate_byof(byof, states, x_unified, u_unified)  # Raises if invalid
+        >>> validate_byof(byof, states, n_x=10, n_u=3)  # Raises if invalid
     """
     import jax
     import jax.numpy as jnp
@@ -47,10 +46,6 @@ def validate_byof(
     invalid_keys = set(byof.keys()) - valid_keys
     if invalid_keys:
         raise ValueError(f"Unknown byof keys: {invalid_keys}. Valid keys: {valid_keys}")
-
-    # Get dimensions
-    n_x = x_unified.shape[0]
-    n_u = u_unified.shape[0]
 
     # Create dummy inputs for testing
     dummy_x = jnp.zeros(n_x)

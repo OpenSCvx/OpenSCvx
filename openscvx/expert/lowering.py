@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from openscvx.lowered.unified import UnifiedState
     from openscvx.symbolic.expr.state import State
 
-from openscvx.expert.validation import validate_byof
 from openscvx.lowered import (
     Dynamics,
     LoweredCrossNodeConstraint,
@@ -69,9 +68,7 @@ def apply_byof(
     """
     import jax.numpy as jnp
 
-    # Validate byof functions first
-    validate_byof(byof, states, x_unified, u_unified)
-
+    # Note: byof validation happens earlier in Problem.__init__ to fail fast
     # Handle byof dynamics by splicing in raw JAX functions at the correct slices
     byof_dynamics = byof.get("dynamics", {})
     if byof_dynamics:
