@@ -193,6 +193,13 @@ class ByofSpec(TypedDict, total=False):
         - Ensuring functions are differentiable
         - Following g(x,u) <= 0 convention for constraints
 
+    Tip:
+        Use the ``.slice`` property on State/Control objects for cleaner, more
+        maintainable indexing instead of hardcoded indices. For example, use
+        ``x[velocity.slice]`` instead of ``x[2:3]``. The slice property is set
+        after preprocessing and provides the correct indices into the unified
+        state/control vectors.
+
     Attributes:
         dynamics: Raw JAX functions for state derivatives. Maps state names to functions
             with signature ``(x, u, node, params) -> xdot_component``. States here should
