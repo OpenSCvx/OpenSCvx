@@ -52,6 +52,7 @@ Example:
         # Now have executable JAX functions with Jacobians
 """
 
+import inspect
 from typing import TYPE_CHECKING, Any, List, Optional, Sequence, Tuple, Union
 
 import cvxpy as cp
@@ -672,6 +673,250 @@ def _contains_node_reference(expr: Expr) -> bool:
     return False
 
 
+def _validate_byof_functions(
+    byof: dict,
+    states: List["State"],
+    x_unified: "UnifiedState",
+    u_unified: "UnifiedState",
+) -> None:
+    """Validate byof function signatures and shapes.
+
+    Checks that user-provided functions have the correct signatures and return
+    appropriate shapes. Performs validation before functions are used to provide
+    clear error messages.
+
+    Args:
+        byof: Dictionary of user-provided functions to validate
+        states: List of State objects for determining expected shapes
+        x_unified: Unified state for dimension information
+        u_unified: Unified control for dimension information
+
+    Raises:
+        ValueError: If any function has invalid signature or returns wrong shape
+        TypeError: If functions are not callable
+    """
+    import jax.numpy as jnp
+
+    # Get dimensions
+    n_x = x_unified.shape[0]
+    n_u = u_unified.shape[0]
+
+    # Create dummy inputs for testing
+    dummy_x = jnp.zeros(n_x)
+    dummy_u = jnp.zeros(n_u)
+    dummy_node = 0
+    dummy_params = {}
+
+    # Validate dynamics functions
+    byof_dynamics = byof.get("dynamics", {})
+    if byof_dynamics:
+        # Build mapping from state name to expected shape
+        state_shapes = {state.name: state.shape for state in states}
+
+        for state_name, fn in byof_dynamics.items():
+            if state_name not in state_shapes:
+                raise ValueError(
+                    f"byof dynamics '{state_name}' does not match any state name. "
+                    f"Available states: {list(state_shapes.keys())}"
+                )
+
+            if not callable(fn):
+                raise TypeError(f"byof dynamics '{state_name}' must be callable, got {type(fn)}")
+
+            # Check signature
+            sig = inspect.signature(fn)
+            if len(sig.parameters) != 4:
+                raise ValueError(
+                    f"byof dynamics '{state_name}' must have signature f(x, u, node, params), "
+                    f"got {len(sig.parameters)} parameters: {list(sig.parameters.keys())}"
+                )
+
+            # Test call and check output shape
+            try:
+                result = fn(dummy_x, dummy_u, dummy_node, dummy_params)
+            except Exception as e:
+                raise ValueError(
+                    f"byof dynamics '{state_name}' failed on test call with "
+                    f"x.shape={dummy_x.shape}, u.shape={dummy_u.shape}: {e}"
+                ) from e
+
+            expected_shape = state_shapes[state_name]
+            result_shape = jnp.asarray(result).shape
+            if result_shape != expected_shape:
+                raise ValueError(
+                    f"byof dynamics '{state_name}' returned shape {result_shape}, "
+                    f"expected {expected_shape} (state '{state_name}' shape)"
+                )
+
+            # Test that gradient works (JAX compatibility check)
+            try:
+                jax.grad(lambda x: jnp.sum(fn(x, dummy_u, dummy_node, dummy_params)))(dummy_x)
+            except Exception as e:
+                raise ValueError(
+                    f"byof dynamics '{state_name}' is not differentiable with JAX. "
+                    f"Ensure the function uses JAX operations (jax.numpy, not numpy): {e}"
+                ) from e
+
+    # Validate nodal constraints
+    for i, fn in enumerate(byof.get("nodal_constraints", [])):
+        if not callable(fn):
+            raise TypeError(f"byof nodal_constraints[{i}] must be callable, got {type(fn)}")
+
+        # Check signature
+        sig = inspect.signature(fn)
+        if len(sig.parameters) != 4:
+            raise ValueError(
+                f"byof nodal_constraints[{i}] must have signature f(x, u, node, params), "
+                f"got {len(sig.parameters)} parameters: {list(sig.parameters.keys())}"
+            )
+
+        # Test call
+        try:
+            result = fn(dummy_x, dummy_u, dummy_node, dummy_params)
+        except Exception as e:
+            raise ValueError(
+                f"byof nodal_constraints[{i}] failed on test call with "
+                f"x.shape={dummy_x.shape}, u.shape={dummy_u.shape}: {e}"
+            ) from e
+
+        # Check that result is array-like (can be scalar or vector)
+        try:
+            result_array = jnp.asarray(result)
+        except Exception as e:
+            raise ValueError(
+                f"byof nodal_constraints[{i}] must return array-like value, got {type(result)}: {e}"
+            ) from e
+
+        # Test gradient
+        try:
+            jax.grad(lambda x: jnp.sum(fn(x, dummy_u, dummy_node, dummy_params)))(dummy_x)
+        except Exception as e:
+            raise ValueError(
+                f"byof nodal_constraints[{i}] is not differentiable with JAX: {e}"
+            ) from e
+
+    # Validate cross-nodal constraints
+    dummy_X = jnp.zeros((10, n_x))  # Dummy trajectory with 10 nodes
+    dummy_U = jnp.zeros((10, n_u))
+
+    for i, fn in enumerate(byof.get("cross_nodal_constraints", [])):
+        if not callable(fn):
+            raise TypeError(f"byof cross_nodal_constraints[{i}] must be callable, got {type(fn)}")
+
+        # Check signature
+        sig = inspect.signature(fn)
+        if len(sig.parameters) != 3:
+            raise ValueError(
+                f"byof cross_nodal_constraints[{i}] must have signature f(X, U, params), "
+                f"got {len(sig.parameters)} parameters: {list(sig.parameters.keys())}"
+            )
+
+        # Test call
+        try:
+            result = fn(dummy_X, dummy_U, dummy_params)
+        except Exception as e:
+            raise ValueError(
+                f"byof cross_nodal_constraints[{i}] failed on test call with "
+                f"X.shape={dummy_X.shape}, U.shape={dummy_U.shape}: {e}"
+            ) from e
+
+        # Check that result is array-like
+        try:
+            result_array = jnp.asarray(result)
+        except Exception as e:
+            raise ValueError(
+                f"byof cross_nodal_constraints[{i}] must return array-like value, "
+                f"got {type(result)}: {e}"
+            ) from e
+
+        # Test gradient
+        try:
+            jax.grad(lambda X: jnp.sum(fn(X, dummy_U, dummy_params)))(dummy_X)
+        except Exception as e:
+            raise ValueError(
+                f"byof cross_nodal_constraints[{i}] is not differentiable with JAX: {e}"
+            ) from e
+
+    # Validate CTCS constraints
+    for i, ctcs_spec in enumerate(byof.get("ctcs_constraints", [])):
+        if not isinstance(ctcs_spec, dict):
+            raise TypeError(f"byof ctcs_constraints[{i}] must be a dict, got {type(ctcs_spec)}")
+
+        if "constraint_fn" not in ctcs_spec:
+            raise ValueError(f"byof ctcs_constraints[{i}] missing required key 'constraint_fn'")
+
+        fn = ctcs_spec["constraint_fn"]
+        if not callable(fn):
+            raise TypeError(
+                f"byof ctcs_constraints[{i}]['constraint_fn'] must be callable, got {type(fn)}"
+            )
+
+        # Check signature
+        sig = inspect.signature(fn)
+        if len(sig.parameters) != 4:
+            raise ValueError(
+                f"byof ctcs_constraints[{i}]['constraint_fn'] must have signature "
+                f"f(x, u, node, params), got {len(sig.parameters)} parameters: "
+                f"{list(sig.parameters.keys())}"
+            )
+
+        # Test call
+        try:
+            result = fn(dummy_x, dummy_u, dummy_node, dummy_params)
+        except Exception as e:
+            raise ValueError(
+                f"byof ctcs_constraints[{i}]['constraint_fn'] failed on test call: {e}"
+            ) from e
+
+        # Check that result is scalar
+        result_array = jnp.asarray(result)
+        if result_array.shape != ():
+            raise ValueError(
+                f"byof ctcs_constraints[{i}]['constraint_fn'] must return a scalar, "
+                f"got shape {result_array.shape}"
+            )
+
+        # Test gradient
+        try:
+            jax.grad(lambda x: fn(x, dummy_u, dummy_node, dummy_params))(dummy_x)
+        except Exception as e:
+            raise ValueError(
+                f"byof ctcs_constraints[{i}]['constraint_fn'] is not differentiable with JAX: {e}"
+            ) from e
+
+        # Validate penalty function if provided
+        if "penalty" in ctcs_spec:
+            penalty_spec = ctcs_spec["penalty"]
+            if callable(penalty_spec):
+                # Test custom penalty function
+                try:
+                    test_residual = jnp.array(0.5)
+                    penalty_result = penalty_spec(test_residual)
+                    jnp.asarray(penalty_result)
+                except Exception as e:
+                    raise ValueError(
+                        f"byof ctcs_constraints[{i}]['penalty'] custom function failed: {e}"
+                    ) from e
+            elif penalty_spec not in ["square", "l1", "huber"]:
+                raise ValueError(
+                    f"byof ctcs_constraints[{i}]['penalty'] must be 'square', 'l1', 'huber', "
+                    f"or a callable, got {penalty_spec!r}"
+                )
+
+        # Validate bounds if provided
+        if "bounds" in ctcs_spec:
+            bounds = ctcs_spec["bounds"]
+            if not isinstance(bounds, (tuple, list)) or len(bounds) != 2:
+                raise ValueError(
+                    f"byof ctcs_constraints[{i}]['bounds'] must be a (min, max) tuple, got {bounds}"
+                )
+            if bounds[0] > bounds[1]:
+                raise ValueError(
+                    f"byof ctcs_constraints[{i}]['bounds'] min ({bounds[0]}) must be <= "
+                    f"max ({bounds[1]})"
+                )
+
+
 def _apply_byof(
     byof: dict,
     dynamics: Dynamics,
@@ -679,6 +924,7 @@ def _apply_byof(
     jax_constraints: LoweredJaxConstraints,
     x_unified: "UnifiedState",
     x_prop_unified: "UnifiedState",
+    u_unified: "UnifiedState",
     states: List["State"],
     states_prop: List["State"],
     N: int,
@@ -699,8 +945,10 @@ def _apply_byof(
         jax_constraints: Lowered JAX constraints to append to
         x_unified: Unified optimization state interface to potentially augment
         x_prop_unified: Unified propagation state interface to potentially augment
+        u_unified: Unified control interface for validation
         states: List of State objects for optimization (with _slice attributes)
         states_prop: List of State objects for propagation (with _slice attributes)
+        N: Number of nodes in the trajectory
 
     Returns:
         Tuple of (dynamics, dynamics_prop, jax_constraints, x_unified, x_prop_unified)
@@ -712,6 +960,9 @@ def _apply_byof(
     invalid_keys = set(byof.keys()) - valid_keys
     if invalid_keys:
         raise ValueError(f"Unknown byof keys: {invalid_keys}. Valid keys: {valid_keys}")
+
+    # Validate function signatures and shapes
+    _validate_byof_functions(byof, states, x_unified, u_unified)
 
     # Handle byof dynamics by splicing in raw JAX functions at the correct slices
     byof_dynamics = byof.get("dynamics", {})
@@ -911,6 +1162,7 @@ def lower_symbolic_problem(
             jax_constraints,
             x_unified,
             x_prop_unified,
+            u_unified,
             problem.states,
             problem.states_prop,
             problem.N,
