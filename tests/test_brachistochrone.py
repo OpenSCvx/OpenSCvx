@@ -879,21 +879,32 @@ def test_propagation():
     jax.clear_caches()
 
 
-def test_byof():
+@pytest.mark.parametrize(
+    "byof_mode",
+    ["ctcs", "nodal", "cross_nodal", "dynamics", "mixed"],
+)
+def test_byof(byof_mode):
     """
     Test brachistochrone using byof (bring-your-own-functions) for expert users.
 
-    This test demonstrates using raw JAX functions instead of the symbolic layer
-    for defining constraints. The byof parameter allows expert users to bypass
-    the symbolic layer and directly specify JAX functions for:
-    - nodal_constraints: Point-wise constraints at each node
-    - cross_nodal_constraints: Constraints coupling multiple nodes
-    - ctcs_constraints: Continuous-time constraint satisfaction
+    This test demonstrates using raw JAX functions instead of the symbolic layer.
+    The byof parameter allows expert users to bypass the symbolic layer and directly
+    specify JAX functions for different purposes.
+
+    Args:
+        byof_mode: One of:
+            - "ctcs": CTCS constraints via byof
+            - "nodal": Nodal constraints via byof
+            - "cross_nodal": Cross-nodal constraints via byof
+            - "dynamics": Replace all dynamics with byof
+            - "mixed": Mix symbolic and byof (position dynamics + velocity dynamics/constraints via
+                byof)
 
     The unified state vector after augmentation is:
     - x[0], x[1]: position (x, y)
     - x[2]: velocity
     - x[3]: time
+    - x[4+]: augmented states (for CTCS)
 
     The unified control vector after augmentation is:
     - u[0]: theta (angle)
@@ -939,14 +950,160 @@ def test_byof():
     states = [position, velocity]
     controls = [theta]
 
-    # Define dynamics
-    dynamics = {
-        "position": ox.Concat(
-            velocity[0] * ox.Sin(theta[0]),
-            -velocity[0] * ox.Cos(theta[0]),
-        ),
-        "velocity": g * ox.Cos(theta[0]),
-    }
+    # Setup dynamics and constraints based on mode
+    if byof_mode == "dynamics":
+        # Pure byof dynamics: replace all dynamics with raw JAX functions
+        # Note: dynamics dict must still contain time if time_dilation is enabled
+        dynamics = {"time": 1.0}  # Only time dynamics in symbolic
+
+        # Define position and velocity dynamics via byof
+        # Using .slice property for clean state/control access
+        byof: ByofSpec = {
+            "dynamics": {
+                "position": lambda x, u, node, params: jnp.array(
+                    [
+                        x[velocity.slice][0] * jnp.sin(u[theta.slice][0]),
+                        -x[velocity.slice][0] * jnp.cos(u[theta.slice][0]),
+                    ]
+                ),
+                "velocity": lambda x, u, node, params: jnp.array([g * jnp.cos(u[theta.slice][0])]),
+            }
+        }
+
+        # Use symbolic constraints for box bounds
+        constraints = []
+        for state in states:
+            constraints.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
+
+    elif byof_mode == "mixed":
+        # Mix symbolic and byof for both dynamics and constraints
+        # Position dynamics via symbolic, velocity dynamics via byof
+        # Position constraints via symbolic, velocity constraints via byof
+        dynamics = {
+            "position": ox.Concat(
+                velocity[0] * ox.Sin(theta[0]),
+                -velocity[0] * ox.Cos(theta[0]),
+            ),
+            "time": 1.0,
+        }
+
+        # Velocity dynamics via byof, velocity constraints via byof
+        byof: ByofSpec = {
+            "dynamics": {
+                "velocity": lambda x, u, node, params: jnp.array([g * jnp.cos(u[theta.slice][0])]),
+            },
+            "ctcs_constraints": [
+                {
+                    "constraint_fn": lambda x, u, node, params: x[velocity.slice][0] - 10.0,
+                    "penalty": "square",
+                },
+                {
+                    "constraint_fn": lambda x, u, node, params: 0.0 - x[velocity.slice][0],
+                    "penalty": "square",
+                },
+            ],
+        }
+
+        # Use symbolic constraints for position bounds only
+        constraints = [
+            ox.ctcs(position <= position.max),
+            ox.ctcs(position.min <= position),
+        ]
+
+    elif byof_mode == "ctcs":
+        # CTCS constraints via byof
+        dynamics = {
+            "position": ox.Concat(
+                velocity[0] * ox.Sin(theta[0]),
+                -velocity[0] * ox.Cos(theta[0]),
+            ),
+            "velocity": g * ox.Cos(theta[0]),
+        }
+
+        # Define box constraints using byof instead of symbolic layer
+        byof: ByofSpec = {
+            "ctcs_constraints": [
+                {
+                    "constraint_fn": lambda x, u, node, params: x[position.slice][0] - 10.0,
+                    "penalty": "square",
+                },
+                {
+                    "constraint_fn": lambda x, u, node, params: 0.0 - x[position.slice][0],
+                    "penalty": "square",
+                },
+                {
+                    "constraint_fn": lambda x, u, node, params: x[position.slice][1] - 10.0,
+                    "penalty": "square",
+                },
+                {
+                    "constraint_fn": lambda x, u, node, params: 0.0 - x[position.slice][1],
+                    "penalty": "square",
+                },
+                {
+                    "constraint_fn": lambda x, u, node, params: x[velocity.slice][0] - 10.0,
+                    "penalty": "square",
+                },
+                {
+                    "constraint_fn": lambda x, u, node, params: 0.0 - x[velocity.slice][0],
+                    "penalty": "square",
+                },
+            ],
+        }
+        constraints = []
+
+    elif byof_mode == "nodal":
+        # Nodal constraints via byof
+        dynamics = {
+            "position": ox.Concat(
+                velocity[0] * ox.Sin(theta[0]),
+                -velocity[0] * ox.Cos(theta[0]),
+            ),
+            "velocity": g * ox.Cos(theta[0]),
+        }
+
+        # Define box constraints using byof nodal constraints
+        # Constraints follow g(x, u) <= 0 convention
+        # Note: nodal_constraints is a list of functions that will be vmapped
+        byof: ByofSpec = {
+            "nodal_constraints": [
+                # position bounds
+                lambda x, u, node, params: x[position.slice][0] - 10.0,  # position[0] <= 10.0
+                lambda x, u, node, params: 0.0 - x[position.slice][0],  # position[0] >= 0.0
+                lambda x, u, node, params: x[position.slice][1] - 10.0,  # position[1] <= 10.0
+                lambda x, u, node, params: 0.0 - x[position.slice][1],  # position[1] >= 0.0
+                # velocity bounds
+                lambda x, u, node, params: x[velocity.slice][0] - 10.0,  # velocity[0] <= 10.0
+                lambda x, u, node, params: 0.0 - x[velocity.slice][0],  # velocity[0] >= 0.0
+            ],
+        }
+        constraints = []
+
+    elif byof_mode == "cross_nodal":
+        # Cross-nodal constraints via byof
+        dynamics = {
+            "position": ox.Concat(
+                velocity[0] * ox.Sin(theta[0]),
+                -velocity[0] * ox.Cos(theta[0]),
+            ),
+            "velocity": g * ox.Cos(theta[0]),
+        }
+
+        # Use symbolic for most constraints, byof for a cross-nodal constraint
+        # For this test, we'll add a constraint that the total distance traveled
+        # doesn't exceed a threshold
+        byof: ByofSpec = {
+            "cross_nodal_constraints": [
+                # Sum of velocities across all nodes should be positive
+                # This is a simple cross-nodal constraint for demonstration
+                # X is (N, n_x), U is (N, n_u)
+                lambda X, U, params: -jnp.sum(X[:, velocity.slice]),  # -sum(velocities) <= 0
+            ],
+        }
+
+        # Use symbolic constraints for box bounds
+        constraints = []
+        for state in states:
+            constraints.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
 
     time = ox.Time(
         initial=0.0,
@@ -955,61 +1112,12 @@ def test_byof():
         max=total_time,
     )
 
-    # Define box constraints using byof instead of symbolic layer
-    # Demonstrate two ways to access slices in byof functions:
-    #
-    # 1. Direct property access using .slice (preferred when you have the State/Control object)
-    #    The lambda captures the State/Control object reference, and .slice gets set during
-    #    Problem construction, so it's available when the function is called.
-    #
-    # 2. Name-based lookup using problem.slices["name"] (useful for introspection)
-    #    This can't be used in the byof dict definition since problem doesn't exist yet,
-    #    but you could construct byof functions after problem creation if needed.
-    #
-    # Constraints follow g(x, u) <= 0 convention
-    byof: ByofSpec = {
-        "ctcs_constraints": [
-            # position[0] <= 10.0  =>  position[0] - 10.0 <= 0
-            # Using .slice property for clean access
-            {
-                "constraint_fn": lambda x, u, node, params: x[position.slice][0] - 10.0,
-                "penalty": "square",
-            },
-            # position[0] >= 0.0  =>  -position[0] <= 0  =>  0.0 - position[0] <= 0
-            {
-                "constraint_fn": lambda x, u, node, params: 0.0 - x[position.slice][0],
-                "penalty": "square",
-            },
-            # position[1] <= 10.0
-            {
-                "constraint_fn": lambda x, u, node, params: x[position.slice][1] - 10.0,
-                "penalty": "square",
-            },
-            # position[1] >= 0.0
-            {
-                "constraint_fn": lambda x, u, node, params: 0.0 - x[position.slice][1],
-                "penalty": "square",
-            },
-            # velocity[0] <= 10.0
-            # Alternatively, for scalar states, can directly index: x[velocity.slice][0]
-            {
-                "constraint_fn": lambda x, u, node, params: x[velocity.slice][0] - 10.0,
-                "penalty": "square",
-            },
-            # velocity[0] >= 0.0
-            {
-                "constraint_fn": lambda x, u, node, params: 0.0 - x[velocity.slice][0],
-                "penalty": "square",
-            },
-        ],
-    }
-
     problem = Problem(
         dynamics=dynamics,
         states=states,
         controls=controls,
         time=time,
-        constraints=[],  # No symbolic constraints - using byof instead
+        constraints=constraints,
         N=n,
         licq_max=1e-8,
         byof=byof,
@@ -1033,7 +1141,7 @@ def test_byof():
     result = problem.post_process()
 
     # Check convergence
-    assert result["converged"], "BYOF problem failed to converge"
+    assert result["converged"], f"BYOF {byof_mode} problem failed to converge"
 
     # Compare to analytical solution
     comparison = compare_trajectory_to_analytical(
@@ -1047,7 +1155,7 @@ def test_byof():
         g,
     )
 
-    _print_comparison_metrics(comparison, "Brachistochrone BYOF")
+    _print_comparison_metrics(comparison, f"Brachistochrone BYOF ({byof_mode})")
     _assert_brachistochrone_accuracy(comparison, problem, result)
 
     # Clean up JAX caches
