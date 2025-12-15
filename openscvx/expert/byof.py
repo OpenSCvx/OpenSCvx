@@ -69,13 +69,17 @@ Example:
         problem = ox.Problem(..., byof=byof)
 """
 
-from typing import Callable, List, Literal, Tuple, TypedDict, Union
+from typing import TYPE_CHECKING, Any, Callable, List, Literal, Tuple, TypedDict, Union
+
+if TYPE_CHECKING:
+    from jax import Array as JaxArray
+else:
+    JaxArray = Any
 
 __all__ = ["ByofSpec", "CtcsConstraintSpec", "PenaltyFunction"]
 
 
 # Type aliases for clarity
-JaxArray = "jax.Array"  # String literal to avoid jax import
 DynamicsFunction = Callable[[JaxArray, JaxArray, int, dict], JaxArray]
 NodalConstraintFunction = Callable[[JaxArray, JaxArray, int, dict], JaxArray]
 CrossNodalConstraintFunction = Callable[[JaxArray, JaxArray, dict], JaxArray]
