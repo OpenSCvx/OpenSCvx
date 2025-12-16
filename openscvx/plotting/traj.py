@@ -29,6 +29,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import viser
 
+from openscvx.algorithms import OptimizationResults
+
 # Type alias for update callbacks: fn(frame_idx: int) -> None
 UpdateCallback = Callable[[int], None]
 
@@ -417,7 +419,7 @@ def add_animation_controls(
 # =============================================================================
 
 
-def create_plotting_server(results: dict) -> viser.ViserServer:
+def create_plotting_server(results: OptimizationResults) -> viser.ViserServer:
     """Create a basic (non-animated) plotting server.
 
     Args:
@@ -430,7 +432,7 @@ def create_plotting_server(results: dict) -> viser.ViserServer:
     return create_server(pos)
 
 
-def add_velocity_trace(server: viser.ViserServer, results: dict) -> None:
+def add_velocity_trace(server: viser.ViserServer, results: OptimizationResults) -> None:
     """Add a static velocity-colored trajectory trace.
 
     Args:
@@ -444,7 +446,7 @@ def add_velocity_trace(server: viser.ViserServer, results: dict) -> None:
 
 
 def create_animated_plotting_server(
-    results: dict,
+    results: OptimizationResults,
     show_ghost_trajectory: bool = True,
     loop_animation: bool = True,
     thrust_key: str = "force",
