@@ -22,7 +22,10 @@ grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 import openscvx as ox
-from examples.plotting_viser import create_animated_plotting_server
+from examples.plotting_viser import (
+    create_animated_plotting_server,
+    create_scp_animated_plotting_server,
+)
 from openscvx import Problem
 from openscvx.utils import generate_orthogonal_unit_vectors
 
@@ -177,5 +180,17 @@ if __name__ == "__main__":
 
     results.update(plotting_dict)
 
-    server = create_animated_plotting_server(results, thrust_key="thrust_force")
-    server.sleep_forever()
+    # Create both visualization servers (viser auto-assigns ports)
+    traj_server = create_animated_plotting_server(
+        results,
+        thrust_key="thrust_force",
+        viewcone_scale=10.0,
+    )
+    scp_server = create_scp_animated_plotting_server(
+        results,
+        attitude_stride=3,
+        frame_duration_ms=200,
+    )
+
+    # Keep both servers running
+    traj_server.sleep_forever()
