@@ -264,10 +264,28 @@ def add_position_marker(
     return handle, update
 
 
+def _rotate_vector_by_quaternion(v: np.ndarray, q: np.ndarray) -> np.ndarray:
+    """Rotate vector v by quaternion q (wxyz format).
+
+    Args:
+        v: Vector of shape (3,)
+        q: Quaternion of shape (4,) in [w, x, y, z] format
+
+    Returns:
+        Rotated vector of shape (3,)
+    """
+    w, x, y, z = q
+    # Quaternion rotation: v' = q * v * q_conj
+    # Using the formula for rotating a vector by a quaternion
+    t = 2.0 * np.cross(np.array([x, y, z]), v)
+    return v + w * t + np.cross(np.array([x, y, z]), t)
+
+
 def add_thrust_vector(
     server: viser.ViserServer,
     pos: np.ndarray,
     thrust: np.ndarray | None,
+    attitude: np.ndarray | None = None,
     scale: float = 0.3,
     color: tuple[int, int, int] = (255, 100, 100),
     line_width: float = 4.0,
@@ -278,6 +296,9 @@ def add_thrust_vector(
         server: ViserServer instance
         pos: Position array of shape (N, 3)
         thrust: Thrust/force array of shape (N, 3), or None to skip
+        attitude: Quaternion array of shape (N, 4) in [w, x, y, z] format.
+            If provided, thrust is assumed to be in body frame and will be
+            rotated to world frame using the attitude.
         scale: Scale factor for thrust vector length
         color: RGB color tuple
         line_width: Line width
@@ -288,7 +309,15 @@ def add_thrust_vector(
     if thrust is None:
         return None, None
 
-    thrust_end = pos[0] + thrust[0] * scale
+    def get_thrust_world(frame_idx: int) -> np.ndarray:
+        """Get thrust vector in world frame."""
+        thrust_body = thrust[frame_idx]
+        if attitude is not None:
+            return _rotate_vector_by_quaternion(thrust_body, attitude[frame_idx])
+        return thrust_body
+
+    thrust_world = get_thrust_world(0)
+    thrust_end = pos[0] + thrust_world * scale
     handle = server.scene.add_line_segments(
         "/thrust_vector",
         points=np.array([[pos[0], thrust_end]]),  # Shape (1, 2, 3)
@@ -297,8 +326,47 @@ def add_thrust_vector(
     )
 
     def update(frame_idx: int) -> None:
-        thrust_end = pos[frame_idx] + thrust[frame_idx] * scale
+        thrust_world = get_thrust_world(frame_idx)
+        thrust_end = pos[frame_idx] + thrust_world * scale
         handle.points = np.array([[pos[frame_idx], thrust_end]])
+
+    return handle, update
+
+
+def add_attitude_frame(
+    server: viser.ViserServer,
+    pos: np.ndarray,
+    attitude: np.ndarray | None,
+    axes_length: float = 2.0,
+    axes_radius: float = 0.05,
+) -> tuple[viser.FrameHandle | None, UpdateCallback | None]:
+    """Add an animated body coordinate frame showing attitude.
+
+    Args:
+        server: ViserServer instance
+        pos: Position array of shape (N, 3)
+        attitude: Quaternion array of shape (N, 4) in [w, x, y, z] format, or None to skip
+        axes_length: Length of the coordinate axes
+        axes_radius: Radius of the axes cylinders
+
+    Returns:
+        Tuple of (handle, update_callback), or (None, None) if attitude is None
+    """
+    if attitude is None:
+        return None, None
+
+    # Viser uses wxyz quaternion format
+    handle = server.scene.add_frame(
+        "/body_frame",
+        wxyz=attitude[0],
+        position=pos[0],
+        axes_length=axes_length,
+        axes_radius=axes_radius,
+    )
+
+    def update(frame_idx: int) -> None:
+        handle.wxyz = attitude[frame_idx]
+        handle.position = pos[frame_idx]
 
     return handle, update
 
@@ -451,6 +519,8 @@ def create_animated_plotting_server(
     loop_animation: bool = True,
     thrust_key: str = "force",
     thrust_scale: float = 0.3,
+    attitude_key: str = "attitude",
+    attitude_axes_length: float = 2.0,
 ) -> viser.ViserServer:
     """Create an animated trajectory visualization server.
 
@@ -464,6 +534,7 @@ def create_animated_plotting_server(
     - Velocity-colored trail that grows as animation progresses
     - Current position marker
     - Thrust vector visualization (if thrust data available)
+    - Body frame attitude visualization (if attitude data available, for 6DOF)
     - Optional ghost trajectory showing full path
     - Static obstacles/gates if present in results
 
@@ -473,6 +544,8 @@ def create_animated_plotting_server(
         loop_animation: If True, loop animation when it reaches the end
         thrust_key: Key for thrust/force data in trajectory dict (default: "force")
         thrust_scale: Scale factor for thrust vector visualization
+        attitude_key: Key for attitude quaternion data (default: "attitude")
+        attitude_axes_length: Length of body frame axes
 
     Returns:
         ViserServer instance (animation runs in background thread)
@@ -481,6 +554,7 @@ def create_animated_plotting_server(
     pos = results.trajectory["position"]
     vel = results.trajectory["velocity"]
     thrust = results.trajectory.get(thrust_key)
+    attitude = results.trajectory.get(attitude_key)
     traj_time = results.trajectory["time"]
 
     # Precompute colors
@@ -502,10 +576,19 @@ def create_animated_plotting_server(
     _, update_trail = add_animated_trail(server, pos, colors)
     update_callbacks.append(update_trail)
 
-    _, update_marker = add_position_marker(server, pos)
-    update_callbacks.append(update_marker)
+    # Use position marker for point-mass, attitude frame for 6DOF
+    if attitude is not None:
+        _, update_attitude = add_attitude_frame(
+            server, pos, attitude, axes_length=attitude_axes_length
+        )
+        update_callbacks.append(update_attitude)
+    else:
+        _, update_marker = add_position_marker(server, pos)
+        update_callbacks.append(update_marker)
 
-    _, update_thrust = add_thrust_vector(server, pos, thrust, scale=thrust_scale)
+    _, update_thrust = add_thrust_vector(
+        server, pos, thrust, attitude=attitude, scale=thrust_scale
+    )
     update_callbacks.append(update_thrust)  # Will be filtered out if None
 
     # Add animation controls
