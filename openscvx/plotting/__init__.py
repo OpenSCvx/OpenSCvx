@@ -14,11 +14,11 @@ violations, and creating animations of the optimization process.
 
 from .plotting import (
     plot_control,
-    plot_scp_iteration_animation,
     plot_state,
     plot_trust_region_heatmap,
     plot_virtual_control_heatmap,
 )
+from .scp_iteration_animation import plot_scp_iteration_animation
 
 __all__ = [
     # Core plotting functions
