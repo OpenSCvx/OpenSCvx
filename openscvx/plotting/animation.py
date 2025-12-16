@@ -761,6 +761,320 @@ def add_viewcone(
 
 
 # =============================================================================
+# SCP Iteration Visualization Components
+# =============================================================================
+
+
+def add_scp_iteration_nodes(
+    server: viser.ViserServer,
+    positions: list[np.ndarray],
+    colors: list[tuple[int, int, int]] | None = None,
+    point_size: float = 0.3,
+    show_lines: bool = True,
+    line_width: float = 2.0,
+) -> tuple[viser.PointCloudHandle, viser.LineSegmentsHandle | None, UpdateCallback]:
+    """Add animated optimization nodes that update per SCP iteration.
+
+    Args:
+        server: ViserServer instance
+        positions: List of position arrays per iteration, each shape (N, 3)
+        colors: Optional list of RGB colors per iteration. If None, uses a
+            gradient from red (early) to green (converged).
+        point_size: Size of node markers
+        show_lines: If True, connect nodes with line segments
+        line_width: Width of connecting lines
+
+    Returns:
+        Tuple of (point_handle, line_handle, update_callback)
+    """
+    n_iterations = len(positions)
+
+    # Default color gradient: red -> yellow -> green
+    if colors is None:
+        colors = []
+        for i in range(n_iterations):
+            t = i / max(n_iterations - 1, 1)
+            r = int(255 * (1 - t))
+            g = int(255 * t)
+            colors.append((r, g, 50))
+
+    # Convert colors to numpy arrays for viser compatibility (shape (3,) for single color)
+    colors_np = [np.array([c[0], c[1], c[2]], dtype=np.uint8) for c in colors]
+
+    # Initial state
+    pos = np.asarray(positions[0], dtype=np.float32)
+    color = colors_np[0]
+
+    point_handle = server.scene.add_point_cloud(
+        "/scp/nodes",
+        points=pos,
+        colors=color,
+        point_size=point_size,
+    )
+
+    line_handle = None
+    if show_lines and len(pos) > 1:
+        # Create line segments connecting consecutive nodes
+        segments = np.array([[pos[i], pos[i + 1]] for i in range(len(pos) - 1)], dtype=np.float32)
+        line_handle = server.scene.add_line_segments(
+            "/scp/trajectory",
+            points=segments,
+            colors=color,
+            line_width=line_width,
+        )
+
+    def update(iter_idx: int) -> None:
+        idx = min(iter_idx, n_iterations - 1)
+        pos = np.asarray(positions[idx], dtype=np.float32)
+        color = colors_np[idx]
+
+        point_handle.points = pos
+        point_handle.colors = color
+
+        if line_handle is not None and len(pos) > 1:
+            segments = np.array(
+                [[pos[i], pos[i + 1]] for i in range(len(pos) - 1)], dtype=np.float32
+            )
+            line_handle.points = segments
+            line_handle.colors = color
+
+    return point_handle, line_handle, update
+
+
+def add_scp_iteration_attitudes(
+    server: viser.ViserServer,
+    positions: list[np.ndarray],
+    attitudes: list[np.ndarray] | None,
+    axes_length: float = 1.5,
+    axes_radius: float = 0.03,
+    stride: int = 1,
+) -> tuple[list[viser.FrameHandle], UpdateCallback | None]:
+    """Add animated attitude frames at each node that update per SCP iteration.
+
+    Args:
+        server: ViserServer instance
+        positions: List of position arrays per iteration, each shape (N, 3)
+        attitudes: List of quaternion arrays per iteration, each shape (N, 4) in wxyz format.
+            If None, returns empty list and None callback.
+        axes_length: Length of coordinate frame axes
+        axes_radius: Radius of axes cylinders
+        stride: Show attitude frame every `stride` nodes (1 = all nodes)
+
+    Returns:
+        Tuple of (list of frame handles, update_callback)
+    """
+    if attitudes is None:
+        return [], None
+
+    n_iterations = len(positions)
+    n_nodes = len(positions[0])
+
+    # Create frame handles for nodes at stride intervals
+    node_indices = list(range(0, n_nodes, stride))
+    handles = []
+
+    for i, node_idx in enumerate(node_indices):
+        handle = server.scene.add_frame(
+            f"/scp/attitudes/frame_{i}",
+            wxyz=attitudes[0][node_idx],
+            position=positions[0][node_idx],
+            axes_length=axes_length,
+            axes_radius=axes_radius,
+        )
+        handles.append(handle)
+
+    def update(iter_idx: int) -> None:
+        idx = min(iter_idx, n_iterations - 1)
+        pos = positions[idx]
+        att = attitudes[idx]
+
+        for i, node_idx in enumerate(node_indices):
+            # Handle case where number of nodes changes between iterations
+            if node_idx < len(pos) and node_idx < len(att):
+                handles[i].position = pos[node_idx]
+                handles[i].wxyz = att[node_idx]
+
+    return handles, update
+
+
+def add_scp_ghost_iterations(
+    server: viser.ViserServer,
+    positions: list[np.ndarray],
+    max_ghosts: int = 5,
+    opacity_decay: float = 0.6,
+    base_color: tuple[int, int, int] = (100, 100, 255),
+    point_size: float = 0.15,
+) -> tuple[list[viser.PointCloudHandle], UpdateCallback]:
+    """Add ghost trails showing previous SCP iterations.
+
+    Shows the last `max_ghosts` iterations with decreasing opacity,
+    allowing visualization of convergence history.
+
+    Args:
+        server: ViserServer instance
+        positions: List of position arrays per iteration, each shape (N, 3)
+        max_ghosts: Maximum number of ghost iterations to show
+        opacity_decay: Opacity multiplier per iteration back (0.6 = 60% of previous)
+        base_color: RGB base color for ghosts
+        point_size: Size of ghost points
+
+    Returns:
+        Tuple of (list of ghost handles, update_callback)
+    """
+    n_iterations = len(positions)
+
+    # Pre-create ghost handles (initially invisible)
+    ghost_handles = []
+    for i in range(max_ghosts):
+        handle = server.scene.add_point_cloud(
+            f"/scp/ghosts/iter_{i}",
+            points=np.zeros((1, 3), dtype=np.float32),  # Placeholder
+            colors=np.array([0, 0, 0], dtype=np.uint8),  # Shape (3,)
+            point_size=point_size,
+        )
+        ghost_handles.append(handle)
+
+    def update(iter_idx: int) -> None:
+        idx = min(iter_idx, n_iterations - 1)
+
+        for ghost_i in range(max_ghosts):
+            history_idx = idx - ghost_i - 1  # -1 because current is not a ghost
+
+            if history_idx >= 0:
+                # Show this ghost
+                opacity = opacity_decay ** (ghost_i + 1)
+                color = np.array([int(c * opacity) for c in base_color], dtype=np.uint8)
+                pos = np.asarray(positions[history_idx], dtype=np.float32)
+                ghost_handles[ghost_i].points = pos
+                ghost_handles[ghost_i].colors = color
+            else:
+                # Hide this ghost (move to origin with zero size effectively)
+                ghost_handles[ghost_i].points = np.zeros((1, 3), dtype=np.float32)
+                ghost_handles[ghost_i].colors = np.array([0, 0, 0], dtype=np.uint8)
+
+    return ghost_handles, update
+
+
+def add_scp_animation_controls(
+    server: viser.ViserServer,
+    n_iterations: int,
+    update_callbacks: list[UpdateCallback],
+    autoplay: bool = False,
+    frame_duration_ms: int = 500,
+    folder_name: str = "SCP Animation",
+) -> None:
+    """Add GUI controls for stepping through SCP iterations.
+
+    Creates play/pause button, step buttons, iteration slider, and speed control.
+
+    Args:
+        server: ViserServer instance
+        n_iterations: Total number of SCP iterations
+        update_callbacks: List of update functions to call each iteration
+        autoplay: Whether to start playing automatically
+        frame_duration_ms: Default milliseconds per iteration frame
+        folder_name: Name for the GUI folder
+    """
+    # Filter out None callbacks
+    callbacks = [cb for cb in update_callbacks if cb is not None]
+
+    def update_all(iter_idx: int) -> None:
+        """Update all visualization components."""
+        for callback in callbacks:
+            callback(iter_idx)
+
+    # --- GUI Controls ---
+    with server.gui.add_folder(folder_name):
+        play_button = server.gui.add_button("Play")
+        with server.gui.add_folder("Step Controls", expand_by_default=False):
+            prev_button = server.gui.add_button("◀ Previous")
+            next_button = server.gui.add_button("Next ▶")
+        iter_slider = server.gui.add_slider(
+            "Iteration",
+            min=0,
+            max=n_iterations - 1,
+            step=1,
+            initial_value=0,
+        )
+        speed_slider = server.gui.add_slider(
+            "Speed (ms/iter)",
+            min=50,
+            max=2000,
+            step=50,
+            initial_value=frame_duration_ms,
+        )
+        loop_checkbox = server.gui.add_checkbox("Loop", initial_value=True)
+
+    # Animation state
+    state = {"playing": autoplay, "iteration": 0, "needs_update": True}
+
+    @play_button.on_click
+    def _(_) -> None:
+        state["playing"] = not state["playing"]
+        state["needs_update"] = True  # Trigger immediate update on play
+        play_button.name = "Pause" if state["playing"] else "Play"
+
+    @prev_button.on_click
+    def _(_) -> None:
+        if state["iteration"] > 0:
+            state["iteration"] -= 1
+            iter_slider.value = state["iteration"]
+            update_all(state["iteration"])
+
+    @next_button.on_click
+    def _(_) -> None:
+        if state["iteration"] < n_iterations - 1:
+            state["iteration"] += 1
+            iter_slider.value = state["iteration"]
+            update_all(state["iteration"])
+
+    @iter_slider.on_update
+    def _(_) -> None:
+        if not state["playing"]:
+            state["iteration"] = int(iter_slider.value)
+            update_all(state["iteration"])
+
+    def animation_loop() -> None:
+        """Background thread for SCP iteration playback."""
+        last_update = time.time()
+        while True:
+            time.sleep(0.016)  # ~60 fps check rate
+
+            # Handle immediate update requests (e.g., on play button click)
+            if state["needs_update"]:
+                state["needs_update"] = False
+                last_update = time.time()
+                update_all(state["iteration"])
+                continue
+
+            if state["playing"]:
+                current_time = time.time()
+                elapsed_ms = (current_time - last_update) * 1000
+
+                if elapsed_ms >= speed_slider.value:
+                    last_update = current_time
+                    state["iteration"] += 1
+
+                    if state["iteration"] >= n_iterations:
+                        if loop_checkbox.value:
+                            state["iteration"] = 0
+                        else:
+                            state["iteration"] = n_iterations - 1
+                            state["playing"] = False
+                            play_button.name = "Play"
+
+                    iter_slider.value = state["iteration"]
+                    update_all(state["iteration"])
+
+    # Start animation thread
+    thread = threading.Thread(target=animation_loop, daemon=True)
+    thread.start()
+
+    # Initial update to ensure first frame is fully rendered
+    update_all(0)
+
+
+# =============================================================================
 # Animation Controller
 # =============================================================================
 

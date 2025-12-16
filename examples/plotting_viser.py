@@ -18,6 +18,10 @@ from openscvx.plotting.animation import (
     add_gates,
     add_ghost_trajectory,
     add_position_marker,
+    add_scp_animation_controls,
+    add_scp_ghost_iterations,
+    add_scp_iteration_attitudes,
+    add_scp_iteration_nodes,
     add_target_markers,
     add_thrust_vector,
     add_viewcone,
@@ -194,5 +198,133 @@ def create_animated_plotting_server(
 
     # Add animation controls
     add_animation_controls(server, traj_time, update_callbacks, loop=loop_animation)
+
+    return server
+
+
+def create_scp_animated_plotting_server(
+    results: OptimizationResults,
+    position_slice: slice | None = None,
+    attitude_slice: slice | None = None,
+    show_ghost_iterations: bool = True,
+    max_ghosts: int = 5,
+    show_attitudes: bool = True,
+    attitude_stride: int = 3,
+    attitude_axes_length: float = 1.5,
+    node_point_size: float = 0.3,
+    show_lines: bool = True,
+    frame_duration_ms: int = 500,
+) -> viser.ViserServer:
+    """Create an animated visualization of SCP iteration convergence.
+
+    This shows how the optimization nodes evolve across SCP iterations,
+    allowing you to visualize the convergence process.
+
+    Features:
+    - Play/pause button for iteration animation
+    - Previous/Next buttons to step through iterations
+    - Iteration slider to scrub through convergence history
+    - Speed control for playback
+    - Node positions colored by iteration (red -> green as it converges)
+    - Optional ghost trails showing previous iterations
+    - Optional attitude frames at each node (for 6DOF problems)
+    - Static obstacles/gates if present in results
+
+    Args:
+        results: Optimization results containing SCP iteration history (results.X).
+        position_slice: Slice for extracting position from state vector.
+            If None, auto-detected from results._states looking for "position".
+        attitude_slice: Slice for extracting attitude quaternion from state vector.
+            If None, auto-detected from results._states looking for "attitude".
+        show_ghost_iterations: If True, show faded previous iterations
+        max_ghosts: Maximum number of ghost iterations to display
+        show_attitudes: If True and attitude data available, show body frames
+        attitude_stride: Show attitude frame every N nodes (reduces clutter)
+        attitude_axes_length: Length of attitude coordinate frame axes
+        node_point_size: Size of node markers
+        show_lines: If True, connect nodes with line segments
+        frame_duration_ms: Default milliseconds per iteration frame
+
+    Returns:
+        ViserServer instance (animation runs in background thread)
+    """
+    # Get iteration history
+    X_history = results.X  # List of state arrays per iteration
+    n_iterations = len(X_history)
+
+    if n_iterations == 0:
+        raise ValueError("No SCP iteration history available in results.X")
+
+    # Auto-detect slices from state metadata if not provided
+    if position_slice is None or attitude_slice is None:
+        states = getattr(results, "_states", [])
+        for state in states:
+            if position_slice is None and state.name.lower() == "position":
+                position_slice = state._slice
+            if attitude_slice is None and state.name.lower() == "attitude":
+                attitude_slice = state._slice
+
+    # Default position slice if still not found (assume first 3 states)
+    if position_slice is None:
+        position_slice = slice(0, 3)
+
+    # Extract position history
+    positions = [X[:, position_slice] for X in X_history]
+
+    # Extract attitude history if available
+    attitudes = None
+    if attitude_slice is not None:
+        attitudes = [X[:, attitude_slice] for X in X_history]
+
+    # Create server using final iteration's positions for grid sizing
+    server = create_server(positions[-1])
+
+    # Add static elements (gates, obstacles) if present
+    if "vertices" in results:
+        add_gates(server, results["vertices"])
+
+    if "obstacles_centers" in results:
+        add_ellipsoid_obstacles(
+            server,
+            centers=results["obstacles_centers"],
+            radii=results.get("obstacles_radii", [np.ones(3)] * len(results["obstacles_centers"])),
+            axes=results.get("obstacles_axes"),
+        )
+
+    # Collect update callbacks
+    update_callbacks = []
+
+    # Add ghost iterations (previous iterations as faded trails)
+    if show_ghost_iterations:
+        _, update_ghosts = add_scp_ghost_iterations(server, positions, max_ghosts=max_ghosts)
+        update_callbacks.append(update_ghosts)
+
+    # Add main iteration nodes
+    _, _, update_nodes = add_scp_iteration_nodes(
+        server,
+        positions,
+        point_size=node_point_size,
+        show_lines=show_lines,
+    )
+    update_callbacks.append(update_nodes)
+
+    # Add attitude frames if available and enabled
+    if show_attitudes and attitudes is not None:
+        _, update_attitudes = add_scp_iteration_attitudes(
+            server,
+            positions,
+            attitudes,
+            axes_length=attitude_axes_length,
+            stride=attitude_stride,
+        )
+        update_callbacks.append(update_attitudes)
+
+    # Add SCP animation controls
+    add_scp_animation_controls(
+        server,
+        n_iterations,
+        update_callbacks,
+        frame_duration_ms=frame_duration_ms,
+    )
 
     return server
