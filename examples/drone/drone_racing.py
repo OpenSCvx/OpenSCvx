@@ -9,8 +9,16 @@ racing through a series of gates in a specified order. The problem includes:
 - Loop closure (start equals end position)
 """
 
+import os
+import sys
+
 import jax.numpy as jnp
 import numpy as np
+
+# Add grandparent directory to path to import examples.plotting
+current_dir = os.path.dirname(os.path.abspath(__file__))
+grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
+sys.path.append(grandparent_dir)
 
 import openscvx as ox
 
