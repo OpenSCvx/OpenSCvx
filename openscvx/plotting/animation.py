@@ -331,6 +331,113 @@ def add_gates(
         )
 
 
+def _generate_cone_mesh(
+    apex: np.ndarray,
+    height: float,
+    half_angle_deg: float,
+    n_segments: int = 32,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Generate a cone mesh with apex at given position, opening upward.
+
+    Args:
+        apex: Apex position (3,) - the tip of the cone
+        height: Height of the cone (extends in +Z direction from apex)
+        half_angle_deg: Half-angle of the cone from the vertical axis in degrees
+        n_segments: Number of segments around the circumference
+
+    Returns:
+        Tuple of (vertices, faces) where vertices is (V, 3) and faces is (F, 3)
+    """
+    half_angle_rad = np.radians(half_angle_deg)
+    base_radius = height * np.tan(half_angle_rad)
+
+    # Vertices: apex + base circle points
+    vertices = [apex.copy()]  # Apex at index 0
+
+    # Base circle vertices
+    for i in range(n_segments):
+        angle = 2 * np.pi * i / n_segments
+        x = apex[0] + base_radius * np.cos(angle)
+        y = apex[1] + base_radius * np.sin(angle)
+        z = apex[2] + height
+        vertices.append([x, y, z])
+
+    # Center of base for closing the bottom
+    base_center = apex.copy()
+    base_center[2] += height
+    vertices.append(base_center)  # Index n_segments + 1
+
+    vertices = np.array(vertices, dtype=np.float32)
+
+    # Faces: triangles from apex to base edge pairs, plus base cap
+    faces = []
+
+    # Side faces (apex to each edge of base)
+    for i in range(n_segments):
+        next_i = (i + 1) % n_segments
+        # Triangle: apex, base[i], base[next_i]
+        faces.append([0, i + 1, next_i + 1])
+
+    # Base cap faces (center to each edge)
+    base_center_idx = n_segments + 1
+    for i in range(n_segments):
+        next_i = (i + 1) % n_segments
+        # Triangle: center, base[next_i], base[i] (reverse winding for outward normal)
+        faces.append([base_center_idx, next_i + 1, i + 1])
+
+    faces = np.array(faces, dtype=np.int32)
+
+    return vertices, faces
+
+
+def add_glideslope_cone(
+    server: viser.ViserServer,
+    apex: np.ndarray | tuple = (0.0, 0.0, 0.0),
+    height: float = 2000.0,
+    glideslope_angle_deg: float = 86.0,
+    color: tuple[int, int, int] = (100, 200, 100),
+    opacity: float = 0.2,
+    wireframe: bool = False,
+    n_segments: int = 32,
+) -> viser.MeshHandle:
+    """Add a glideslope constraint cone to the scene.
+
+    The glideslope constraint typically has the form:
+        ||position_xy|| <= tan(angle) * position_z
+
+    This creates a cone with apex at the landing site, opening upward.
+
+    Args:
+        server: ViserServer instance
+        apex: Apex position (landing site), default is origin
+        height: Height of the cone visualization
+        glideslope_angle_deg: Glideslope angle in degrees (measured from vertical).
+            For constraint ||r_xy|| <= tan(θ) * z, pass θ here.
+            Common values: 86° (very wide), 70° (moderate), 45° (steep)
+        color: RGB color tuple
+        opacity: Opacity (0-1)
+        wireframe: If True, render as wireframe
+        n_segments: Number of segments for cone smoothness
+
+    Returns:
+        Mesh handle for the cone
+    """
+    apex = np.asarray(apex, dtype=np.float32)
+
+    vertices, faces = _generate_cone_mesh(apex, height, glideslope_angle_deg, n_segments)
+
+    handle = server.scene.add_mesh_simple(
+        "/constraints/glideslope_cone",
+        vertices=vertices,
+        faces=faces,
+        color=color,
+        wireframe=wireframe,
+        opacity=opacity if not wireframe else 1.0,
+    )
+
+    return handle
+
+
 def add_ghost_trajectory(
     server: viser.ViserServer,
     pos: np.ndarray,

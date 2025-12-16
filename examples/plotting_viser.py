@@ -3,7 +3,7 @@
 This module provides convenience functions for common visualization patterns.
 These are templates meant to be copied and customized for specific problems.
 
-For the composable primitives, see openscvx.plotting.traj.
+For the composable primitives, see openscvx.plotting.animation.
 """
 
 import numpy as np
@@ -17,6 +17,7 @@ from openscvx.plotting.animation import (
     add_ellipsoid_obstacles,
     add_gates,
     add_ghost_trajectory,
+    add_glideslope_cone,
     add_position_marker,
     add_scp_animation_controls,
     add_scp_ghost_iterations,
@@ -213,6 +214,7 @@ def create_scp_animated_plotting_server(
     node_point_size: float = 0.3,
     show_lines: bool = True,
     frame_duration_ms: int = 500,
+    scene_scale: float = 1.0,
 ) -> viser.ViserServer:
     """Create an animated visualization of SCP iteration convergence.
 
@@ -242,6 +244,8 @@ def create_scp_animated_plotting_server(
         node_point_size: Size of node markers
         show_lines: If True, connect nodes with line segments
         frame_duration_ms: Default milliseconds per iteration frame
+        scene_scale: Divide all positions by this factor. Use >1 for large-scale
+            trajectories (e.g., 100.0 for km-scale problems).
 
     Returns:
         ViserServer instance (animation runs in background thread)
@@ -266,8 +270,8 @@ def create_scp_animated_plotting_server(
     if position_slice is None:
         position_slice = slice(0, 3)
 
-    # Extract position history
-    positions = [X[:, position_slice] for X in X_history]
+    # Extract position history and apply scene scale
+    positions = [X[:, position_slice] / scene_scale for X in X_history]
 
     # Extract attitude history if available
     attitudes = None
@@ -324,5 +328,114 @@ def create_scp_animated_plotting_server(
         update_callbacks,
         frame_duration_ms=frame_duration_ms,
     )
+
+    return server
+
+
+def create_pdg_animated_plotting_server(
+    results: OptimizationResults,
+    show_ghost_trajectory: bool = True,
+    loop_animation: bool = True,
+    thrust_key: str = "thrust",
+    thrust_scale: float = 0.0001,
+    thrust_vector_scale: float = 1.0,
+    show_glideslope: bool = True,
+    glideslope_angle_deg: float | None = None,
+    glideslope_height: float | None = None,
+    marker_radius: float = 0.3,
+    trail_point_size: float = 0.15,
+    ghost_point_size: float = 0.05,
+    scene_scale: float = 100.0,
+) -> viser.ViserServer:
+    """Create an animated visualization for Powered Descent Guidance problems.
+
+    This is specialized for rocket landing trajectories with:
+    - 3D position and velocity
+    - Thrust vector visualization
+    - Glideslope constraint cone
+
+    All positions are divided by scene_scale to bring large-scale trajectories
+    (e.g., 2000m) into a range that viser handles well (~20m).
+
+    Args:
+        results: Optimization result dictionary containing trajectory data.
+            Expected keys:
+            - trajectory["position"]: 3D position (N, 3)
+            - trajectory["velocity"]: 3D velocity (N, 3)
+            - trajectory[thrust_key]: Thrust vector (N, 3)
+            - glideslope_angle_deg: Glideslope angle in degrees (optional, for cone)
+        show_ghost_trajectory: If True, show faint full trajectory
+        loop_animation: If True, loop animation when it reaches the end
+        thrust_key: Key for thrust data in trajectory dict
+        thrust_scale: Converts thrust magnitude (Newtons) to scene units.
+            E.g., 0.0001 means 10000N becomes 1 scene unit.
+        thrust_vector_scale: Additional multiplier for thrust vector length.
+        show_glideslope: If True, show glideslope constraint cone
+        glideslope_angle_deg: Glideslope angle in degrees. If None, uses value from
+            results["glideslope_angle_deg"] or defaults to 86.0.
+        glideslope_height: Height of glideslope cone visualization (in original units).
+            If None, uses 10% of the initial altitude.
+        marker_radius: Radius of position marker (in scaled scene units).
+        trail_point_size: Size of trail points.
+        ghost_point_size: Size of ghost trajectory points.
+        scene_scale: Divide all positions by this factor. Default 100.0 brings
+            km-scale trajectories into a ~10-20m range for viser.
+
+    Returns:
+        ViserServer instance (animation runs in background thread)
+    """
+    # Extract and scale position data
+    pos = results.trajectory["position"] / scene_scale
+    vel = results.trajectory["velocity"]
+    thrust = results.trajectory.get(thrust_key)
+    traj_time = results.trajectory["time"]
+
+    # Combined thrust scale factor
+    combined_thrust_scale = thrust_scale * thrust_vector_scale
+
+    # Get glideslope parameters
+    if glideslope_angle_deg is None:
+        glideslope_angle_deg = results.get("glideslope_angle_deg", 86.0)
+
+    if glideslope_height is None:
+        # Default to 20% of initial altitude - just show near landing point
+        glideslope_height = float(results.trajectory["position"][0, 2]) * 0.1
+    glideslope_height_scaled = glideslope_height / scene_scale
+
+    # Precompute colors
+    colors = compute_velocity_colors(vel)
+
+    # Create server
+    server = create_server(pos)
+
+    # Add static elements
+    if show_glideslope:
+        add_glideslope_cone(
+            server,
+            apex=(0, 0, 0),
+            height=glideslope_height_scaled,
+            glideslope_angle_deg=glideslope_angle_deg,
+        )
+
+    if show_ghost_trajectory:
+        add_ghost_trajectory(server, pos, colors, point_size=ghost_point_size)
+
+    # Add animated elements
+    update_callbacks = []
+
+    _, update_trail = add_animated_trail(server, pos, colors, point_size=trail_point_size)
+    update_callbacks.append(update_trail)
+
+    _, update_marker = add_position_marker(server, pos, radius=marker_radius)
+    update_callbacks.append(update_marker)
+
+    # Thrust vector (no attitude for 3DoF, thrust is in world frame)
+    _, update_thrust = add_thrust_vector(
+        server, pos, thrust, attitude=None, scale=combined_thrust_scale
+    )
+    update_callbacks.append(update_thrust)
+
+    # Add animation controls
+    add_animation_controls(server, traj_time, update_callbacks, loop=loop_animation)
 
     return server
