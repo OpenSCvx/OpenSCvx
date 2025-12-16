@@ -207,7 +207,6 @@ def create_scp_animated_plotting_server(
     position_slice: slice | None = None,
     attitude_slice: slice | None = None,
     show_ghost_iterations: bool = True,
-    max_ghosts: int = 5,
     show_attitudes: bool = True,
     attitude_stride: int = 3,
     attitude_axes_length: float = 1.5,
@@ -236,8 +235,7 @@ def create_scp_animated_plotting_server(
             If None, auto-detected from results._states looking for "position".
         attitude_slice: Slice for extracting attitude quaternion from state vector.
             If None, auto-detected from results._states looking for "attitude".
-        show_ghost_iterations: If True, show faded previous iterations
-        max_ghosts: Maximum number of ghost iterations to display
+        show_ghost_iterations: If True, show all previous iterations with viridis coloring
         show_attitudes: If True and attitude data available, show body frames
         attitude_stride: Show attitude frame every N nodes (reduces clutter)
         attitude_axes_length: Length of attitude coordinate frame axes
@@ -294,9 +292,9 @@ def create_scp_animated_plotting_server(
     # Collect update callbacks
     update_callbacks = []
 
-    # Add ghost iterations (previous iterations as faded trails)
+    # Add ghost iterations (previous iterations with viridis coloring)
     if show_ghost_iterations:
-        _, update_ghosts = add_scp_ghost_iterations(server, positions, max_ghosts=max_ghosts)
+        _, update_ghosts = add_scp_ghost_iterations(server, positions)
         update_callbacks.append(update_ghosts)
 
     # Add main iteration nodes

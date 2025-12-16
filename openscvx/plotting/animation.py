@@ -765,6 +765,20 @@ def add_viewcone(
 # =============================================================================
 
 
+def _get_viridis_color(t: float) -> np.ndarray:
+    """Get a viridis colormap color for parameter t in [0, 1].
+
+    Args:
+        t: Parameter in [0, 1] where 0 is start of colormap, 1 is end
+
+    Returns:
+        RGB color array of shape (3,) with values in [0, 255]
+    """
+    cmap = plt.get_cmap("viridis")
+    rgb = cmap(t)[:3]  # Get RGB, ignore alpha
+    return np.array([int(c * 255) for c in rgb], dtype=np.uint8)
+
+
 def add_scp_iteration_nodes(
     server: viser.ViserServer,
     positions: list[np.ndarray],
@@ -772,31 +786,32 @@ def add_scp_iteration_nodes(
     point_size: float = 0.3,
     show_lines: bool = True,
     line_width: float = 2.0,
+    cmap_name: str = "viridis",
 ) -> tuple[viser.PointCloudHandle, viser.LineSegmentsHandle | None, UpdateCallback]:
     """Add animated optimization nodes that update per SCP iteration.
 
     Args:
         server: ViserServer instance
         positions: List of position arrays per iteration, each shape (N, 3)
-        colors: Optional list of RGB colors per iteration. If None, uses a
-            gradient from red (early) to green (converged).
+        colors: Optional list of RGB colors per iteration. If None, uses viridis colormap.
         point_size: Size of node markers
         show_lines: If True, connect nodes with line segments
         line_width: Width of connecting lines
+        cmap_name: Matplotlib colormap name (default: "viridis")
 
     Returns:
         Tuple of (point_handle, line_handle, update_callback)
     """
     n_iterations = len(positions)
 
-    # Default color gradient: red -> yellow -> green
+    # Default: use viridis colormap
     if colors is None:
+        cmap = plt.get_cmap(cmap_name)
         colors = []
         for i in range(n_iterations):
             t = i / max(n_iterations - 1, 1)
-            r = int(255 * (1 - t))
-            g = int(255 * t)
-            colors.append((r, g, 50))
+            rgb = cmap(t)[:3]
+            colors.append(tuple(int(c * 255) for c in rgb))
 
     # Convert colors to numpy arrays for viser compatibility (shape (3,) for single color)
     colors_np = [np.array([c[0], c[1], c[2]], dtype=np.uint8) for c in colors]
@@ -900,59 +915,85 @@ def add_scp_iteration_attitudes(
 def add_scp_ghost_iterations(
     server: viser.ViserServer,
     positions: list[np.ndarray],
-    max_ghosts: int = 5,
-    opacity_decay: float = 0.6,
-    base_color: tuple[int, int, int] = (100, 100, 255),
     point_size: float = 0.15,
-) -> tuple[list[viser.PointCloudHandle], UpdateCallback]:
-    """Add ghost trails showing previous SCP iterations.
+    show_lines: bool = True,
+    line_width: float = 1.5,
+    cmap_name: str = "viridis",
+) -> tuple[list, UpdateCallback]:
+    """Add ghost trails showing all previous SCP iterations.
 
-    Shows the last `max_ghosts` iterations with decreasing opacity,
-    allowing visualization of convergence history.
+    Shows all previous iterations with viridis coloring to visualize convergence.
 
     Args:
         server: ViserServer instance
         positions: List of position arrays per iteration, each shape (N, 3)
-        max_ghosts: Maximum number of ghost iterations to show
-        opacity_decay: Opacity multiplier per iteration back (0.6 = 60% of previous)
-        base_color: RGB base color for ghosts
         point_size: Size of ghost points
+        show_lines: If True, show line segments connecting ghost nodes
+        line_width: Width of ghost line segments
+        cmap_name: Matplotlib colormap name for ghost colors
 
     Returns:
-        Tuple of (list of ghost handles, update_callback)
+        Tuple of (list of handles, update_callback)
     """
     n_iterations = len(positions)
+    n_ghosts = n_iterations - 1  # All iterations except current
+    cmap = plt.get_cmap(cmap_name)
 
-    # Pre-create ghost handles (initially invisible)
-    ghost_handles = []
-    for i in range(max_ghosts):
-        handle = server.scene.add_point_cloud(
-            f"/scp/ghosts/iter_{i}",
+    # Pre-create ghost handles for all iterations (initially invisible)
+    ghost_point_handles = []
+    ghost_line_handles = []
+
+    for i in range(n_ghosts):
+        point_handle = server.scene.add_point_cloud(
+            f"/scp/ghosts/points_{i}",
             points=np.zeros((1, 3), dtype=np.float32),  # Placeholder
-            colors=np.array([0, 0, 0], dtype=np.uint8),  # Shape (3,)
+            colors=np.array([0, 0, 0], dtype=np.uint8),
             point_size=point_size,
         )
-        ghost_handles.append(handle)
+        ghost_point_handles.append(point_handle)
+
+        if show_lines:
+            line_handle = server.scene.add_line_segments(
+                f"/scp/ghosts/lines_{i}",
+                points=np.zeros((1, 2, 3), dtype=np.float32),  # Placeholder
+                colors=np.array([0, 0, 0], dtype=np.uint8),
+                line_width=line_width,
+            )
+            ghost_line_handles.append(line_handle)
 
     def update(iter_idx: int) -> None:
         idx = min(iter_idx, n_iterations - 1)
 
-        for ghost_i in range(max_ghosts):
+        for ghost_i in range(n_ghosts):
             history_idx = idx - ghost_i - 1  # -1 because current is not a ghost
 
             if history_idx >= 0:
-                # Show this ghost
-                opacity = opacity_decay ** (ghost_i + 1)
-                color = np.array([int(c * opacity) for c in base_color], dtype=np.uint8)
-                pos = np.asarray(positions[history_idx], dtype=np.float32)
-                ghost_handles[ghost_i].points = pos
-                ghost_handles[ghost_i].colors = color
-            else:
-                # Hide this ghost (move to origin with zero size effectively)
-                ghost_handles[ghost_i].points = np.zeros((1, 3), dtype=np.float32)
-                ghost_handles[ghost_i].colors = np.array([0, 0, 0], dtype=np.uint8)
+                # Get color from colormap based on iteration progress
+                t = history_idx / max(n_iterations - 1, 1)
+                rgb = cmap(t)[:3]
+                color = np.array([int(c * 255) for c in rgb], dtype=np.uint8)
 
-    return ghost_handles, update
+                pos = np.asarray(positions[history_idx], dtype=np.float32)
+                ghost_point_handles[ghost_i].points = pos
+                ghost_point_handles[ghost_i].colors = color
+
+                if show_lines and len(pos) > 1:
+                    segments = np.array(
+                        [[pos[j], pos[j + 1]] for j in range(len(pos) - 1)],
+                        dtype=np.float32,
+                    )
+                    ghost_line_handles[ghost_i].points = segments
+                    ghost_line_handles[ghost_i].colors = color
+            else:
+                # Hide this ghost
+                ghost_point_handles[ghost_i].points = np.zeros((1, 3), dtype=np.float32)
+                ghost_point_handles[ghost_i].colors = np.array([0, 0, 0], dtype=np.uint8)
+
+                if show_lines:
+                    ghost_line_handles[ghost_i].points = np.zeros((1, 2, 3), dtype=np.float32)
+                    ghost_line_handles[ghost_i].colors = np.array([0, 0, 0], dtype=np.uint8)
+
+    return ghost_point_handles + ghost_line_handles, update
 
 
 def add_scp_animation_controls(
