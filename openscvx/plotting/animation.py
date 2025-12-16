@@ -872,20 +872,6 @@ def add_viewcone(
 # =============================================================================
 
 
-def _get_viridis_color(t: float) -> np.ndarray:
-    """Get a viridis colormap color for parameter t in [0, 1].
-
-    Args:
-        t: Parameter in [0, 1] where 0 is start of colormap, 1 is end
-
-    Returns:
-        RGB color array of shape (3,) with values in [0, 255]
-    """
-    cmap = plt.get_cmap("viridis")
-    rgb = cmap(t)[:3]  # Get RGB, ignore alpha
-    return np.array([int(c * 255) for c in rgb], dtype=np.uint8)
-
-
 def add_scp_iteration_nodes(
     server: viser.ViserServer,
     positions: list[np.ndarray],

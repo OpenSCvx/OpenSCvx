@@ -218,6 +218,7 @@ def create_scp_animated_plotting_server(
     node_point_size: float = 0.3,
     frame_duration_ms: int = 500,
     scene_scale: float = 1.0,
+    cmap_name: str = "viridis",
 ) -> viser.ViserServer:
     """Create an animated visualization of SCP iteration convergence.
 
@@ -229,8 +230,8 @@ def create_scp_animated_plotting_server(
     - Previous/Next buttons to step through iterations
     - Iteration slider to scrub through convergence history
     - Speed control for playback
-    - Node positions colored by iteration (viridis colormap)
-    - Nonlinear propagation lines showing actual integrated trajectories (viridis colored)
+    - Node positions colored by iteration
+    - Nonlinear propagation lines showing actual integrated trajectories
     - Ghost trails showing all previous iterations
     - Optional attitude frames at each node (for 6DOF problems)
     - Static obstacles/gates if present in results
@@ -241,10 +242,9 @@ def create_scp_animated_plotting_server(
             If None, auto-detected from results._states looking for "position".
         attitude_slice: Slice for extracting attitude quaternion from state vector.
             If None, auto-detected from results._states looking for "attitude".
-        show_ghost_iterations: If True, show all previous iterations with viridis coloring
+        show_ghost_iterations: If True, show all previous iterations
         show_propagation: If True, show nonlinear propagation lines between nodes.
             This reveals defects (gaps) in early iterations that close as SCP converges.
-            Lines are colored with viridis and persist across iterations.
         propagation_line_width: Width of propagation lines
         show_attitudes: If True and attitude data available, show body frames
         attitude_stride: Show attitude frame every N nodes (reduces clutter)
@@ -253,6 +253,7 @@ def create_scp_animated_plotting_server(
         frame_duration_ms: Default milliseconds per iteration frame
         scene_scale: Divide all positions by this factor. Use >1 for large-scale
             trajectories (e.g., 100.0 for km-scale problems).
+        cmap_name: Matplotlib colormap name for iteration coloring (default: "viridis")
 
     Returns:
         ViserServer instance (animation runs in background thread)
@@ -303,9 +304,9 @@ def create_scp_animated_plotting_server(
     # Collect update callbacks
     update_callbacks = []
 
-    # Add ghost iterations (previous iterations with viridis coloring)
+    # Add ghost iterations (previous iterations)
     if show_ghost_iterations:
-        _, update_ghosts = add_scp_ghost_iterations(server, positions)
+        _, update_ghosts = add_scp_ghost_iterations(server, positions, cmap_name=cmap_name)
         update_callbacks.append(update_ghosts)
 
     # Add nonlinear propagation lines if discretization history is available
@@ -325,6 +326,7 @@ def create_scp_animated_plotting_server(
             server,
             propagations,
             line_width=propagation_line_width,
+            cmap_name=cmap_name,
         )
         update_callbacks.append(update_propagation)
 
@@ -333,6 +335,7 @@ def create_scp_animated_plotting_server(
         server,
         positions,
         point_size=node_point_size,
+        cmap_name=cmap_name,
     )
     update_callbacks.append(update_nodes)
 
