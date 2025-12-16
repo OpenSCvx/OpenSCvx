@@ -23,7 +23,7 @@ grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 import openscvx as ox
-from examples.plotting import plot_animation
+from examples.plotting_viser import create_animated_plotting_server
 from openscvx import Problem
 from openscvx.utils import gen_vertices, rot
 
@@ -275,4 +275,9 @@ if __name__ == "__main__":
 
     results.update_plotting_data(**plotting_dict)
 
-    plot_animation(results, problem.settings).show()
+    server = create_animated_plotting_server(
+        results,
+        thrust_key="thrust_force",
+        viewcone_scale=10.0,
+    )
+    server.sleep_forever()
