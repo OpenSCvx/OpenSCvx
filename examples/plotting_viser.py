@@ -309,41 +309,24 @@ def create_scp_animated_plotting_server(
         update_callbacks.append(update_ghosts)
 
     # Add nonlinear propagation lines if discretization history is available
-    if (
-        show_propagation
-        and hasattr(results, "discretization_history")
-        and results.discretization_history
-    ):
-        # Get state/control dimensions from results metadata
-        n_x = getattr(results, "_n_x", None)
-        n_u = getattr(results, "_n_u", None)
+    if show_propagation and results.discretization_history:
+        n_x = results.X[0].shape[1]
+        n_u = results.U[0].shape[1]
 
-        # Try to infer from state array shape if not available
-        if n_x is None and X_history:
-            n_x = X_history[0].shape[1]
-        if n_u is None:
-            # Try to get from control history
-            if hasattr(results, "U") and results.U:
-                n_u = results.U[0].shape[1]
-            else:
-                n_u = 0  # Fallback
+        propagations = extract_propagation_positions(
+            results.discretization_history,
+            n_x=n_x,
+            n_u=n_u,
+            position_slice=position_slice,
+            scene_scale=scene_scale,
+        )
 
-        if n_x is not None and n_u is not None:
-            propagations = extract_propagation_positions(
-                results.discretization_history,
-                n_x=n_x,
-                n_u=n_u,
-                position_slice=position_slice,
-                scene_scale=scene_scale,
-            )
-
-            if propagations:
-                _, update_propagation = add_scp_propagation_lines(
-                    server,
-                    propagations,
-                    line_width=propagation_line_width,
-                )
-                update_callbacks.append(update_propagation)
+        _, update_propagation = add_scp_propagation_lines(
+            server,
+            propagations,
+            line_width=propagation_line_width,
+        )
+        update_callbacks.append(update_propagation)
 
     # Add main iteration nodes
     _, update_nodes = add_scp_iteration_nodes(
