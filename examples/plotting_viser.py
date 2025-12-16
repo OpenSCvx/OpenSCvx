@@ -18,6 +18,7 @@ from openscvx.plotting.animation import (
     add_gates,
     add_ghost_trajectory,
     add_position_marker,
+    add_target_markers,
     add_thrust_vector,
     add_viewcone,
     compute_velocity_colors,
@@ -60,8 +61,10 @@ def create_animated_plotting_server(
     attitude_key: str = "attitude",
     attitude_axes_length: float = 2.0,
     show_viewcone: bool = True,
-    viewcone_fov: float = 60.0,
+    viewcone_fov: float | None = None,
     viewcone_scale: float = 5.0,
+    show_targets: bool = True,
+    target_radius: float = 1.0,
 ) -> viser.ViserServer:
     """Create an animated trajectory visualization server.
 
@@ -76,13 +79,20 @@ def create_animated_plotting_server(
     - Current position marker
     - Thrust vector visualization (if thrust data available)
     - Body frame attitude visualization (if attitude data available, for 6DOF)
-    - Viewcone/camera frustum (if R_sb (body-to-sensor) in results and show_viewcone=True)
+    - Viewcone/camera frustum (if R_sb in results and show_viewcone=True)
+    - Target markers for viewplanning (if init_poses in results and show_targets=True)
     - Optional ghost trajectory showing full path
     - Static obstacles/gates if present in results
     - Ellipsoidal obstacles (if obstacles_centers, obstacles_radii, obstacles_axes in results)
 
     Args:
-        results: Optimization result dictionary containing trajectory data
+        results: Optimization result dictionary containing trajectory data.
+            Expected keys in results (beyond trajectory data):
+            - vertices: Gate/obstacle vertices (optional)
+            - R_sb: Body-to-sensor rotation matrix for viewcone (optional)
+            - alpha_x: Sensor cone half-angle parameter for FOV calculation (optional)
+            - init_poses: List of viewplanning target positions (optional)
+            - obstacles_centers, obstacles_radii, obstacles_axes: Ellipsoid obstacles (optional)
         show_ghost_trajectory: If True, show faint full trajectory
         loop_animation: If True, loop animation when it reaches the end
         thrust_key: Key for thrust/force data in trajectory dict (default: "force")
@@ -90,8 +100,11 @@ def create_animated_plotting_server(
         attitude_key: Key for attitude quaternion data (default: "attitude")
         attitude_axes_length: Length of body frame axes
         show_viewcone: If True and R_sb is in results, show camera viewcone
-        viewcone_fov: Field of view for viewcone in degrees
+        viewcone_fov: Field of view for viewcone in degrees. If None, computed from
+            alpha_x in results (fov = 180/alpha_x degrees), or defaults to 60.0.
         viewcone_scale: Size/depth of viewcone frustum
+        show_targets: If True and init_poses in results, show target markers
+        target_radius: Radius of target marker spheres
 
     Returns:
         ViserServer instance (animation runs in background thread)
@@ -106,6 +119,18 @@ def create_animated_plotting_server(
     # Viewcone parameters (body-to-sensor rotation)
     # Note: In many problems, R_sb is named as such but is actually body-to-sensor
     R_sb = results.get("R_sb")
+    alpha_x = results.get("alpha_x")
+
+    # Compute FOV from alpha_x if not explicitly provided
+    # alpha_x defines the half-angle as pi/alpha_x, so full FOV = 2 * (180/alpha_x) degrees
+    if viewcone_fov is None:
+        if alpha_x is not None:
+            viewcone_fov = np.degrees(np.pi / alpha_x) * 2
+        else:
+            viewcone_fov = 60.0  # Default
+
+    # Viewplanning target positions
+    init_poses = results.get("init_poses")
 
     # Precompute colors
     colors = compute_velocity_colors(vel)
@@ -159,6 +184,13 @@ def create_animated_plotting_server(
             R_sb=R_sb,
         )
         update_callbacks.append(update_viewcone)
+
+    # Add target markers for viewplanning problems
+    if show_targets and init_poses is not None:
+        target_results = add_target_markers(server, init_poses, radius=target_radius)
+        for _, update in target_results:
+            if update is not None:
+                update_callbacks.append(update)
 
     # Add animation controls
     add_animation_controls(server, traj_time, update_callbacks, loop=loop_animation)

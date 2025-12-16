@@ -23,6 +23,7 @@ grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 import openscvx as ox
+from examples.plotting_viser import create_animated_plotting_server
 from openscvx import Problem
 from openscvx.utils import gen_vertices, rot
 
@@ -272,67 +273,9 @@ if __name__ == "__main__":
 
     results.update(plotting_dict)
 
-    # Viser plotting
-    from openscvx.plotting.animation import (
-        add_animated_trail,
-        add_animation_controls,
-        add_attitude_frame,
-        add_gates,
-        add_ghost_trajectory,
-        add_target_markers,
-        add_thrust_vector,
-        add_viewcone,
-        compute_velocity_colors,
-        create_server,
+    server = create_animated_plotting_server(
+        results,
+        thrust_key="thrust_force",
+        viewcone_scale=10.0,
     )
-
-    # Extract data
-    pos = results.trajectory["position"]
-    vel = results.trajectory["velocity"]
-    attitude = results.trajectory["attitude"]
-    thrust = results.trajectory["thrust_force"]
-    traj_time = results.trajectory["time"]
-
-    # Create server and colors
-    server = create_server(pos)
-    colors = compute_velocity_colors(vel)
-
-    # Static elements
-    add_gates(server, vertices)
-    add_ghost_trajectory(server, pos, colors)
-
-    # Animated elements
-    update_callbacks = []
-
-    _, update_trail = add_animated_trail(server, pos, colors)
-    update_callbacks.append(update_trail)
-
-    _, update_attitude = add_attitude_frame(server, pos, attitude, axes_length=3.0)
-    update_callbacks.append(update_attitude)
-
-    _, update_thrust = add_thrust_vector(server, pos, thrust, attitude=attitude, scale=0.2)
-    update_callbacks.append(update_thrust)
-
-    # Viewcone - half-angle is pi/alpha_x, full FOV is 2x that
-    # For alpha_x=6: half-angle = 30°, full FOV = 60°
-    fov_deg = np.degrees(np.pi / alpha_x)
-    _, update_viewcone = add_viewcone(
-        server,
-        pos,
-        attitude,
-        fov=fov_deg,
-        scale=10.0,
-        R_sb=np.array(R_sb),  # R_sb is body-to-sensor in this problem
-    )
-    update_callbacks.append(update_viewcone)
-
-    # Target markers (static positions)
-    target_results = add_target_markers(server, init_poses, radius=1.0)
-    for _, update in target_results:
-        if update is not None:
-            update_callbacks.append(update)
-
-    # Animation controls
-    add_animation_controls(server, traj_time, update_callbacks)
-
     server.sleep_forever()
