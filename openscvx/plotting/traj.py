@@ -264,6 +264,114 @@ def add_position_marker(
     return handle, update
 
 
+def add_target_marker(
+    server: viser.ViserServer,
+    target_pos: np.ndarray,
+    name: str = "target",
+    radius: float = 0.8,
+    color: tuple[int, int, int] = (255, 50, 50),
+    show_trail: bool = True,
+    trail_color: tuple[int, int, int] | None = None,
+) -> tuple[viser.IcosphereHandle, UpdateCallback | None]:
+    """Add a viewplanning target marker (static or moving).
+
+    Args:
+        server: ViserServer instance
+        target_pos: Target position - either shape (3,) for static or (N, 3) for moving
+        name: Unique name for this target (used in scene path)
+        radius: Marker radius
+        color: RGB color tuple for marker
+        show_trail: If True and target is moving, show trajectory trail
+        trail_color: RGB color for trail (defaults to dimmed marker color)
+
+    Returns:
+        Tuple of (handle, update_callback). update_callback is None for static targets.
+    """
+    target_pos = np.asarray(target_pos)
+
+    # Check if static (single position) or moving (trajectory)
+    is_moving = target_pos.ndim == 2 and target_pos.shape[0] > 1
+
+    initial_pos = target_pos[0] if is_moving else target_pos
+
+    # Add marker
+    handle = server.scene.add_icosphere(
+        f"/targets/{name}/marker",
+        radius=radius,
+        color=color,
+        position=initial_pos,
+    )
+
+    # For moving targets, optionally show trail
+    trail_handle = None
+    if is_moving and show_trail:
+        if trail_color is None:
+            trail_color = tuple(int(c * 0.5) for c in color)
+        trail_handle = server.scene.add_point_cloud(
+            f"/targets/{name}/trail",
+            points=target_pos,
+            colors=trail_color,
+            point_size=0.1,
+        )
+
+    if not is_moving:
+        # Static target - no update needed
+        return handle, None
+
+    def update(frame_idx: int) -> None:
+        # Clamp to valid range for target trajectory
+        idx = min(frame_idx, len(target_pos) - 1)
+        handle.position = target_pos[idx]
+
+    return handle, update
+
+
+def add_target_markers(
+    server: viser.ViserServer,
+    target_positions: list[np.ndarray],
+    colors: list[tuple[int, int, int]] | None = None,
+    radius: float = 0.8,
+    show_trails: bool = True,
+) -> list[tuple[viser.IcosphereHandle, UpdateCallback | None]]:
+    """Add multiple viewplanning target markers.
+
+    Args:
+        server: ViserServer instance
+        target_positions: List of target positions, each either (3,) or (N, 3)
+        colors: List of RGB colors, one per target. Defaults to distinct colors.
+        radius: Marker radius
+        show_trails: If True, show trails for moving targets
+
+    Returns:
+        List of (handle, update_callback) tuples
+    """
+    # Default colors if not provided
+    if colors is None:
+        default_colors = [
+            (255, 50, 50),  # Red
+            (50, 255, 50),  # Green
+            (50, 50, 255),  # Blue
+            (255, 255, 50),  # Yellow
+            (255, 50, 255),  # Magenta
+            (50, 255, 255),  # Cyan
+        ]
+        colors = [default_colors[i % len(default_colors)] for i in range(len(target_positions))]
+
+    results = []
+    for i, (pos, color) in enumerate(zip(target_positions, colors)):
+        handle, update = add_target_marker(
+            server,
+            pos,
+            name=f"target_{i}",
+            radius=radius,
+            color=color,
+            show_trail=show_trails,
+        )
+        results.append((handle, update))
+
+    return results
+
+
 def _rotate_vector_by_quaternion(v: np.ndarray, q: np.ndarray) -> np.ndarray:
     """Rotate vector v by quaternion q (wxyz format).
 
@@ -366,6 +474,128 @@ def add_attitude_frame(
 
     def update(frame_idx: int) -> None:
         handle.wxyz = attitude[frame_idx]
+        handle.position = pos[frame_idx]
+
+    return handle, update
+
+
+def _rotation_matrix_to_quaternion(R: np.ndarray) -> np.ndarray:
+    """Convert rotation matrix to quaternion (wxyz format).
+
+    Args:
+        R: Rotation matrix of shape (3, 3)
+
+    Returns:
+        Quaternion array [w, x, y, z]
+    """
+    # Using Shepperd's method for numerical stability
+    trace = np.trace(R)
+
+    if trace > 0:
+        s = 0.5 / np.sqrt(trace + 1.0)
+        w = 0.25 / s
+        x = (R[2, 1] - R[1, 2]) * s
+        y = (R[0, 2] - R[2, 0]) * s
+        z = (R[1, 0] - R[0, 1]) * s
+    elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
+        s = 2.0 * np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2])
+        w = (R[2, 1] - R[1, 2]) / s
+        x = 0.25 * s
+        y = (R[0, 1] + R[1, 0]) / s
+        z = (R[0, 2] + R[2, 0]) / s
+    elif R[1, 1] > R[2, 2]:
+        s = 2.0 * np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2])
+        w = (R[0, 2] - R[2, 0]) / s
+        x = (R[0, 1] + R[1, 0]) / s
+        y = 0.25 * s
+        z = (R[1, 2] + R[2, 1]) / s
+    else:
+        s = 2.0 * np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1])
+        w = (R[1, 0] - R[0, 1]) / s
+        x = (R[0, 2] + R[2, 0]) / s
+        y = (R[1, 2] + R[2, 1]) / s
+        z = 0.25 * s
+
+    return np.array([w, x, y, z])
+
+
+def _quaternion_multiply(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
+    """Multiply two quaternions (wxyz format).
+
+    Args:
+        q1: First quaternion [w, x, y, z]
+        q2: Second quaternion [w, x, y, z]
+
+    Returns:
+        Product quaternion [w, x, y, z]
+    """
+    w1, x1, y1, z1 = q1
+    w2, x2, y2, z2 = q2
+    return np.array(
+        [
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+        ]
+    )
+
+
+def add_viewcone(
+    server: viser.ViserServer,
+    pos: np.ndarray,
+    attitude: np.ndarray | None,
+    fov: float = 60.0,
+    aspect: float = 1.0,
+    scale: float = 5.0,
+    R_sb: np.ndarray | None = None,
+    color: tuple[int, int, int] = (255, 200, 100),
+) -> tuple[viser.CameraFrustumHandle | None, UpdateCallback | None]:
+    """Add an animated camera viewcone/frustum visualization.
+
+    The sensor is assumed to look along +Z in its own frame (boresight = [0,0,1]).
+
+    Args:
+        server: ViserServer instance
+        pos: Position array of shape (N, 3)
+        attitude: Quaternion array of shape (N, 4) in [w, x, y, z] format, or None to skip
+        fov: Field of view in degrees (full angle, not half-angle)
+        aspect: Aspect ratio (width/height)
+        scale: Size/depth of the frustum
+        R_sb: Body-to-sensor rotation matrix (3x3). If None, sensor is aligned with body z-axis.
+            This matrix transforms vectors FROM body frame TO sensor frame.
+        color: RGB color tuple
+
+    Returns:
+        Tuple of (handle, update_callback), or (None, None) if attitude is None
+    """
+    if attitude is None:
+        return None, None
+
+    # Sensor-to-body is the inverse (transpose) of body-to-sensor
+    R_sb = R_sb.T if R_sb is not None else np.eye(3)
+    q_sb = _rotation_matrix_to_quaternion(R_sb)
+
+    def get_sensor_quaternion(frame_idx: int) -> np.ndarray:
+        """Get frustum orientation in world frame."""
+        q_body = attitude[frame_idx]
+        # Chain: body attitude * sensor-to-body * flip for viser convention
+        q_sensor = _quaternion_multiply(q_body, q_sb)
+        return q_sensor
+
+    initial_wxyz = get_sensor_quaternion(0)
+    handle = server.scene.add_camera_frustum(
+        "/viewcone",
+        fov=fov,
+        aspect=aspect,
+        scale=scale,
+        wxyz=initial_wxyz,
+        position=pos[0],
+        color=color,
+    )
+
+    def update(frame_idx: int) -> None:
+        handle.wxyz = get_sensor_quaternion(frame_idx)
         handle.position = pos[frame_idx]
 
     return handle, update
@@ -521,6 +751,9 @@ def create_animated_plotting_server(
     thrust_scale: float = 0.3,
     attitude_key: str = "attitude",
     attitude_axes_length: float = 2.0,
+    show_viewcone: bool = True,
+    viewcone_fov: float = 60.0,
+    viewcone_scale: float = 5.0,
 ) -> viser.ViserServer:
     """Create an animated trajectory visualization server.
 
@@ -535,6 +768,7 @@ def create_animated_plotting_server(
     - Current position marker
     - Thrust vector visualization (if thrust data available)
     - Body frame attitude visualization (if attitude data available, for 6DOF)
+    - Viewcone/camera frustum (if R_sb (body-to-sensor) in results and show_viewcone=True)
     - Optional ghost trajectory showing full path
     - Static obstacles/gates if present in results
 
@@ -546,6 +780,9 @@ def create_animated_plotting_server(
         thrust_scale: Scale factor for thrust vector visualization
         attitude_key: Key for attitude quaternion data (default: "attitude")
         attitude_axes_length: Length of body frame axes
+        show_viewcone: If True and R_sb is in results, show camera viewcone
+        viewcone_fov: Field of view for viewcone in degrees
+        viewcone_scale: Size/depth of viewcone frustum
 
     Returns:
         ViserServer instance (animation runs in background thread)
@@ -556,6 +793,10 @@ def create_animated_plotting_server(
     thrust = results.trajectory.get(thrust_key)
     attitude = results.trajectory.get(attitude_key)
     traj_time = results.trajectory["time"]
+
+    # Viewcone parameters (body-to-sensor rotation)
+    # Note: In many problems, R_sb is named as such but is actually body-to-sensor
+    R_sb = results.get("R_sb")
 
     # Precompute colors
     colors = compute_velocity_colors(vel)
@@ -586,10 +827,20 @@ def create_animated_plotting_server(
         _, update_marker = add_position_marker(server, pos)
         update_callbacks.append(update_marker)
 
-    _, update_thrust = add_thrust_vector(
-        server, pos, thrust, attitude=attitude, scale=thrust_scale
-    )
+    _, update_thrust = add_thrust_vector(server, pos, thrust, attitude=attitude, scale=thrust_scale)
     update_callbacks.append(update_thrust)  # Will be filtered out if None
+
+    # Add viewcone if R_sb is available and enabled
+    if show_viewcone and R_sb is not None and attitude is not None:
+        _, update_viewcone = add_viewcone(
+            server,
+            pos,
+            attitude,
+            fov=viewcone_fov,
+            scale=viewcone_scale,
+            R_sb=R_sb,
+        )
+        update_callbacks.append(update_viewcone)
 
     # Add animation controls
     add_animation_controls(server, traj_time, update_callbacks, loop=loop_animation)
