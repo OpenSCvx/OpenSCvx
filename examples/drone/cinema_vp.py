@@ -23,7 +23,7 @@ grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 import openscvx as ox
-from examples.plotting import plot_animation
+from examples.plotting_viser import create_animated_plotting_server
 from openscvx import Problem
 from openscvx.utils import get_kp_pose
 
@@ -261,11 +261,9 @@ plotting_dict = {
     "alpha_x": alpha_x,
     "alpha_y": alpha_y,
     "R_sb": R_sb,
-    "init_poses": init_pose,
     "norm_type": norm_type,
     "min_range": min_range,
     "max_range": max_range,
-    "moving_subject": True,
 }
 
 if __name__ == "__main__":
@@ -273,6 +271,16 @@ if __name__ == "__main__":
     results = problem.solve()
     results = problem.post_process()
 
+    # Compute moving target trajectory using the post-processed time array
+    traj_time = results.trajectory["time"].flatten()
+    target_trajectory = np.asarray(get_kp_pose(traj_time, init_pose))
+    plotting_dict["init_poses"] = [target_trajectory]  # List of target trajectories
+
     results.update(plotting_dict)
 
-    plot_animation(results, problem.settings).show()
+    server = create_animated_plotting_server(
+        results,
+        thrust_key="thrust_force",
+        viewcone_scale=10.0,
+    )
+    server.sleep_forever()

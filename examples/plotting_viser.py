@@ -122,10 +122,10 @@ def create_animated_plotting_server(
     alpha_x = results.get("alpha_x")
 
     # Compute FOV from alpha_x if not explicitly provided
-    # alpha_x defines the half-angle as pi/alpha_x, so full FOV = 2 * (180/alpha_x) degrees
+    # alpha_x defines the cone half-angle as pi/alpha_x radians
     if viewcone_fov is None:
         if alpha_x is not None:
-            viewcone_fov = np.degrees(np.pi / alpha_x) * 2
+            viewcone_fov = np.degrees(np.pi / alpha_x)
         else:
             viewcone_fov = 60.0  # Default
 
