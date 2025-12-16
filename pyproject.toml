@@ -26,6 +26,8 @@ dependencies = [
     "diffrax",
     "absl-py",
     "flatbuffers",
+    "viser",
+    "matplotlib",
 ]
 
 [project.urls]
