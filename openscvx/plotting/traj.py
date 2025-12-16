@@ -1,12 +1,44 @@
+"""Viser-based trajectory visualization.
+
+This module provides modular components for visualizing trajectory optimization results.
+Components can be composed together for custom visualizations, or use the convenience
+function `create_animated_plotting_server` for a complete out-of-the-box experience.
+
+Example (modular usage):
+    server = create_server(pos)
+    add_gates(server, vertices)
+    add_ghost_trajectory(server, pos, colors)
+
+    _, update_trail = add_animated_trail(server, pos, colors)
+    _, update_marker = add_position_marker(server, pos)
+    _, update_thrust = add_thrust_vector(server, pos, thrust)
+
+    add_animation_controls(server, traj_time, [update_trail, update_marker, update_thrust])
+    server.sleep_forever()
+
+Example (convenience function):
+    server = create_animated_plotting_server(results)
+    server.sleep_forever()
+"""
+
 import threading
 import time
+from typing import Callable
 
 import matplotlib.pyplot as plt
 import numpy as np
 import viser
 
+# Type alias for update callbacks: fn(frame_idx: int) -> None
+UpdateCallback = Callable[[int], None]
 
-def _compute_velocity_colors(vel: np.ndarray, cmap_name: str = "viridis") -> np.ndarray:
+
+# =============================================================================
+# Helper Functions
+# =============================================================================
+
+
+def compute_velocity_colors(vel: np.ndarray, cmap_name: str = "viridis") -> np.ndarray:
     """Compute RGB colors based on velocity magnitude.
 
     Args:
@@ -28,69 +60,44 @@ def _compute_velocity_colors(vel: np.ndarray, cmap_name: str = "viridis") -> np.
     return colors
 
 
-def _compute_grid_size(pos: np.ndarray, padding: float = 1.2) -> float:
-    """Compute grid size based on trajectory extent."""
+def compute_grid_size(pos: np.ndarray, padding: float = 1.2) -> float:
+    """Compute grid size based on trajectory extent.
+
+    Args:
+        pos: Position array of shape (N, 3)
+        padding: Padding factor (1.2 = 20% padding)
+
+    Returns:
+        Grid size (width and height)
+    """
     max_x = np.abs(pos[:, 0]).max()
     max_y = np.abs(pos[:, 1]).max()
     return max(max_x, max_y) * 2 * padding
 
 
-def _add_static_elements(server: viser.ViserServer, results: dict) -> None:
-    """Add static scene elements like obstacles and gates."""
-    # Add gate/obstacle vertices if present
-    if "vertices" in results:
-        for i, verts in enumerate(results["vertices"]):
-            verts = np.array(verts)
-            n_verts = len(verts)
-
-            if n_verts == 4:
-                # Planar gate: 4 vertices forming a closed loop
-                edges = [[0, 1], [1, 2], [2, 3], [3, 0]]
-            elif n_verts == 8:
-                # 3D box: 8 vertices
-                edges = [
-                    [0, 1],
-                    [1, 2],
-                    [2, 3],
-                    [3, 0],  # front face
-                    [4, 5],
-                    [5, 6],
-                    [6, 7],
-                    [7, 4],  # back face
-                    [0, 4],
-                    [1, 5],
-                    [2, 6],
-                    [3, 7],  # connecting edges
-                ]
-            else:
-                # Unknown format, skip
-                continue
-
-            # Shape (N, 2, 3) for N line segments
-            points = np.array([[verts[e[0]], verts[e[1]]] for e in edges])
-            server.scene.add_line_segments(
-                f"/gates/gate_{i}",
-                points=points,
-                colors=(255, 165, 0),  # orange
-                line_width=3.0,
-            )
+# =============================================================================
+# Server Setup
+# =============================================================================
 
 
-def create_plotting_server(results: dict) -> viser.ViserServer:
-    """Create a basic (non-animated) plotting server.
+def create_server(
+    pos: np.ndarray,
+    dark_mode: bool = True,
+) -> viser.ViserServer:
+    """Create a viser server with basic scene setup.
 
     Args:
-        results: Optimization result dictionary containing trajectory data
+        pos: Position array for computing grid size
+        dark_mode: Whether to use dark theme
 
     Returns:
-        ViserServer instance
+        ViserServer instance with grid and origin frame
     """
     server = viser.ViserServer()
-    server.gui.configure_theme(dark_mode=True)
+    if dark_mode:
+        server.gui.configure_theme(dark_mode=True)
 
-    pos = results.trajectory["position"]
-    grid_size = _compute_grid_size(pos)
-
+    grid_size = compute_grid_size(pos)
     server.scene.add_grid(
         "/grid",
         width=grid_size,
@@ -106,97 +113,246 @@ def create_plotting_server(results: dict) -> viser.ViserServer:
     return server
 
 
-def add_velocity_trace(server: viser.ViserServer, results: dict) -> None:
-    """Add a static velocity-colored trajectory trace.
+# =============================================================================
+# Static Visualization Components
+# =============================================================================
+
+
+def add_gates(
+    server: viser.ViserServer,
+    vertices: list,
+    color: tuple[int, int, int] = (255, 165, 0),
+    line_width: float = 3.0,
+) -> None:
+    """Add gate/obstacle wireframes to the scene.
 
     Args:
         server: ViserServer instance
-        results: Optimization result dictionary
+        vertices: List of vertex arrays (4 vertices for planar gate, 8 for box)
+        color: RGB color tuple
+        line_width: Line width for wireframe
     """
-    pos = results.trajectory["position"]
-    vel = results.trajectory["velocity"]
-    colors = _compute_velocity_colors(vel)
-    server.scene.add_point_cloud("/traj", points=pos, colors=colors)
+    for i, verts in enumerate(vertices):
+        verts = np.array(verts)
+        n_verts = len(verts)
 
+        if n_verts == 4:
+            # Planar gate: 4 vertices forming a closed loop
+            edges = [[0, 1], [1, 2], [2, 3], [3, 0]]
+        elif n_verts == 8:
+            # 3D box: 8 vertices
+            edges = [
+                [0, 1],
+                [1, 2],
+                [2, 3],
+                [3, 0],  # front face
+                [4, 5],
+                [5, 6],
+                [6, 7],
+                [7, 4],  # back face
+                [0, 4],
+                [1, 5],
+                [2, 6],
+                [3, 7],  # connecting edges
+            ]
+        else:
+            # Unknown format, skip
+            continue
 
-def create_animated_plotting_server(
-    results: dict,
-    show_ghost_trajectory: bool = True,
-    loop_animation: bool = True,
-    thrust_key: str = "force",
-) -> viser.ViserServer:
-    """Create an animated trajectory visualization server.
-
-    Features:
-    - Play/pause button for animation
-    - Frame slider to scrub through trajectory
-    - Speed control slider
-    - Velocity-colored trail that grows as animation progresses
-    - Current position marker
-    - Thrust vector visualization
-    - Optional ghost trajectory showing full path
-    - Static obstacles/gates if present in results
-
-    Args:
-        results: Optimization result dictionary containing trajectory data
-        show_ghost_trajectory: If True, show faint full trajectory
-        loop_animation: If True, loop animation when it reaches the end
-        thrust_key: Key for thrust/force data in trajectory dict (default: "force")
-
-    Returns:
-        ViserServer instance (animation runs in background thread)
-    """
-    server = viser.ViserServer()
-    server.gui.configure_theme(dark_mode=True)
-
-    pos = results.trajectory["position"]
-    vel = results.trajectory["velocity"]
-    thrust = results.trajectory.get(thrust_key)
-    traj_time = results.trajectory["time"].flatten()  # Time array
-    n_frames = pos.shape[0]
-    t_start, t_end = traj_time[0], traj_time[-1]
-    duration = t_end - t_start
-
-    # Setup scene
-    grid_size = _compute_grid_size(pos)
-    server.scene.add_grid(
-        "/grid",
-        width=grid_size,
-        height=grid_size,
-        position=np.array([0.0, 0.0, 0.0]),
-    )
-    server.scene.add_frame(
-        "/origin",
-        wxyz=(1.0, 0.0, 0.0, 0.0),
-        position=(0.0, 0.0, 0.0),
-    )
-
-    # Add static elements (gates, obstacles)
-    _add_static_elements(server, results)
-
-    # Precompute velocity colors
-    colors = _compute_velocity_colors(vel)
-
-    # Ghost trajectory (faint full path)
-    if show_ghost_trajectory:
-        ghost_colors = (colors * 0.3).astype(np.uint8)  # Dim the colors
-        server.scene.add_point_cloud(
-            "/ghost_traj",
-            points=pos,
-            colors=ghost_colors,
-            point_size=0.05,
+        # Shape (N, 2, 3) for N line segments
+        points = np.array([[verts[e[0]], verts[e[1]]] for e in edges])
+        server.scene.add_line_segments(
+            f"/gates/gate_{i}",
+            points=points,
+            colors=color,
+            line_width=line_width,
         )
 
+
+def add_ghost_trajectory(
+    server: viser.ViserServer,
+    pos: np.ndarray,
+    colors: np.ndarray,
+    opacity: float = 0.3,
+    point_size: float = 0.05,
+) -> None:
+    """Add a faint ghost trajectory showing the full path.
+
+    Args:
+        server: ViserServer instance
+        pos: Position array of shape (N, 3)
+        colors: RGB color array of shape (N, 3)
+        opacity: Opacity factor (0-1) applied to colors
+        point_size: Size of trajectory points
+    """
+    ghost_colors = (colors * opacity).astype(np.uint8)
+    server.scene.add_point_cloud(
+        "/ghost_traj",
+        points=pos,
+        colors=ghost_colors,
+        point_size=point_size,
+    )
+
+
+# =============================================================================
+# Animated Visualization Components
+# Each returns (handle, update_callback) where update_callback(frame_idx) updates the visual
+# =============================================================================
+
+
+def add_animated_trail(
+    server: viser.ViserServer,
+    pos: np.ndarray,
+    colors: np.ndarray,
+    point_size: float = 0.15,
+) -> tuple[viser.PointCloudHandle, UpdateCallback]:
+    """Add an animated trail that grows with the animation.
+
+    Args:
+        server: ViserServer instance
+        pos: Position array of shape (N, 3)
+        colors: RGB color array of shape (N, 3)
+        point_size: Size of trail points
+
+    Returns:
+        Tuple of (handle, update_callback)
+    """
+    handle = server.scene.add_point_cloud(
+        "/trail",
+        points=pos[:1],
+        colors=colors[:1],
+        point_size=point_size,
+    )
+
+    def update(frame_idx: int) -> None:
+        idx = frame_idx + 1  # Include current frame
+        handle.points = pos[:idx]
+        handle.colors = colors[:idx]
+
+    return handle, update
+
+
+def add_position_marker(
+    server: viser.ViserServer,
+    pos: np.ndarray,
+    radius: float = 0.5,
+    color: tuple[int, int, int] = (100, 200, 255),
+) -> tuple[viser.IcosphereHandle, UpdateCallback]:
+    """Add an animated position marker (sphere at current position).
+
+    Args:
+        server: ViserServer instance
+        pos: Position array of shape (N, 3)
+        radius: Marker radius
+        color: RGB color tuple
+
+    Returns:
+        Tuple of (handle, update_callback)
+    """
+    handle = server.scene.add_icosphere(
+        "/current_pos",
+        radius=radius,
+        color=color,
+        position=pos[0],
+    )
+
+    def update(frame_idx: int) -> None:
+        handle.position = pos[frame_idx]
+
+    return handle, update
+
+
+def add_thrust_vector(
+    server: viser.ViserServer,
+    pos: np.ndarray,
+    thrust: np.ndarray | None,
+    scale: float = 0.3,
+    color: tuple[int, int, int] = (255, 100, 100),
+    line_width: float = 4.0,
+) -> tuple[viser.LineSegmentsHandle | None, UpdateCallback | None]:
+    """Add an animated thrust/force vector visualization.
+
+    Args:
+        server: ViserServer instance
+        pos: Position array of shape (N, 3)
+        thrust: Thrust/force array of shape (N, 3), or None to skip
+        scale: Scale factor for thrust vector length
+        color: RGB color tuple
+        line_width: Line width
+
+    Returns:
+        Tuple of (handle, update_callback), or (None, None) if thrust is None
+    """
+    if thrust is None:
+        return None, None
+
+    thrust_end = pos[0] + thrust[0] * scale
+    handle = server.scene.add_line_segments(
+        "/thrust_vector",
+        points=np.array([[pos[0], thrust_end]]),  # Shape (1, 2, 3)
+        colors=color,
+        line_width=line_width,
+    )
+
+    def update(frame_idx: int) -> None:
+        thrust_end = pos[frame_idx] + thrust[frame_idx] * scale
+        handle.points = np.array([[pos[frame_idx], thrust_end]])
+
+    return handle, update
+
+
+# =============================================================================
+# Animation Controller
+# =============================================================================
+
+
+def add_animation_controls(
+    server: viser.ViserServer,
+    traj_time: np.ndarray,
+    update_callbacks: list[UpdateCallback],
+    loop: bool = True,
+    folder_name: str = "Animation",
+) -> None:
+    """Add animation GUI controls and start the animation loop.
+
+    Creates play/pause button, reset button, time slider, speed slider, and loop checkbox.
+    Runs animation in a background daemon thread.
+
+    Args:
+        server: ViserServer instance
+        traj_time: Time array of shape (N,) with timestamps for each frame
+        update_callbacks: List of update functions to call each frame
+        loop: Whether to loop animation by default
+        folder_name: Name for the GUI folder
+    """
+    traj_time = traj_time.flatten()
+    n_frames = len(traj_time)
+    t_start, t_end = float(traj_time[0]), float(traj_time[-1])
+    duration = t_end - t_start
+
+    # Filter out None callbacks
+    callbacks = [cb for cb in update_callbacks if cb is not None]
+
+    def time_to_frame(t: float) -> int:
+        """Convert simulation time to frame index."""
+        return int(np.clip(np.searchsorted(traj_time, t, side="right") - 1, 0, n_frames - 1))
+
+    def update_all(sim_t: float) -> None:
+        """Update all visualization components."""
+        idx = time_to_frame(sim_t)
+        for callback in callbacks:
+            callback(idx)
+
     # --- GUI Controls ---
-    with server.gui.add_folder("Animation"):
+    with server.gui.add_folder(folder_name):
         play_button = server.gui.add_button("Play")
         reset_button = server.gui.add_button("Reset")
         time_slider = server.gui.add_slider(
             "Time (s)",
-            min=float(t_start),
-            max=float(t_end),
-            step=float(duration / 100),
-            initial_value=float(t_start),
+            min=t_start,
+            max=t_end,
+            step=duration / 100,
+            initial_value=t_start,
         )
         speed_slider = server.gui.add_slider(
             "Speed",
@@ -205,59 +361,10 @@ def create_animated_plotting_server(
             step=0.1,
             initial_value=1.0,
         )
-        loop_checkbox = server.gui.add_checkbox("Loop", initial_value=loop_animation)
+        loop_checkbox = server.gui.add_checkbox("Loop", initial_value=loop)
 
-    # --- Dynamic Scene Handles ---
-    # Trail showing trajectory up to current frame
-    trail_handle = server.scene.add_point_cloud(
-        "/trail",
-        points=pos[:1],
-        colors=colors[:1],
-        point_size=0.15,
-    )
-
-    # Current position marker
-    marker_handle = server.scene.add_icosphere(
-        "/current_pos",
-        radius=0.5,
-        color=(100, 200, 255),  # Cyan/light blue
-        position=pos[0],
-    )
-
-    # Thrust vector at current position
-    thrust_scale = 0.3  # Scale factor for thrust visualization
-    thrust_line_handle = None
-    if thrust is not None:
-        thrust_end = pos[0] + thrust[0] * thrust_scale
-        thrust_line_handle = server.scene.add_line_segments(
-            "/thrust_vector",
-            points=np.array([[pos[0], thrust_end]]),  # Shape (1, 2, 3)
-            colors=(255, 100, 100),  # Red for thrust
-            line_width=4.0,
-        )
-
-    # Animation state (track simulation time, not frame)
-    state = {"playing": False, "sim_time": float(t_start)}
-
-    def time_to_frame(t: float) -> int:
-        """Convert simulation time to frame index."""
-        return int(np.clip(np.searchsorted(traj_time, t, side="right") - 1, 0, n_frames - 1))
-
-    def update_scene(sim_t: float) -> None:
-        """Update all dynamic scene elements for given simulation time."""
-        idx = time_to_frame(sim_t)
-
-        # Update trail (show all points up to current time)
-        trail_handle.points = pos[: idx + 1]
-        trail_handle.colors = colors[: idx + 1]
-
-        # Update marker position
-        marker_handle.position = pos[idx]
-
-        # Update thrust vector
-        if thrust_line_handle is not None:
-            thrust_end = pos[idx] + thrust[idx] * thrust_scale
-            thrust_line_handle.points = np.array([[pos[idx], thrust_end]])  # Shape (1, 2, 3)
+    # Animation state
+    state = {"playing": False, "sim_time": t_start}
 
     @play_button.on_click
     def _(_) -> None:
@@ -266,15 +373,15 @@ def create_animated_plotting_server(
 
     @reset_button.on_click
     def _(_) -> None:
-        state["sim_time"] = float(t_start)
-        time_slider.value = float(t_start)
-        update_scene(t_start)
+        state["sim_time"] = t_start
+        time_slider.value = t_start
+        update_all(t_start)
 
     @time_slider.on_update
     def _(_) -> None:
         if not state["playing"]:
             state["sim_time"] = float(time_slider.value)
-            update_scene(state["sim_time"])
+            update_all(state["sim_time"])
 
     def animation_loop() -> None:
         """Background thread for realtime animation playback."""
@@ -291,17 +398,115 @@ def create_animated_plotting_server(
 
                 if state["sim_time"] >= t_end:
                     if loop_checkbox.value:
-                        state["sim_time"] = float(t_start)
+                        state["sim_time"] = t_start
                     else:
-                        state["sim_time"] = float(t_end)
+                        state["sim_time"] = t_end
                         state["playing"] = False
                         play_button.name = "Play"
 
                 time_slider.value = state["sim_time"]
-                update_scene(state["sim_time"])
+                update_all(state["sim_time"])
 
     # Start animation thread
     thread = threading.Thread(target=animation_loop, daemon=True)
     thread.start()
+
+
+# =============================================================================
+# Convenience Functions
+# =============================================================================
+
+
+def create_plotting_server(results: dict) -> viser.ViserServer:
+    """Create a basic (non-animated) plotting server.
+
+    Args:
+        results: Optimization result dictionary containing trajectory data
+
+    Returns:
+        ViserServer instance
+    """
+    pos = results.trajectory["position"]
+    return create_server(pos)
+
+
+def add_velocity_trace(server: viser.ViserServer, results: dict) -> None:
+    """Add a static velocity-colored trajectory trace.
+
+    Args:
+        server: ViserServer instance
+        results: Optimization result dictionary
+    """
+    pos = results.trajectory["position"]
+    vel = results.trajectory["velocity"]
+    colors = compute_velocity_colors(vel)
+    server.scene.add_point_cloud("/traj", points=pos, colors=colors)
+
+
+def create_animated_plotting_server(
+    results: dict,
+    show_ghost_trajectory: bool = True,
+    loop_animation: bool = True,
+    thrust_key: str = "force",
+    thrust_scale: float = 0.3,
+) -> viser.ViserServer:
+    """Create an animated trajectory visualization server.
+
+    This is a convenience function that composes the modular components.
+    For custom visualizations, use the individual add_* functions directly.
+
+    Features:
+    - Play/pause button for animation
+    - Time slider to scrub through trajectory (realtime playback)
+    - Speed control slider
+    - Velocity-colored trail that grows as animation progresses
+    - Current position marker
+    - Thrust vector visualization (if thrust data available)
+    - Optional ghost trajectory showing full path
+    - Static obstacles/gates if present in results
+
+    Args:
+        results: Optimization result dictionary containing trajectory data
+        show_ghost_trajectory: If True, show faint full trajectory
+        loop_animation: If True, loop animation when it reaches the end
+        thrust_key: Key for thrust/force data in trajectory dict (default: "force")
+        thrust_scale: Scale factor for thrust vector visualization
+
+    Returns:
+        ViserServer instance (animation runs in background thread)
+    """
+    # Extract data
+    pos = results.trajectory["position"]
+    vel = results.trajectory["velocity"]
+    thrust = results.trajectory.get(thrust_key)
+    traj_time = results.trajectory["time"]
+
+    # Precompute colors
+    colors = compute_velocity_colors(vel)
+
+    # Create server
+    server = create_server(pos)
+
+    # Add static elements
+    if "vertices" in results:
+        add_gates(server, results["vertices"])
+
+    if show_ghost_trajectory:
+        add_ghost_trajectory(server, pos, colors)
+
+    # Add animated elements (collect update callbacks)
+    update_callbacks = []
+
+    _, update_trail = add_animated_trail(server, pos, colors)
+    update_callbacks.append(update_trail)
+
+    _, update_marker = add_position_marker(server, pos)
+    update_callbacks.append(update_marker)
+
+    _, update_thrust = add_thrust_vector(server, pos, thrust, scale=thrust_scale)
+    update_callbacks.append(update_thrust)  # Will be filtered out if None
+
+    # Add animation controls
+    add_animation_controls(server, traj_time, update_callbacks, loop=loop_animation)
 
     return server
