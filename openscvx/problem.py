@@ -49,7 +49,6 @@ from openscvx.lowered.jax_constraints import (
     LoweredJaxConstraints,
     LoweredNodalConstraint,
 )
-from openscvx.plotting.plotting import ProblemPlotMixin
 from openscvx.propagation import get_propagation_solver, propagate_trajectory_results
 from openscvx.solvers import optimal_control_problem
 from openscvx.symbolic.builder import preprocess_symbolic_problem
@@ -72,7 +71,7 @@ if TYPE_CHECKING:
     import cvxpy as cp
 
 
-class Problem(ProblemPlotMixin):
+class Problem:
     def __init__(
         self,
         dynamics: dict,

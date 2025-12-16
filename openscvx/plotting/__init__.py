@@ -16,6 +16,8 @@ from .plotting import (
     plot_control,
     plot_scp_iteration_animation,
     plot_state,
+    plot_trust_region_heatmap,
+    plot_virtual_control_heatmap,
 )
 
 __all__ = [
@@ -23,6 +25,8 @@ __all__ = [
     "plot_state",
     "plot_control",
     "plot_scp_iteration_animation",
+    "plot_trust_region_heatmap",
+    "plot_virtual_control_heatmap",
 ]
 
 # Mark module as unstable/deprecated
