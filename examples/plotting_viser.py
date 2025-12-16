@@ -23,11 +23,13 @@ from openscvx.plotting.animation import (
     add_scp_ghost_iterations,
     add_scp_iteration_attitudes,
     add_scp_iteration_nodes,
+    add_scp_propagation_lines,
     add_target_markers,
     add_thrust_vector,
     add_viewcone,
     compute_velocity_colors,
     create_server,
+    extract_propagation_positions,
 )
 
 
@@ -208,11 +210,12 @@ def create_scp_animated_plotting_server(
     position_slice: slice | None = None,
     attitude_slice: slice | None = None,
     show_ghost_iterations: bool = True,
+    show_propagation: bool = True,
+    propagation_line_width: float = 2.0,
     show_attitudes: bool = True,
     attitude_stride: int = 3,
     attitude_axes_length: float = 1.5,
     node_point_size: float = 0.3,
-    show_lines: bool = True,
     frame_duration_ms: int = 500,
     scene_scale: float = 1.0,
 ) -> viser.ViserServer:
@@ -226,8 +229,9 @@ def create_scp_animated_plotting_server(
     - Previous/Next buttons to step through iterations
     - Iteration slider to scrub through convergence history
     - Speed control for playback
-    - Node positions colored by iteration (red -> green as it converges)
-    - Optional ghost trails showing previous iterations
+    - Node positions colored by iteration (viridis colormap)
+    - Nonlinear propagation lines showing actual integrated trajectories (viridis colored)
+    - Ghost trails showing all previous iterations
     - Optional attitude frames at each node (for 6DOF problems)
     - Static obstacles/gates if present in results
 
@@ -238,11 +242,14 @@ def create_scp_animated_plotting_server(
         attitude_slice: Slice for extracting attitude quaternion from state vector.
             If None, auto-detected from results._states looking for "attitude".
         show_ghost_iterations: If True, show all previous iterations with viridis coloring
+        show_propagation: If True, show nonlinear propagation lines between nodes.
+            This reveals defects (gaps) in early iterations that close as SCP converges.
+            Lines are colored with viridis and persist across iterations.
+        propagation_line_width: Width of propagation lines
         show_attitudes: If True and attitude data available, show body frames
         attitude_stride: Show attitude frame every N nodes (reduces clutter)
         attitude_axes_length: Length of attitude coordinate frame axes
         node_point_size: Size of node markers
-        show_lines: If True, connect nodes with line segments
         frame_duration_ms: Default milliseconds per iteration frame
         scene_scale: Divide all positions by this factor. Use >1 for large-scale
             trajectories (e.g., 100.0 for km-scale problems).
@@ -301,12 +308,48 @@ def create_scp_animated_plotting_server(
         _, update_ghosts = add_scp_ghost_iterations(server, positions)
         update_callbacks.append(update_ghosts)
 
+    # Add nonlinear propagation lines if discretization history is available
+    if (
+        show_propagation
+        and hasattr(results, "discretization_history")
+        and results.discretization_history
+    ):
+        # Get state/control dimensions from results metadata
+        n_x = getattr(results, "_n_x", None)
+        n_u = getattr(results, "_n_u", None)
+
+        # Try to infer from state array shape if not available
+        if n_x is None and X_history:
+            n_x = X_history[0].shape[1]
+        if n_u is None:
+            # Try to get from control history
+            if hasattr(results, "U") and results.U:
+                n_u = results.U[0].shape[1]
+            else:
+                n_u = 0  # Fallback
+
+        if n_x is not None and n_u is not None:
+            propagations = extract_propagation_positions(
+                results.discretization_history,
+                n_x=n_x,
+                n_u=n_u,
+                position_slice=position_slice,
+                scene_scale=scene_scale,
+            )
+
+            if propagations:
+                _, update_propagation = add_scp_propagation_lines(
+                    server,
+                    propagations,
+                    line_width=propagation_line_width,
+                )
+                update_callbacks.append(update_propagation)
+
     # Add main iteration nodes
-    _, _, update_nodes = add_scp_iteration_nodes(
+    _, update_nodes = add_scp_iteration_nodes(
         server,
         positions,
         point_size=node_point_size,
-        show_lines=show_lines,
     )
     update_callbacks.append(update_nodes)
 

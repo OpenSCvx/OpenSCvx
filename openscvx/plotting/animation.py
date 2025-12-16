@@ -891,10 +891,8 @@ def add_scp_iteration_nodes(
     positions: list[np.ndarray],
     colors: list[tuple[int, int, int]] | None = None,
     point_size: float = 0.3,
-    show_lines: bool = True,
-    line_width: float = 2.0,
     cmap_name: str = "viridis",
-) -> tuple[viser.PointCloudHandle, viser.LineSegmentsHandle | None, UpdateCallback]:
+) -> tuple[viser.PointCloudHandle, UpdateCallback]:
     """Add animated optimization nodes that update per SCP iteration.
 
     Args:
@@ -902,12 +900,10 @@ def add_scp_iteration_nodes(
         positions: List of position arrays per iteration, each shape (N, 3)
         colors: Optional list of RGB colors per iteration. If None, uses viridis colormap.
         point_size: Size of node markers
-        show_lines: If True, connect nodes with line segments
-        line_width: Width of connecting lines
         cmap_name: Matplotlib colormap name (default: "viridis")
 
     Returns:
-        Tuple of (point_handle, line_handle, update_callback)
+        Tuple of (point_handle, update_callback)
     """
     n_iterations = len(positions)
 
@@ -934,17 +930,6 @@ def add_scp_iteration_nodes(
         point_size=point_size,
     )
 
-    line_handle = None
-    if show_lines and len(pos) > 1:
-        # Create line segments connecting consecutive nodes
-        segments = np.array([[pos[i], pos[i + 1]] for i in range(len(pos) - 1)], dtype=np.float32)
-        line_handle = server.scene.add_line_segments(
-            "/scp/trajectory",
-            points=segments,
-            colors=color,
-            line_width=line_width,
-        )
-
     def update(iter_idx: int) -> None:
         idx = min(iter_idx, n_iterations - 1)
         pos = np.asarray(positions[idx], dtype=np.float32)
@@ -953,14 +938,7 @@ def add_scp_iteration_nodes(
         point_handle.points = pos
         point_handle.colors = color
 
-        if line_handle is not None and len(pos) > 1:
-            segments = np.array(
-                [[pos[i], pos[i + 1]] for i in range(len(pos) - 1)], dtype=np.float32
-            )
-            line_handle.points = segments
-            line_handle.colors = color
-
-    return point_handle, line_handle, update
+    return point_handle, update
 
 
 def add_scp_iteration_attitudes(
@@ -1023,8 +1001,6 @@ def add_scp_ghost_iterations(
     server: viser.ViserServer,
     positions: list[np.ndarray],
     point_size: float = 0.15,
-    show_lines: bool = True,
-    line_width: float = 1.5,
     cmap_name: str = "viridis",
 ) -> tuple[list, UpdateCallback]:
     """Add ghost trails showing all previous SCP iterations.
@@ -1035,8 +1011,6 @@ def add_scp_ghost_iterations(
         server: ViserServer instance
         positions: List of position arrays per iteration, each shape (N, 3)
         point_size: Size of ghost points
-        show_lines: If True, show line segments connecting ghost nodes
-        line_width: Width of ghost line segments
         cmap_name: Matplotlib colormap name for ghost colors
 
     Returns:
@@ -1048,7 +1022,6 @@ def add_scp_ghost_iterations(
 
     # Pre-create ghost handles for all iterations (initially invisible)
     ghost_point_handles = []
-    ghost_line_handles = []
 
     for i in range(n_ghosts):
         point_handle = server.scene.add_point_cloud(
@@ -1058,15 +1031,6 @@ def add_scp_ghost_iterations(
             point_size=point_size,
         )
         ghost_point_handles.append(point_handle)
-
-        if show_lines:
-            line_handle = server.scene.add_line_segments(
-                f"/scp/ghosts/lines_{i}",
-                points=np.zeros((1, 2, 3), dtype=np.float32),  # Placeholder
-                colors=np.array([0, 0, 0], dtype=np.uint8),
-                line_width=line_width,
-            )
-            ghost_line_handles.append(line_handle)
 
     def update(iter_idx: int) -> None:
         idx = min(iter_idx, n_iterations - 1)
@@ -1083,24 +1047,154 @@ def add_scp_ghost_iterations(
                 pos = np.asarray(positions[history_idx], dtype=np.float32)
                 ghost_point_handles[ghost_i].points = pos
                 ghost_point_handles[ghost_i].colors = color
-
-                if show_lines and len(pos) > 1:
-                    segments = np.array(
-                        [[pos[j], pos[j + 1]] for j in range(len(pos) - 1)],
-                        dtype=np.float32,
-                    )
-                    ghost_line_handles[ghost_i].points = segments
-                    ghost_line_handles[ghost_i].colors = color
             else:
                 # Hide this ghost
                 ghost_point_handles[ghost_i].points = np.zeros((1, 3), dtype=np.float32)
                 ghost_point_handles[ghost_i].colors = np.array([0, 0, 0], dtype=np.uint8)
 
-                if show_lines:
-                    ghost_line_handles[ghost_i].points = np.zeros((1, 2, 3), dtype=np.float32)
-                    ghost_line_handles[ghost_i].colors = np.array([0, 0, 0], dtype=np.uint8)
+    return ghost_point_handles, update
 
-    return ghost_point_handles + ghost_line_handles, update
+
+def extract_propagation_positions(
+    discretization_history: list[np.ndarray],
+    n_x: int,
+    n_u: int,
+    position_slice: slice,
+    scene_scale: float = 1.0,
+) -> list[list[np.ndarray]]:
+    """Extract 3D position trajectories from discretization history.
+
+    The discretization history contains the multi-shot integration results.
+    Each V matrix has shape (flattened_size, n_timesteps) where:
+    - flattened_size = (N-1) * i4
+    - i4 = n_x + n_x*n_x + 2*n_x*n_u (state + STM + control influence matrices)
+    - n_timesteps = number of integration substeps
+
+    Args:
+        discretization_history: List of V matrices from each SCP iteration
+        n_x: Number of states
+        n_u: Number of controls
+        position_slice: Slice for extracting position from state vector
+        scene_scale: Divide positions by this factor for visualization
+
+    Returns:
+        List of propagation trajectories per iteration.
+        Each iteration contains a list of (n_substeps, 3) arrays, one per segment.
+    """
+    if not discretization_history:
+        return []
+
+    i4 = n_x + n_x * n_x + 2 * n_x * n_u
+    propagations = []
+
+    for V in discretization_history:
+        # V shape: (flattened_size, n_timesteps)
+        n_timesteps = V.shape[1]
+        n_segments = V.shape[0] // i4  # N-1 segments
+
+        iteration_segments = []
+        for seg_idx in range(n_segments):
+            # Extract this segment's data across all timesteps
+            seg_start = seg_idx * i4
+            seg_end = seg_start + i4
+
+            # For each timestep, extract the position from the state
+            segment_positions = []
+            for t_idx in range(n_timesteps):
+                # Get full state at this segment and timestep
+                state = V[seg_start:seg_end, t_idx][:n_x]
+                # Extract position components
+                pos = state[position_slice] / scene_scale
+                segment_positions.append(pos)
+
+            iteration_segments.append(np.array(segment_positions, dtype=np.float32))
+
+        propagations.append(iteration_segments)
+
+    return propagations
+
+
+def add_scp_propagation_lines(
+    server: viser.ViserServer,
+    propagations: list[list[np.ndarray]],
+    line_width: float = 2.0,
+    cmap_name: str = "viridis",
+) -> tuple[list, UpdateCallback]:
+    """Add animated nonlinear propagation lines that update per SCP iteration.
+
+    Shows the actual integrated trajectory between optimization nodes,
+    revealing defects (gaps) in early iterations that close as SCP converges.
+    All iterations up to the current one are shown with viridis coloring,
+    similar to ghost iterations for nodes.
+
+    Args:
+        server: ViserServer instance
+        propagations: List of propagation trajectories per iteration from
+            extract_propagation_positions(). Each iteration contains a list
+            of (n_substeps, 3) position arrays, one per segment.
+        line_width: Width of propagation lines
+        cmap_name: Matplotlib colormap name (default: "viridis")
+
+    Returns:
+        Tuple of (list of line handles, update_callback)
+    """
+    if not propagations:
+        return [], lambda _: None
+
+    n_iterations = len(propagations)
+    n_segments = len(propagations[0])
+    cmap = plt.get_cmap(cmap_name)
+
+    # Pre-compute colors for each iteration
+    iteration_colors = []
+    for i in range(n_iterations):
+        t = i / max(n_iterations - 1, 1)
+        rgb = cmap(t)[:3]
+        iteration_colors.append(np.array([int(c * 255) for c in rgb], dtype=np.uint8))
+
+    # Create line handles for each (iteration, segment) pair
+    # Structure: handles[iter_idx][seg_idx]
+    all_handles = []
+
+    for iter_idx in range(n_iterations):
+        iter_handles = []
+        color = iteration_colors[iter_idx]
+
+        for seg_idx in range(n_segments):
+            seg_pos = propagations[iter_idx][seg_idx]  # Shape (n_substeps, 3)
+
+            if len(seg_pos) < 2:
+                iter_handles.append(None)
+                continue
+
+            # Create line segments connecting consecutive substeps
+            segments = np.array(
+                [[seg_pos[i], seg_pos[i + 1]] for i in range(len(seg_pos) - 1)],
+                dtype=np.float32,
+            )
+
+            handle = server.scene.add_line_segments(
+                f"/scp/propagation/iter_{iter_idx}/segment_{seg_idx}",
+                points=segments,
+                colors=color,
+                line_width=line_width,
+                visible=(iter_idx == 0),  # Only first iteration visible initially
+            )
+            iter_handles.append(handle)
+
+        all_handles.append(iter_handles)
+
+    def update(iter_idx: int) -> None:
+        idx = min(iter_idx, n_iterations - 1)
+
+        # Show all iterations up to and including current, hide the rest
+        for i in range(n_iterations):
+            should_show = i <= idx
+            for handle in all_handles[i]:
+                if handle is not None:
+                    handle.visible = should_show
+
+    return all_handles, update
 
 
 def add_scp_animation_controls(
