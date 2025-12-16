@@ -10,11 +10,14 @@ double integrator (point mass) dynamics instead of full 6-DOF dynamics. The prob
 - Loop closure constraint
 """
 
+import time
+
 import jax.numpy as jnp
 import numpy as np
 
 import openscvx as ox
-from examples.plotting import plot_animation_double_integrator
+
+# from examples.plotting import plot_animation_double_integrator
 from openscvx import Problem
 from openscvx.utils import gen_vertices, rot
 
@@ -126,7 +129,7 @@ for _ in range(n_gates + 1):
 
 position.guess = position_bar
 
-time = ox.Time(
+t = ox.Time(
     initial=0.0,
     final=("minimize", total_time),
     min=0.0,
@@ -137,7 +140,7 @@ problem = Problem(
     dynamics=dynamics,
     states=states,
     controls=controls,
-    time=time,
+    time=t,
     constraints=constraint_exprs,
     N=n,
 )
@@ -167,4 +170,12 @@ if __name__ == "__main__":
 
     results.update(plotting_dict)
 
-    plot_animation_double_integrator(results, problem.settings).show()
+    from openscvx.plotting.traj import add_velocity_trace, create_plotting_server
+
+    server = create_plotting_server(results)
+    add_velocity_trace(server, results)
+
+    while True:
+        time.sleep(1.0)
+
+    # plot_animation_double_integrator(results, problem.settings).show()
