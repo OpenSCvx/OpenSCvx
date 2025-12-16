@@ -7,6 +7,7 @@ function `create_animated_plotting_server` for a complete out-of-the-box experie
 Example (modular usage):
     server = create_server(pos)
     add_gates(server, vertices)
+    add_ellipsoid_obstacles(server, centers, radii, axes)
     add_ghost_trajectory(server, pos, colors)
 
     _, update_trail = add_animated_trail(server, pos, colors)
@@ -118,6 +119,170 @@ def create_server(
 # =============================================================================
 # Static Visualization Components
 # =============================================================================
+
+
+def _generate_ellipsoid_mesh(
+    center: np.ndarray,
+    radii: np.ndarray,
+    axes: np.ndarray | None = None,
+    subdivisions: int = 2,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Generate ellipsoid mesh vertices and faces via icosphere subdivision.
+
+    Args:
+        center: Center position (3,)
+        radii: Radii along each principal axis (3,)
+        axes: Rotation matrix (3, 3) defining principal axes. If None, uses identity.
+        subdivisions: Number of icosphere subdivisions (higher = smoother)
+
+    Returns:
+        Tuple of (vertices, faces) where vertices is (V, 3) and faces is (F, 3)
+    """
+    # Start with icosahedron vertices
+    phi = (1.0 + np.sqrt(5.0)) / 2.0  # Golden ratio
+    icosahedron_verts = np.array(
+        [
+            [-1, phi, 0],
+            [1, phi, 0],
+            [-1, -phi, 0],
+            [1, -phi, 0],
+            [0, -1, phi],
+            [0, 1, phi],
+            [0, -1, -phi],
+            [0, 1, -phi],
+            [phi, 0, -1],
+            [phi, 0, 1],
+            [-phi, 0, -1],
+            [-phi, 0, 1],
+        ],
+        dtype=np.float64,
+    )
+    # Normalize to unit sphere
+    icosahedron_verts /= np.linalg.norm(icosahedron_verts[0])
+
+    icosahedron_faces = np.array(
+        [
+            [0, 11, 5],
+            [0, 5, 1],
+            [0, 1, 7],
+            [0, 7, 10],
+            [0, 10, 11],
+            [1, 5, 9],
+            [5, 11, 4],
+            [11, 10, 2],
+            [10, 7, 6],
+            [7, 1, 8],
+            [3, 9, 4],
+            [3, 4, 2],
+            [3, 2, 6],
+            [3, 6, 8],
+            [3, 8, 9],
+            [4, 9, 5],
+            [2, 4, 11],
+            [6, 2, 10],
+            [8, 6, 7],
+            [9, 8, 1],
+        ],
+        dtype=np.int32,
+    )
+
+    vertices = icosahedron_verts
+    faces = icosahedron_faces
+
+    # Subdivide faces
+    for _ in range(subdivisions):
+        new_faces = []
+        midpoint_cache = {}
+
+        def get_midpoint(i1: int, i2: int) -> int:
+            """Get or create midpoint vertex between two vertices."""
+            key = (min(i1, i2), max(i1, i2))
+            if key in midpoint_cache:
+                return midpoint_cache[key]
+
+            nonlocal vertices
+            p1, p2 = vertices[i1], vertices[i2]
+            mid = (p1 + p2) / 2.0
+            mid = mid / np.linalg.norm(mid)  # Project onto unit sphere
+
+            idx = len(vertices)
+            vertices = np.vstack([vertices, mid])
+            midpoint_cache[key] = idx
+            return idx
+
+        for tri in faces:
+            v0, v1, v2 = tri
+            a = get_midpoint(v0, v1)
+            b = get_midpoint(v1, v2)
+            c = get_midpoint(v2, v0)
+            new_faces.extend([[v0, a, c], [v1, b, a], [v2, c, b], [a, b, c]])
+
+        faces = np.array(new_faces, dtype=np.int32)
+
+    # Scale by radii to create ellipsoid
+    vertices = vertices / radii
+
+    # Rotate by principal axes if provided
+    if axes is not None:
+        vertices = vertices @ axes.T
+
+    # Translate to center
+    vertices = vertices + center
+
+    return vertices.astype(np.float32), faces
+
+
+def add_ellipsoid_obstacles(
+    server: viser.ViserServer,
+    centers: list[np.ndarray],
+    radii: list[np.ndarray],
+    axes: list[np.ndarray] | None = None,
+    color: tuple[int, int, int] = (255, 100, 100),
+    opacity: float = 0.6,
+    wireframe: bool = False,
+    subdivisions: int = 2,
+) -> list:
+    """Add ellipsoidal obstacles to the scene.
+
+    Args:
+        server: ViserServer instance
+        centers: List of center positions, each shape (3,)
+        radii: List of radii along principal axes, each shape (3,)
+        axes: List of rotation matrices (3, 3) defining principal axes.
+            If None, ellipsoids are axis-aligned.
+        color: RGB color tuple
+        opacity: Opacity (0-1), only used when wireframe=False
+        wireframe: If True, render as wireframe instead of solid
+        subdivisions: Icosphere subdivisions (higher = smoother, 2 is usually good)
+
+    Returns:
+        List of mesh handles
+    """
+    handles = []
+
+    if axes is None:
+        axes = [None] * len(centers)
+
+    for i, (center, rad, ax) in enumerate(zip(centers, radii, axes)):
+        # Convert JAX arrays to numpy if needed
+        center = np.asarray(center, dtype=np.float64)
+        rad = np.asarray(rad, dtype=np.float64)
+        if ax is not None:
+            ax = np.asarray(ax, dtype=np.float64)
+
+        vertices, faces = _generate_ellipsoid_mesh(center, rad, ax, subdivisions)
+
+        handle = server.scene.add_mesh_simple(
+            f"/obstacles/ellipsoid_{i}",
+            vertices=vertices,
+            faces=faces,
+            color=color,
+            wireframe=wireframe,
+            opacity=opacity if not wireframe else 1.0,
+        )
+        handles.append(handle)
+
+    return handles
 
 
 def add_gates(
@@ -303,11 +468,10 @@ def add_target_marker(
     )
 
     # For moving targets, optionally show trail
-    trail_handle = None
     if is_moving and show_trail:
         if trail_color is None:
             trail_color = tuple(int(c * 0.5) for c in color)
-        trail_handle = server.scene.add_point_cloud(
+        server.scene.add_point_cloud(
             f"/targets/{name}/trail",
             points=target_pos,
             colors=trail_color,
@@ -771,6 +935,7 @@ def create_animated_plotting_server(
     - Viewcone/camera frustum (if R_sb (body-to-sensor) in results and show_viewcone=True)
     - Optional ghost trajectory showing full path
     - Static obstacles/gates if present in results
+    - Ellipsoidal obstacles (if obstacles_centers, obstacles_radii, obstacles_axes in results)
 
     Args:
         results: Optimization result dictionary containing trajectory data
@@ -807,6 +972,15 @@ def create_animated_plotting_server(
     # Add static elements
     if "vertices" in results:
         add_gates(server, results["vertices"])
+
+    # Add ellipsoidal obstacles if present
+    if "obstacles_centers" in results:
+        add_ellipsoid_obstacles(
+            server,
+            centers=results["obstacles_centers"],
+            radii=results.get("obstacles_radii", [np.ones(3)] * len(results["obstacles_centers"])),
+            axes=results.get("obstacles_axes"),
+        )
 
     if show_ghost_trajectory:
         add_ghost_trajectory(server, pos, colors)
