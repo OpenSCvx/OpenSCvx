@@ -181,7 +181,7 @@ if __name__ == "__main__":
     # Create both visualization servers (viser auto-assigns ports)
     traj_server = create_animated_plotting_server(
         results,
-        thrust_key="thrust_force",
+        thrust_key="force",
         viewcone_scale=10.0,
     )
     scp_server = create_scp_animated_plotting_server(
