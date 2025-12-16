@@ -14,8 +14,8 @@ import jax.numpy as jnp
 import numpy as np
 
 import openscvx as ox
-from examples.plotting import plot_animation
 from openscvx import Problem
+from openscvx.plotting.traj import create_animated_plotting_server
 from openscvx.utils import generate_orthogonal_unit_vectors
 
 n = 6
@@ -149,7 +149,7 @@ problem = Problem(
     N=n,
 )
 
-problem.settings.prp.dt = 0.01
+problem.settings.prp.dt = 0.001
 problem.settings.scp.lam_vb = 1e0
 problem.settings.scp.w_tr_adapt = 1.8
 problem.settings.scp.w_tr = 1e1
@@ -171,4 +171,5 @@ if __name__ == "__main__":
 
     results.update(plotting_dict)
 
-    plot_animation(results, problem.settings).show()
+    server = create_animated_plotting_server(results, thrust_key="thrust_force")
+    server.sleep_forever()
