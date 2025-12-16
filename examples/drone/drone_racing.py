@@ -13,8 +13,10 @@ import jax.numpy as jnp
 import numpy as np
 
 import openscvx as ox
-from examples.plotting import plot_animation
 from openscvx import Problem
+
+# from examples.plotting import plot_animation
+from openscvx.plotting.traj import create_animated_plotting_server
 from openscvx.utils import gen_vertices, rot
 
 n = 22  # Number of Nodes
@@ -301,4 +303,5 @@ if __name__ == "__main__":
 
     results.update(plotting_dict)
 
-    plot_animation(results, problem.settings).show()
+    server = create_animated_plotting_server(results, thrust_key="thrust_force")
+    server.sleep_forever()
