@@ -152,7 +152,10 @@ def create_animated_plotting_server(
     pos = results.trajectory["position"]
     vel = results.trajectory["velocity"]
     thrust = results.trajectory.get(thrust_key)
+    traj_time = results.trajectory["time"].flatten()  # Time array
     n_frames = pos.shape[0]
+    t_start, t_end = traj_time[0], traj_time[-1]
+    duration = t_end - t_start
 
     # Setup scene
     grid_size = _compute_grid_size(pos)
@@ -188,12 +191,12 @@ def create_animated_plotting_server(
     with server.gui.add_folder("Animation"):
         play_button = server.gui.add_button("Play")
         reset_button = server.gui.add_button("Reset")
-        frame_slider = server.gui.add_slider(
-            "Frame",
-            min=0,
-            max=n_frames - 1,
-            step=1,
-            initial_value=0,
+        time_slider = server.gui.add_slider(
+            "Time (s)",
+            min=float(t_start),
+            max=float(t_end),
+            step=float(duration / 100),
+            initial_value=float(t_start),
         )
         speed_slider = server.gui.add_slider(
             "Speed",
@@ -233,14 +236,18 @@ def create_animated_plotting_server(
             line_width=4.0,
         )
 
-    # Animation state
-    state = {"playing": False, "frame": 0.0}
+    # Animation state (track simulation time, not frame)
+    state = {"playing": False, "sim_time": float(t_start)}
 
-    def update_scene(frame_idx: int) -> None:
-        """Update all dynamic scene elements for given frame."""
-        idx = int(np.clip(frame_idx, 0, n_frames - 1))
+    def time_to_frame(t: float) -> int:
+        """Convert simulation time to frame index."""
+        return int(np.clip(np.searchsorted(traj_time, t, side="right") - 1, 0, n_frames - 1))
 
-        # Update trail
+    def update_scene(sim_t: float) -> None:
+        """Update all dynamic scene elements for given simulation time."""
+        idx = time_to_frame(sim_t)
+
+        # Update trail (show all points up to current time)
         trail_handle.points = pos[: idx + 1]
         trail_handle.colors = colors[: idx + 1]
 
@@ -259,18 +266,18 @@ def create_animated_plotting_server(
 
     @reset_button.on_click
     def _(_) -> None:
-        state["frame"] = 0.0
-        frame_slider.value = 0
-        update_scene(0)
+        state["sim_time"] = float(t_start)
+        time_slider.value = float(t_start)
+        update_scene(t_start)
 
-    @frame_slider.on_update
+    @time_slider.on_update
     def _(_) -> None:
         if not state["playing"]:
-            state["frame"] = float(frame_slider.value)
-            update_scene(int(frame_slider.value))
+            state["sim_time"] = float(time_slider.value)
+            update_scene(state["sim_time"])
 
     def animation_loop() -> None:
-        """Background thread for animation playback."""
+        """Background thread for realtime animation playback."""
         last_time = time.time()
         while True:
             time.sleep(0.016)  # ~60 fps
@@ -279,19 +286,19 @@ def create_animated_plotting_server(
             last_time = current_time
 
             if state["playing"]:
-                # Advance frame based on speed
-                state["frame"] += dt * speed_slider.value * 15  # frames per second
+                # Advance simulation time (speed=1.0 is realtime)
+                state["sim_time"] += dt * speed_slider.value
 
-                if state["frame"] >= n_frames - 1:
+                if state["sim_time"] >= t_end:
                     if loop_checkbox.value:
-                        state["frame"] = 0.0
+                        state["sim_time"] = float(t_start)
                     else:
-                        state["frame"] = n_frames - 1
+                        state["sim_time"] = float(t_end)
                         state["playing"] = False
                         play_button.name = "Play"
 
-                frame_slider.value = int(state["frame"])
-                update_scene(int(state["frame"]))
+                time_slider.value = state["sim_time"]
+                update_scene(state["sim_time"])
 
     # Start animation thread
     thread = threading.Thread(target=animation_loop, daemon=True)
