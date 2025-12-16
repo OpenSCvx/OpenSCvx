@@ -22,8 +22,6 @@ grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 import openscvx as ox
-
-# from examples.plotting import plot_animation_double_integrator
 from openscvx import Problem
 from openscvx.utils import gen_vertices, rot
 
@@ -180,5 +178,3 @@ if __name__ == "__main__":
 
     server = create_animated_plotting_server(results)
     server.sleep_forever()
-
-    # plot_animation_double_integrator(results, problem.settings).show()
