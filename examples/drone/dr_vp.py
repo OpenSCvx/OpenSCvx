@@ -265,7 +265,7 @@ if __name__ == "__main__":
     results.update(plotting_dict)
 
     # Viser plotting
-    from openscvx.plotting.traj import (
+    from openscvx.plotting.animation import (
         add_animated_trail,
         add_animation_controls,
         add_attitude_frame,
