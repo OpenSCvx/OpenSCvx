@@ -878,8 +878,11 @@ def add_scp_iteration_nodes(
     colors: list[tuple[int, int, int]] | None = None,
     point_size: float = 0.3,
     cmap_name: str = "viridis",
-) -> tuple[viser.PointCloudHandle, UpdateCallback]:
+) -> tuple[list[viser.PointCloudHandle], UpdateCallback]:
     """Add animated optimization nodes that update per SCP iteration.
+
+    Pre-buffers point clouds for all iterations and toggles visibility for performance.
+    This avoids transmitting point data on every frame update.
 
     Args:
         server: ViserServer instance
@@ -889,7 +892,7 @@ def add_scp_iteration_nodes(
         cmap_name: Matplotlib colormap name (default: "viridis")
 
     Returns:
-        Tuple of (point_handle, update_callback)
+        Tuple of (list of point_handles, update_callback)
     """
     n_iterations = len(positions)
 
@@ -902,29 +905,33 @@ def add_scp_iteration_nodes(
             rgb = cmap(t)[:3]
             colors.append(tuple(int(c * 255) for c in rgb))
 
-    # Convert colors to numpy arrays for viser compatibility (shape (3,) for single color)
+    # Convert colors to numpy arrays for viser compatibility
     colors_np = [np.array([c[0], c[1], c[2]], dtype=np.uint8) for c in colors]
 
-    # Initial state
-    pos = np.asarray(positions[0], dtype=np.float32)
-    color = colors_np[0]
+    # Pre-create point clouds for all iterations (only first visible initially)
+    handles = []
+    for i in range(n_iterations):
+        pos = np.asarray(positions[i], dtype=np.float32)
+        handle = server.scene.add_point_cloud(
+            f"/scp/nodes/iter_{i}",
+            points=pos,
+            colors=colors_np[i],
+            point_size=point_size,
+            visible=(i == 0),
+        )
+        handles.append(handle)
 
-    point_handle = server.scene.add_point_cloud(
-        "/scp/nodes",
-        points=pos,
-        colors=color,
-        point_size=point_size,
-    )
+    # Track current visible iteration to minimize visibility toggles
+    state = {"current_idx": 0}
 
     def update(iter_idx: int) -> None:
         idx = min(iter_idx, n_iterations - 1)
-        pos = np.asarray(positions[idx], dtype=np.float32)
-        color = colors_np[idx]
+        if idx != state["current_idx"]:
+            handles[state["current_idx"]].visible = False
+            handles[idx].visible = True
+            state["current_idx"] = idx
 
-        point_handle.points = pos
-        point_handle.colors = color
-
-    return point_handle, update
+    return handles, update
 
 
 def add_scp_iteration_attitudes(
@@ -988,9 +995,10 @@ def add_scp_ghost_iterations(
     positions: list[np.ndarray],
     point_size: float = 0.15,
     cmap_name: str = "viridis",
-) -> tuple[list, UpdateCallback]:
+) -> tuple[list[viser.PointCloudHandle], UpdateCallback]:
     """Add ghost trails showing all previous SCP iterations.
 
+    Pre-buffers point clouds for all iterations and toggles visibility for performance.
     Shows all previous iterations with viridis coloring to visualize convergence.
 
     Args:
@@ -1003,42 +1011,47 @@ def add_scp_ghost_iterations(
         Tuple of (list of handles, update_callback)
     """
     n_iterations = len(positions)
-    n_ghosts = n_iterations - 1  # All iterations except current
     cmap = plt.get_cmap(cmap_name)
 
-    # Pre-create ghost handles for all iterations (initially invisible)
-    ghost_point_handles = []
+    # Pre-create point clouds for all iterations with their colors
+    # (all initially hidden, shown progressively as ghosts)
+    handles = []
+    for i in range(n_iterations):
+        t = i / max(n_iterations - 1, 1)
+        rgb = cmap(t)[:3]
+        color = np.array([int(c * 255) for c in rgb], dtype=np.uint8)
+        pos = np.asarray(positions[i], dtype=np.float32)
 
-    for i in range(n_ghosts):
-        point_handle = server.scene.add_point_cloud(
-            f"/scp/ghosts/points_{i}",
-            points=np.zeros((1, 3), dtype=np.float32),  # Placeholder
-            colors=np.array([0, 0, 0], dtype=np.uint8),
+        handle = server.scene.add_point_cloud(
+            f"/scp/ghosts/iter_{i}",
+            points=pos,
+            colors=color,
             point_size=point_size,
+            visible=False,  # All start hidden
         )
-        ghost_point_handles.append(point_handle)
+        handles.append(handle)
+
+    # Track which iterations are currently visible as ghosts
+    state = {"visible_up_to": -1}
 
     def update(iter_idx: int) -> None:
         idx = min(iter_idx, n_iterations - 1)
+        # Ghosts are iterations 0 through idx-1 (everything before current)
+        new_visible_up_to = idx - 1
 
-        for ghost_i in range(n_ghosts):
-            history_idx = idx - ghost_i - 1  # -1 because current is not a ghost
-
-            if history_idx >= 0:
-                # Get color from colormap based on iteration progress
-                t = history_idx / max(n_iterations - 1, 1)
-                rgb = cmap(t)[:3]
-                color = np.array([int(c * 255) for c in rgb], dtype=np.uint8)
-
-                pos = np.asarray(positions[history_idx], dtype=np.float32)
-                ghost_point_handles[ghost_i].points = pos
-                ghost_point_handles[ghost_i].colors = color
+        if new_visible_up_to != state["visible_up_to"]:
+            # Show/hide only the iterations that changed
+            if new_visible_up_to > state["visible_up_to"]:
+                # Show newly visible ghosts
+                for i in range(state["visible_up_to"] + 1, new_visible_up_to + 1):
+                    handles[i].visible = True
             else:
-                # Hide this ghost
-                ghost_point_handles[ghost_i].points = np.zeros((1, 3), dtype=np.float32)
-                ghost_point_handles[ghost_i].colors = np.array([0, 0, 0], dtype=np.uint8)
+                # Hide ghosts that should no longer be visible
+                for i in range(new_visible_up_to + 1, state["visible_up_to"] + 1):
+                    handles[i].visible = False
+            state["visible_up_to"] = new_visible_up_to
 
-    return ghost_point_handles, update
+    return handles, update
 
 
 def extract_propagation_positions(
