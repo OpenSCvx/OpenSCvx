@@ -10,8 +10,6 @@ double integrator (point mass) dynamics instead of full 6-DOF dynamics. The prob
 - Loop closure constraint
 """
 
-import time
-
 import jax.numpy as jnp
 import numpy as np
 
@@ -170,12 +168,9 @@ if __name__ == "__main__":
 
     results.update(plotting_dict)
 
-    from openscvx.plotting.traj import add_velocity_trace, create_plotting_server
+    from openscvx.plotting.traj import create_animated_plotting_server
 
-    server = create_plotting_server(results)
-    add_velocity_trace(server, results)
-
-    while True:
-        time.sleep(1.0)
+    server = create_animated_plotting_server(results)
+    server.sleep_forever()
 
     # plot_animation_double_integrator(results, problem.settings).show()
