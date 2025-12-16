@@ -13,10 +13,10 @@ import jax.numpy as jnp
 import numpy as np
 
 import openscvx as ox
-from openscvx import Problem
 
 # from examples.plotting import plot_animation
-from openscvx.plotting.traj import create_animated_plotting_server
+from examples.plotting_viser import create_animated_plotting_server
+from openscvx import Problem
 from openscvx.utils import gen_vertices, rot
 
 n = 22  # Number of Nodes

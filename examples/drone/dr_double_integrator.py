@@ -168,7 +168,7 @@ if __name__ == "__main__":
 
     results.update(plotting_dict)
 
-    from openscvx.plotting.traj import create_animated_plotting_server
+    from examples.plotting_viser import create_animated_plotting_server
 
     server = create_animated_plotting_server(results)
     server.sleep_forever()

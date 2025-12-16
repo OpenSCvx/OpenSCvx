@@ -14,8 +14,8 @@ import jax.numpy as jnp
 import numpy as np
 
 import openscvx as ox
+from examples.plotting_viser import create_animated_plotting_server
 from openscvx import Problem
-from openscvx.plotting.traj import create_animated_plotting_server
 from openscvx.utils import generate_orthogonal_unit_vectors
 
 n = 6
