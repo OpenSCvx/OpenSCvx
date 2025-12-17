@@ -159,6 +159,33 @@ class Variable(Leaf):
         self._max = arr
 
     @property
+    def slice(self):
+        """Get the slice indexing this variable in the unified state/control vector.
+
+        After preprocessing, each variable is assigned a canonical position in the
+        unified optimization vector. This property returns the slice object that
+        extracts this variable's values from the unified vector.
+
+        This is particularly useful for expert users working with byof (bring-your-own
+        functions) who need to manually index into the unified x and u vectors.
+
+        Returns:
+            slice: Slice object for indexing into unified vector, or None if the
+                variable hasn't been preprocessed yet.
+
+        Example:
+                velocity = ox.State("velocity", shape=(3,))
+                # ... after Problem construction ...
+                print(velocity.slice)  # slice(2, 5) (for example)
+
+                # Use in byof functions
+                def my_constraint(x, u, node, params):
+                    vel = x[velocity.slice]  # Extract velocity from unified state
+                    return jnp.sum(vel**2) - 100  # |v|^2 <= 100
+        """
+        return self._slice
+
+    @property
     def guess(self):
         """Get the initial guess for the variable trajectory.
 

@@ -96,7 +96,7 @@ plugins:
             extra:
               show_docstring: true
             docstring_style: google
-            filters: ["!^__"]
+            filters: ["!^_[^_]", "!^__(?!init)"]
 
 
 # Additional configuration

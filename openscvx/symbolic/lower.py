@@ -52,13 +52,14 @@ Example:
         # Now have executable JAX functions with Jacobians
 """
 
-from typing import TYPE_CHECKING, Any, List, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, List, Optional, Sequence, Tuple, Union
 
 import cvxpy as cp
 import jax
 import numpy as np
 from jax import jacfwd
 
+from openscvx.expert import apply_byof
 from openscvx.lowered import (
     CVXPyVariables,
     Dynamics,
@@ -72,6 +73,7 @@ from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import Expr, NodeReference
 
 if TYPE_CHECKING:
+    from openscvx.lowered.unified import UnifiedState
     from openscvx.symbolic.problem import SymbolicProblem
 
 __all__ = [
@@ -557,6 +559,7 @@ def _lower_cvxpy(
     N: int,
     x_unified: UnifiedState,
     u_unified: UnifiedControl,
+    jax_constraints: LoweredJaxConstraints,
 ) -> Tuple[CVXPyVariables, LoweredCvxpyConstraints, dict]:
     """Create CVXPy variables and lower convex constraints.
 
@@ -567,6 +570,7 @@ def _lower_cvxpy(
         constraints: ConstraintSet containing convex constraints
         parameters: Dict of parameter values for constraint lowering
         N: Number of discretization nodes
+        jax_constraints: Lowered JAX constraints (for sizing CVXPy variables)
         x_unified: Unified state interface (for dimensions and scaling)
         u_unified: Unified control interface (for dimensions and scaling)
 
@@ -615,8 +619,8 @@ def _lower_cvxpy(
         c_x=c_x,
         S_u=S_u,
         c_u=c_u,
-        n_nodal_constraints=len(constraints.nodal),
-        n_cross_node_constraints=len(constraints.cross_node),
+        n_nodal_constraints=len(jax_constraints.nodal),
+        n_cross_node_constraints=len(jax_constraints.cross_node),
     )
 
     # Lower convex constraints to CVXPy
@@ -668,7 +672,9 @@ def _contains_node_reference(expr: Expr) -> bool:
     return False
 
 
-def lower_symbolic_problem(problem: "SymbolicProblem") -> LoweredProblem:
+def lower_symbolic_problem(
+    problem: "SymbolicProblem", byof: Optional[dict] = None
+) -> LoweredProblem:
     """Lower symbolic problem specification to executable JAX and CVXPy code.
 
     This is the main orchestrator for converting a preprocessed SymbolicProblem
@@ -682,6 +688,10 @@ def lower_symbolic_problem(problem: "SymbolicProblem") -> LoweredProblem:
     Args:
         problem: Preprocessed SymbolicProblem from preprocess_symbolic_problem().
             Must have is_preprocessed == True.
+        byof: Optional dict of raw JAX functions for expert users. Supported keys:
+            - "nodal_constraints": List of f(x, u, node, params) -> residual
+            - "cross_nodal_constraints": List of f(X, U, params) -> residual
+            - "ctcs_constraints": List of dicts with "constraint_fn", "penalty", "bounds"
 
     Returns:
         LoweredProblem dataclass containing lowered problem
@@ -715,9 +725,26 @@ def lower_symbolic_problem(problem: "SymbolicProblem") -> LoweredProblem:
     # Lower non-convex constraints to JAX
     jax_constraints = _lower_jax_constraints(problem.constraints)
 
+    # Handle byof (bring-your-own-functions) for expert users
+    # This must happen BEFORE CVXPy variable creation since CTCS constraints
+    # augment the state dimension
+    if byof is not None:
+        dynamics, dynamics_prop, jax_constraints, x_unified, x_prop_unified = apply_byof(
+            byof,
+            dynamics,
+            dynamics_prop,
+            jax_constraints,
+            x_unified,
+            x_prop_unified,
+            u_unified,
+            problem.states,
+            problem.states_prop,
+            problem.N,
+        )
+
     # Create CVXPy variables and lower convex constraints
     ocp_vars, cvxpy_constraints, cvxpy_params = _lower_cvxpy(
-        problem.constraints, problem.parameters, problem.N, x_unified, u_unified
+        problem.constraints, problem.parameters, problem.N, x_unified, u_unified, jax_constraints
     )
 
     return LoweredProblem(

@@ -29,7 +29,9 @@ Pipeline stages:
 See `preprocess_symbolic_problem()` for the main entry point.
 """
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
 
 from openscvx.symbolic.augmentation import (
     augment_dynamics_with_ctcs,
@@ -39,7 +41,7 @@ from openscvx.symbolic.augmentation import (
     sort_ctcs_constraints,
 )
 from openscvx.symbolic.constraint_set import ConstraintSet
-from openscvx.symbolic.expr import Parameter, traverse
+from openscvx.symbolic.expr import Constant, Parameter, traverse
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.preprocessing import (
@@ -71,6 +73,7 @@ def preprocess_symbolic_problem(
     time_dilation_factor_max: float = 3.0,
     dynamics_prop_extra: dict = None,
     states_prop_extra: List[State] = None,
+    byof: Optional[dict] = None,
 ) -> SymbolicProblem:
     """Preprocess and augment symbolic trajectory optimization problem.
 
@@ -107,6 +110,10 @@ def preprocess_symbolic_problem(
             states (default: None)
         states_prop_extra: Optional list of additional State objects for propagation only
             (default: None)
+        byof: Optional dict of raw JAX functions for expert users. If byof contains
+            a "dynamics" key, it should map state names to raw JAX functions with
+            signature f(x, u, node, params) -> xdot_component. States in byof["dynamics"]
+            should NOT appear in the symbolic dynamics dict.
 
     Returns:
         SymbolicProblem dataclass with:
@@ -206,8 +213,20 @@ def preprocess_symbolic_problem(
     if "time" not in dynamics:
         dynamics["time"] = 1.0
 
+    # Extract byof dynamics for validation
+    byof_dynamics = byof.get("dynamics", {}) if byof else {}
+
     # Validate dynamics dict matches state names and dimensions
-    validate_dynamics_dict(dynamics, states)
+    # byof_dynamics states should not be in symbolic dynamics dict
+    validate_dynamics_dict(dynamics, states, byof_dynamics=byof_dynamics)
+
+    # Inject zero placeholders for byof dynamics states
+    # These will be replaced with the actual byof functions at lowering time
+    for state in states:
+        if state.name in byof_dynamics:
+            dynamics[state.name] = Constant(np.zeros(state.shape))
+
+    # Validate dynamics dimensions AFTER injecting placeholders
     validate_dynamics_dict_dimensions(dynamics, states)
 
     # Convert dynamics dict to concatenated expression
