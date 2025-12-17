@@ -745,64 +745,99 @@ def add_attitude_frame(
     return handle, update
 
 
-def _rotation_matrix_to_quaternion(R: np.ndarray) -> np.ndarray:
-    """Convert rotation matrix to quaternion (wxyz format).
+def _generate_viewcone_vertices(
+    half_angle_x: float,
+    half_angle_y: float | None,
+    depth: float,
+    norm_type: float | str,
+    n_segments: int = 32,
+) -> np.ndarray:
+    """Generate viewcone vertices in sensor frame (apex at origin, pointing along +Z).
+
+    The base cross-section follows the p-norm unit ball boundary (superellipse):
+        ||[x/a, y/b]||_p = 1
 
     Args:
-        R: Rotation matrix of shape (3, 3)
+        half_angle_x: Half-angle in x direction (radians)
+        half_angle_y: Half-angle in y direction (radians). If None, uses half_angle_x.
+        depth: Depth/length of the cone
+        norm_type: p-norm value (1, 2, 3, ..., or "inf"/float("inf") for infinity norm)
+        n_segments: Number of segments around the boundary
 
     Returns:
-        Quaternion array [w, x, y, z]
+        Vertices array of shape (N, 3) where first vertex is apex at origin
     """
-    # Using Shepperd's method for numerical stability
-    trace = np.trace(R)
+    if half_angle_y is None:
+        half_angle_y = half_angle_x
 
-    if trace > 0:
-        s = 0.5 / np.sqrt(trace + 1.0)
-        w = 0.25 / s
-        x = (R[2, 1] - R[1, 2]) * s
-        y = (R[0, 2] - R[2, 0]) * s
-        z = (R[1, 0] - R[0, 1]) * s
-    elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
-        s = 2.0 * np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2])
-        w = (R[2, 1] - R[1, 2]) / s
-        x = 0.25 * s
-        y = (R[0, 1] + R[1, 0]) / s
-        z = (R[0, 2] + R[2, 0]) / s
-    elif R[1, 1] > R[2, 2]:
-        s = 2.0 * np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2])
-        w = (R[0, 2] - R[2, 0]) / s
-        x = (R[0, 1] + R[1, 0]) / s
-        y = 0.25 * s
-        z = (R[1, 2] + R[2, 1]) / s
+    # Compute base dimensions at the given depth
+    base_half_x = depth * np.tan(half_angle_x)
+    base_half_y = depth * np.tan(half_angle_y)
+
+    vertices = [[0.0, 0.0, 0.0]]  # Apex at origin
+
+    # Handle inf norm
+    if norm_type == "inf" or norm_type == float("inf"):
+        p = 100.0  # Large p approximates inf-norm
     else:
-        s = 2.0 * np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1])
-        w = (R[1, 0] - R[0, 1]) / s
-        x = (R[0, 2] + R[2, 0]) / s
-        y = (R[1, 2] + R[2, 1]) / s
-        z = 0.25 * s
+        p = float(norm_type)
 
-    return np.array([w, x, y, z])
+    # Generate superellipse boundary points
+    # Parameterization: x = sign(cos(θ)) * |cos(θ)|^(2/p), y = sign(sin(θ)) * |sin(θ)|^(2/p)
+    for i in range(n_segments):
+        theta = 2 * np.pi * i / n_segments
+        cos_t = np.cos(theta)
+        sin_t = np.sin(theta)
+
+        # Superellipse parameterization
+        x = np.sign(cos_t) * (np.abs(cos_t) ** (2.0 / p)) * base_half_x
+        y = np.sign(sin_t) * (np.abs(sin_t) ** (2.0 / p)) * base_half_y
+        vertices.append([x, y, depth])
+
+    return np.array(vertices, dtype=np.float32)
 
 
-def _quaternion_multiply(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
-    """Multiply two quaternions (wxyz format).
+def _generate_viewcone_faces(n_base_vertices: int) -> np.ndarray:
+    """Generate faces for a cone/pyramid mesh.
 
     Args:
-        q1: First quaternion [w, x, y, z]
-        q2: Second quaternion [w, x, y, z]
+        n_base_vertices: Number of vertices on the base (excluding apex)
 
     Returns:
-        Product quaternion [w, x, y, z]
+        Faces array of shape (F, 3) with vertex indices
     """
-    w1, x1, y1, z1 = q1
-    w2, x2, y2, z2 = q2
+    faces = []
+
+    # Side faces: triangles from apex (index 0) to each edge of base
+    # Winding: apex -> current -> next gives outward-facing normals (visible from outside)
+    for i in range(n_base_vertices):
+        current_i = i + 1
+        next_i = (i + 1) % n_base_vertices + 1
+        faces.append([0, current_i, next_i])
+
+    # Base cap: triangulate as a fan from first base vertex
+    # Winding for outward-facing normal (visible from outside/below the cone)
+    for i in range(2, n_base_vertices):
+        faces.append([1, i + 1, i])
+
+    return np.array(faces, dtype=np.int32)
+
+
+def _quaternion_to_rotation_matrix(q: np.ndarray) -> np.ndarray:
+    """Convert quaternion (wxyz) to rotation matrix.
+
+    Args:
+        q: Quaternion [w, x, y, z]
+
+    Returns:
+        3x3 rotation matrix
+    """
+    w, x, y, z = q
     return np.array(
         [
-            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
-            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
-            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
-            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
         ]
     )
 
@@ -811,26 +846,42 @@ def add_viewcone(
     server: viser.ViserServer,
     pos: np.ndarray,
     attitude: np.ndarray | None,
-    fov: float = 60.0,
-    aspect: float = 1.0,
-    scale: float = 5.0,
+    half_angle_x: float,
+    half_angle_y: float | None = None,
+    scale: float = 10.0,
+    norm_type: float | str = 2,
     R_sb: np.ndarray | None = None,
-    color: tuple[int, int, int] = (255, 200, 100),
-) -> tuple[viser.CameraFrustumHandle | None, UpdateCallback | None]:
-    """Add an animated camera viewcone/frustum visualization.
+    color: tuple[int, int, int] = (35, 138, 141),  # Viridis at t≈0.33 (teal)
+    opacity: float = 0.4,
+    wireframe: bool = False,
+    n_segments: int = 32,
+) -> tuple[viser.MeshHandle | None, UpdateCallback | None]:
+    """Add an animated viewcone mesh that matches p-norm constraints.
 
     The sensor is assumed to look along +Z in its own frame (boresight = [0,0,1]).
+    The viewcone represents the constraint ||[x,y]||_p <= tan(alpha) * z.
+
+    Cross-section shapes by norm:
+        - p=1: diamond
+        - p=2: circle/ellipse
+        - p>2: rounded square (superellipse)
+        - p=inf: square/rectangle
 
     Args:
         server: ViserServer instance
         pos: Position array of shape (N, 3)
         attitude: Quaternion array of shape (N, 4) in [w, x, y, z] format, or None to skip
-        fov: Field of view in degrees (full angle, not half-angle)
-        aspect: Aspect ratio (width/height)
-        scale: Size/depth of the frustum
+        half_angle_x: Half-angle of the cone in x direction (radians).
+            For symmetric cones, this is pi/alpha_x where alpha_x is the constraint parameter.
+        half_angle_y: Half-angle in y direction (radians). If None, uses half_angle_x.
+            For asymmetric constraints, this is pi/alpha_y.
+        scale: Depth/length of the cone visualization
+        norm_type: p-norm value (1, 2, 3, ..., or "inf" for infinity norm)
         R_sb: Body-to-sensor rotation matrix (3x3). If None, sensor is aligned with body z-axis.
-            This matrix transforms vectors FROM body frame TO sensor frame.
         color: RGB color tuple
+        opacity: Mesh opacity (0-1), ignored if wireframe=True
+        wireframe: If True, render as wireframe instead of solid
+        n_segments: Number of segments for cone smoothness
 
     Returns:
         Tuple of (handle, update_callback), or (None, None) if attitude is None
@@ -838,31 +889,48 @@ def add_viewcone(
     if attitude is None:
         return None, None
 
-    # Sensor-to-body is the inverse (transpose) of body-to-sensor
-    R_sb = R_sb.T if R_sb is not None else np.eye(3)
-    q_sb = _rotation_matrix_to_quaternion(R_sb)
+    # Convert inputs to numpy arrays (handles JAX arrays)
+    pos = np.asarray(pos, dtype=np.float64)
+    attitude = np.asarray(attitude, dtype=np.float64)
+    if R_sb is not None:
+        R_sb = np.asarray(R_sb, dtype=np.float64)
 
-    def get_sensor_quaternion(frame_idx: int) -> np.ndarray:
-        """Get frustum orientation in world frame."""
+    # Generate base geometry in sensor frame
+    base_vertices = _generate_viewcone_vertices(
+        half_angle_x, half_angle_y, scale, norm_type, n_segments
+    )
+    n_base_verts = len(base_vertices) - 1  # Exclude apex
+    faces = _generate_viewcone_faces(n_base_verts)
+
+    # Sensor-to-body rotation (transpose of body-to-sensor)
+    R_sensor_to_body = R_sb.T if R_sb is not None else np.eye(3)
+
+    def transform_vertices(frame_idx: int) -> np.ndarray:
+        """Transform cone vertices from sensor frame to world frame."""
+        # Get body-to-world rotation from attitude quaternion
         q_body = attitude[frame_idx]
-        # Chain: body attitude * sensor-to-body * flip for viser convention
-        q_sensor = _quaternion_multiply(q_body, q_sb)
-        return q_sensor
+        R_body_to_world = _quaternion_to_rotation_matrix(q_body)
 
-    initial_wxyz = get_sensor_quaternion(0)
-    handle = server.scene.add_camera_frustum(
-        "/viewcone",
-        fov=fov,
-        aspect=aspect,
-        scale=scale,
-        wxyz=initial_wxyz,
-        position=pos[0],
+        # Full transform: sensor -> body -> world
+        R_sensor_to_world = R_body_to_world @ R_sensor_to_body
+
+        # Transform vertices and translate to position
+        world_vertices = (R_sensor_to_world @ base_vertices.T).T + pos[frame_idx]
+        return world_vertices.astype(np.float32)
+
+    # Create initial mesh
+    initial_vertices = transform_vertices(0)
+    handle = server.scene.add_mesh_simple(
+        "/viewcone_mesh",
+        vertices=initial_vertices,
+        faces=faces,
         color=color,
+        wireframe=wireframe,
+        opacity=opacity if not wireframe else 1.0,
     )
 
     def update(frame_idx: int) -> None:
-        handle.wxyz = get_sensor_quaternion(frame_idx)
-        handle.position = pos[frame_idx]
+        handle.vertices = transform_vertices(frame_idx)
 
     return handle, update
 

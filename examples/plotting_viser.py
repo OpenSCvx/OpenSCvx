@@ -6,6 +6,7 @@ These are templates meant to be copied and customized for specific problems.
 For the composable primitives, see openscvx.plotting.animation.
 """
 
+import matplotlib.pyplot as plt
 import numpy as np
 import viser
 
@@ -70,6 +71,10 @@ def create_animated_plotting_server(
     show_viewcone: bool = True,
     viewcone_fov: float | None = None,
     viewcone_scale: float = 5.0,
+    viewcone_norm_type: int | str = 2,
+    viewcone_wireframe: bool = False,
+    viewcone_opacity: float = 0.4,
+    viewcone_color_t: float = 0.5,
     show_targets: bool = True,
     target_radius: float = 1.0,
 ) -> viser.ViserServer:
@@ -86,7 +91,7 @@ def create_animated_plotting_server(
     - Current position marker
     - Thrust vector visualization (if thrust data available)
     - Body frame attitude visualization (if attitude data available, for 6DOF)
-    - Viewcone/camera frustum (if R_sb in results and show_viewcone=True)
+    - Viewcone mesh (if R_sb in results and show_viewcone=True)
     - Target markers for viewplanning (if init_poses in results and show_targets=True)
     - Optional ghost trajectory showing full path
     - Static obstacles/gates if present in results
@@ -97,7 +102,8 @@ def create_animated_plotting_server(
             Expected keys in results (beyond trajectory data):
             - vertices: Gate/obstacle vertices (optional)
             - R_sb: Body-to-sensor rotation matrix for viewcone (optional)
-            - alpha_x: Sensor cone half-angle parameter for FOV calculation (optional)
+            - alpha_x, alpha_y: Sensor cone half-angle parameters (optional)
+            - norm_type: Norm type for viewcone constraint (optional, default 2)
             - init_poses: List of viewplanning target positions (optional)
             - obstacles_centers, obstacles_radii, obstacles_axes: Ellipsoid obstacles (optional)
         show_ghost_trajectory: If True, show faint full trajectory
@@ -107,34 +113,58 @@ def create_animated_plotting_server(
         attitude_key: Key for attitude quaternion data (default: "attitude")
         attitude_axes_length: Length of body frame axes
         show_viewcone: If True and R_sb is in results, show camera viewcone
-        viewcone_fov: Field of view for viewcone in degrees. If None, computed from
-            alpha_x in results (fov = 180/alpha_x degrees), or defaults to 60.0.
-        viewcone_scale: Size/depth of viewcone frustum
+        viewcone_fov: Field of view for viewcone in degrees (full angle). If None, computed
+            from alpha_x in results (fov = 180/alpha_x degrees), or defaults to 60.0.
+        viewcone_scale: Size/depth of viewcone mesh
+        viewcone_norm_type: p-norm value (1, 2, "inf", etc.). Can also be read from results["norm_type"].
+        viewcone_wireframe: If True, render viewcone as wireframe
+        viewcone_opacity: Opacity of viewcone mesh (0-1)
+        viewcone_color_t: Position in viridis colormap (0.0-1.0) for viewcone color.
+            0.0=purple, 0.33≈teal, 0.5≈green, 1.0=yellow.
         show_targets: If True and init_poses in results, show target markers
         target_radius: Radius of target marker spheres
 
     Returns:
         ViserServer instance (animation runs in background thread)
     """
-    # Extract data
-    pos = results.trajectory["position"]
-    vel = results.trajectory["velocity"]
+    # Extract data and convert to numpy (handles JAX arrays)
+    pos = np.asarray(results.trajectory["position"])
+    vel = np.asarray(results.trajectory["velocity"])
     thrust = results.trajectory.get(thrust_key)
+    if thrust is not None:
+        thrust = np.asarray(thrust)
     attitude = results.trajectory.get(attitude_key)
-    traj_time = results.trajectory["time"]
+    if attitude is not None:
+        attitude = np.asarray(attitude)
+    traj_time = np.asarray(results.trajectory["time"])
 
     # Viewcone parameters (body-to-sensor rotation)
-    # Note: In many problems, R_sb is named as such but is actually body-to-sensor
     R_sb = results.get("R_sb")
+    if R_sb is not None:
+        R_sb = np.asarray(R_sb)
     alpha_x = results.get("alpha_x")
+    if alpha_x is not None:
+        alpha_x = float(alpha_x)
+    alpha_y = results.get("alpha_y")
+    if alpha_y is not None:
+        alpha_y = float(alpha_y)
 
-    # Compute FOV from alpha_x if not explicitly provided
+    # Get norm type from results if available, otherwise use parameter
+    norm_type = results.get("norm_type", viewcone_norm_type)
+
+    # Compute half-angles in radians from alpha parameters or FOV
     # alpha_x defines the cone half-angle as pi/alpha_x radians
-    if viewcone_fov is None:
-        if alpha_x is not None:
-            viewcone_fov = np.degrees(np.pi / alpha_x)
-        else:
-            viewcone_fov = 60.0  # Default
+    if alpha_x is not None:
+        half_angle_x = np.pi / alpha_x
+        half_angle_y = np.pi / alpha_y if alpha_y is not None else half_angle_x
+    elif viewcone_fov is not None:
+        # Convert full FOV in degrees to half-angle in radians
+        half_angle_x = np.radians(viewcone_fov / 2)
+        half_angle_y = half_angle_x
+    else:
+        # Default: 60 degree full FOV
+        half_angle_x = np.radians(30.0)
+        half_angle_y = half_angle_x
 
     # Viewplanning target positions
     init_poses = results.get("init_poses")
@@ -180,15 +210,25 @@ def create_animated_plotting_server(
     _, update_thrust = add_thrust_vector(server, pos, thrust, attitude=attitude, scale=thrust_scale)
     update_callbacks.append(update_thrust)  # Will be filtered out if None
 
-    # Add viewcone if R_sb is available and enabled
+    # Add viewcone mesh if R_sb is available and enabled
     if show_viewcone and R_sb is not None and attitude is not None:
+        # Compute viewcone color from viridis colormap
+        cmap = plt.get_cmap("viridis")
+        rgb = cmap(viewcone_color_t)[:3]
+        viewcone_color = tuple(int(c * 255) for c in rgb)
+
         _, update_viewcone = add_viewcone(
             server,
             pos,
             attitude,
-            fov=viewcone_fov,
+            half_angle_x=half_angle_x,
+            half_angle_y=half_angle_y,
             scale=viewcone_scale,
+            norm_type=norm_type,
             R_sb=R_sb,
+            color=viewcone_color,
+            wireframe=viewcone_wireframe,
+            opacity=viewcone_opacity,
         )
         update_callbacks.append(update_viewcone)
 
@@ -258,8 +298,8 @@ def create_scp_animated_plotting_server(
     Returns:
         ViserServer instance (animation runs in background thread)
     """
-    # Get iteration history
-    X_history = results.X  # List of state arrays per iteration
+    # Get iteration history and convert to numpy (handles JAX arrays)
+    X_history = [np.asarray(X) for X in results.X]
     n_iterations = len(X_history)
 
     if n_iterations == 0:
