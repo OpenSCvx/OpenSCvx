@@ -11,8 +11,12 @@ import sys
 import threading
 import time
 
+import matplotlib
 import numpy as np
 import viser
+
+# Get viridis colormap without pyplot (avoids potential backend issues)
+_viridis_cmap = matplotlib.colormaps["viridis"]
 
 # Add grandparent directory to path to import examples
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -302,15 +306,34 @@ def create_realtime_server(
             i4 = n_x + n_x * n_x + 2 * n_x * n_u
 
             all_pos_segments = []
+            all_vel_segments = []
             for i_node in range(V_multi_shoot.shape[1]):
                 node_data = V_multi_shoot[:, i_node]
                 segments_for_node = node_data.reshape(-1, i4)
                 pos_segments = segments_for_node[:, :3]  # First 3 are position
+                vel_segments = segments_for_node[:, 3:6]  # Next 3 are velocity
                 all_pos_segments.append(pos_segments)
+                all_vel_segments.append(vel_segments)
 
             if all_pos_segments:
                 full_traj = np.vstack(all_pos_segments).astype(np.float32)
+                full_vel = np.vstack(all_vel_segments).astype(np.float32)
+
+                # Compute velocity-based colors using viridis colormap
+                vel_norms = np.linalg.norm(full_vel, axis=1)
+                vel_range = vel_norms.max() - vel_norms.min()
+                if vel_range < 1e-8:
+                    vel_normalized = np.zeros_like(vel_norms)
+                else:
+                    vel_normalized = (vel_norms - vel_norms.min()) / vel_range
+
+                colors = np.array(
+                    [[int(c * 255) for c in _viridis_cmap(v)[:3]] for v in vel_normalized],
+                    dtype=np.uint8,
+                )
+
                 trajectory_handle.points = full_traj
+                trajectory_handle.colors = colors
 
         except Exception as e:
             print(f"Trajectory update error: {e}")
