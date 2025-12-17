@@ -37,6 +37,8 @@ from openscvx.plotting.animation import (
 def create_animated_plotting_server(
     results: OptimizationResults,
     loop_animation: bool = True,
+    position_key: str = "position",
+    velocity_key: str = "velocity",
     thrust_key: str = "force",
     thrust_scale: float = 0.3,
     attitude_key: str = "attitude",
@@ -74,6 +76,8 @@ def create_animated_plotting_server(
             - init_poses: List of viewplanning target positions (optional)
             - obstacles_centers, obstacles_radii, obstacles_axes: Ellipsoid obstacles (optional)
         loop_animation: If True, loop animation when it reaches the end
+        position_key: Key for position data in trajectory dict (default: "position")
+        velocity_key: Key for velocity data in trajectory dict (default: "velocity")
         thrust_key: Key for thrust/force data in trajectory dict (default: "force")
         thrust_scale: Scale factor for thrust vector visualization
         attitude_key: Key for attitude quaternion data (default: "attitude")
@@ -86,26 +90,16 @@ def create_animated_plotting_server(
         ViserServer instance (animation runs in background thread)
     """
     # Extract data and convert to numpy (handles JAX arrays)
-    pos = np.asarray(results.trajectory["position"])
-    vel = np.asarray(results.trajectory["velocity"])
+    pos = results.trajectory.get(position_key)
+    vel = results.trajectory.get(velocity_key)
     thrust = results.trajectory.get(thrust_key)
-    if thrust is not None:
-        thrust = np.asarray(thrust)
     attitude = results.trajectory.get(attitude_key)
-    if attitude is not None:
-        attitude = np.asarray(attitude)
-    traj_time = np.asarray(results.trajectory["time"])
+    traj_time = results.trajectory["time"]
 
     # Viewcone parameters from results
     R_sb = results.get("R_sb")
-    if R_sb is not None:
-        R_sb = np.asarray(R_sb)
     alpha_x = results.get("alpha_x")
-    if alpha_x is not None:
-        alpha_x = float(alpha_x)
     alpha_y = results.get("alpha_y")
-    if alpha_y is not None:
-        alpha_y = float(alpha_y)
     norm_type = results.get("norm_type", 2)
 
     # Compute half-angles in radians from alpha parameters
