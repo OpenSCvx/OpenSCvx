@@ -34,48 +34,15 @@ from openscvx.plotting.animation import (
 )
 
 
-def create_plotting_server(results: OptimizationResults) -> viser.ViserServer:
-    """Create a basic (non-animated) plotting server.
-
-    Args:
-        results: Optimization result dictionary containing trajectory data
-
-    Returns:
-        ViserServer instance
-    """
-    pos = results.trajectory["position"]
-    return create_server(pos)
-
-
-def add_velocity_trace(server: viser.ViserServer, results: OptimizationResults) -> None:
-    """Add a static velocity-colored trajectory trace.
-
-    Args:
-        server: ViserServer instance
-        results: Optimization result dictionary
-    """
-    pos = results.trajectory["position"]
-    vel = results.trajectory["velocity"]
-    colors = compute_velocity_colors(vel)
-    server.scene.add_point_cloud("/traj", points=pos, colors=colors)
-
-
 def create_animated_plotting_server(
     results: OptimizationResults,
-    show_ghost_trajectory: bool = True,
     loop_animation: bool = True,
     thrust_key: str = "force",
     thrust_scale: float = 0.3,
     attitude_key: str = "attitude",
     attitude_axes_length: float = 2.0,
     show_viewcone: bool = True,
-    viewcone_fov: float | None = None,
-    viewcone_scale: float = 5.0,
-    viewcone_norm_type: int | str = 2,
-    viewcone_wireframe: bool = False,
-    viewcone_opacity: float = 0.4,
-    viewcone_color_t: float = 0.5,
-    show_targets: bool = True,
+    viewcone_scale: float = 10.0,
     target_radius: float = 1.0,
 ) -> viser.ViserServer:
     """Create an animated trajectory visualization server.
@@ -92,7 +59,7 @@ def create_animated_plotting_server(
     - Thrust vector visualization (if thrust data available)
     - Body frame attitude visualization (if attitude data available, for 6DOF)
     - Viewcone mesh (if R_sb in results and show_viewcone=True)
-    - Target markers for viewplanning (if init_poses in results and show_targets=True)
+    - Target markers for viewplanning (if init_poses in results)
     - Optional ghost trajectory showing full path
     - Static obstacles/gates if present in results
     - Ellipsoidal obstacles (if obstacles_centers, obstacles_radii, obstacles_axes in results)
@@ -106,22 +73,13 @@ def create_animated_plotting_server(
             - norm_type: Norm type for viewcone constraint (optional, default 2)
             - init_poses: List of viewplanning target positions (optional)
             - obstacles_centers, obstacles_radii, obstacles_axes: Ellipsoid obstacles (optional)
-        show_ghost_trajectory: If True, show faint full trajectory
         loop_animation: If True, loop animation when it reaches the end
         thrust_key: Key for thrust/force data in trajectory dict (default: "force")
         thrust_scale: Scale factor for thrust vector visualization
         attitude_key: Key for attitude quaternion data (default: "attitude")
         attitude_axes_length: Length of body frame axes
         show_viewcone: If True and R_sb is in results, show camera viewcone
-        viewcone_fov: Field of view for viewcone in degrees (full angle). If None, computed
-            from alpha_x in results (fov = 180/alpha_x degrees), or defaults to 60.0.
         viewcone_scale: Size/depth of viewcone mesh
-        viewcone_norm_type: p-norm value (1, 2, "inf", etc.). Can also be read from results["norm_type"].
-        viewcone_wireframe: If True, render viewcone as wireframe
-        viewcone_opacity: Opacity of viewcone mesh (0-1)
-        viewcone_color_t: Position in viridis colormap (0.0-1.0) for viewcone color.
-            0.0=purple, 0.33≈teal, 0.5≈green, 1.0=yellow.
-        show_targets: If True and init_poses in results, show target markers
         target_radius: Radius of target marker spheres
 
     Returns:
@@ -138,7 +96,7 @@ def create_animated_plotting_server(
         attitude = np.asarray(attitude)
     traj_time = np.asarray(results.trajectory["time"])
 
-    # Viewcone parameters (body-to-sensor rotation)
+    # Viewcone parameters from results
     R_sb = results.get("R_sb")
     if R_sb is not None:
         R_sb = np.asarray(R_sb)
@@ -148,19 +106,13 @@ def create_animated_plotting_server(
     alpha_y = results.get("alpha_y")
     if alpha_y is not None:
         alpha_y = float(alpha_y)
+    norm_type = results.get("norm_type", 2)
 
-    # Get norm type from results if available, otherwise use parameter
-    norm_type = results.get("norm_type", viewcone_norm_type)
-
-    # Compute half-angles in radians from alpha parameters or FOV
+    # Compute half-angles in radians from alpha parameters
     # alpha_x defines the cone half-angle as pi/alpha_x radians
     if alpha_x is not None:
         half_angle_x = np.pi / alpha_x
         half_angle_y = np.pi / alpha_y if alpha_y is not None else half_angle_x
-    elif viewcone_fov is not None:
-        # Convert full FOV in degrees to half-angle in radians
-        half_angle_x = np.radians(viewcone_fov / 2)
-        half_angle_y = half_angle_x
     else:
         # Default: 60 degree full FOV
         half_angle_x = np.radians(30.0)
@@ -188,8 +140,7 @@ def create_animated_plotting_server(
             axes=results.get("obstacles_axes"),
         )
 
-    if show_ghost_trajectory:
-        add_ghost_trajectory(server, pos, colors)
+    add_ghost_trajectory(server, pos, colors)
 
     # Add animated elements (collect update callbacks)
     update_callbacks = []
@@ -214,7 +165,7 @@ def create_animated_plotting_server(
     if show_viewcone and R_sb is not None and attitude is not None:
         # Compute viewcone color from viridis colormap
         cmap = plt.get_cmap("viridis")
-        rgb = cmap(viewcone_color_t)[:3]
+        rgb = cmap(0.4)[:3]
         viewcone_color = tuple(int(c * 255) for c in rgb)
 
         _, update_viewcone = add_viewcone(
@@ -227,13 +178,13 @@ def create_animated_plotting_server(
             norm_type=norm_type,
             R_sb=R_sb,
             color=viewcone_color,
-            wireframe=viewcone_wireframe,
-            opacity=viewcone_opacity,
+            wireframe=False,
+            opacity=0.4,
         )
         update_callbacks.append(update_viewcone)
 
     # Add target markers for viewplanning problems
-    if show_targets and init_poses is not None:
+    if init_poses is not None:
         target_results = add_target_markers(server, init_poses, radius=target_radius)
         for _, update in target_results:
             if update is not None:
@@ -249,8 +200,6 @@ def create_scp_animated_plotting_server(
     results: OptimizationResults,
     position_slice: slice | None = None,
     attitude_slice: slice | None = None,
-    show_ghost_iterations: bool = True,
-    show_propagation: bool = True,
     propagation_line_width: float = 2.0,
     show_attitudes: bool = True,
     attitude_stride: int = 3,
@@ -282,9 +231,6 @@ def create_scp_animated_plotting_server(
             If None, auto-detected from results._states looking for "position".
         attitude_slice: Slice for extracting attitude quaternion from state vector.
             If None, auto-detected from results._states looking for "attitude".
-        show_ghost_iterations: If True, show all previous iterations
-        show_propagation: If True, show nonlinear propagation lines between nodes.
-            This reveals defects (gaps) in early iterations that close as SCP converges.
         propagation_line_width: Width of propagation lines
         show_attitudes: If True and attitude data available, show body frames
         attitude_stride: Show attitude frame every N nodes (reduces clutter)
@@ -345,12 +291,11 @@ def create_scp_animated_plotting_server(
     update_callbacks = []
 
     # Add ghost iterations (previous iterations)
-    if show_ghost_iterations:
-        _, update_ghosts = add_scp_ghost_iterations(server, positions, cmap_name=cmap_name)
-        update_callbacks.append(update_ghosts)
+    _, update_ghosts = add_scp_ghost_iterations(server, positions, cmap_name=cmap_name)
+    update_callbacks.append(update_ghosts)
 
     # Add nonlinear propagation lines if discretization history is available
-    if show_propagation and results.discretization_history:
+    if results.discretization_history:
         n_x = results.X[0].shape[1]
         n_u = results.U[0].shape[1]
 
