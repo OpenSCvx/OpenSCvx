@@ -1,7 +1,9 @@
-"""Interactive real-time visualization for cinematic viewpoint planning.
+"""Interactive real-time visualization for cinematic viewpoint planning using Viser.
 
-This module provides a PyQt5-based GUI for interactively solving and visualizing
+This module provides a web-based GUI for interactively solving and visualizing
 the cinematic viewpoint planning trajectory optimization problem in real-time.
+
+Run this script and open the displayed URL in your browser.
 """
 
 import os
@@ -9,19 +11,13 @@ import sys
 import threading
 import time
 
+import matplotlib
 import numpy as np
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtWidgets import (
-    QApplication,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QSlider,
-    QVBoxLayout,
-    QWidget,
-)
+import viser
+from scipy.spatial.transform import Rotation as R
+
+# Get viridis colormap without pyplot (avoids potential backend issues)
+_viridis_cmap = matplotlib.colormaps["viridis"]
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
@@ -33,599 +29,498 @@ from examples.drone.cinema_vp_realtime_base import (
     problem,
 )
 
-# Import PyQtGraph OpenGL modules
-try:
-    from pyqtgraph.opengl import (
-        GLGridItem,
-        GLLinePlotItem,
-        GLMeshItem,
-        GLScatterPlotItem,
-        GLViewWidget,
-        MeshData,
+# Initialize the problem
+problem.initialize()
+
+
+def _generate_viewcone_vertices(
+    half_angle_x: float,
+    half_angle_y: float | None,
+    scale: float,
+    norm_type: float | str,
+    n_segments: int = 32,
+) -> np.ndarray:
+    """Generate viewcone vertices in sensor frame (apex at origin, looking along +Z)."""
+    if half_angle_y is None:
+        half_angle_y = half_angle_x
+
+    # Compute extent at z=scale
+    tan_x = np.tan(half_angle_x)
+    tan_y = np.tan(half_angle_y)
+
+    # Generate points around the cone base depending on norm type
+    theta = np.linspace(0, 2 * np.pi, n_segments, endpoint=False)
+
+    # Convert norm_type to numeric value
+    if norm_type == "inf" or norm_type == np.inf:
+        p = np.inf
+    else:
+        p = float(norm_type)
+
+    # Generate unit vectors on the p-norm ball
+    if p == np.inf:
+        # Square cross-section
+        # Use parametric form for a square
+        t = theta / (2 * np.pi) * 4  # 0 to 4
+        unit_x = np.zeros_like(t)
+        unit_y = np.zeros_like(t)
+        for i, ti in enumerate(t):
+            if ti < 1:
+                unit_x[i] = 1.0
+                unit_y[i] = ti * 2 - 1
+            elif ti < 2:
+                unit_x[i] = 1 - (ti - 1) * 2
+                unit_y[i] = 1.0
+            elif ti < 3:
+                unit_x[i] = -1.0
+                unit_y[i] = 1 - (ti - 2) * 2
+            else:
+                unit_x[i] = -1 + (ti - 3) * 2
+                unit_y[i] = -1.0
+    else:
+        # p-norm ball: |x|^p + |y|^p = 1
+        cos_t = np.cos(theta)
+        sin_t = np.sin(theta)
+        # Superellipse parametric form
+        r = (np.abs(cos_t) ** p + np.abs(sin_t) ** p) ** (-1.0 / p)
+        unit_x = r * cos_t
+        unit_y = r * sin_t
+
+    # Scale by tan values and cone depth
+    x = unit_x * tan_x * scale
+    y = unit_y * tan_y * scale
+    z = np.full_like(x, scale)
+
+    # Apex at origin
+    apex = np.array([[0.0, 0.0, 0.0]])
+    base_points = np.stack([x, y, z], axis=1)
+
+    return np.vstack([apex, base_points])
+
+
+def _generate_viewcone_faces(n_base_verts: int) -> np.ndarray:
+    """Generate triangle faces for viewcone (fan from apex)."""
+    faces = []
+    for i in range(n_base_verts):
+        next_i = (i + 1) % n_base_verts
+        # Face: apex (0), current base vertex (i+1), next base vertex (next_i+1)
+        faces.append([0, i + 1, next_i + 1])
+    return np.array(faces, dtype=np.uint32)
+
+
+def _quaternion_to_rotation_matrix(q: np.ndarray) -> np.ndarray:
+    """Convert quaternion [w, x, y, z] to rotation matrix."""
+    r = R.from_quat([q[1], q[2], q[3], q[0]])  # scipy uses [x, y, z, w]
+    return r.as_matrix()
+
+
+def create_realtime_server(
+    optimization_problem,
+    keypoint_param,
+    plot_dict: dict,
+) -> viser.ViserServer:
+    """Create a viser server for real-time cinematic viewpoint trajectory optimization.
+
+    Args:
+        optimization_problem: The OpenSCvx Problem instance
+        keypoint_param: The keypoint position parameter object
+        plot_dict: Dictionary containing visualization parameters (R_sb, alpha_x, etc.)
+
+    Returns:
+        ViserServer instance
+    """
+    server = viser.ViserServer()
+    server.gui.configure_theme(dark_mode=True)
+
+    # Extract plotting parameters
+    alpha_x = plot_dict.get("alpha_x", 6.0)
+    alpha_y = plot_dict.get("alpha_y", 8.0)
+    R_sb = np.array(plot_dict.get("R_sb", np.eye(3)))
+    norm_type = plot_dict.get("norm_type", "inf")
+
+    # Compute half-angles in radians
+    half_angle_x = np.pi / alpha_x
+    half_angle_y = np.pi / alpha_y
+
+    # =========================================================================
+    # Scene Setup
+    # =========================================================================
+
+    # Grid
+    server.scene.add_grid(
+        "/grid",
+        width=50,
+        height=50,
+        position=(0.0, 0.0, 0.0),
     )
 
-    HAS_OPENGL = True
-except ImportError:
-    print("PyQtGraph OpenGL not available, falling back to 2D")
-    HAS_OPENGL = False
+    # Origin frame
+    server.scene.add_frame(
+        "/origin",
+        wxyz=(1.0, 0.0, 0.0, 0.0),
+        position=(0.0, 0.0, 0.0),
+        axes_length=1.0,
+    )
 
-# Import scipy Rotation for quaternion to rotation matrix conversion
-# (matching plot_animation_pyqtgraph)
-from scipy.spatial.transform import Rotation as R
+    # Trajectory point cloud (initially empty)
+    trajectory_handle = server.scene.add_point_cloud(
+        "/trajectory",
+        points=np.zeros((1, 3), dtype=np.float32),
+        colors=(255, 255, 0),
+        point_size=0.2,
+    )
 
-running = {"stop": False}
-reset_requested = {"reset": False}
-latest_results = {"results": None}
-new_result_event = threading.Event()
+    # Keypoint marker (red sphere)
+    initial_kp = keypoint_param.value
+    keypoint_handle = server.scene.add_icosphere(
+        "/keypoint",
+        radius=0.3,
+        color=(255, 0, 0),
+        position=tuple(initial_kp),
+    )
 
+    # Line-of-sight visualization (line from drone to keypoint)
+    los_handle = server.scene.add_line_segments(
+        "/line_of_sight",
+        points=np.zeros((1, 2, 3), dtype=np.float32),
+        colors=(255, 255, 0),  # Yellow
+        line_width=2.0,
+    )
 
-class CinemaVPPlotWidget(QWidget):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        layout = QVBoxLayout()
-        self.setLayout(layout)
-        if HAS_OPENGL:
-            # Create 3D view
-            self.view = GLViewWidget()
-            self.view.setCameraPosition(distance=30)
-            # Add grid
-            grid = GLGridItem()
-            self.view.addItem(grid)
-            # Add trajectory scatter plot
-            self.traj_scatter = GLScatterPlotItem(pos=np.zeros((1, 3)), color=(0, 0, 1, 1), size=5)
-            self.view.addItem(self.traj_scatter)
-            # Add keypoint scatter plot
-            self.kp_scatter = GLScatterPlotItem(pos=np.zeros((1, 3)), color=(1, 0, 0, 1), size=10)
-            self.view.addItem(self.kp_scatter)
-            # Add line-of-sight visualization (line from drone to keypoint)
-            self.los_line = GLLinePlotItem(color=(1, 1, 0, 0.5), width=2)
-            self.view.addItem(self.los_line)
-            # Add drone axes visualization (x=red, y=green, z=blue)
-            self.axis_lines = []
-            axis_colors = [(1, 0, 0, 1), (0, 1, 0, 1), (0, 0, 1, 1)]  # Red, Green, Blue
-            for color in axis_colors:
-                axis_line = GLLinePlotItem(color=color, width=3)
-                self.view.addItem(axis_line)
-                self.axis_lines.append(axis_line)
-            # Add view cone mesh
-            self.viewcone_mesh = None
-            self.cone_meshdata = None  # Store cone mesh data for reuse
-            # Create main layout with view and control panel
-            main_layout = QHBoxLayout()
-            # Create control panel
-            self.create_control_panel()
-            # Add widgets to main layout
-            main_layout.addWidget(self.view, stretch=3)
-            main_layout.addWidget(self.control_panel, stretch=1)
-            layout.addLayout(main_layout)
-        else:
-            # Fallback to 2D
-            label = QLabel("3D OpenGL not available")
-            layout.addWidget(label)
-
-    def create_control_panel(self):
-        """Create the control panel with sliders for keypoint position"""
-        self.control_panel = QWidget()
-        control_layout = QVBoxLayout()
-        self.control_panel.setLayout(control_layout)
-        # Title
-        title = QLabel("Cinema View Planning Control")
-        title.setStyleSheet("font-weight: bold; font-size: 14px;")
-        control_layout.addWidget(title)
-        # Optimization Metrics Display
-        metrics_group = QGroupBox("Optimization Metrics")
-        metrics_layout = QVBoxLayout()
-        metrics_group.setLayout(metrics_layout)
-        # Create labels for each metric
-        self.iter_label = QLabel("Iteration: 0")
-        self.j_tr_label = QLabel("J_tr: 0.00e+00")
-        self.j_vb_label = QLabel("J_vb: 0.00e+00")
-        self.j_vc_label = QLabel("J_vc: 0.00e+00")
-        self.objective_label = QLabel("Objective: 0.00e+00")
-        self.lam_cost_display_label = QLabel(f"λ_cost: {problem.settings.scp.lam_cost:.2E}")
-        self.dis_time_label = QLabel("Dis Time: 0.0ms")
-        self.solve_time_label = QLabel("Solve Time: 0.0ms")
-        self.status_label = QLabel("Status: --")
-        # Style the labels
-        for label in [
-            self.iter_label,
-            self.j_tr_label,
-            self.j_vb_label,
-            self.j_vc_label,
-            self.objective_label,
-            self.lam_cost_display_label,
-            self.dis_time_label,
-            self.solve_time_label,
-            self.status_label,
-        ]:
-            label.setStyleSheet("font-family: monospace; font-size: 11px; padding: 2px;")
-            metrics_layout.addWidget(label)
-        control_layout.addWidget(metrics_group)
-        # Optimization Weights
-        weights_group = QGroupBox("Optimization Weights")
-        weights_layout = QVBoxLayout()
-        weights_group.setLayout(weights_layout)
-        # Lambda cost input - Input on left, label on right
-        lam_cost_layout = QHBoxLayout()
-        lam_cost_input = QLineEdit()
-        lam_cost_input.setText(f"{problem.settings.scp.lam_cost:.2E}")
-        lam_cost_input.setFixedWidth(80)
-        lam_cost_input.returnPressed.connect(lambda: on_lam_cost_changed(lam_cost_input))
-        lam_cost_label = QLabel("λ_cost:")
-        lam_cost_label.setAlignment(Qt.AlignLeft)
-        lam_cost_layout.addWidget(lam_cost_input)
-        lam_cost_layout.addWidget(lam_cost_label)
-        lam_cost_layout.addStretch()  # Push everything to the left
-        weights_layout.addLayout(lam_cost_layout)
-        # Lambda trust region input - Input on left, label on right
-        lam_tr_layout = QHBoxLayout()
-        lam_tr_input = QLineEdit()
-        lam_tr_input.setText(f"{problem.settings.scp.w_tr:.2E}")
-        lam_tr_input.setFixedWidth(80)
-        lam_tr_input.returnPressed.connect(lambda: on_lam_tr_changed(lam_tr_input))
-        lam_tr_label = QLabel("λ_tr:")
-        lam_tr_label.setAlignment(Qt.AlignLeft)
-        lam_tr_layout.addWidget(lam_tr_input)
-        lam_tr_layout.addWidget(lam_tr_label)
-        lam_tr_layout.addStretch()  # Push everything to the left
-        weights_layout.addLayout(lam_tr_layout)
-        control_layout.addWidget(weights_group)
-        # Reset Button
-        reset_group = QGroupBox("Problem Control")
-        reset_layout = QVBoxLayout()
-        reset_group.setLayout(reset_layout)
-        reset_button = QPushButton("Reset Problem")
-        reset_button.clicked.connect(self.on_reset_clicked)
-        reset_layout.addWidget(reset_button)
-        control_layout.addWidget(reset_group)
-        # Keypoint Position Controls
-        kp_group = QGroupBox("Keypoint Position (Line-of-Sight Target)")
-        kp_layout = QVBoxLayout()
-        kp_group.setLayout(kp_layout)
-        # X, Y, Z sliders
-        self.kp_sliders = []
-        for j, coord in enumerate(["X", "Y", "Z"]):
-            slider_layout = QHBoxLayout()
-            label = QLabel(f"{coord}:")
-            slider = QSlider(Qt.Horizontal)
-            # Set range based on position bounds (scaled for slider)
-            slider.setRange(-200, 200)
-            # Set initial value based on current keypoint position
-            initial_value = int(kp_pose.value[j] * 10)  # Scale by 10 for precision
-            slider.setValue(initial_value)
-            value_label = QLabel(f"{kp_pose.value[j]:.2f}")
-            # Connect slider to update function
-            slider.valueChanged.connect(
-                lambda val, axis=j, label=value_label: self.on_slider_changed(val, axis, label)
-            )
-            slider_layout.addWidget(label)
-            slider_layout.addWidget(slider)
-            slider_layout.addWidget(value_label)
-            kp_layout.addLayout(slider_layout)
-            self.kp_sliders.append((slider, value_label))
-        # Text inputs for precise control
-        text_inputs_layout = QHBoxLayout()
-        self.kp_x_input = QLineEdit()
-        self.kp_x_input.setText(f"{kp_pose.value[0]:.2f}")
-        self.kp_x_input.setFixedWidth(60)
-        self.kp_x_input.returnPressed.connect(
-            lambda: self.on_text_input_changed(0, self.kp_x_input)
+    # Drone body frame axes (will be updated with attitude)
+    axis_handles = []
+    axis_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]  # RGB for XYZ
+    for i, color in enumerate(axis_colors):
+        handle = server.scene.add_line_segments(
+            f"/drone_axes/axis_{i}",
+            points=np.zeros((1, 2, 3), dtype=np.float32),
+            colors=color,
+            line_width=3.0,
         )
-        self.kp_y_input = QLineEdit()
-        self.kp_y_input.setText(f"{kp_pose.value[1]:.2f}")
-        self.kp_y_input.setFixedWidth(60)
-        self.kp_y_input.returnPressed.connect(
-            lambda: self.on_text_input_changed(1, self.kp_y_input)
-        )
-        self.kp_z_input = QLineEdit()
-        self.kp_z_input.setText(f"{kp_pose.value[2]:.2f}")
-        self.kp_z_input.setFixedWidth(60)
-        self.kp_z_input.returnPressed.connect(
-            lambda: self.on_text_input_changed(2, self.kp_z_input)
-        )
-        text_inputs_layout.addWidget(QLabel("Precise:"))
-        text_inputs_layout.addWidget(self.kp_x_input)
-        text_inputs_layout.addWidget(self.kp_y_input)
-        text_inputs_layout.addWidget(self.kp_z_input)
-        kp_layout.addLayout(text_inputs_layout)
-        control_layout.addWidget(kp_group)
-        control_layout.addStretch()
-        # Create labels dictionary for metrics update
-        self.labels_dict = {
-            "iter_label": self.iter_label,
-            "j_tr_label": self.j_tr_label,
-            "j_vb_label": self.j_vb_label,
-            "j_vc_label": self.j_vc_label,
-            "objective_label": self.objective_label,
-            "lam_cost_display_label": self.lam_cost_display_label,
-            "dis_time_label": self.dis_time_label,
-            "solve_time_label": self.solve_time_label,
-            "status_label": self.status_label,
-        }
+        axis_handles.append(handle)
 
-    def on_slider_changed(self, value, axis, label):
-        """Handle slider value changes"""
-        # Convert slider value (-200 to 200) to world coordinates (-20 to 20)
-        world_value = value * 0.1
-        # Update the parameter
-        new_kp_pose = kp_pose.value.copy()
-        new_kp_pose[axis] = world_value
-        # Update both the Parameter object's value and problem.parameters
-        kp_pose.value = new_kp_pose
-        problem.parameters["kp_pose"] = new_kp_pose
-        # Update label
-        label.setText(f"{world_value:.2f}")
-        # Update text input
-        if axis == 0:
-            self.kp_x_input.setText(f"{world_value:.2f}")
-        elif axis == 1:
-            self.kp_y_input.setText(f"{world_value:.2f}")
-        elif axis == 2:
-            self.kp_z_input.setText(f"{world_value:.2f}")
+    # View cone mesh (initially invisible, will be created on first update)
+    viewcone_handle = {"mesh": None, "base_vertices": None}
 
-    def on_text_input_changed(self, axis, input_widget):
-        """Handle text input changes"""
+    # Pre-compute viewcone base geometry in sensor frame
+    viewcone_scale = 10.0
+    viewcone_base_vertices = _generate_viewcone_vertices(
+        half_angle_x, half_angle_y, viewcone_scale, norm_type, n_segments=32
+    )
+    viewcone_faces = _generate_viewcone_faces(len(viewcone_base_vertices) - 1)
+    viewcone_handle["base_vertices"] = viewcone_base_vertices
+
+    # Create initial viewcone mesh
+    cmap = matplotlib.colormaps["viridis"]
+    rgb = cmap(0.4)[:3]
+    viewcone_color = tuple(int(c * 255) for c in rgb)
+
+    viewcone_handle["mesh"] = server.scene.add_mesh_simple(
+        "/viewcone",
+        vertices=viewcone_base_vertices.astype(np.float32),
+        faces=viewcone_faces,
+        color=viewcone_color,
+        wireframe=False,
+        opacity=0.4,
+    )
+
+    # Keypoint draggable transform control
+    keypoint_drag_handle = server.scene.add_transform_controls(
+        "/keypoint_drag",
+        position=tuple(initial_kp),
+        scale=2.0,
+        disable_rotations=True,
+        visible=True,
+    )
+
+    # =========================================================================
+    # Shared State
+    # =========================================================================
+
+    state = {
+        "running": True,
+        "reset_requested": False,
+    }
+
+    # =========================================================================
+    # GUI Controls
+    # =========================================================================
+
+    # --- Optimization Metrics ---
+    with server.gui.add_folder("Optimization Metrics"):
+        metrics_text = server.gui.add_markdown(
+            """**Iteration:** 0
+**J_tr:** 0.00E+00
+**J_vb:** 0.00E+00
+**J_vc:** 0.00E+00
+**Objective:** 0.00E+00
+**Dis Time:** 0.0ms
+**Solve Time:** 0.0ms
+**Status:** --"""
+        )
+
+    # --- Optimization Weights ---
+    with server.gui.add_folder("Optimization Weights"):
+        lam_cost_input = server.gui.add_number(
+            "lambda_cost",
+            initial_value=optimization_problem.settings.scp.lam_cost,
+            min=1e-6,
+            max=1e6,
+            step=0.01,
+        )
+        lam_tr_input = server.gui.add_number(
+            "lambda_tr (w_tr)",
+            initial_value=optimization_problem.settings.scp.w_tr,
+            min=1e-6,
+            max=1e6,
+            step=0.1,
+        )
+
+        @lam_cost_input.on_update
+        def _(_) -> None:
+            optimization_problem.settings.scp.lam_cost = lam_cost_input.value
+
+        @lam_tr_input.on_update
+        def _(_) -> None:
+            optimization_problem.settings.scp.w_tr = lam_tr_input.value
+
+    # --- Problem Control ---
+    with server.gui.add_folder("Problem Control"):
+        reset_button = server.gui.add_button("Reset Problem")
+
+        @reset_button.on_click
+        def _(_) -> None:
+            state["reset_requested"] = True
+            print("Problem reset requested")
+
+    # --- Keypoint Position Controls ---
+    with server.gui.add_folder("Keypoint Position (Line-of-Sight Target)"):
+        server.gui.add_markdown("*Drag the control in 3D view or use inputs below*")
+
+        kp_vector_input = server.gui.add_vector3(
+            "Position",
+            initial_value=tuple(initial_kp),
+            step=0.5,
+        )
+
+        reset_kp_button = server.gui.add_button("Reset Keypoint")
+
+        @reset_kp_button.on_click
+        def _(_) -> None:
+            original = plot_dict.get("init_poses", np.array([13.0, 0.0, 2.0]))
+            kp_vector_input.value = tuple(original)
+            keypoint_param.value = np.array(original)
+            optimization_problem.parameters["kp_pose"] = np.array(original)
+            keypoint_drag_handle.position = tuple(original)
+            keypoint_handle.position = tuple(original)
+            print("Keypoint reset to initial position")
+
+        # Callback for GUI vector3 input -> update params and scene objects
+        @kp_vector_input.on_update
+        def _(_) -> None:
+            new_pos = np.array(kp_vector_input.value)
+            keypoint_param.value = new_pos
+            optimization_problem.parameters["kp_pose"] = new_pos
+            keypoint_drag_handle.position = tuple(new_pos)
+            keypoint_handle.position = tuple(new_pos)
+
+    # Wire up drag handle callback
+    @keypoint_drag_handle.on_update
+    def _(_) -> None:
+        new_pos = np.array(keypoint_drag_handle.position)
+        keypoint_param.value = new_pos
+        optimization_problem.parameters["kp_pose"] = new_pos
+        kp_vector_input.value = tuple(new_pos)
+        keypoint_handle.position = tuple(new_pos)
+
+    # =========================================================================
+    # Helper Functions
+    # =========================================================================
+
+    def update_metrics(results: dict) -> None:
+        """Update the metrics markdown display."""
+        iter_num = results.get("iter", 0)
+        j_tr = results.get("J_tr", 0.0)
+        j_vb = results.get("J_vb", 0.0)
+        j_vc = results.get("J_vc", 0.0)
+        cost = results.get("cost", 0.0)
+        dis_time = results.get("dis_time", 0.0)
+        solve_time = results.get("solve_time", 0.0)
+        status = results.get("prob_stat", "--")
+
+        metrics_text.content = f"""**Iteration:** {iter_num}
+**J_tr:** {j_tr:.2E}
+**J_vb:** {j_vb:.2E}
+**J_vc:** {j_vc:.2E}
+**Objective:** {cost:.2E}
+**Dis Time:** {dis_time:.1f}ms
+**Solve Time:** {solve_time:.1f}ms
+**Status:** {status}"""
+
+    def update_trajectory_and_drone(V_multi_shoot: np.ndarray, x_traj: np.ndarray) -> None:
+        """Update trajectory visualization and drone pose."""
         try:
-            value = float(input_widget.text())
-            # Update the parameter
-            new_kp_pose = kp_pose.value.copy()
-            new_kp_pose[axis] = value
-            # Update both the Parameter object's value and problem.parameters
-            kp_pose.value = new_kp_pose
-            problem.parameters["kp_pose"] = new_kp_pose
-            # Update slider
-            slider, label = self.kp_sliders[axis]
-            slider_value = int(value * 10)  # Scale by 10 for slider
-            slider.setValue(slider_value)
-            label.setText(f"{value:.2f}")
-        except ValueError:
-            print(f"Invalid input for axis {axis}")
+            n_x = optimization_problem.settings.sim.n_states
+            n_u = optimization_problem.settings.sim.n_controls
+            i4 = n_x + n_x * n_x + 2 * n_x * n_u
 
-    def on_reset_clicked(self):
-        """Handle reset button click"""
-        reset_requested["reset"] = True
-        print("Reset requested - problem will reset on next iteration")
+            all_pos_segments = []
+            all_vel_segments = []
+            for i_node in range(V_multi_shoot.shape[1]):
+                node_data = V_multi_shoot[:, i_node]
+                segments_for_node = node_data.reshape(-1, i4)
+                pos_segments = segments_for_node[:, :3]  # First 3 are position
+                vel_segments = segments_for_node[:, 3:6]  # Next 3 are velocity
+                all_pos_segments.append(pos_segments)
+                all_vel_segments.append(vel_segments)
 
-    def keyPressEvent(self, event):
-        """Handle keyboard shortcuts"""
-        if event.key() == Qt.Key_Escape:
-            self.close()
-        else:
-            super().keyPressEvent(event)
+            if all_pos_segments:
+                full_traj = np.vstack(all_pos_segments).astype(np.float32)
+                full_vel = np.vstack(all_vel_segments).astype(np.float32)
 
-
-def on_lam_cost_changed(input_widget):
-    """Handle lambda cost input changes"""
-    new_value = input_widget.text()
-    try:
-        lam_cost_value = float(new_value)
-        problem.settings.scp.lam_cost = lam_cost_value
-        input_widget.setText(f"{lam_cost_value:.2E}")
-    except ValueError:
-        print("Invalid input. Please enter a valid number.")
-
-
-def on_lam_tr_changed(input_widget):
-    """Handle lambda trust region input changes"""
-    new_value = input_widget.text()
-    try:
-        lam_tr_value = float(new_value)
-        problem.settings.scp.w_tr = lam_tr_value
-        input_widget.setText(f"{lam_tr_value:.2E}")
-    except ValueError:
-        print("Invalid input. Please enter a valid number.")
-
-
-def update_optimization_metrics(results, labels_dict):
-    """Update the optimization metrics display"""
-    if results is None:
-        return
-    # Extract metrics from results
-    iter_num = results.get("iter", 0)
-    j_tr = results.get("J_tr", 0.0)
-    j_vb = results.get("J_vb", 0.0)
-    j_vc = results.get("J_vc", 0.0)
-    cost = results.get("cost", 0.0)
-    status = results.get("prob_stat", "--")
-    # Get timing information
-    dis_time = results.get("dis_time", 0.0)
-    solve_time = results.get("solve_time", 0.0)
-    # Update labels
-    labels_dict["iter_label"].setText(f"Iteration: {iter_num}")
-    labels_dict["j_tr_label"].setText(f"J_tr: {j_tr:.2E}")
-    labels_dict["j_vb_label"].setText(f"J_vb: {j_vb:.2E}")
-    labels_dict["j_vc_label"].setText(f"J_vc: {j_vc:.2E}")
-    labels_dict["objective_label"].setText(f"Objective: {cost:.2E}")
-    labels_dict["lam_cost_display_label"].setText(f"λ_cost: {problem.settings.scp.lam_cost:.2E}")
-    labels_dict["dis_time_label"].setText(f"Dis Time: {dis_time:.1f}ms")
-    labels_dict["solve_time_label"].setText(f"Solve Time: {solve_time:.1f}ms")
-    labels_dict["status_label"].setText(f"Status: {status}")
-
-
-def update_viewcone(plot_widget, drone_pos, att, plotting_dict, pos_range=None):
-    """Create or update the view cone mesh visualization"""
-    if not HAS_OPENGL:
-        return
-
-    # Get view cone parameters from plotting_dict
-    alpha_x = plotting_dict.get("alpha_x", 6.0)
-    alpha_y = plotting_dict.get("alpha_y", 8.0)
-    R_sb = plotting_dict.get("R_sb", np.eye(3))
-    norm_type = plotting_dict.get("norm_type", "inf")
-
-    # Create cone mesh data if it doesn't exist
-    if not hasattr(plot_widget, "cone_meshdata") or plot_widget.cone_meshdata is None:
-        n_cone = 40
-        theta = np.linspace(0, 2 * np.pi, n_cone)
-        A = np.diag([1 / np.tan(np.pi / alpha_x), 1 / np.tan(np.pi / alpha_y)])
-
-        # Calculate cone length based on trajectory range (similar to plot_animation_pyqtgraph)
-        if pos_range is not None:
-            cone_length = max(pos_range) * 0.3  # 30% of trajectory range
-            cone_length = max(cone_length, 10.0)  # Minimum 10 units
-            cone_length = min(cone_length, 50.0)  # Maximum 50 units
-        else:
-            cone_length = 15.0  # Default length
-
-        # Create circle in sensor frame
-        circle = np.stack([np.cos(theta), np.sin(theta)])
-
-        # Calculate z values based on norm type
-        if norm_type == "inf" or norm_type == np.inf:
-            z = np.linalg.norm(A @ circle, axis=0, ord=np.inf)
-        else:
-            z = np.linalg.norm(A @ circle, axis=0, ord=norm_type)
-
-        # Create cone base points
-        X = circle[0] / z
-        Y = circle[1] / z
-        Z = np.ones_like(X)
-        base_points = np.stack([X, Y, Z], axis=1) * cone_length
-
-        # Create cone mesh (apex at origin, base at cone_length)
-        apex = np.array([[0, 0, 0]])
-        vertices = np.vstack([apex, base_points])
-
-        # Create faces
-        faces = []
-        for i in range(1, n_cone):
-            faces.append([0, i, i + 1])
-        faces.append([0, n_cone, 1])
-        faces = np.array(faces)
-
-        # Store the mesh data for reuse
-        plot_widget.cone_meshdata = MeshData(vertexes=vertices, faces=faces)
-
-    # Transform cone from sensor frame to body frame to inertial frame
-    # Use scipy Rotation for quaternion conversion (matching plot_animation_pyqtgraph)
-    # Quaternion format: [qw, qx, qy, qz] -> scipy expects [qx, qy, qz, qw]
-    r = R.from_quat([att[1], att[2], att[3], att[0]])
-    rotmat = r.as_matrix()
-
-    # Get original vertices and transform them
-    verts = plot_widget.cone_meshdata.vertexes()
-    verts_tf = (rotmat @ R_sb.T @ verts.T).T + drone_pos
-
-    # Create or update mesh
-    if plot_widget.viewcone_mesh is None:
-        plot_widget.viewcone_mesh = GLMeshItem(
-            meshdata=MeshData(vertexes=verts_tf, faces=plot_widget.cone_meshdata.faces()),
-            smooth=True,
-            color=(1, 1, 0, 0.5),  # Yellow, semi-transparent (matching plot_animation_pyqtgraph)
-            shader="shaded",
-            drawEdges=False,
-            glOptions="additive",  # Use additive blending like plot_animation_pyqtgraph
-        )
-        plot_widget.view.addItem(plot_widget.viewcone_mesh)
-    else:
-        # Update existing mesh
-        plot_widget.viewcone_mesh.setMeshData(
-            vertexes=verts_tf, faces=plot_widget.cone_meshdata.faces()
-        )
-        # Remove and re-add cone to ensure it is drawn last (matching plot_animation_pyqtgraph)
-        if plot_widget.viewcone_mesh in plot_widget.view.items:
-            plot_widget.view.removeItem(plot_widget.viewcone_mesh)
-        plot_widget.view.addItem(plot_widget.viewcone_mesh)
-
-
-def optimization_loop():
-    problem.initialize()
-    try:
-        while not running["stop"]:
-            # Check if reset was requested
-            if reset_requested["reset"]:
-                problem.reset()
-                reset_requested["reset"] = False
-                print("Problem reset to initial conditions")
-
-            # Perform a single SCP step (automatically warm-starts from previous iteration)
-            step_result = problem.step()
-
-            # Build results dict for visualization
-            results = {
-                "iter": step_result["scp_k"] - 1,  # Display iteration (0-indexed)
-                "J_tr": step_result["scp_J_tr"],
-                "J_vb": step_result["scp_J_vb"],
-                "J_vc": step_result["scp_J_vc"],
-                "converged": step_result["converged"],
-                "V_multi_shoot": problem.state.V_history[-1] if problem.state.V_history else [],
-                "x": problem.state.x,  # Current state trajectory
-                "u": problem.state.u,  # Current control trajectory
-            }
-
-            # Get timing from the print queue (emitted data)
-            try:
-                if hasattr(problem, "print_queue") and not problem.print_queue.empty():
-                    # Get the latest emitted data
-                    emitted_data = problem.print_queue.get_nowait()
-                    results["dis_time"] = emitted_data.get("dis_time", 0.0)
-                    results["solve_time"] = emitted_data.get("subprop_time", 0.0)
-                    results["prob_stat"] = emitted_data.get("prob_stat", "--")
-                    results["cost"] = emitted_data.get("cost", 0.0)
+                # Compute velocity-based colors using viridis colormap
+                vel_norms = np.linalg.norm(full_vel, axis=1)
+                vel_range = vel_norms.max() - vel_norms.min()
+                if vel_range < 1e-8:
+                    vel_normalized = np.zeros_like(vel_norms)
                 else:
+                    vel_normalized = (vel_norms - vel_norms.min()) / vel_range
+
+                colors = np.array(
+                    [[int(c * 255) for c in _viridis_cmap(v)[:3]] for v in vel_normalized],
+                    dtype=np.uint8,
+                )
+
+                trajectory_handle.points = full_traj
+                trajectory_handle.colors = colors
+
+                # Update line-of-sight (from last position to keypoint)
+                if len(full_traj) > 0:
+                    current_kp = optimization_problem.parameters["kp_pose"]
+                    last_pos = full_traj[-1]
+                    los_points = np.array([[last_pos, current_kp]], dtype=np.float32)
+                    los_handle.points = los_points
+
+            # Update drone axes and viewcone using x_traj (state trajectory)
+            if x_traj is not None and len(x_traj) > 0 and x_traj.shape[1] >= 10:
+                # Get last position and attitude
+                last_pos = x_traj[-1, :3]
+                att = x_traj[-1, 6:10]  # Quaternion [qw, qx, qy, qz]
+
+                # Convert quaternion to rotation matrix
+                rotmat = _quaternion_to_rotation_matrix(att)
+
+                # Draw body frame axes (x=red, y=green, z=blue)
+                axes_length = 2.0
+                axes = axes_length * np.eye(3)
+                axes_rot = rotmat @ axes
+
+                for k in range(3):
+                    axis_pts = np.array([[last_pos, last_pos + axes_rot[:, k]]], dtype=np.float32)
+                    axis_handles[k].points = axis_pts
+
+                # Update viewcone mesh
+                if (
+                    viewcone_handle["mesh"] is not None
+                    and viewcone_handle["base_vertices"] is not None
+                ):
+                    # Sensor-to-body rotation
+                    R_sensor_to_body = R_sb.T
+
+                    # Full transform: sensor -> body -> world
+                    R_sensor_to_world = rotmat @ R_sensor_to_body
+
+                    # Transform vertices and translate to position
+                    base_verts = viewcone_handle["base_vertices"]
+                    world_vertices = (R_sensor_to_world @ base_verts.T).T + last_pos
+                    viewcone_handle["mesh"].vertices = world_vertices.astype(np.float32)
+
+        except Exception as e:
+            print(f"Trajectory update error: {e}")
+
+    # =========================================================================
+    # Optimization Worker
+    # =========================================================================
+
+    def optimization_loop() -> None:
+        """Background thread running continuous optimization."""
+        iteration = 0
+
+        while state["running"]:
+            try:
+                # Check for reset request
+                if state["reset_requested"]:
+                    optimization_problem.reset()
+                    state["reset_requested"] = False
+                    iteration = 0
+                    print("Problem reset to initial conditions")
+
+                # Run one SCP step
+                start_time = time.time()
+                step_result = optimization_problem.step()
+                solve_time = (time.time() - start_time) * 1000  # ms
+
+                # Build results dict
+                results = {
+                    "iter": step_result["scp_k"] - 1,
+                    "J_tr": step_result["scp_J_tr"],
+                    "J_vb": step_result["scp_J_vb"],
+                    "J_vc": step_result["scp_J_vc"],
+                    "converged": step_result["converged"],
+                    "solve_time": solve_time,
+                }
+
+                # Get timing from print queue if available
+                try:
+                    if (
+                        hasattr(optimization_problem, "print_queue")
+                        and not optimization_problem.print_queue.empty()
+                    ):
+                        emitted_data = optimization_problem.print_queue.get_nowait()
+                        results["dis_time"] = emitted_data.get("dis_time", 0.0)
+                        results["prob_stat"] = emitted_data.get("prob_stat", "--")
+                        results["cost"] = emitted_data.get("cost", 0.0)
+                    else:
+                        results["dis_time"] = 0.0
+                        results["prob_stat"] = "--"
+                        results["cost"] = 0.0
+                except Exception:
                     results["dis_time"] = 0.0
-                    results["solve_time"] = 0.0
                     results["prob_stat"] = "--"
                     results["cost"] = 0.0
-            except Exception:
-                results["dis_time"] = 0.0
-                results["solve_time"] = 0.0
-                results["prob_stat"] = "--"
-                results["cost"] = 0.0
 
-            results.update(plotting_dict)
-            latest_results["results"] = results
-            new_result_event.set()
-    except KeyboardInterrupt:
-        running["stop"] = True
-        print("Stopped by user.")
+                # Update visualizations (viser is thread-safe)
+                update_metrics(results)
 
+                # Update trajectory from V_history
+                if optimization_problem.state.V_history:
+                    V_multi_shoot = np.array(optimization_problem.state.V_history[-1])
+                    x_traj = np.array(optimization_problem.state.x)
+                    update_trajectory_and_drone(V_multi_shoot, x_traj)
 
-def plot_thread_func():
-    # Initialize PyQtGraph
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    print(f"Creating plot window... OpenGL available: {HAS_OPENGL}")
-    # Create 3D plot window
-    plot_widget = CinemaVPPlotWidget()
-    plot_widget.setWindowTitle("Cinema View Planning Real-time Trajectory")
-    plot_widget.resize(1200, 800)
-    plot_widget.show()
-    print("Plot window created and shown")
-    # Force the window to be visible
-    plot_widget.raise_()
-    plot_widget.activateWindow()
-    # Small delay to ensure window appears
-    time.sleep(0.1)
-    # Update timer
-    timer = QTimer()
+                iteration += 1
+                time.sleep(0.05)  # Small delay to avoid overwhelming
 
-    def update_plot():
-        if latest_results["results"] is not None:
-            try:
-                V_multi_shoot = np.array(latest_results["results"]["V_multi_shoot"])
-                # Extract 3D position data (first 3 elements of state)
-                n_x = problem.settings.sim.n_states
-                n_u = problem.settings.sim.n_controls
-                i1 = n_x
-                i2 = i1 + n_x * n_x
-                i3 = i2 + n_x * n_u
-                i4 = i3 + n_x * n_u
-                all_pos_segments = []
-                for i_node in range(V_multi_shoot.shape[1]):
-                    node_data = V_multi_shoot[:, i_node]
-                    segments_for_node = node_data.reshape(-1, i4)
-                    pos_segments = segments_for_node[:, :3]  # 3D positions
-                    all_pos_segments.append(pos_segments)
-                if all_pos_segments:
-                    full_traj = np.vstack(all_pos_segments)
-                    if HAS_OPENGL:
-                        plot_widget.traj_scatter.setData(pos=full_traj)
-                        # Update keypoint position
-                        current_kp = problem.parameters["kp_pose"]
-                        plot_widget.kp_scatter.setData(pos=current_kp.reshape(1, 3))
-                        # Update line-of-sight line (from last position to keypoint)
-                        if len(full_traj) > 0:
-                            los_points = np.vstack([full_traj[-1], current_kp])
-                            plot_widget.los_line.setData(pos=los_points)
-                            # Extract attitude from last node and draw axes
-                            # State order: position[0:3], velocity[3:6], attitude[6:10], ...
-                            if "x" in latest_results["results"]:
-                                x_traj = latest_results["results"]["x"]  # Now a numpy array
-                                if len(x_traj) > 0 and x_traj.shape[1] >= 10:
-                                    # Get attitude quaternion [qw, qx, qy, qz] at last node
-                                    att = x_traj[-1, 6:10]
-                                    # Convert quaternion to rotation matrix using scipy
-                                    # (matching plot_animation_pyqtgraph)
-                                    r = R.from_quat([att[1], att[2], att[3], att[0]])
-                                    rotmat = r.as_matrix()
-                                    # Draw axes (x=red, y=green, z=blue)
-                                    axes_length = 2.0
-                                    axes = axes_length * np.eye(3)
-                                    axes_rot = rotmat @ axes
-                                    current_pos = full_traj[-1]
-                                    for k in range(3):
-                                        axis_pts = np.vstack(
-                                            [current_pos, current_pos + axes_rot[:, k]]
-                                        )
-                                        plot_widget.axis_lines[k].setData(pos=axis_pts)
-                                    # Update view cone
-                                    # Calculate position range for cone length
-                                    if len(full_traj) > 1:
-                                        pos_range = np.max(full_traj, axis=0) - np.min(
-                                            full_traj, axis=0
-                                        )
-                                    else:
-                                        pos_range = None
-                                    update_viewcone(
-                                        plot_widget,
-                                        current_pos,
-                                        att,
-                                        plotting_dict,
-                                        pos_range=pos_range,
-                                    )
-                    else:
-                        # 2D fallback
-                        pass
-                # Update optimization metrics display
-                update_optimization_metrics(latest_results["results"], plot_widget.labels_dict)
             except Exception as e:
-                print(f"Plot update error: {e}")
-                if "x" in latest_results["results"]:
-                    x_traj = latest_results["results"]["x"]  # Now a numpy array
-                    if HAS_OPENGL:
-                        plot_widget.traj_scatter.setData(pos=x_traj[:, :3])
-                        # Update keypoint position
-                        current_kp = problem.parameters["kp_pose"]
-                        plot_widget.kp_scatter.setData(pos=current_kp.reshape(1, 3))
-                        # Update line-of-sight line
-                        if len(x_traj) > 0:
-                            los_points = np.vstack([x_traj[-1, :3], current_kp])
-                            plot_widget.los_line.setData(pos=los_points)
-                            # Draw axes at last position
-                            if x_traj.shape[1] >= 10:
-                                att = x_traj[-1, 6:10]
-                                # Convert quaternion to rotation matrix using scipy
-                                # (matching plot_animation_pyqtgraph)
-                                r = R.from_quat([att[1], att[2], att[3], att[0]])
-                                rotmat = r.as_matrix()
-                                axes_length = 2.0
-                                axes = axes_length * np.eye(3)
-                                axes_rot = rotmat @ axes
-                                current_pos = x_traj[-1, :3]
-                                for k in range(3):
-                                    axis_pts = np.vstack(
-                                        [current_pos, current_pos + axes_rot[:, k]]
-                                    )
-                                    plot_widget.axis_lines[k].setData(pos=axis_pts)
-                                # Update view cone
-                                # Calculate position range for cone length
-                                if len(x_traj) > 1:
-                                    pos_range = np.max(x_traj[:, :3], axis=0) - np.min(
-                                        x_traj[:, :3], axis=0
-                                    )
-                                else:
-                                    pos_range = None
-                                update_viewcone(
-                                    plot_widget,
-                                    current_pos,
-                                    att,
-                                    plotting_dict,
-                                    pos_range=pos_range,
-                                )
+                print(f"Optimization error: {e}")
+                time.sleep(1.0)
 
-    timer.timeout.connect(update_plot)
-    timer.start(50)  # Update every 50ms
-    print("Starting Qt event loop...")
-    # Start the Qt event loop
-    app.exec_()
+    # Start optimization in background thread
+    opt_thread = threading.Thread(target=optimization_loop, daemon=True)
+    opt_thread.start()
+
+    return server
 
 
 if __name__ == "__main__":
-    # Start optimization thread
-    opt_thread = threading.Thread(target=optimization_loop)
-    opt_thread.daemon = True
-    opt_thread.start()
-    # Start plotting in main thread (this will block and run the Qt event loop)
-    plot_thread_func()
+    print("Creating viser server for Cinema Viewpoint Planning Real-time Optimization...")
+    server = create_realtime_server(problem, kp_pose, plotting_dict)
+    print(f"Server running at: {server.request_share_url()}")
+    print("Open the URL above in your browser to view the visualization")
+    print("Press Ctrl+C to stop")
+
+    try:
+        while True:
+            time.sleep(1.0)
+    except KeyboardInterrupt:
+        print("\nStopping server...")
