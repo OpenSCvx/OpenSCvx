@@ -84,7 +84,7 @@ def create_realtime_server(
         handle = server.scene.add_line_segments(
             f"/gates/gate_{i}",
             points=np.zeros((4, 2, 3), dtype=np.float32),
-            colors=(0, 255, 0),
+            colors=(255, 165, 0),  # Orange, matching non-realtime plots
             line_width=3.0,
         )
         gate_handles.append(handle)
@@ -96,7 +96,7 @@ def create_realtime_server(
         click_target = server.scene.add_icosphere(
             f"/gates/click_target_{i}",
             radius=0.5,
-            color=(100, 255, 100),
+            color=(255, 165, 0),  # Orange, matching gate color
             position=tuple(initial_pos),
         )
         gate_click_targets.append(click_target)
@@ -122,8 +122,8 @@ def create_realtime_server(
         # Hide previously selected
         if selected_gate["index"] is not None:
             gate_drag_handles[selected_gate["index"]].visible = False
-            gate_handles[selected_gate["index"]].colors = (0, 255, 0)  # Green
-            gate_click_targets[selected_gate["index"]].color = (100, 255, 100)
+            gate_handles[selected_gate["index"]].colors = (255, 165, 0)  # Orange
+            gate_click_targets[selected_gate["index"]].color = (255, 165, 0)
 
         # Show newly selected
         if gate_idx is not None:
