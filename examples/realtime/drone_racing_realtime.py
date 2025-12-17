@@ -1,7 +1,9 @@
-"""Interactive real-time visualization for drone racing.
+"""Interactive real-time visualization for drone racing using Viser.
 
-This module provides a PyQt5-based GUI for interactively solving and visualizing
+This module provides a web-based GUI for interactively solving and visualizing
 the drone racing trajectory optimization problem in real-time.
+
+Run this script and open the displayed URL in your browser.
 """
 
 import os
@@ -10,102 +12,367 @@ import threading
 import time
 
 import numpy as np
-import pyqtgraph.opengl as gl
-from PyQt5.QtCore import QObject, Qt, QTimer, pyqtSignal
-from PyQt5.QtWidgets import (
-    QApplication,
-    QCheckBox,
-    QGridLayout,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QMainWindow,
-    QPushButton,
-    QScrollArea,
-    QVBoxLayout,
-    QWidget,
-)
-from pyqtgraph import Vector
-from pyqtgraph.opengl import GLViewWidget
+import viser
 
+# Add grandparent directory to path to import examples
 current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 from examples.drone.drone_racing import (
     gate_center_params,
-    gen_vertices,
     initial_gate_centers,
     problem,
 )
+from openscvx.utils import gen_vertices
 
-# Add the OpenSCvx path
-# Import the drone racing problem and parameters
+# Initialize the problem
 problem.initialize()
 
 
-class OptimizationWorker(QObject):
-    finished = pyqtSignal()
-    results_ready = pyqtSignal(dict)
-    metrics_updated = pyqtSignal(dict)
+def create_realtime_server(
+    optimization_problem,
+    gate_params: list,
+    initial_centers: list,
+    n_gates: int = 10,
+) -> viser.ViserServer:
+    """Create a viser server for real-time trajectory optimization visualization.
 
-    def __init__(self):
-        super().__init__()
-        self.running = False
-        self.reset_requested = False
-        self.problem = problem
-        self.gate_center_params = gate_center_params
+    Args:
+        optimization_problem: The OpenSCvx Problem instance
+        gate_params: List of gate center parameter objects
+        initial_centers: List of initial gate center positions
+        n_gates: Number of gates
 
-    def update_gate_position(self, gate_idx, x, y, z):
-        if 0 <= gate_idx < len(self.gate_center_params):
-            # User input now represents the actual center position (no offset needed)
-            new_center = np.array([x, y, z])
-            # Update gate center parameter value
-            self.gate_center_params[gate_idx].value = new_center
-            # Sync the parameter to the problem's parameter dictionary
-            param_name = self.gate_center_params[gate_idx].name
-            self.problem.parameters[param_name] = new_center
+    Returns:
+        ViserServer instance
+    """
+    server = viser.ViserServer()
+    server.gui.configure_theme(dark_mode=True)
 
-    def run_optimization(self):
-        self.running = True
+    # =========================================================================
+    # Scene Setup
+    # =========================================================================
+
+    # Grid
+    server.scene.add_grid(
+        "/grid",
+        width=200,
+        height=100,
+        position=(100.0, -50.0, 0.0),
+    )
+
+    # Origin frame
+    server.scene.add_frame(
+        "/origin",
+        wxyz=(1.0, 0.0, 0.0, 0.0),
+        position=(0.0, 0.0, 0.0),
+        axes_length=5.0,
+    )
+
+    # Trajectory point cloud (initially empty)
+    trajectory_handle = server.scene.add_point_cloud(
+        "/trajectory",
+        points=np.zeros((1, 3), dtype=np.float32),
+        colors=(255, 255, 0),
+        point_size=0.3,
+    )
+
+    # Gate line segments (visual only)
+    gate_handles = []
+    for i in range(n_gates):
+        handle = server.scene.add_line_segments(
+            f"/gates/gate_{i}",
+            points=np.zeros((4, 2, 3), dtype=np.float32),
+            colors=(0, 255, 0),
+            line_width=3.0,
+        )
+        gate_handles.append(handle)
+
+    # Clickable spheres at gate centers (for selection)
+    gate_click_targets = []
+    for i in range(n_gates):
+        initial_pos = gate_params[i].value
+        click_target = server.scene.add_icosphere(
+            f"/gates/click_target_{i}",
+            radius=0.5,
+            color=(100, 255, 100),
+            position=tuple(initial_pos),
+        )
+        gate_click_targets.append(click_target)
+
+    # Gate transform controls (draggable gizmos)
+    gate_drag_handles = []
+    for i in range(n_gates):
+        initial_pos = gate_params[i].value
+        drag_handle = server.scene.add_transform_controls(
+            f"/gates/drag_{i}",
+            position=tuple(initial_pos),
+            scale=3.0,
+            disable_rotations=True,  # Gates only need translation
+            visible=False,  # Hidden by default
+        )
+        gate_drag_handles.append(drag_handle)
+
+    # Track currently selected gate
+    selected_gate = {"index": None}
+
+    def select_gate(gate_idx: int | None) -> None:
+        """Select a gate and show its transform control, hiding others."""
+        # Hide previously selected
+        if selected_gate["index"] is not None:
+            gate_drag_handles[selected_gate["index"]].visible = False
+            gate_handles[selected_gate["index"]].colors = (0, 255, 0)  # Green
+            gate_click_targets[selected_gate["index"]].color = (100, 255, 100)
+
+        # Show newly selected
+        if gate_idx is not None:
+            gate_drag_handles[gate_idx].visible = True
+            gate_handles[gate_idx].colors = (255, 200, 0)  # Yellow/orange highlight
+            gate_click_targets[gate_idx].color = (255, 200, 0)  # Highlight click target
+            selected_gate["index"] = gate_idx
+        else:
+            selected_gate["index"] = None
+
+    # Add click handlers to clickable spheres
+    def make_gate_click_handler(gate_idx: int):
+        @gate_click_targets[gate_idx].on_click
+        def _(_) -> None:
+            # Toggle: click selected gate again to deselect
+            if selected_gate["index"] == gate_idx:
+                select_gate(None)
+            else:
+                select_gate(gate_idx)
+
+        return _
+
+    for i in range(n_gates):
+        make_gate_click_handler(i)
+
+    # =========================================================================
+    # Shared State
+    # =========================================================================
+
+    state = {
+        "running": True,
+        "reset_requested": False,
+    }
+
+    # =========================================================================
+    # GUI Controls
+    # =========================================================================
+
+    # --- Optimization Metrics ---
+    with server.gui.add_folder("Optimization Metrics"):
+        metrics_text = server.gui.add_markdown(
+            """**Iteration:** 0
+**J_tr:** 0.00E+00
+**J_vb:** 0.00E+00
+**J_vc:** 0.00E+00
+**Objective:** 0.00E+00
+**Dis Time:** 0.0ms
+**Solve Time:** 0.0ms
+**Status:** --"""
+        )
+
+    # --- Optimization Weights ---
+    with server.gui.add_folder("Optimization Weights"):
+        lam_cost_input = server.gui.add_number(
+            "λ_cost",
+            initial_value=optimization_problem.settings.scp.lam_cost,
+            min=1e-6,
+            max=1e6,
+            step=0.1,
+        )
+        lam_tr_input = server.gui.add_number(
+            "λ_tr (w_tr)",
+            initial_value=optimization_problem.settings.scp.w_tr,
+            min=1e-6,
+            max=1e6,
+            step=0.1,
+        )
+
+        @lam_cost_input.on_update
+        def _(_) -> None:
+            optimization_problem.settings.scp.lam_cost = lam_cost_input.value
+
+        @lam_tr_input.on_update
+        def _(_) -> None:
+            optimization_problem.settings.scp.w_tr = lam_tr_input.value
+
+    # --- Problem Control ---
+    with server.gui.add_folder("Problem Control"):
+        reset_button = server.gui.add_button("Reset Problem")
+
+        @reset_button.on_click
+        def _(_) -> None:
+            state["reset_requested"] = True
+            print("Problem reset requested")
+
+    # --- Gate Controls ---
+    gate_vector_inputs = []
+    with server.gui.add_folder("Gate Positions", expand_by_default=False):
+        server.gui.add_markdown("*Click a gate in 3D view to select and drag it*")
+
+        reset_gates_button = server.gui.add_button("Reset All Gates")
+
+        @reset_gates_button.on_click
+        def _(_) -> None:
+            # Deselect any selected gate
+            select_gate(None)
+            for i, vec_input in enumerate(gate_vector_inputs):
+                original = initial_centers[i]
+                vec_input.value = tuple(original)
+                gate_params[i].value = np.array(original)
+                optimization_problem.parameters[gate_params[i].name] = np.array(original)
+                # Also update drag handle and click target positions
+                gate_drag_handles[i].position = tuple(original)
+                gate_click_targets[i].position = tuple(original)
+            print("Gates reset to initial positions")
+
+        for i in range(n_gates):
+            initial_pos = gate_params[i].value
+            vec_input = server.gui.add_vector3(
+                f"Gate {i + 1}",
+                initial_value=tuple(initial_pos),
+                step=1.0,
+            )
+            gate_vector_inputs.append(vec_input)
+
+            # Callback for GUI vector3 input -> update params and scene objects
+            def make_gate_gui_callback(gate_idx: int, input_handle):
+                @input_handle.on_update
+                def _(_) -> None:
+                    new_center = np.array(input_handle.value)
+                    gate_params[gate_idx].value = new_center
+                    optimization_problem.parameters[gate_params[gate_idx].name] = new_center
+                    # Sync drag handle and click target positions
+                    gate_drag_handles[gate_idx].position = tuple(new_center)
+                    gate_click_targets[gate_idx].position = tuple(new_center)
+
+                return _
+
+            make_gate_gui_callback(i, vec_input)
+
+    # Wire up drag handle callbacks (must be done after gate_vector_inputs is populated)
+    def make_drag_callback(gate_idx: int, drag_handle):
+        @drag_handle.on_update
+        def _(_) -> None:
+            new_center = np.array(drag_handle.position)
+            gate_params[gate_idx].value = new_center
+            optimization_problem.parameters[gate_params[gate_idx].name] = new_center
+            # Sync GUI vector3 input and click target
+            gate_vector_inputs[gate_idx].value = tuple(new_center)
+            gate_click_targets[gate_idx].position = tuple(new_center)
+
+        return _
+
+    for i in range(n_gates):
+        make_drag_callback(i, gate_drag_handles[i])
+
+    # =========================================================================
+    # Helper Functions
+    # =========================================================================
+
+    def update_metrics(results: dict) -> None:
+        """Update the metrics markdown display."""
+        iter_num = results.get("iter", 0)
+        j_tr = results.get("J_tr", 0.0)
+        j_vb = results.get("J_vb", 0.0)
+        j_vc = results.get("J_vc", 0.0)
+        cost = results.get("cost", 0.0)
+        dis_time = results.get("dis_time", 0.0)
+        solve_time = results.get("solve_time", 0.0)
+        status = results.get("prob_stat", "--")
+
+        metrics_text.content = f"""**Iteration:** {iter_num}
+**J_tr:** {j_tr:.2E}
+**J_vb:** {j_vb:.2E}
+**J_vc:** {j_vc:.2E}
+**Objective:** {cost:.2E}
+**Dis Time:** {dis_time:.1f}ms
+**Solve Time:** {solve_time:.1f}ms
+**Status:** {status}"""
+
+    def update_trajectory(V_multi_shoot: np.ndarray) -> None:
+        """Update the trajectory point cloud from multi-shoot data."""
+        try:
+            n_x = optimization_problem.settings.sim.n_states
+            n_u = optimization_problem.settings.sim.n_controls
+            i4 = n_x + n_x * n_x + 2 * n_x * n_u
+
+            all_pos_segments = []
+            for i_node in range(V_multi_shoot.shape[1]):
+                node_data = V_multi_shoot[:, i_node]
+                segments_for_node = node_data.reshape(-1, i4)
+                pos_segments = segments_for_node[:, :3]  # First 3 are position
+                all_pos_segments.append(pos_segments)
+
+            if all_pos_segments:
+                full_traj = np.vstack(all_pos_segments).astype(np.float32)
+                trajectory_handle.points = full_traj
+
+        except Exception as e:
+            print(f"Trajectory update error: {e}")
+
+    def update_gates() -> None:
+        """Update gate visualizations based on current gate parameters."""
+        radii = np.array([2.5, 1e-4, 2.5])
+        for i, handle in enumerate(gate_handles):
+            center = gate_params[i].value
+            if center is not None:
+                vertices = gen_vertices(center, radii)
+                # Create line segments for closed polygon (4 edges)
+                edges = np.array(
+                    [
+                        [vertices[0], vertices[1]],
+                        [vertices[1], vertices[2]],
+                        [vertices[2], vertices[3]],
+                        [vertices[3], vertices[0]],
+                    ],
+                    dtype=np.float32,
+                )
+                handle.points = edges
+
+    # =========================================================================
+    # Optimization Worker
+    # =========================================================================
+
+    def optimization_loop() -> None:
+        """Background thread running continuous optimization."""
         iteration = 0
-        while self.running:
+
+        while state["running"]:
             try:
-                # Check if reset was requested
-                if self.reset_requested:
-                    self.problem.reset()
-                    self.reset_requested = False
+                # Check for reset request
+                if state["reset_requested"]:
+                    optimization_problem.reset()
+                    state["reset_requested"] = False
                     iteration = 0
                     print("Problem reset to initial conditions")
 
+                # Run one SCP step
                 start_time = time.time()
-                step_result = self.problem.step()
-                solve_time = time.time() - start_time
+                step_result = optimization_problem.step()
+                solve_time = (time.time() - start_time) * 1000  # ms
 
-                # Build results dict for visualization
+                # Build results dict
                 results = {
-                    "iter": step_result["scp_k"] - 1,  # Display iteration (0-indexed)
+                    "iter": step_result["scp_k"] - 1,
                     "J_tr": step_result["scp_J_tr"],
                     "J_vb": step_result["scp_J_vb"],
                     "J_vc": step_result["scp_J_vc"],
                     "converged": step_result["converged"],
-                    "solve_time": solve_time * 1000,  # Convert to milliseconds
-                    "V_multi_shoot": self.problem.state.V_history[-1]
-                    if self.problem.state.V_history
-                    else [],
-                    "x": self.problem.state.x,  # Current state trajectory
-                    "u": self.problem.state.u,  # Current control trajectory
+                    "solve_time": solve_time,
                 }
 
-                # Get timing from the print queue (emitted data) if available
+                # Get timing from print queue if available
                 try:
                     if (
-                        hasattr(self.problem, "print_queue")
-                        and not self.problem.print_queue.empty()
+                        hasattr(optimization_problem, "print_queue")
+                        and not optimization_problem.print_queue.empty()
                     ):
-                        # Get the latest emitted data
-                        emitted_data = self.problem.print_queue.get_nowait()
+                        emitted_data = optimization_problem.print_queue.get_nowait()
                         results["dis_time"] = emitted_data.get("dis_time", 0.0)
                         results["prob_stat"] = emitted_data.get("prob_stat", "--")
                         results["cost"] = emitted_data.get("cost", 0.0)
@@ -117,488 +384,39 @@ class OptimizationWorker(QObject):
                     results["dis_time"] = 0.0
                     results["prob_stat"] = "--"
                     results["cost"] = 0.0
-                # Update vertices for visualization
-                radii = np.array([2.5, 1e-4, 2.5])
-                vertices = []
-                for center_param in self.gate_center_params:
-                    center = center_param.value
-                    if center is not None:
-                        vertices.append(gen_vertices(center, radii))
-                    else:
-                        vertices.append([])
-                results.update(
-                    {
-                        "vertices": vertices,
-                        "gate_center_params": self.gate_center_params,
-                    }
-                )
-                self.results_ready.emit(results)
-                # Emit metrics for compatibility
-                metrics = {
-                    "iteration": iteration,
-                    "objective": results.get("cost", 0.0),
-                    "solve_time": solve_time,
-                    "status": results.get("prob_stat", "Unknown"),
-                }
-                self.metrics_updated.emit(metrics)
+
+                # Update visualizations (viser is thread-safe)
+                update_metrics(results)
+                update_gates()
+
+                # Update trajectory from V_history
+                if optimization_problem.state.V_history:
+                    V_multi_shoot = np.array(optimization_problem.state.V_history[-1])
+                    update_trajectory(V_multi_shoot)
+
                 iteration += 1
-                time.sleep(0.1)
+                time.sleep(0.05)  # Small delay to avoid overwhelming
+
             except Exception as e:
                 print(f"Optimization error: {e}")
                 time.sleep(1.0)
-        self.finished.emit()
 
+    # Start the optimization thread
+    opt_thread = threading.Thread(target=optimization_loop, daemon=True)
+    opt_thread.start()
 
-class DraggableGLViewWidget(GLViewWidget):
-    """Custom GLViewWidget that supports manual camera interaction"""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.manual_camera_interaction = False
-        self.camera_interaction_timer = None
-
-    def mousePressEvent(self, event):
-        # User is interacting with camera - disable auto-adjustment temporarily
-        self.manual_camera_interaction = True
-        if self.camera_interaction_timer:
-            self.camera_interaction_timer.stop()
-        self.camera_interaction_timer = QTimer()
-        self.camera_interaction_timer.timeout.connect(self.re_enable_auto_camera)
-        self.camera_interaction_timer.start(2000)  # Re-enable after 2 seconds
-        # Update status label
-        if hasattr(self.parent(), "camera_status_label"):
-            self.parent().camera_status_label.setText("Camera: Manual control (2s)")
-            self.parent().camera_status_label.setStyleSheet("font-size: 10px; color: #ff6600;")
-        super().mousePressEvent(event)
-
-    def re_enable_auto_camera(self):
-        """Re-enable auto camera adjustment after manual interaction"""
-        self.manual_camera_interaction = False
-        if self.camera_interaction_timer:
-            self.camera_interaction_timer.stop()
-        # Update status label
-        if hasattr(self.parent(), "camera_status_label"):
-            self.parent().camera_status_label.setText("Camera: Auto-adjust enabled")
-            self.parent().camera_status_label.setStyleSheet("font-size: 10px; color: #666;")
-
-    def mouseMoveEvent(self, event):
-        # Only handle camera interaction, no gate dragging
-        super().mouseMoveEvent(event)
-
-    def mouseReleaseEvent(self, event):
-        super().mouseReleaseEvent(event)
-
-    def wheelEvent(self, event):
-        # Disable auto-camera during zoom
-        self.manual_camera_interaction = True
-        if self.camera_interaction_timer:
-            self.camera_interaction_timer.stop()
-        self.camera_interaction_timer = QTimer()
-        self.camera_interaction_timer.timeout.connect(self.re_enable_auto_camera)
-        self.camera_interaction_timer.start(2000)
-        # Update status label
-        if hasattr(self.parent(), "camera_status_label"):
-            self.parent().camera_status_label.setText("Camera: Manual control (2s)")
-            self.parent().camera_status_label.setStyleSheet("font-size: 10px; color: #ff6600;")
-        super().wheelEvent(event)
-
-
-class DroneRacingGUI(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Drone Racing Real-time Optimization")
-        self.setGeometry(100, 100, 1400, 900)
-        # Setup the worker
-        self.worker = OptimizationWorker()
-        self.worker_thread = threading.Thread(target=self.worker.run_optimization)
-        self.worker.results_ready.connect(self.update_visualization)
-        self.worker.metrics_updated.connect(self.update_metrics)
-        # Setup GUI
-        self.setup_gui()
-        # Setup the problem and start optimization
-        # self.worker.setup_problem()
-        self.worker_thread.start()
-
-    def setup_gui(self):
-        """Set up the GUI layout"""
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        layout = QHBoxLayout(central_widget)
-        # Left panel for controls
-        left_panel = QWidget()
-        left_layout = QVBoxLayout()
-        # Title
-        title = QLabel("Drone Racing Control")
-        title.setStyleSheet("font-weight: bold; font-size: 14px;")
-        left_layout.addWidget(title)
-        # Optimization Metrics Display
-        metrics_group = QGroupBox("Optimization Metrics")
-        metrics_layout = QVBoxLayout()
-        metrics_group.setLayout(metrics_layout)
-        # Create labels for each metric
-        self.iter_label = QLabel("Iteration: 0")
-        self.j_tr_label = QLabel("J_tr: 0.00E+00")
-        self.j_vb_label = QLabel("J_vb: 0.00E+00")
-        self.j_vc_label = QLabel("J_vc: 0.00E+00")
-        self.objective_label = QLabel("Objective: 0.00E+00")
-        self.lam_cost_display_label = QLabel(
-            f"λ_cost: {self.worker.problem.settings.scp.lam_cost:.2E}"
-        )
-        self.dis_time_label = QLabel("Dis Time: 0.0ms")
-        self.solve_time_label = QLabel("Solve Time: 0.0ms")
-        self.status_label = QLabel("Status: --")
-        # Style the labels
-        for label in [
-            self.iter_label,
-            self.j_tr_label,
-            self.j_vb_label,
-            self.j_vc_label,
-            self.objective_label,
-            self.lam_cost_display_label,
-            self.dis_time_label,
-            self.solve_time_label,
-            self.status_label,
-        ]:
-            label.setStyleSheet("font-family: monospace; font-size: 11px; padding: 2px;")
-            metrics_layout.addWidget(label)
-        left_layout.addWidget(metrics_group)
-        # Optimization Weights
-        weights_group = QGroupBox("Optimization Weights")
-        weights_layout = QVBoxLayout()
-        weights_group.setLayout(weights_layout)
-        # Lambda cost input - Input on left, label on right
-        lam_cost_layout = QHBoxLayout()
-        self.lam_cost_input = QLineEdit()
-        self.lam_cost_input.setText(f"{self.worker.problem.settings.scp.lam_cost:.2E}")
-        self.lam_cost_input.setFixedWidth(80)
-        self.lam_cost_input.returnPressed.connect(
-            lambda: self.on_lam_cost_changed(self.lam_cost_input)
-        )
-        lam_cost_label = QLabel("λ_cost:")
-        lam_cost_label.setAlignment(Qt.AlignLeft)
-        lam_cost_layout.addWidget(self.lam_cost_input)
-        lam_cost_layout.addWidget(lam_cost_label)
-        lam_cost_layout.addStretch()  # Push everything to the left
-        weights_layout.addLayout(lam_cost_layout)
-        # Lambda trust region input - Input on left, label on right
-        lam_tr_layout = QHBoxLayout()
-        self.lam_tr_input = QLineEdit()
-        self.lam_tr_input.setText(f"{self.worker.problem.settings.scp.w_tr:.2E}")
-        self.lam_tr_input.setFixedWidth(80)
-        self.lam_tr_input.returnPressed.connect(lambda: self.on_lam_tr_changed(self.lam_tr_input))
-        lam_tr_label = QLabel("λ_tr:")
-        lam_tr_label.setAlignment(Qt.AlignLeft)
-        lam_tr_layout.addWidget(self.lam_tr_input)
-        lam_tr_layout.addWidget(lam_tr_label)
-        lam_tr_layout.addStretch()  # Push everything to the left
-        weights_layout.addLayout(lam_tr_layout)
-        left_layout.addWidget(weights_group)
-        # Camera Controls
-        camera_group = QGroupBox("Camera Controls")
-        camera_layout = QVBoxLayout()
-        camera_group.setLayout(camera_layout)
-        camera_reset_button = QPushButton("Reset Camera View")
-        camera_reset_button.clicked.connect(self.reset_camera_view)
-        camera_layout.addWidget(camera_reset_button)
-        # Add auto-camera checkbox
-        self.auto_camera_checkbox = QCheckBox("Auto-adjust camera to trajectory")
-        self.auto_camera_checkbox.setChecked(True)
-        camera_layout.addWidget(self.auto_camera_checkbox)
-        # Add status indicator for manual camera interaction
-        self.camera_status_label = QLabel("Camera: Auto-adjust enabled")
-        self.camera_status_label.setStyleSheet("font-size: 10px; color: #666;")
-        camera_layout.addWidget(self.camera_status_label)
-        left_layout.addWidget(camera_group)
-        # Problem Control
-        problem_control_group = QGroupBox("Problem Control")
-        problem_control_layout = QVBoxLayout()
-        problem_control_group.setLayout(problem_control_layout)
-        reset_problem_button = QPushButton("Reset Problem")
-        reset_problem_button.clicked.connect(self.reset_problem)
-        problem_control_layout.addWidget(reset_problem_button)
-        left_layout.addWidget(problem_control_group)
-        # Gate Controls
-        gate_group = QGroupBox("Gate Positions")
-        gate_layout = QVBoxLayout()
-        gate_group.setLayout(gate_layout)
-        # Reset button for gates
-        reset_gates_button = QPushButton("Reset Gate Positions")
-        reset_gates_button.clicked.connect(self.reset_gate_positions)
-        gate_layout.addWidget(reset_gates_button)
-        # Scrollable area for gate controls
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setMaximumHeight(300)
-        scroll_content = QWidget()
-        scroll_layout = QVBoxLayout()
-        self.gate_controls = []
-        for i in range(10):  # 10 gates
-            gate_control_group = QWidget()
-            gate_control_layout = QGridLayout(gate_control_group)
-            gate_label = QLabel(f"Gate {i + 1}")
-            gate_control_layout.addWidget(gate_label, 0, 0, 1, 3)
-            # X, Y, Z text inputs
-            x_input = QLineEdit()
-            x_input.setFixedWidth(60)
-            # Show actual center position (with offset) to user
-            actual_center = self.worker.gate_center_params[i].value
-            x_input.setText(str(actual_center[0]))
-            x_input.editingFinished.connect(
-                lambda gate_idx=i, field=x_input: self.update_gate_x_text(gate_idx, field)
-            )
-            y_input = QLineEdit()
-            y_input.setFixedWidth(60)
-            y_input.setText(str(actual_center[1]))
-            y_input.editingFinished.connect(
-                lambda gate_idx=i, field=y_input: self.update_gate_y_text(gate_idx, field)
-            )
-            z_input = QLineEdit()
-            z_input.setFixedWidth(60)
-            z_input.setText(str(actual_center[2]))
-            z_input.editingFinished.connect(
-                lambda gate_idx=i, field=z_input: self.update_gate_z_text(gate_idx, field)
-            )
-            gate_control_layout.addWidget(QLabel("X:"), 1, 0)
-            gate_control_layout.addWidget(x_input, 1, 1)
-            gate_control_layout.addWidget(QLabel("Y:"), 2, 0)
-            gate_control_layout.addWidget(y_input, 2, 1)
-            gate_control_layout.addWidget(QLabel("Z:"), 3, 0)
-            gate_control_layout.addWidget(z_input, 3, 1)
-            self.gate_controls.append((x_input, y_input, z_input))
-            scroll_layout.addWidget(gate_control_group)
-        scroll_layout.addStretch()
-        scroll_content.setLayout(scroll_layout)
-        scroll_area.setWidget(scroll_content)
-        gate_layout.addWidget(scroll_area)
-        left_layout.addWidget(gate_group)
-        left_layout.addStretch()
-        left_panel.setLayout(left_layout)
-        layout.addWidget(left_panel, 1)
-        # 3D visualization
-        self.gl_widget = DraggableGLViewWidget()
-        self.gl_widget.setCameraPosition(distance=150, elevation=30, azimuth=45)
-        # Set the camera center separately
-        self.gl_widget.opts["center"] = Vector(100, -50, 20)
-        # Add grid
-        grid = gl.GLGridItem()
-        grid.setSize(200, 100)  # Match the fixed bounds: x (0,200), y (-100,0)
-        grid.setSpacing(20, 20)
-        self.gl_widget.addItem(grid)
-        self.grid_item = grid  # Store reference for updates
-        # Initialize visualization objects
-        self.trajectory_plot = gl.GLScatterPlotItem(color=(1, 1, 0, 1), size=5)
-        self.gl_widget.addItem(self.trajectory_plot)
-        self.gate_plots = []
-        for i in range(10):
-            gate_plot = gl.GLLinePlotItem(color=(0, 1, 0, 1), width=3)
-            self.gl_widget.addItem(gate_plot)
-            self.gate_plots.append(gate_plot)
-        layout.addWidget(self.gl_widget, 3)
-
-    def update_gate_x_text(self, gate_idx, field):
-        try:
-            value = float(field.text())
-            current_pos = self.worker.gate_center_params[gate_idx].value
-            self.worker.update_gate_position(gate_idx, value, current_pos[1], current_pos[2])
-        except Exception as e:
-            print(f"Invalid X input for gate {gate_idx}: {e}")
-
-    def update_gate_y_text(self, gate_idx, field):
-        try:
-            value = float(field.text())
-            current_pos = self.worker.gate_center_params[gate_idx].value
-            self.worker.update_gate_position(gate_idx, current_pos[0], value, current_pos[2])
-        except Exception as e:
-            print(f"Invalid Y input for gate {gate_idx}: {e}")
-
-    def update_gate_z_text(self, gate_idx, field):
-        try:
-            value = float(field.text())
-            current_pos = self.worker.gate_center_params[gate_idx].value
-            self.worker.update_gate_position(gate_idx, current_pos[0], current_pos[1], value)
-        except Exception as e:
-            print(f"Invalid Z input for gate {gate_idx}: {e}")
-
-    def update_visualization(self, results):
-        """Update the 3D visualization with new results"""
-        try:
-            # Update optimization metrics display
-            self.update_optimization_metrics(results)
-            # Trajectory extraction
-            if "V_multi_shoot" in results:
-                try:
-                    V_multi_shoot = np.array(results["V_multi_shoot"])
-                    n_x = self.worker.problem.settings.sim.n_states
-                    n_u = self.worker.problem.settings.sim.n_controls
-                    i1 = n_x
-                    i2 = i1 + n_x * n_x
-                    i3 = i2 + n_x * n_u
-                    i4 = i3 + n_x * n_u
-                    all_pos_segments = []
-                    for i_node in range(V_multi_shoot.shape[1]):
-                        node_data = V_multi_shoot[:, i_node]
-                        segments_for_node = node_data.reshape(-1, i4)
-                        pos_segments = segments_for_node[:, :3]
-                        all_pos_segments.append(pos_segments)
-                    if all_pos_segments:
-                        full_traj = np.vstack(all_pos_segments)
-                        self.trajectory_plot.setData(pos=full_traj)
-                        # Auto-adjust camera to fit trajectory bounds
-                        if self.auto_camera_checkbox.isChecked():
-                            self.adjust_camera_to_trajectory(full_traj)
-                except Exception as e:
-                    print(f"Trajectory extraction error: {e}")
-            # Gate plotting (always runs)
-            if "vertices" in results:
-                for i, vertices in enumerate(results["vertices"]):
-                    if i < len(self.gate_plots) and vertices is not None and len(vertices) >= 4:
-                        try:
-                            # Plot a line through the vertices of the gate
-                            closed_vertices = np.vstack([vertices, vertices[0]])
-                            self.gate_plots[i].setData(pos=closed_vertices)
-                        except Exception as e:
-                            print(f"Gate plotting error for gate {i}: {e}")
-                    elif i < len(self.gate_plots):
-                        self.gate_plots[i].setData(pos=np.zeros((0, 3)))
-        except Exception as e:
-            print(f"Error in update_visualization: {e}")
-
-    def adjust_camera_to_trajectory(self, trajectory):
-        """Automatically adjust camera to fit trajectory bounds with fixed x,y bounds"""
-        try:
-            # Skip auto-adjustment if user is manually interacting with camera
-            if (
-                hasattr(self.gl_widget, "manual_camera_interaction")
-                and self.gl_widget.manual_camera_interaction
-            ):
-                return
-            if trajectory is None or len(trajectory) == 0:
-                return
-            # Use fixed bounds for x and y, calculate z from trajectory
-            min_x, max_x = 0, 200
-            min_y, max_y = -100, 0
-            # Calculate z bounds from trajectory
-            min_z = np.min(trajectory[:, 2])
-            max_z = np.max(trajectory[:, 2])
-            # Add padding to z bounds
-            padding_z = 10.0
-            min_z -= padding_z
-            max_z += padding_z
-            # Calculate center and size
-            center = np.array([(min_x + max_x) / 2, (min_y + max_y) / 2, (min_z + max_z) / 2])
-            size_x = max_x - min_x
-            size_y = max_y - min_y
-            size_z = max_z - min_z
-            max_size = max(size_x, size_y, size_z)
-            # Set camera distance based on the largest dimension
-            distance = max_size * 1.2
-            # Update camera position
-            self.gl_widget.setCameraPosition(distance=distance, elevation=30, azimuth=45)
-            # Set the camera center separately
-            self.gl_widget.opts["center"] = Vector(center[0], center[1], center[2])
-            # Update grid size to match the fixed bounds
-            grid_size_x = size_x
-            grid_size_y = size_y
-            grid_spacing = 20  # Fixed spacing for better readability
-            # Update the grid
-            if hasattr(self, "grid_item"):
-                self.grid_item.setSize(grid_size_x, grid_size_y)
-                self.grid_item.setSpacing(grid_spacing, grid_spacing)
-        except Exception as e:
-            print(f"Error adjusting camera: {e}")
-
-    def on_lam_cost_changed(self, input_widget):
-        """Handle lambda cost input changes"""
-        # Extract the new value from the input widget
-        new_value = input_widget.text()
-        try:
-            # Convert the new value to a float
-            lam_cost_value = float(new_value)
-            self.worker.problem.settings.scp.lam_cost = lam_cost_value
-            # Update the display with scientific notation
-            input_widget.setText(f"{lam_cost_value:.2E}")
-        except ValueError:
-            print("Invalid input. Please enter a valid number.")
-
-    def on_lam_tr_changed(self, input_widget):
-        """Handle lambda trust region input changes"""
-        # Extract the new value from the input widget
-        new_value = input_widget.text()
-        try:
-            # Convert the new value to a float
-            lam_tr_value = float(new_value)
-            self.worker.problem.settings.scp.w_tr = lam_tr_value
-            # Update the display with scientific notation
-            input_widget.setText(f"{lam_tr_value:.2E}")
-        except ValueError:
-            print("Invalid input. Please enter a valid number.")
-
-    def update_optimization_metrics(self, results):
-        """Update the optimization metrics display"""
-        if results is None:
-            return
-        # Extract metrics from results
-        iter_num = results.get("iter", 0)
-        j_tr = results.get("J_tr", 0.0)
-        j_vb = results.get("J_vb", 0.0)
-        j_vc = results.get("J_vc", 0.0)
-        cost = results.get("cost", 0.0)
-        status = results.get("prob_stat", "--")
-        # Get timing information
-        dis_time = results.get("dis_time", 0.0)
-        solve_time = results.get("solve_time", 0.0)
-        # Update labels
-        self.iter_label.setText(f"Iteration: {iter_num}")
-        self.j_tr_label.setText(f"J_tr: {j_tr:.2E}")
-        self.j_vb_label.setText(f"J_vb: {j_vb:.2E}")
-        self.j_vc_label.setText(f"J_vc: {j_vc:.2E}")
-        self.objective_label.setText(f"Objective: {cost:.2E}")
-        self.lam_cost_display_label.setText(
-            f"λ_cost: {self.worker.problem.settings.scp.lam_cost:.2E}"
-        )
-        self.dis_time_label.setText(f"Dis Time: {dis_time:.1f}ms")
-        self.solve_time_label.setText(f"Solve Time: {solve_time:.1f}ms")
-        self.status_label.setText(f"Status: {status}")
-
-    def update_metrics(self, metrics):
-        """Update the metrics display - kept for compatibility"""
-        # This method is kept for compatibility but the main update is done
-        # in update_optimization_metrics
-        pass
-
-    def reset_problem(self):
-        """Reset the optimization problem"""
-        self.worker.reset_requested = True
-        print("Problem reset requested")
-
-    def reset_gate_positions(self):
-        """Reset gate positions to their original values"""
-        for i in range(10):
-            original_center = initial_gate_centers[i]
-            self.worker.update_gate_position(
-                i, original_center[0], original_center[1], original_center[2]
-            )
-            # Update text inputs
-            if i < len(self.gate_controls):
-                x_input, y_input, z_input = self.gate_controls[i]
-                x_input.setText(f"{original_center[0]:.2f}")
-                y_input.setText(f"{original_center[1]:.2f}")
-                z_input.setText(f"{original_center[2]:.2f}")
-
-    def reset_camera_view(self):
-        """Reset the camera view to default"""
-        self.gl_widget.setCameraPosition(distance=150, elevation=30, azimuth=45)
-
-    def closeEvent(self, event):
-        """Clean up when closing the window"""
-        self.worker.running = False
-        if self.worker_thread.is_alive():
-            self.worker_thread.join()
-        event.accept()
+    return server
 
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = DroneRacingGUI()
-    window.show()
-    sys.exit(app.exec_())
+    print("Starting Drone Racing Real-time Optimization (Viser)")
+    print("Open the URL shown below in your browser\n")
+
+    server = create_realtime_server(
+        optimization_problem=problem,
+        gate_params=gate_center_params,
+        initial_centers=initial_gate_centers,
+        n_gates=10,
+    )
+
+    server.sleep_forever()
