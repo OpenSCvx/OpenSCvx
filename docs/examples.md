@@ -55,17 +55,6 @@ Most examples follow this structure:
 6. **Solving**: Run the optimization
 7. **Visualization**: Plot and analyze results
 
-## Interactive Examples
-
-For interactive 3D visualization, many examples include GUI plotting functions:
-
-```python
-from examples.plotting import plot_animation_pyqtgraph
-
-# After solving the problem
-plot_animation_pyqtgraph(results).show()
-```
-
 ## Performance Tips
 
 - Start with simpler examples to understand the workflow
