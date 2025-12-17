@@ -23,14 +23,15 @@ def _plot_timeseries(
     row: int,
     col: int,
     show_legend: bool,
+    show: str = "both",
 ):
     """Add traces for a single component of a variable to the figure."""
     t_nodes = result.nodes["time"].flatten()
-    has_trajectory = bool(result.trajectory)
+    has_trajectory = bool(result.trajectory) and var_name in result.trajectory
     t_full = result.trajectory["time"].flatten() if has_trajectory else None
 
     # Plot propagated trajectory if available
-    if has_trajectory and var_name in result.trajectory:
+    if show in ("both", "trajectory") and has_trajectory:
         data = result.trajectory[var_name]
         y = data if data.ndim == 1 else data[:, component_idx]
         fig.add_trace(
@@ -38,9 +39,9 @@ def _plot_timeseries(
                 x=t_full,
                 y=y,
                 mode="lines",
-                name="Propagated",
+                name="Trajectory",
                 showlegend=show_legend,
-                legendgroup="propagated",
+                legendgroup="trajectory",
                 line={"color": "green", "width": 2},
             ),
             row=row,
@@ -48,7 +49,7 @@ def _plot_timeseries(
         )
 
     # Plot optimization nodes
-    if var_name in result.nodes:
+    if show in ("both", "nodes") and var_name in result.nodes:
         data = result.nodes[var_name]
         y = data if data.ndim == 1 else data[:, component_idx]
         fig.add_trace(
@@ -66,12 +67,17 @@ def _plot_timeseries(
         )
 
 
-def plot_state(result: OptimizationResults, state_name: str):
+def plot_state(
+    result: OptimizationResults,
+    state_name: str,
+    show: str = "both",
+):
     """Plot a single state variable (all components on one figure).
 
     Args:
         result: Optimization results containing state trajectories
         state_name: Name of the state to plot
+        show: What to plot - "both", "nodes", or "trajectory"
 
     Returns:
         Plotly figure
@@ -79,10 +85,12 @@ def plot_state(result: OptimizationResults, state_name: str):
     available = {s.name for s in result._states}
     if state_name not in available:
         raise ValueError(f"State '{state_name}' not found. Available: {sorted(available)}")
+    if show not in ("both", "nodes", "trajectory"):
+        raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
 
     dim = _get_var_dim(result, state_name, result._states)
     t_nodes = result.nodes["time"].flatten()
-    has_trajectory = bool(result.trajectory)
+    has_trajectory = bool(result.trajectory) and state_name in result.trajectory
     t_full = result.trajectory["time"].flatten() if has_trajectory else None
 
     fig = go.Figure()
@@ -91,12 +99,12 @@ def plot_state(result: OptimizationResults, state_name: str):
     for i in range(dim):
         label = f"{state_name}_{i}" if dim > 1 else state_name
 
-        if has_trajectory and state_name in result.trajectory:
+        if show in ("both", "trajectory") and has_trajectory:
             data = result.trajectory[state_name]
             y = data if data.ndim == 1 else data[:, i]
-            fig.add_trace(go.Scatter(x=t_full, y=y, mode="lines", name=f"{label} (prop)"))
+            fig.add_trace(go.Scatter(x=t_full, y=y, mode="lines", name=f"{label} (traj)"))
 
-        if state_name in result.nodes:
+        if show in ("both", "nodes") and state_name in result.nodes:
             data = result.nodes[state_name]
             y = data if data.ndim == 1 else data[:, i]
             fig.add_trace(go.Scatter(x=t_nodes, y=y, mode="markers", name=f"{label} (nodes)"))
@@ -109,6 +117,7 @@ def plot_states(
     result: OptimizationResults,
     state_names: list[str] | None = None,
     include_private: bool = False,
+    show: str = "both",
 ):
     """Plot multiple state variables in a subplot grid.
 
@@ -116,10 +125,13 @@ def plot_states(
         result: Optimization results containing state trajectories
         state_names: Optional list of state names to plot; defaults to all states
         include_private: Whether to include private states (names starting with '_')
+        show: What to plot - "both", "nodes", or "trajectory"
 
     Returns:
         Plotly figure with state trajectory subplots
     """
+    if show not in ("both", "nodes", "trajectory"):
+        raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
     states = result._states
     if not include_private:
         states = [s for s in states if not s.name.startswith("_")]
@@ -150,7 +162,9 @@ def plot_states(
     for idx, (_, var_name, comp_idx) in enumerate(components):
         row = (idx // n_cols) + 1
         col = (idx % n_cols) + 1
-        _plot_timeseries(fig, result, var_name, comp_idx, row, col, show_legend=(idx == 0))
+        _plot_timeseries(
+            fig, result, var_name, comp_idx, row, col, show_legend=(idx == 0), show=show
+        )
 
     for i in range(1, n_rows + 1):
         fig.update_xaxes(title_text="Time (s)", row=i, col=1)
@@ -158,12 +172,17 @@ def plot_states(
     return fig
 
 
-def plot_control(result: OptimizationResults, control_name: str):
+def plot_control(
+    result: OptimizationResults,
+    control_name: str,
+    show: str = "both",
+):
     """Plot a single control variable (all components on one figure).
 
     Args:
         result: Optimization results containing control trajectories
         control_name: Name of the control to plot
+        show: What to plot - "both", "nodes", or "trajectory"
 
     Returns:
         Plotly figure
@@ -171,10 +190,12 @@ def plot_control(result: OptimizationResults, control_name: str):
     available = {c.name for c in result._controls}
     if control_name not in available:
         raise ValueError(f"Control '{control_name}' not found. Available: {sorted(available)}")
+    if show not in ("both", "nodes", "trajectory"):
+        raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
 
     dim = _get_var_dim(result, control_name, result._controls)
     t_nodes = result.nodes["time"].flatten()
-    has_trajectory = bool(result.trajectory)
+    has_trajectory = bool(result.trajectory) and control_name in result.trajectory
     t_full = result.trajectory["time"].flatten() if has_trajectory else None
 
     fig = go.Figure()
@@ -183,12 +204,12 @@ def plot_control(result: OptimizationResults, control_name: str):
     for i in range(dim):
         label = f"{control_name}_{i}" if dim > 1 else control_name
 
-        if has_trajectory and control_name in result.trajectory:
+        if show in ("both", "trajectory") and has_trajectory:
             data = result.trajectory[control_name]
             y = data if data.ndim == 1 else data[:, i]
-            fig.add_trace(go.Scatter(x=t_full, y=y, mode="lines", name=f"{label} (prop)"))
+            fig.add_trace(go.Scatter(x=t_full, y=y, mode="lines", name=f"{label} (traj)"))
 
-        if control_name in result.nodes:
+        if show in ("both", "nodes") and control_name in result.nodes:
             data = result.nodes[control_name]
             y = data if data.ndim == 1 else data[:, i]
             fig.add_trace(go.Scatter(x=t_nodes, y=y, mode="markers", name=f"{label} (nodes)"))
@@ -201,6 +222,7 @@ def plot_controls(
     result: OptimizationResults,
     control_names: list[str] | None = None,
     include_private: bool = False,
+    show: str = "both",
 ):
     """Plot multiple control variables in a subplot grid.
 
@@ -208,10 +230,13 @@ def plot_controls(
         result: Optimization results containing control trajectories
         control_names: Optional list of control names to plot; defaults to all controls
         include_private: Whether to include private controls (names starting with '_')
+        show: What to plot - "both", "nodes", or "trajectory"
 
     Returns:
         Plotly figure with control trajectory subplots
     """
+    if show not in ("both", "nodes", "trajectory"):
+        raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
     controls = result._controls
     if not include_private:
         controls = [c for c in controls if not c.name.startswith("_")]
@@ -242,7 +267,9 @@ def plot_controls(
     for idx, (_, var_name, comp_idx) in enumerate(components):
         row = (idx // n_cols) + 1
         col = (idx % n_cols) + 1
-        _plot_timeseries(fig, result, var_name, comp_idx, row, col, show_legend=(idx == 0))
+        _plot_timeseries(
+            fig, result, var_name, comp_idx, row, col, show_legend=(idx == 0), show=show
+        )
 
     for i in range(1, n_rows + 1):
         fig.update_xaxes(title_text="Time (s)", row=i, col=1)
