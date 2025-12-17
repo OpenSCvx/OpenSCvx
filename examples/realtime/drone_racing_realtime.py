@@ -71,7 +71,7 @@ def create_realtime_server(
         "/origin",
         wxyz=(1.0, 0.0, 0.0, 0.0),
         position=(0.0, 0.0, 0.0),
-        axes_length=5.0,
+        axes_length=1.0,
     )
 
     # Trajectory point cloud (initially empty)
