@@ -1,10 +1,6 @@
 """Static scene primitives for viser visualization.
 
-This module contains functions for adding static elements to a viser scene:
-- Ellipsoid obstacles
-- Gates (planar and 3D boxes)
-- Glideslope cones
-- Ghost trajectories
+This module contains functions for adding rigid elements to a viser scene
 """
 
 import numpy as np

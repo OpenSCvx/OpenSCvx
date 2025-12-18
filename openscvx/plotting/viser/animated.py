@@ -3,15 +3,6 @@
 This module contains functions for adding animated elements to a viser scene.
 Each function returns (handle, update_callback) where update_callback(frame_idx)
 updates the visual for the given frame.
-
-Components:
-- Animated trail (growing point cloud)
-- Position marker (moving sphere)
-- Target markers (static or moving)
-- Thrust vector (force visualization)
-- Attitude frame (body coordinate axes)
-- Viewcone (camera/sensor field of view)
-- Animation controls (GUI for playback)
 """
 
 import threading

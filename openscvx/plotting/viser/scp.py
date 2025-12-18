@@ -2,13 +2,6 @@
 
 This module contains functions for visualizing the successive convex programming
 (SCP) optimization process, showing how the solution evolves across iterations.
-
-Components:
-- Iteration nodes (optimization variables at each iteration)
-- Iteration attitudes (body frames at each iteration)
-- Ghost iterations (faded previous iterations)
-- Propagation lines (integrated trajectories showing defects)
-- SCP animation controls (GUI for stepping through iterations)
 """
 
 import threading
