@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import matplotlib.pyplot as plt
 import numpy as np
+import plotly.graph_objects as go
 import viser
 
 from openscvx.algorithms import OptimizationResults
+from openscvx.plotting.plotting import plot_vector_norm
 from openscvx.plotting.viser import (
     add_animated_trail,
     add_animation_controls,
@@ -53,6 +55,7 @@ def create_animated_plotting_server(
     show_viewcone: bool = True,
     viewcone_scale: float = 10.0,
     target_radius: float = 1.0,
+    show_control_plot: str | None = None,
 ) -> viser.ViserServer:
     """Create an animated trajectory visualization server.
 
@@ -92,6 +95,8 @@ def create_animated_plotting_server(
         show_viewcone: If True and R_sb is in results, show camera viewcone
         viewcone_scale: Size/depth of viewcone mesh
         target_radius: Radius of target marker spheres
+        show_control_plot: If provided with a control name, displays a 2D plotly plot
+            of the control norm with an animated marker showing current position
 
     Returns:
         ViserServer instance (animation runs in background thread)
@@ -190,6 +195,57 @@ def create_animated_plotting_server(
         for _, update in target_results:
             if update is not None:
                 update_callbacks.append(update)
+
+    # Add control norm plot if requested
+    if show_control_plot is not None:
+        # Create plotly figure using existing plot_vector_norm function
+        fig = plot_vector_norm(results, show_control_plot, show="both")
+
+        # Get data for marker animation
+        has_trajectory = bool(results.trajectory) and show_control_plot in results.trajectory
+        if has_trajectory:
+            t_data = results.trajectory["time"].flatten()
+            control_data = results.trajectory[show_control_plot]
+            norm_data = np.linalg.norm(control_data, axis=1) if control_data.ndim > 1 else np.abs(control_data)
+        else:
+            t_data = results.nodes["time"].flatten()
+            control_data = results.nodes[show_control_plot]
+            norm_data = np.linalg.norm(control_data, axis=1) if control_data.ndim > 1 else np.abs(control_data)
+
+        # Add animated marker trace to the figure
+        fig.add_trace(
+            go.Scatter(
+                x=[t_data[0]],
+                y=[norm_data[0]],
+                mode="markers",
+                marker={"color": "red", "size": 12, "symbol": "circle"},
+                name="Current",
+            )
+        )
+
+        # Add plotly figure to viser GUI
+        plotly_handle = server.gui.add_plotly(figure=fig, aspect=1.5)
+
+        # Create update callback for the marker
+        def update_control_plot(frame_idx: int) -> None:
+            """Update marker position on control plot."""
+            # Map frame index to control data index
+            if has_trajectory:
+                # For trajectory data, frame_idx directly maps to data index
+                idx = min(frame_idx, len(norm_data) - 1)
+            else:
+                # For nodes, need to find closest node to current time
+                current_time = traj_time[frame_idx]
+                idx = min(np.searchsorted(t_data, current_time), len(norm_data) - 1)
+
+            # Update marker position (it's the last trace we added)
+            fig.data[-1].x = [t_data[idx]]
+            fig.data[-1].y = [norm_data[idx]]
+
+            # Reassign figure to trigger update in viser
+            plotly_handle.figure = fig
+
+        update_callbacks.append(update_control_plot)
 
     # Add animation controls
     add_animation_controls(server, traj_time, update_callbacks, loop=loop_animation)
