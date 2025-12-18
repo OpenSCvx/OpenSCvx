@@ -14,6 +14,7 @@ import numpy as np
 import viser
 
 from openscvx.algorithms import OptimizationResults
+from openscvx.plotting import plot_control
 from openscvx.plotting.viser import (
     add_animated_trail,
     add_animated_vector_norm_plot,
@@ -55,6 +56,7 @@ def create_animated_plotting_server(
     viewcone_scale: float = 10.0,
     target_radius: float = 1.0,
     show_control_plot: str | None = None,
+    show_control_norm_plot: str | None = None,
 ) -> viser.ViserServer:
     """Create an animated trajectory visualization server.
 
@@ -94,8 +96,10 @@ def create_animated_plotting_server(
         show_viewcone: If True and R_sb is in results, show camera viewcone
         viewcone_scale: Size/depth of viewcone mesh
         target_radius: Radius of target marker spheres
-        show_control_plot: If provided with a control name, displays a 2D plotly plot
-            of the control norm with an animated marker showing current position
+        show_control_plot: If provided with a control name, displays component plot
+            showing each control component vs time with animated markers
+        show_control_norm_plot: If provided with a control name, displays norm plot
+            showing ‖control‖₂ vs time with animated marker
 
     Returns:
         ViserServer instance (animation runs in background thread)
@@ -196,16 +200,104 @@ def create_animated_plotting_server(
                 update_callbacks.append(update)
 
     # Add control norm plot if requested
-    if show_control_plot is not None:
-        _, update_plot = add_animated_vector_norm_plot(
+    if show_control_norm_plot is not None:
+        _, update_norm = add_animated_vector_norm_plot(
             server,
             results,
-            show_control_plot,
-            title="Control Norm",
-            folder_name=None,
+            show_control_norm_plot,
+            title=f"‖{show_control_norm_plot}‖₂",
+            folder_name=f"{show_control_norm_plot} Norm",
         )
-        if update_plot is not None:
-            update_callbacks.append(update_plot)
+        if update_norm is not None:
+            update_callbacks.append(update_norm)
+
+    # Add control component plot if requested
+    if show_control_plot is not None:
+        has_in_trajectory = bool(results.trajectory) and show_control_plot in results.trajectory
+        has_in_nodes = show_control_plot in results.nodes
+
+        if has_in_trajectory or has_in_nodes:
+            # Create figure using plot_control
+            import plotly.graph_objects as go
+
+            fig = plot_control(results, show_control_plot, show="both")
+
+            # Clean up legend: hide all node entries and unify their color
+            # We'll add a single "Nodes" entry at the end
+            node_color = "cyan"
+            for trace in fig.data:
+                if "(nodes)" in trace.name.lower() or "nodes" in trace.name.lower():
+                    # Hide from legend and set consistent color
+                    trace.showlegend = False
+                    trace.legendgroup = "nodes"
+                    trace.marker.color = node_color
+
+            # Add a single "Nodes" legend entry (invisible dummy trace)
+            fig.add_trace(
+                go.Scatter(
+                    x=[None],
+                    y=[None],
+                    mode="markers",
+                    marker={"color": node_color, "size": 6},
+                    name="Nodes",
+                    legendgroup="nodes",
+                    showlegend=True,
+                )
+            )
+
+            # Determine data source for animated markers
+            if has_in_trajectory:
+                time_data = results.trajectory["time"].flatten()
+                control_data = results.trajectory[show_control_plot]
+                use_trajectory_indexing = True
+            else:
+                time_data = results.nodes["time"].flatten()
+                control_data = results.nodes[show_control_plot]
+                use_trajectory_indexing = False
+
+            # Handle both scalar and vector controls
+            n_components = 1 if control_data.ndim == 1 else control_data.shape[1]
+
+            # Add marker traces for each component (all same color, only first in legend)
+            marker_trace_indices = []
+            marker_color = "red"
+            for i in range(n_components):
+                y_data = control_data if n_components == 1 else control_data[:, i]
+                marker_trace = go.Scatter(
+                    x=[time_data[0]],
+                    y=[y_data[0]],
+                    mode="markers",
+                    marker={"color": marker_color, "size": 12, "symbol": "circle"},
+                    name="Current",
+                    legendgroup="current",
+                    showlegend=(i == 0),
+                )
+                fig.add_trace(marker_trace)
+                marker_trace_indices.append(len(fig.data) - 1)
+
+            # Add figure to GUI with descriptive folder
+            with server.gui.add_folder(f"{show_control_plot} Components"):
+                plot_handle = server.gui.add_plotly(figure=fig, aspect=1.5)
+
+            # Create single update callback that updates all markers
+            def update_control_components(frame_idx: int) -> None:
+                """Update all component markers based on current frame."""
+                if use_trajectory_indexing:
+                    idx = min(frame_idx, len(time_data) - 1)
+                else:
+                    current_time = traj_time.flatten()[frame_idx]
+                    idx = min(np.searchsorted(time_data, current_time), len(time_data) - 1)
+
+                # Update each marker
+                for i, trace_idx in enumerate(marker_trace_indices):
+                    y_data = control_data if n_components == 1 else control_data[:, i]
+                    fig.data[trace_idx].x = [time_data[idx]]
+                    fig.data[trace_idx].y = [y_data[idx]]
+
+                # Trigger viser update
+                plot_handle.figure = fig
+
+            update_callbacks.append(update_control_components)
 
     # Add animation controls
     add_animation_controls(server, traj_time, update_callbacks, loop=loop_animation)
