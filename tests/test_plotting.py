@@ -15,8 +15,8 @@ import pytest
 from openscvx.algorithms import OptimizationResults
 from openscvx.config import Config
 from openscvx.plotting.plotting import (
-    plot_control,
-    plot_state,
+    plot_controls,
+    plot_states,
 )
 
 
@@ -61,8 +61,8 @@ class TestPlotStateFunction:
         return result
 
     def test_plot_state_returns_figure(self, mock_result_basic, mock_config):
-        """Test that plot_state returns a valid Plotly figure."""
-        fig = plot_state(mock_result_basic, mock_config)
+        """Test that plot_states returns a valid Plotly figure."""
+        fig = plot_states(mock_result_basic)
 
         assert fig is not None
         assert hasattr(fig, "data")
@@ -70,7 +70,7 @@ class TestPlotStateFunction:
         assert fig.layout.title.text == "State Trajectories"
 
     def test_plot_state_with_multiple_states(self, mock_config):
-        """Test plot_state with multiple state variables."""
+        """Test plot_states with multiple state variables."""
         result = Mock(spec=OptimizationResults)
 
         result.nodes = {
@@ -96,19 +96,14 @@ class TestPlotStateFunction:
         result._states = [pos_state, vel_state]
         result._controls = []
 
-        # Update config to match state dimensions
-        mock_config.sim.x.min = np.array([-10.0] * 4)
-        mock_config.sim.x.max = np.array([10.0] * 4)
-        mock_config.sim.n_states = 4
-
-        fig = plot_state(result, mock_config)
+        fig = plot_states(result)
 
         # Should have subplots for each state component (4 total)
         assert fig is not None
         assert len(fig.data) > 0
 
     def test_plot_state_with_empty_trajectory(self, mock_config):
-        """Test plot_state when trajectory is empty."""
+        """Test plot_states when trajectory is empty."""
         result = Mock(spec=OptimizationResults)
 
         result.nodes = {
@@ -124,13 +119,13 @@ class TestPlotStateFunction:
         result._states = [state]
         result._controls = []
 
-        fig = plot_state(result, mock_config)
+        fig = plot_states(result)
 
         assert fig is not None
         # Should still plot node markers even without full trajectory
 
     def test_plot_state_filters_ctcs_augmentation(self, mock_config):
-        """Test that plot_state filters out CTCS augmentation states."""
+        """Test that plot_states filters out CTCS augmentation states by default."""
         result = Mock(spec=OptimizationResults)
 
         result.nodes = {
@@ -156,20 +151,17 @@ class TestPlotStateFunction:
         result._states = [state, aug_state]
         result._controls = []
 
-        fig = plot_state(result, mock_config)
+        fig = plot_states(result, include_private=False)
 
         assert fig is not None
         # CTCS states should be filtered out, so we should only see state_x
 
     def test_plot_state_with_unbounded_states(self, mock_result_basic, mock_config):
-        """Test plot_state with infinite bounds (unbounded states)."""
-        mock_config.sim.x.min = np.array([-np.inf, -10.0, -10.0])
-        mock_config.sim.x.max = np.array([np.inf, 10.0, 10.0])
-
-        fig = plot_state(mock_result_basic, mock_config)
+        """Test plot_states (note: new API doesn't use bounds)."""
+        fig = plot_states(mock_result_basic)
 
         assert fig is not None
-        # Should handle infinite bounds gracefully
+        # New API doesn't plot bounds, just trajectories
 
 
 class TestPlotControlFunction:
@@ -210,8 +202,8 @@ class TestPlotControlFunction:
         return result
 
     def test_plot_control_returns_figure(self, mock_result_basic, mock_config):
-        """Test that plot_control returns a valid Plotly figure."""
-        fig = plot_control(mock_result_basic, mock_config)
+        """Test that plot_controls returns a valid Plotly figure."""
+        fig = plot_controls(mock_result_basic)
 
         assert fig is not None
         assert hasattr(fig, "data")
@@ -219,7 +211,7 @@ class TestPlotControlFunction:
         assert fig.layout.title.text == "Control Trajectories"
 
     def test_plot_control_with_multiple_controls(self, mock_config):
-        """Test plot_control with multiple control variables."""
+        """Test plot_controls with multiple control variables."""
         result = Mock(spec=OptimizationResults)
 
         result.nodes = {
@@ -245,16 +237,13 @@ class TestPlotControlFunction:
         result._controls = [thrust_control, torque_control]
         result._states = []
 
-        mock_config.sim.u.min = np.array([-10.0] * 3)
-        mock_config.sim.u.max = np.array([10.0] * 3)
-
-        fig = plot_control(result, mock_config)
+        fig = plot_controls(result)
 
         assert fig is not None
         assert len(fig.data) > 0
 
     def test_plot_control_with_empty_trajectory(self, mock_config):
-        """Test plot_control when trajectory is empty."""
+        """Test plot_controls when trajectory is empty."""
         result = Mock(spec=OptimizationResults)
 
         result.nodes = {
@@ -270,28 +259,25 @@ class TestPlotControlFunction:
         result._controls = [control]
         result._states = []
 
-        fig = plot_control(result, mock_config)
+        fig = plot_controls(result)
 
         assert fig is not None
 
     def test_plot_control_with_unbounded_controls(self, mock_result_basic, mock_config):
-        """Test plot_control with infinite bounds (unbounded controls)."""
-        mock_config.sim.u.min = np.array([-np.inf, -5.0])
-        mock_config.sim.u.max = np.array([np.inf, 5.0])
-
-        fig = plot_control(mock_result_basic, mock_config)
+        """Test plot_controls (note: new API doesn't use bounds)."""
+        fig = plot_controls(mock_result_basic)
 
         assert fig is not None
-        # Should handle infinite bounds gracefully
+        # New API doesn't plot bounds, just trajectories
 
     def test_plot_control_legend_only_on_first_subplot(self, mock_result_basic, mock_config):
         """Test that legend items only appear on first subplot."""
-        fig = plot_control(mock_result_basic, mock_config)
+        fig = plot_controls(mock_result_basic)
 
         # Count how many traces have showlegend=True
         legend_traces = [trace for trace in fig.data if trace.showlegend]
 
-        # Should have some legend traces (propagated, nodes, bounds)
+        # Should have some legend traces (trajectory, nodes)
         assert len(legend_traces) > 0
 
 
