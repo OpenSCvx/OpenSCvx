@@ -44,6 +44,7 @@ from .primitives import (
 from .animated import (
     UpdateCallback,
     add_animated_trail,
+    add_animation_controls,
     add_attitude_frame,
     add_position_marker,
     add_target_marker,
@@ -51,9 +52,6 @@ from .animated import (
     add_thrust_vector,
     add_viewcone,
 )
-
-# Animation controls
-from .controls import add_animation_controls
 
 # SCP iteration visualization
 from .scp import (
