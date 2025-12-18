@@ -28,6 +28,13 @@ from examples.drone.drone_racing import (
     initial_gate_centers,
     problem,
 )
+from examples.plotting_viser import (
+    build_scp_step_results,
+    compute_velocity_colors_realtime,
+    extract_multishoot_trajectory,
+    format_metrics_markdown,
+    get_print_queue_data,
+)
 from openscvx.utils import gen_vertices
 
 # Initialize the problem
@@ -280,59 +287,19 @@ def create_realtime_server(
 
     def update_metrics(results: dict) -> None:
         """Update the metrics markdown display."""
-        iter_num = results.get("iter", 0)
-        j_tr = results.get("J_tr", 0.0)
-        j_vb = results.get("J_vb", 0.0)
-        j_vc = results.get("J_vc", 0.0)
-        cost = results.get("cost", 0.0)
-        dis_time = results.get("dis_time", 0.0)
-        solve_time = results.get("solve_time", 0.0)
-        status = results.get("prob_stat", "--")
-
-        metrics_text.content = f"""**Iteration:** {iter_num}
-**J_tr:** {j_tr:.2E}
-**J_vb:** {j_vb:.2E}
-**J_vc:** {j_vc:.2E}
-**Objective:** {cost:.2E}
-**Dis Time:** {dis_time:.1f}ms
-**Solve Time:** {solve_time:.1f}ms
-**Status:** {status}"""
+        metrics_text.content = format_metrics_markdown(results)
 
     def update_trajectory(V_multi_shoot: np.ndarray) -> None:
         """Update the trajectory point cloud from multi-shoot data."""
         try:
             n_x = optimization_problem.settings.sim.n_states
             n_u = optimization_problem.settings.sim.n_controls
-            i4 = n_x + n_x * n_x + 2 * n_x * n_u
 
-            all_pos_segments = []
-            all_vel_segments = []
-            for i_node in range(V_multi_shoot.shape[1]):
-                node_data = V_multi_shoot[:, i_node]
-                segments_for_node = node_data.reshape(-1, i4)
-                pos_segments = segments_for_node[:, :3]  # First 3 are position
-                vel_segments = segments_for_node[:, 3:6]  # Next 3 are velocity
-                all_pos_segments.append(pos_segments)
-                all_vel_segments.append(vel_segments)
+            positions, velocities = extract_multishoot_trajectory(V_multi_shoot, n_x, n_u)
 
-            if all_pos_segments:
-                full_traj = np.vstack(all_pos_segments).astype(np.float32)
-                full_vel = np.vstack(all_vel_segments).astype(np.float32)
-
-                # Compute velocity-based colors using viridis colormap
-                vel_norms = np.linalg.norm(full_vel, axis=1)
-                vel_range = vel_norms.max() - vel_norms.min()
-                if vel_range < 1e-8:
-                    vel_normalized = np.zeros_like(vel_norms)
-                else:
-                    vel_normalized = (vel_norms - vel_norms.min()) / vel_range
-
-                colors = np.array(
-                    [[int(c * 255) for c in _viridis_cmap(v)[:3]] for v in vel_normalized],
-                    dtype=np.uint8,
-                )
-
-                trajectory_handle.points = full_traj
+            if len(positions) > 0:
+                colors = compute_velocity_colors_realtime(velocities, _viridis_cmap)
+                trajectory_handle.points = positions
                 trajectory_handle.colors = colors
 
         except Exception as e:
@@ -377,36 +344,11 @@ def create_realtime_server(
                 # Run one SCP step
                 start_time = time.time()
                 step_result = optimization_problem.step()
-                solve_time = (time.time() - start_time) * 1000  # ms
+                solve_time_ms = (time.time() - start_time) * 1000
 
                 # Build results dict
-                results = {
-                    "iter": step_result["scp_k"] - 1,
-                    "J_tr": step_result["scp_J_tr"],
-                    "J_vb": step_result["scp_J_vb"],
-                    "J_vc": step_result["scp_J_vc"],
-                    "converged": step_result["converged"],
-                    "solve_time": solve_time,
-                }
-
-                # Get timing from print queue if available
-                try:
-                    if (
-                        hasattr(optimization_problem, "print_queue")
-                        and not optimization_problem.print_queue.empty()
-                    ):
-                        emitted_data = optimization_problem.print_queue.get_nowait()
-                        results["dis_time"] = emitted_data.get("dis_time", 0.0)
-                        results["prob_stat"] = emitted_data.get("prob_stat", "--")
-                        results["cost"] = emitted_data.get("cost", 0.0)
-                    else:
-                        results["dis_time"] = 0.0
-                        results["prob_stat"] = "--"
-                        results["cost"] = 0.0
-                except Exception:
-                    results["dis_time"] = 0.0
-                    results["prob_stat"] = "--"
-                    results["cost"] = 0.0
+                results = build_scp_step_results(step_result, solve_time_ms)
+                results.update(get_print_queue_data(optimization_problem))
 
                 # Update visualizations (viser is thread-safe)
                 update_metrics(results)

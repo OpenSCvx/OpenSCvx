@@ -4,7 +4,10 @@ This module provides convenience functions for common visualization patterns.
 These are templates meant to be copied and customized for specific problems.
 
 For the composable primitives, see openscvx.plotting.animation.
+For real-time examples, see examples/realtime/*.py.
 """
+
+from __future__ import annotations
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -32,6 +35,10 @@ from openscvx.plotting.viser import (
     create_server,
     extract_propagation_positions,
 )
+
+# =============================================================================
+# Template Visualization Servers
+# =============================================================================
 
 
 def create_animated_plotting_server(
@@ -447,3 +454,193 @@ def create_pdg_animated_plotting_server(
     add_animation_controls(server, traj_time, update_callbacks, loop=loop_animation)
 
     return server
+
+
+# =============================================================================
+# Real-time Visualization Utilities
+# =============================================================================
+# These utilities are used by the real-time examples in examples/realtime/.
+# They extract common patterns for metrics display, trajectory parsing, etc.
+
+
+def format_metrics_markdown(results: dict) -> str:
+    """Format optimization metrics as a markdown string for viser GUI display.
+
+    This provides a consistent format for displaying SCP iteration metrics
+    in real-time visualization GUIs.
+
+    Args:
+        results: Dictionary containing optimization metrics with keys:
+            - iter: Iteration number
+            - J_tr: Trust region penalty
+            - J_vb: Virtual buffer penalty
+            - J_vc: Virtual control penalty
+            - cost: Objective value
+            - dis_time: Discretization time in ms
+            - solve_time: Solve time in ms
+            - prob_stat: Problem status string
+
+    Returns:
+        Markdown-formatted string for display in viser GUI.
+
+    Example:
+        >>> results = {"iter": 5, "J_tr": 1.2e-3, "cost": 42.5, ...}
+        >>> metrics_text.content = format_metrics_markdown(results)
+    """
+    iter_num = results.get("iter", 0)
+    j_tr = results.get("J_tr", 0.0)
+    j_vb = results.get("J_vb", 0.0)
+    j_vc = results.get("J_vc", 0.0)
+    cost = results.get("cost", 0.0)
+    dis_time = results.get("dis_time", 0.0)
+    solve_time = results.get("solve_time", 0.0)
+    status = results.get("prob_stat", "--")
+
+    return f"""**Iteration:** {iter_num}
+**J_tr:** {j_tr:.2E}
+**J_vb:** {j_vb:.2E}
+**J_vc:** {j_vc:.2E}
+**Objective:** {cost:.2E}
+**Dis Time:** {dis_time:.1f}ms
+**Solve Time:** {solve_time:.1f}ms
+**Status:** {status}"""
+
+
+def extract_multishoot_trajectory(
+    V_multi_shoot: np.ndarray,
+    n_x: int,
+    n_u: int,
+    position_slice: slice = slice(0, 3),
+    velocity_slice: slice | None = slice(3, 6),
+) -> tuple[np.ndarray, np.ndarray | None]:
+    """Extract position and velocity trajectories from multi-shoot data.
+
+    The multi-shoot format stores propagation segments with state, STM, and
+    sensitivity data packed together. This function extracts the state
+    components from each segment.
+
+    Args:
+        V_multi_shoot: Multi-shoot data array of shape (n_segments * segment_size, n_nodes)
+        n_x: Number of states
+        n_u: Number of controls
+        position_slice: Slice for extracting position from state (default: first 3)
+        velocity_slice: Slice for extracting velocity from state (default: states 3-6).
+            Set to None to skip velocity extraction.
+
+    Returns:
+        Tuple of (positions, velocities) as float32 arrays.
+        positions: Shape (n_total_points, 3)
+        velocities: Shape (n_total_points, 3) or None if velocity_slice is None
+
+    Note:
+        The segment size is computed as: n_x + n_x² + 2*n_x*n_u
+        This accounts for: state (n_x) + STM (n_x²) + sensitivities (2*n_x*n_u)
+    """
+    # Segment size: state + STM + control sensitivities
+    segment_size = n_x + n_x * n_x + 2 * n_x * n_u
+
+    all_pos_segments = []
+    all_vel_segments = [] if velocity_slice is not None else None
+
+    for i_node in range(V_multi_shoot.shape[1]):
+        node_data = V_multi_shoot[:, i_node]
+        segments_for_node = node_data.reshape(-1, segment_size)
+        pos_segments = segments_for_node[:, position_slice]
+        all_pos_segments.append(pos_segments)
+
+        if velocity_slice is not None:
+            vel_segments = segments_for_node[:, velocity_slice]
+            all_vel_segments.append(vel_segments)
+
+    positions = np.vstack(all_pos_segments).astype(np.float32)
+    velocities = np.vstack(all_vel_segments).astype(np.float32) if all_vel_segments else None
+
+    return positions, velocities
+
+
+def get_print_queue_data(optimization_problem) -> dict:
+    """Safely extract data from optimization problem's print queue.
+
+    The print queue contains timing and status information emitted during
+    optimization. This function safely extracts that data with sensible
+    defaults if the queue is empty or unavailable.
+
+    Args:
+        optimization_problem: OpenSCvx Problem instance with optional print_queue attribute
+
+    Returns:
+        Dictionary with keys: dis_time, prob_stat, cost
+        Returns default values if queue is empty or unavailable.
+    """
+    defaults = {"dis_time": 0.0, "prob_stat": "--", "cost": 0.0}
+
+    try:
+        if (
+            hasattr(optimization_problem, "print_queue")
+            and not optimization_problem.print_queue.empty()
+        ):
+            emitted_data = optimization_problem.print_queue.get_nowait()
+            return {
+                "dis_time": emitted_data.get("dis_time", 0.0),
+                "prob_stat": emitted_data.get("prob_stat", "--"),
+                "cost": emitted_data.get("cost", 0.0),
+            }
+    except Exception:
+        pass
+
+    return defaults
+
+
+def build_scp_step_results(step_result: dict, solve_time_ms: float) -> dict:
+    """Build a results dictionary from an SCP step result.
+
+    Extracts the standard metrics from an optimization step result and
+    combines them with timing information.
+
+    Args:
+        step_result: Dictionary returned by optimization_problem.step()
+        solve_time_ms: Total solve time in milliseconds
+
+    Returns:
+        Dictionary with keys: iter, J_tr, J_vb, J_vc, converged, solve_time
+    """
+    return {
+        "iter": step_result["scp_k"] - 1,
+        "J_tr": step_result["scp_J_tr"],
+        "J_vb": step_result["scp_J_vb"],
+        "J_vc": step_result["scp_J_vc"],
+        "converged": step_result["converged"],
+        "solve_time": solve_time_ms,
+    }
+
+
+def compute_velocity_colors_realtime(vel: np.ndarray, cmap) -> np.ndarray:
+    """Compute RGB colors based on velocity magnitude (pyplot-free version).
+
+    This version accepts a pre-loaded colormap to avoid importing matplotlib.pyplot,
+    which can cause issues with viser's web visualization in real-time examples.
+
+    Args:
+        vel: Velocity array of shape (N, 3)
+        cmap: Pre-loaded matplotlib colormap (e.g., matplotlib.colormaps["viridis"])
+
+    Returns:
+        Array of RGB colors with shape (N, 3), dtype uint8, values in [0, 255]
+
+    Example:
+        >>> import matplotlib
+        >>> _viridis = matplotlib.colormaps["viridis"]  # Load at module level
+        >>> colors = compute_velocity_colors_realtime(velocities, _viridis)
+    """
+    vel_norms = np.linalg.norm(vel, axis=1)
+    vel_range = vel_norms.max() - vel_norms.min()
+    if vel_range < 1e-8:
+        vel_normalized = np.zeros_like(vel_norms)
+    else:
+        vel_normalized = (vel_norms - vel_norms.min()) / vel_range
+
+    colors = np.array(
+        [[int(c * 255) for c in cmap(v)[:3]] for v in vel_normalized],
+        dtype=np.uint8,
+    )
+    return colors
