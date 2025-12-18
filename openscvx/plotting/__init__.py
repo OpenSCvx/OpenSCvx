@@ -1,24 +1,27 @@
 """Trajectory visualization and plotting utilities.
 
-This module provides visualization utilities for trajectory optimization results:
+This module provides reusable building blocks for visualizing trajectory
+optimization results. It is intentionally minimal - we provide common utilities
+that can be composed together, not a complete solution that tries to do
+everything for you.
 
-- **2D plots** (plotly-based): Time series, projections, heatmaps
-  - Direct imports: `from openscvx.plotting import plot_projections_2d, plot_vector_norm`
+**2D Plots** (plotly-based):
+    Direct imports for time series, projections, and heatmaps::
 
-- **3D visualization** (viser-based): Interactive trajectory animation
-  - Submodule import: `from openscvx.plotting import viser`
-  - See `openscvx.plotting.viser` for composable 3D primitives
+        from openscvx.plotting import plot_projections_2d, plot_vector_norm
+        plot_vector_norm(results, "thrust", bounds=(rho_min, rho_max)).show()
 
-Example:
-    # 2D plots
-    from openscvx.plotting import plot_projections_2d, plot_vector_norm
-    plot_projections_2d(results, velocity_var_name="velocity").show()
+**3D Visualization** (viser-based):
+    The ``viser`` submodule provides composable primitives for building
+    interactive 3D visualizations. See ``openscvx.plotting.viser`` for details::
 
-    # 3D visualization
-    from openscvx.plotting import viser
-    server = viser.create_server(positions)
-    viser.add_gates(server, gate_vertices)
-    server.sleep_forever()
+        from openscvx.plotting import viser
+        server = viser.create_server(positions)
+        viser.add_gates(server, gate_vertices)
+        server.sleep_forever()
+
+For problem-specific visualization examples (drones, rockets, etc.), see
+``examples/plotting_viser.py``.
 """
 
 from . import viser

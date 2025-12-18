@@ -1,8 +1,20 @@
-"""Animated trajectory components for viser visualization.
+"""Animated scene elements for viser visualization.
 
-This module contains functions for adding animated elements to a viser scene.
-Each function returns (handle, update_callback) where update_callback(frame_idx)
-updates the visual for the given frame.
+Each function in this module adds an animated element to a viser scene and
+returns a tuple of ``(handle, update_callback)``. The update callback has
+signature ``update_callback(frame_idx: int) -> None`` and updates the visual
+to reflect the state at that frame index.
+
+Collect these callbacks and pass them to ``add_animation_controls()`` to
+wire up playback with GUI controls (play/pause, scrubber, speed, etc.).
+
+Example::
+
+    _, update_trail = add_animated_trail(server, positions, colors)
+    _, update_marker = add_position_marker(server, positions)
+    _, update_thrust = add_thrust_vector(server, positions, thrust, attitude)
+
+    add_animation_controls(server, time_array, [update_trail, update_marker, update_thrust])
 """
 
 import threading

@@ -1,6 +1,7 @@
 """Static scene primitives for viser visualization.
 
-This module contains functions for adding rigid elements to a viser scene
+Functions for adding non-animated elements: obstacles, gates, constraint cones,
+ghost trajectories, etc. Called once during scene setup.
 """
 
 import numpy as np
