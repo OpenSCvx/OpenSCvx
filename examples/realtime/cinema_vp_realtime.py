@@ -455,13 +455,7 @@ def create_realtime_server(
 
 if __name__ == "__main__":
     print("Creating viser server for Cinema Viewpoint Planning Real-time Optimization...")
-    server = create_realtime_server(problem, kp_pose, plotting_dict)
-    print(f"Server running at: {server.request_share_url()}")
-    print("Open the URL above in your browser to view the visualization")
-    print("Press Ctrl+C to stop")
+    print("Open the URL shown below in your browser\n")
 
-    try:
-        while True:
-            time.sleep(1.0)
-    except KeyboardInterrupt:
-        print("\nStopping server...")
+    server = create_realtime_server(problem, kp_pose, plotting_dict)
+    server.sleep_forever()
