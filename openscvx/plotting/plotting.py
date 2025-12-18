@@ -389,19 +389,30 @@ def plot_projections_2d(
                 }
                 fig.add_trace(
                     go.Scatter(
-                        x=data[:, xi], y=data[:, yi], mode="markers", marker=marker,
-                        name="Trajectory", legendgroup="trajectory", showlegend=(i == 0),
+                        x=data[:, xi],
+                        y=data[:, yi],
+                        mode="markers",
+                        marker=marker,
+                        name="Trajectory",
+                        legendgroup="trajectory",
+                        showlegend=(i == 0),
                     ),
-                    row=row, col=col,
+                    row=row,
+                    col=col,
                 )
             else:
                 fig.add_trace(
                     go.Scatter(
-                        x=data[:, xi], y=data[:, yi], mode="lines",
+                        x=data[:, xi],
+                        y=data[:, yi],
+                        mode="lines",
                         line={"color": "green", "width": 2},
-                        name="Trajectory", legendgroup="trajectory", showlegend=(i == 0),
+                        name="Trajectory",
+                        legendgroup="trajectory",
+                        showlegend=(i == 0),
                     ),
-                    row=row, col=col,
+                    row=row,
+                    col=col,
                 )
 
     # Plot nodes if available and requested
@@ -423,10 +434,16 @@ def plot_projections_2d(
                 marker = {"color": "cyan", "size": 6}
             fig.add_trace(
                 go.Scatter(
-                    x=data[:, xi], y=data[:, yi], mode="markers", marker=marker,
-                    name="Nodes", legendgroup="nodes", showlegend=(i == 0),
+                    x=data[:, xi],
+                    y=data[:, yi],
+                    mode="markers",
+                    marker=marker,
+                    name="Nodes",
+                    legendgroup="nodes",
+                    showlegend=(i == 0),
                 ),
-                row=row, col=col,
+                row=row,
+                col=col,
             )
 
     # Set axis titles
