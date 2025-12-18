@@ -21,12 +21,12 @@ grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 import openscvx as ox
-from examples.plotting import plot_control_norm, plot_xy_xz_yz
 from examples.plotting_viser import (
     create_pdg_animated_plotting_server,
     create_scp_animated_plotting_server,
 )
 from openscvx import Problem
+from openscvx.plotting import plot_projections_2d, plot_vector_norm
 
 n = 10
 total_time = 95.0  # Total simulation time
@@ -174,8 +174,8 @@ if __name__ == "__main__":
 
     # plot_state(results, problem.settings).show()
     # plot_control(results, problem.settings).show()
-    plot_control_norm(results, problem.settings).show()
-    plot_xy_xz_yz(results, problem.settings).show()
+    plot_vector_norm(results, "thrust", bounds=(rho_min, rho_max)).show()
+    plot_projections_2d(results, velocity_var_name="velocity").show()
 
     # Create PDG trajectory visualization
     # scene_scale=100 brings 2000m scale down to ~20m for viser

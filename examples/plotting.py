@@ -2,7 +2,6 @@ import random
 
 import numpy as np
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 # Optional pyqtgraph imports
 try:
@@ -1326,106 +1325,6 @@ def plot_brachistochrone_velocity(results: OptimizationResults, params=None):
 
     fig.update_layout(
         title=f"Brachistochrone Velocity: {tof} seconds", title_x=0.5, template="plotly_dark"
-    )
-    return fig
-
-
-def plot_xy_xz_yz(result: dict, params: Config):
-    position = result.trajectory["position"]
-    result["t_full"]
-
-    fig = make_subplots(
-        rows=2,
-        cols=2,
-        subplot_titles=("XY Plane", "XZ Plane", "YZ Plane"),
-        specs=[[{}, {}], [{}, None]],
-    )
-
-    # Add trajectory traces
-    fig.add_trace(
-        go.Scatter(
-            x=position[:, 0],
-            y=position[:, 1],
-            mode="lines",
-            line={"color": "blue", "width": 2},
-            name="Trajectory XY Plane",
-        ),
-        row=1,
-        col=1,
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=position[:, 0],
-            y=position[:, 2],
-            mode="lines",
-            line={"color": "blue", "width": 2},
-            name="Trajectory XZ Plane",
-        ),
-        row=1,
-        col=2,
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=position[:, 1],
-            y=position[:, 2],
-            mode="lines",
-            line={"color": "blue", "width": 2},
-            name="Trajectory YZ Plane",
-        ),
-        row=2,
-        col=1,
-    )
-
-    # Set axis titles
-    fig.update_xaxes(title_text="X (m)", row=1, col=1)
-    fig.update_yaxes(title_text="Y (m)", row=1, col=1)
-    fig.update_xaxes(title_text="X (m)", row=1, col=2)
-    fig.update_yaxes(title_text="Z (m)", row=1, col=2)
-    fig.update_xaxes(title_text="Y (m)", row=2, col=1)
-    fig.update_yaxes(title_text="Z (m)", row=2, col=1)
-
-    # Set equal aspect ratio for each subplot
-    fig.update_layout(
-        title="Trajectory in XY, XZ, and YZ Planes",
-        template="plotly_dark",
-        xaxis={"scaleanchor": "y"},  # row=1, col=1
-        xaxis2={"scaleanchor": "y2"},  # row=1, col=2
-        xaxis3={"scaleanchor": "y3"},  # row=2, col=1
-    )
-
-    return fig
-
-
-def plot_control_norm(results: OptimizationResults, params: Config):
-    # Plot the control norm over time
-    fig = go.Figure()
-
-    u_full = results.trajectory["thrust"]
-    t_full = results.t_full
-
-    # Compute the norm of the control vector
-    u_norm = np.linalg.norm(u_full, axis=1)
-
-    rho_min = results.plotting_data["rho_min"]
-    rho_max = results.plotting_data["rho_max"]
-
-    fig.add_trace(
-        go.Scatter(
-            x=t_full,
-            y=u_norm,
-            mode="lines",
-            line={"color": "blue", "width": 2},
-            name="Control Norm",
-        )
-    )
-    fig.add_hline(y=rho_min, line={"color": "red", "width": 2, "dash": "dash"}, name="Min Thrust")
-    fig.add_hline(y=rho_max, line={"color": "red", "width": 2, "dash": "dash"}, name="Max Thrust")
-
-    title = f"Control Norm: {results.t_final} seconds"
-    fig.update_layout(
-        title=title, xaxis_title="Time (s)", yaxis_title="Control Norm", template="plotly_dark"
     )
     return fig
 

@@ -14,8 +14,10 @@ violations, and creating animations of the optimization process.
 
 from .plotting import (
     plot_control,
+    plot_projections_2d,
     plot_state,
     plot_trust_region_heatmap,
+    plot_vector_norm,
     plot_virtual_control_heatmap,
 )
 
@@ -23,6 +25,8 @@ __all__ = [
     # Core plotting functions
     "plot_state",
     "plot_control",
+    "plot_projections_2d",
+    "plot_vector_norm",
     "plot_trust_region_heatmap",
     "plot_virtual_control_heatmap",
 ]

@@ -315,6 +315,393 @@ def plot_trust_region_heatmap(result: OptimizationResults):
     return fig
 
 
+def plot_projections_2d(
+    result: OptimizationResults,
+    var_name: str = "position",
+    velocity_var_name: str | None = None,
+    cmap: str = "viridis",
+    show: str = "both",
+):
+    """Plot XY, XZ, YZ projections of a 3D variable.
+
+    Useful for visualizing 3D trajectories in 2D plane views.
+
+    Args:
+        result: Optimization results containing trajectories
+        var_name: Name of the 3D variable to plot (default: "position")
+        velocity_var_name: Optional name of velocity variable for coloring by speed.
+            If provided, trajectory points are colored by velocity magnitude.
+        cmap: Matplotlib colormap name for velocity coloring (default: "viridis")
+        show: What to plot - "both", "nodes", or "trajectory"
+
+    Returns:
+        Plotly figure with three subplots (XY, XZ, YZ planes)
+    """
+    import numpy as np
+
+    if show not in ("both", "nodes", "trajectory"):
+        raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
+
+    has_trajectory = bool(result.trajectory) and var_name in result.trajectory
+    has_nodes = var_name in result.nodes
+
+    if not has_trajectory and not has_nodes:
+        available_traj = set(result.trajectory.keys()) if result.trajectory else set()
+        available_nodes = set(result.nodes.keys())
+        raise ValueError(
+            f"Variable '{var_name}' not found. "
+            f"Available in trajectory: {sorted(available_traj)}, nodes: {sorted(available_nodes)}"
+        )
+
+    fig = make_subplots(
+        rows=2,
+        cols=2,
+        subplot_titles=("XY Plane", "XZ Plane", "YZ Plane"),
+        specs=[[{}, {}], [{}, None]],
+    )
+
+    # Compute velocity colors if velocity variable is provided
+    traj_vel_norm = None
+    node_vel_norm = None
+    if velocity_var_name is not None:
+        if has_trajectory and velocity_var_name in result.trajectory:
+            vel_data = result.trajectory[velocity_var_name]
+            traj_vel_norm = np.linalg.norm(vel_data, axis=1)
+        if has_nodes and velocity_var_name in result.nodes:
+            vel_data = result.nodes[velocity_var_name]
+            node_vel_norm = np.linalg.norm(vel_data, axis=1)
+
+    # Plot trajectory if available and requested
+    if show in ("both", "trajectory") and has_trajectory:
+        data = result.trajectory[var_name]
+
+        if traj_vel_norm is not None:
+            # Use markers colored by velocity magnitude
+            marker_common = {
+                "size": 4,
+                "color": traj_vel_norm,
+                "colorscale": cmap,
+                "showscale": True,
+                "colorbar": {
+                    "title": "‖velocity‖",
+                    "x": 1.02,
+                    "y": 0.5,
+                    "len": 0.9,
+                },
+            }
+            fig.add_trace(
+                go.Scatter(
+                    x=data[:, 0],
+                    y=data[:, 1],
+                    mode="markers",
+                    marker=marker_common,
+                    name="Trajectory",
+                    legendgroup="trajectory",
+                    showlegend=True,
+                ),
+                row=1,
+                col=1,
+            )
+            # Hide colorbar on subsequent subplots
+            marker_no_colorbar = {**marker_common, "showscale": False}
+            fig.add_trace(
+                go.Scatter(
+                    x=data[:, 0],
+                    y=data[:, 2],
+                    mode="markers",
+                    marker=marker_no_colorbar,
+                    name="Trajectory",
+                    legendgroup="trajectory",
+                    showlegend=False,
+                ),
+                row=1,
+                col=2,
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=data[:, 1],
+                    y=data[:, 2],
+                    mode="markers",
+                    marker=marker_no_colorbar,
+                    name="Trajectory",
+                    legendgroup="trajectory",
+                    showlegend=False,
+                ),
+                row=2,
+                col=1,
+            )
+        else:
+            # Simple line plot without velocity coloring
+            fig.add_trace(
+                go.Scatter(
+                    x=data[:, 0],
+                    y=data[:, 1],
+                    mode="lines",
+                    line={"color": "green", "width": 2},
+                    name="Trajectory",
+                    legendgroup="trajectory",
+                    showlegend=True,
+                ),
+                row=1,
+                col=1,
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=data[:, 0],
+                    y=data[:, 2],
+                    mode="lines",
+                    line={"color": "green", "width": 2},
+                    name="Trajectory",
+                    legendgroup="trajectory",
+                    showlegend=False,
+                ),
+                row=1,
+                col=2,
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=data[:, 1],
+                    y=data[:, 2],
+                    mode="lines",
+                    line={"color": "green", "width": 2},
+                    name="Trajectory",
+                    legendgroup="trajectory",
+                    showlegend=False,
+                ),
+                row=2,
+                col=1,
+            )
+
+    # Plot nodes if available and requested
+    if show in ("both", "nodes") and has_nodes:
+        data = result.nodes[var_name]
+
+        if node_vel_norm is not None:
+            # Use markers colored by velocity magnitude
+            # Don't show colorbar if trajectory already has one
+            show_colorbar = traj_vel_norm is None
+            marker_common = {
+                "size": 8,
+                "color": node_vel_norm,
+                "colorscale": cmap,
+                "showscale": show_colorbar,
+                "colorbar": {
+                    "title": "‖velocity‖",
+                    "x": 1.02,
+                    "y": 0.5,
+                    "len": 0.9,
+                }
+                if show_colorbar
+                else None,
+                "line": {"color": "white", "width": 1},
+            }
+            fig.add_trace(
+                go.Scatter(
+                    x=data[:, 0],
+                    y=data[:, 1],
+                    mode="markers",
+                    marker=marker_common,
+                    name="Nodes",
+                    legendgroup="nodes",
+                    showlegend=True,
+                ),
+                row=1,
+                col=1,
+            )
+            marker_no_colorbar = {**marker_common, "showscale": False, "colorbar": None}
+            fig.add_trace(
+                go.Scatter(
+                    x=data[:, 0],
+                    y=data[:, 2],
+                    mode="markers",
+                    marker=marker_no_colorbar,
+                    name="Nodes",
+                    legendgroup="nodes",
+                    showlegend=False,
+                ),
+                row=1,
+                col=2,
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=data[:, 1],
+                    y=data[:, 2],
+                    mode="markers",
+                    marker=marker_no_colorbar,
+                    name="Nodes",
+                    legendgroup="nodes",
+                    showlegend=False,
+                ),
+                row=2,
+                col=1,
+            )
+        else:
+            # Simple markers without velocity coloring
+            fig.add_trace(
+                go.Scatter(
+                    x=data[:, 0],
+                    y=data[:, 1],
+                    mode="markers",
+                    marker={"color": "cyan", "size": 6},
+                    name="Nodes",
+                    legendgroup="nodes",
+                    showlegend=True,
+                ),
+                row=1,
+                col=1,
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=data[:, 0],
+                    y=data[:, 2],
+                    mode="markers",
+                    marker={"color": "cyan", "size": 6},
+                    name="Nodes",
+                    legendgroup="nodes",
+                    showlegend=False,
+                ),
+                row=1,
+                col=2,
+            )
+            fig.add_trace(
+                go.Scatter(
+                    x=data[:, 1],
+                    y=data[:, 2],
+                    mode="markers",
+                    marker={"color": "cyan", "size": 6},
+                    name="Nodes",
+                    legendgroup="nodes",
+                    showlegend=False,
+                ),
+                row=2,
+                col=1,
+            )
+
+    # Set axis titles
+    fig.update_xaxes(title_text="X", row=1, col=1)
+    fig.update_yaxes(title_text="Y", row=1, col=1)
+    fig.update_xaxes(title_text="X", row=1, col=2)
+    fig.update_yaxes(title_text="Z", row=1, col=2)
+    fig.update_xaxes(title_text="Y", row=2, col=1)
+    fig.update_yaxes(title_text="Z", row=2, col=1)
+
+    # Set equal aspect ratio for each subplot
+    layout_opts = {
+        "title": f"{var_name} - XY, XZ, YZ Projections",
+        "template": "plotly_dark",
+        "xaxis": {"scaleanchor": "y"},
+        "xaxis2": {"scaleanchor": "y2"},
+        "xaxis3": {"scaleanchor": "y3"},
+    }
+    # Move legend to bottom-right when using colorbar to avoid overlap
+    if velocity_var_name is not None:
+        layout_opts["legend"] = {
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": -0.15,
+            "xanchor": "center",
+            "x": 0.5,
+        }
+    fig.update_layout(**layout_opts)
+
+    return fig
+
+
+def plot_vector_norm(
+    result: OptimizationResults,
+    var_name: str,
+    bounds: tuple[float, float] | None = None,
+    show: str = "both",
+):
+    """Plot the 2-norm of a vector variable over time.
+
+    Useful for visualizing thrust magnitude, velocity magnitude, etc.
+
+    Args:
+        result: Optimization results containing trajectories
+        var_name: Name of the vector variable (state or control)
+        bounds: Optional (min, max) bounds to show as horizontal dashed lines
+        show: What to plot - "both", "nodes", or "trajectory"
+
+    Returns:
+        Plotly figure
+    """
+    import numpy as np
+
+    if show not in ("both", "nodes", "trajectory"):
+        raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
+
+    has_trajectory = bool(result.trajectory) and var_name in result.trajectory
+    has_nodes = var_name in result.nodes
+
+    if not has_trajectory and not has_nodes:
+        available_traj = set(result.trajectory.keys()) if result.trajectory else set()
+        available_nodes = set(result.nodes.keys())
+        raise ValueError(
+            f"Variable '{var_name}' not found. "
+            f"Available in trajectory: {sorted(available_traj)}, nodes: {sorted(available_nodes)}"
+        )
+
+    fig = go.Figure()
+
+    # Plot trajectory norm if available and requested
+    if show in ("both", "trajectory") and has_trajectory:
+        t_full = result.trajectory["time"].flatten()
+        data = result.trajectory[var_name]
+        norm = np.linalg.norm(data, axis=1)
+        fig.add_trace(
+            go.Scatter(
+                x=t_full,
+                y=norm,
+                mode="lines",
+                line={"color": "green", "width": 2},
+                name="Trajectory",
+                legendgroup="trajectory",
+            )
+        )
+
+    # Plot node norms if available and requested
+    if show in ("both", "nodes") and has_nodes:
+        t_nodes = result.nodes["time"].flatten()
+        data = result.nodes[var_name]
+        norm = np.linalg.norm(data, axis=1)
+        fig.add_trace(
+            go.Scatter(
+                x=t_nodes,
+                y=norm,
+                mode="markers",
+                marker={"color": "cyan", "size": 6},
+                name="Nodes",
+                legendgroup="nodes",
+            )
+        )
+
+    # Add bounds if provided
+    if bounds is not None:
+        min_bound, max_bound = bounds
+        fig.add_hline(
+            y=min_bound,
+            line={"color": "red", "width": 2, "dash": "dash"},
+            annotation_text="Min",
+            annotation_position="right",
+        )
+        fig.add_hline(
+            y=max_bound,
+            line={"color": "red", "width": 2, "dash": "dash"},
+            annotation_text="Max",
+            annotation_position="right",
+        )
+
+    fig.update_layout(
+        title=f"‖{var_name}‖₂",
+        xaxis_title="Time (s)",
+        yaxis_title="Norm",
+        template="plotly_dark",
+    )
+
+    return fig
+
+
 def plot_virtual_control_heatmap(result: OptimizationResults):
     """Plot heatmap of the final virtual control magnitudes (VC_history[-1])."""
     if not result.VC_history:
