@@ -1,17 +1,27 @@
 """Trajectory visualization and plotting utilities.
 
-!!! danger "Important"
-    **THIS MODULE IS IN MAJOR NEED OF REFACTORING AND SHOULD NOT BE USED.**
+This module provides visualization utilities for trajectory optimization results:
 
-    The plotting module is currently undergoing significant restructuring and
-    should be considered unstable. The API is subject to change without notice.
-    Use at your own risk.
+- **2D plots** (plotly-based): Time series, projections, heatmaps
+  - Direct imports: `from openscvx.plotting import plot_projections_2d, plot_vector_norm`
 
-This module provides visualization utilities for trajectory optimization results.
-It includes functions for plotting state trajectories, control inputs, constraint
-violations, and creating animations of the optimization process.
+- **3D visualization** (viser-based): Interactive trajectory animation
+  - Submodule import: `from openscvx.plotting import viser`
+  - See `openscvx.plotting.viser` for composable 3D primitives
+
+Example:
+    # 2D plots
+    from openscvx.plotting import plot_projections_2d, plot_vector_norm
+    plot_projections_2d(results, velocity_var_name="velocity").show()
+
+    # 3D visualization
+    from openscvx.plotting import viser
+    server = viser.create_server(positions)
+    viser.add_gates(server, gate_vertices)
+    server.sleep_forever()
 """
 
+from . import viser
 from .plotting import (
     plot_control,
     plot_projections_2d,
@@ -22,15 +32,13 @@ from .plotting import (
 )
 
 __all__ = [
-    # Core plotting functions
+    # 2D plotting functions (plotly)
     "plot_state",
     "plot_control",
     "plot_projections_2d",
     "plot_vector_norm",
     "plot_trust_region_heatmap",
     "plot_virtual_control_heatmap",
+    # 3D visualization submodule (viser)
+    "viser",
 ]
-
-# Mark module as unstable/deprecated
-__deprecated__ = True
-__status__ = "unstable"

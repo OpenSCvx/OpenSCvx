@@ -11,7 +11,7 @@ import numpy as np
 import viser
 
 from openscvx.algorithms import OptimizationResults
-from openscvx.plotting.animation import (
+from openscvx.plotting.viser import (
     add_animated_trail,
     add_animation_controls,
     add_attitude_frame,
