@@ -44,6 +44,7 @@ handle every case.
       ``add_ghost_trajectory``
     - Animated: ``add_animated_trail``, ``add_position_marker``, ``add_thrust_vector``,
       ``add_attitude_frame``, ``add_viewcone``, ``add_target_marker(s)``
+    - Plotly: ``add_animated_plotly_marker``, ``add_animated_vector_norm_plot``
     - SCP iteration: ``add_scp_animation_controls``, ``add_scp_iteration_nodes``, etc.
 
 For problem-specific examples (drones with viewcones, rockets with glideslope
@@ -63,6 +64,9 @@ from .animated import (
     add_thrust_vector,
     add_viewcone,
 )
+
+# Plotly integration
+from .plotly_integration import add_animated_plotly_marker, add_animated_vector_norm_plot
 
 # Static primitives
 from .primitives import (
@@ -104,6 +108,9 @@ __all__ = [
     "add_viewcone",
     # Animation controls
     "add_animation_controls",
+    # Plotly integration
+    "add_animated_plotly_marker",
+    "add_animated_vector_norm_plot",
     # SCP visualization
     "add_scp_iteration_nodes",
     "add_scp_iteration_attitudes",
