@@ -30,16 +30,6 @@ For higher-level convenience functions, see examples/plotting_viser.py.
 """
 
 # Server setup
-from .server import compute_grid_size, compute_velocity_colors, create_server
-
-# Static primitives
-from .primitives import (
-    add_ellipsoid_obstacles,
-    add_gates,
-    add_ghost_trajectory,
-    add_glideslope_cone,
-)
-
 # Animated components
 from .animated import (
     UpdateCallback,
@@ -53,6 +43,14 @@ from .animated import (
     add_viewcone,
 )
 
+# Static primitives
+from .primitives import (
+    add_ellipsoid_obstacles,
+    add_gates,
+    add_ghost_trajectory,
+    add_glideslope_cone,
+)
+
 # SCP iteration visualization
 from .scp import (
     add_scp_animation_controls,
@@ -62,6 +60,7 @@ from .scp import (
     add_scp_propagation_lines,
     extract_propagation_positions,
 )
+from .server import compute_grid_size, compute_velocity_colors, create_server
 
 __all__ = [
     # Server
