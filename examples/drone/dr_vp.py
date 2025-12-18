@@ -281,6 +281,8 @@ if __name__ == "__main__":
         results,
         thrust_key="thrust_force",
         viewcone_scale=10.0,
+        show_control_plot="thrust_force",
+        show_control_norm_plot="thrust_force",
     )
     scp_server = create_scp_animated_plotting_server(
         results,
