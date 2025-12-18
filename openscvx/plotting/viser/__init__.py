@@ -66,7 +66,11 @@ from .animated import (
 )
 
 # Plotly integration
-from .plotly_integration import add_animated_plotly_marker, add_animated_vector_norm_plot
+from .plotly_integration import (
+    add_animated_plotly_marker,
+    add_animated_plotly_vline,
+    add_animated_vector_norm_plot,
+)
 
 # Static primitives
 from .primitives import (
@@ -110,6 +114,7 @@ __all__ = [
     "add_animation_controls",
     # Plotly integration
     "add_animated_plotly_marker",
+    "add_animated_plotly_vline",
     "add_animated_vector_norm_plot",
     # SCP visualization
     "add_scp_iteration_nodes",

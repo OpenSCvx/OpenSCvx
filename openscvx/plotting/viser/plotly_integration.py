@@ -11,6 +11,101 @@ import viser
 from openscvx.algorithms import OptimizationResults
 
 
+def add_animated_plotly_vline(
+    server: viser.ViserServer,
+    fig: go.Figure,
+    time_array: np.ndarray,
+    use_trajectory_indexing: bool = True,
+    line_color: str = "red",
+    line_width: int = 2,
+    line_dash: str = "dash",
+    annotation_text: str = "Current",
+    annotation_position: str = "top",
+    folder_name: str | None = None,
+    aspect: float = 1.5,
+) -> tuple:
+    """Add a plotly figure to viser GUI with an animated vertical line.
+
+    This function takes any plotly figure and adds an animated vertical line that
+    synchronizes with viser's 3D animation timeline. The line shows the current
+    time position as the animation plays.
+
+    This is more generic than add_animated_plotly_marker() as it works for any
+    number of traces without needing to specify y-data for each.
+
+    Args:
+        server: ViserServer instance
+        fig: Plotly figure to display
+        time_array: Time values corresponding to animation frames (N,).
+            This should match the time array passed to add_animation_controls().
+        use_trajectory_indexing: If True, frame_idx maps directly to time indices.
+            If False, searches for nearest time value (use for node-only data).
+        line_color: Color of the vertical line
+        line_width: Width of the vertical line in pixels
+        line_dash: Dash style - "solid", "dash", "dot", "dashdot"
+        annotation_text: Text to show on the line
+        annotation_position: Position of annotation - "top", "bottom", "top left", etc.
+        folder_name: Optional GUI folder name to organize plots
+        aspect: Aspect ratio for plot display (width/height)
+
+    Returns:
+        Tuple of (plot_handle, update_callback)
+
+    Example::
+
+        from openscvx.plotting import plot_control, viser
+
+        # Create any plotly figure
+        fig = plot_control(results, "thrust_force")
+
+        # Add to viser with animated vertical line
+        _, update_plot = viser.add_animated_plotly_vline(
+            server, fig,
+            time_array=results.trajectory["time"].flatten(),
+        )
+
+        # Add to animation callbacks
+        update_callbacks.append(update_plot)
+    """
+    # Add vertical line to figure
+    fig.add_vline(
+        x=time_array[0],
+        line_dash=line_dash,
+        line_color=line_color,
+        line_width=line_width,
+        annotation_text=annotation_text,
+        annotation_position=annotation_position,
+    )
+
+    # Add to viser GUI
+    if folder_name:
+        with server.gui.add_folder(folder_name):
+            plot_handle = server.gui.add_plotly(figure=fig, aspect=aspect)
+    else:
+        plot_handle = server.gui.add_plotly(figure=fig, aspect=aspect)
+
+    # Create update callback
+    def update(frame_idx: int) -> None:
+        """Update vertical line position based on current frame."""
+        if use_trajectory_indexing:
+            # Direct indexing: frame_idx corresponds to time index
+            idx = min(frame_idx, len(time_array) - 1)
+        else:
+            # Search for nearest time (for node-only data)
+            current_time = time_array[frame_idx]
+            idx = min(frame_idx, len(time_array) - 1)
+
+        # Update vertical line position (last shape added)
+        current_time = time_array[idx]
+        fig.layout.shapes[-1].x0 = current_time
+        fig.layout.shapes[-1].x1 = current_time
+
+        # Trigger viser update
+        plot_handle.figure = fig
+
+    return plot_handle, update
+
+
 def add_animated_plotly_marker(
     server: viser.ViserServer,
     fig: go.Figure,

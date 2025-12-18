@@ -16,6 +16,7 @@ import viser
 from openscvx.algorithms import OptimizationResults
 from openscvx.plotting import plot_control
 from openscvx.plotting.viser import (
+    add_animated_plotly_vline,
     add_animated_trail,
     add_animated_vector_norm_plot,
     add_animation_controls,
@@ -223,16 +224,14 @@ def create_animated_plotting_server(
             fig = plot_control(results, show_control_plot, show="both")
 
             # Clean up legend: hide all node entries and unify their color
-            # We'll add a single "Nodes" entry at the end
             node_color = "cyan"
             for trace in fig.data:
                 if "(nodes)" in trace.name.lower() or "nodes" in trace.name.lower():
-                    # Hide from legend and set consistent color
                     trace.showlegend = False
                     trace.legendgroup = "nodes"
                     trace.marker.color = node_color
 
-            # Add a single "Nodes" legend entry (invisible dummy trace)
+            # Add single "Nodes" legend entry
             fig.add_trace(
                 go.Scatter(
                     x=[None],
@@ -245,59 +244,23 @@ def create_animated_plotting_server(
                 )
             )
 
-            # Determine data source for animated markers
+            # Determine data source for vertical line position
             if has_in_trajectory:
                 time_data = results.trajectory["time"].flatten()
-                control_data = results.trajectory[show_control_plot]
                 use_trajectory_indexing = True
             else:
                 time_data = results.nodes["time"].flatten()
-                control_data = results.nodes[show_control_plot]
                 use_trajectory_indexing = False
 
-            # Handle both scalar and vector controls
-            n_components = 1 if control_data.ndim == 1 else control_data.shape[1]
-
-            # Add marker traces for each component (all same color, only first in legend)
-            marker_trace_indices = []
-            marker_color = "red"
-            for i in range(n_components):
-                y_data = control_data if n_components == 1 else control_data[:, i]
-                marker_trace = go.Scatter(
-                    x=[time_data[0]],
-                    y=[y_data[0]],
-                    mode="markers",
-                    marker={"color": marker_color, "size": 12, "symbol": "circle"},
-                    name="Current",
-                    legendgroup="current",
-                    showlegend=(i == 0),
-                )
-                fig.add_trace(marker_trace)
-                marker_trace_indices.append(len(fig.data) - 1)
-
-            # Add figure to GUI with descriptive folder
-            with server.gui.add_folder(f"{show_control_plot} Components"):
-                plot_handle = server.gui.add_plotly(figure=fig, aspect=1.5)
-
-            # Create single update callback that updates all markers
-            def update_control_components(frame_idx: int) -> None:
-                """Update all component markers based on current frame."""
-                if use_trajectory_indexing:
-                    idx = min(frame_idx, len(time_data) - 1)
-                else:
-                    current_time = traj_time.flatten()[frame_idx]
-                    idx = min(np.searchsorted(time_data, current_time), len(time_data) - 1)
-
-                # Update each marker
-                for i, trace_idx in enumerate(marker_trace_indices):
-                    y_data = control_data if n_components == 1 else control_data[:, i]
-                    fig.data[trace_idx].x = [time_data[idx]]
-                    fig.data[trace_idx].y = [y_data[idx]]
-
-                # Trigger viser update
-                plot_handle.figure = fig
-
-            update_callbacks.append(update_control_components)
+            # Add animated vertical line using generic utility
+            _, update_vline = add_animated_plotly_vline(
+                server,
+                fig,
+                time_array=time_data,
+                use_trajectory_indexing=use_trajectory_indexing,
+                folder_name=f"{show_control_plot} Components",
+            )
+            update_callbacks.append(update_vline)
 
     # Add animation controls
     add_animation_controls(server, traj_time, update_callbacks, loop=loop_animation)
