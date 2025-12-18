@@ -360,221 +360,73 @@ def plot_projections_2d(
         specs=[[{}, {}], [{}, None]],
     )
 
-    # Compute velocity colors if velocity variable is provided
+    # Subplot positions: (x_idx, y_idx, row, col)
+    subplots = [(0, 1, 1, 1), (0, 2, 1, 2), (1, 2, 2, 1)]
+
+    # Compute velocity norms if velocity variable is provided
     traj_vel_norm = None
     node_vel_norm = None
     if velocity_var_name is not None:
         if has_trajectory and velocity_var_name in result.trajectory:
-            vel_data = result.trajectory[velocity_var_name]
-            traj_vel_norm = np.linalg.norm(vel_data, axis=1)
+            traj_vel_norm = np.linalg.norm(result.trajectory[velocity_var_name], axis=1)
         if has_nodes and velocity_var_name in result.nodes:
-            vel_data = result.nodes[velocity_var_name]
-            node_vel_norm = np.linalg.norm(vel_data, axis=1)
+            node_vel_norm = np.linalg.norm(result.nodes[velocity_var_name], axis=1)
+
+    # Colorbar config (only shown once)
+    colorbar_cfg = {"title": "‖velocity‖", "x": 1.02, "y": 0.5, "len": 0.9}
 
     # Plot trajectory if available and requested
     if show in ("both", "trajectory") and has_trajectory:
         data = result.trajectory[var_name]
-
-        if traj_vel_norm is not None:
-            # Use markers colored by velocity magnitude
-            marker_common = {
-                "size": 4,
-                "color": traj_vel_norm,
-                "colorscale": cmap,
-                "showscale": True,
-                "colorbar": {
-                    "title": "‖velocity‖",
-                    "x": 1.02,
-                    "y": 0.5,
-                    "len": 0.9,
-                },
-            }
-            fig.add_trace(
-                go.Scatter(
-                    x=data[:, 0],
-                    y=data[:, 1],
-                    mode="markers",
-                    marker=marker_common,
-                    name="Trajectory",
-                    legendgroup="trajectory",
-                    showlegend=True,
-                ),
-                row=1,
-                col=1,
-            )
-            # Hide colorbar on subsequent subplots
-            marker_no_colorbar = {**marker_common, "showscale": False}
-            fig.add_trace(
-                go.Scatter(
-                    x=data[:, 0],
-                    y=data[:, 2],
-                    mode="markers",
-                    marker=marker_no_colorbar,
-                    name="Trajectory",
-                    legendgroup="trajectory",
-                    showlegend=False,
-                ),
-                row=1,
-                col=2,
-            )
-            fig.add_trace(
-                go.Scatter(
-                    x=data[:, 1],
-                    y=data[:, 2],
-                    mode="markers",
-                    marker=marker_no_colorbar,
-                    name="Trajectory",
-                    legendgroup="trajectory",
-                    showlegend=False,
-                ),
-                row=2,
-                col=1,
-            )
-        else:
-            # Simple line plot without velocity coloring
-            fig.add_trace(
-                go.Scatter(
-                    x=data[:, 0],
-                    y=data[:, 1],
-                    mode="lines",
-                    line={"color": "green", "width": 2},
-                    name="Trajectory",
-                    legendgroup="trajectory",
-                    showlegend=True,
-                ),
-                row=1,
-                col=1,
-            )
-            fig.add_trace(
-                go.Scatter(
-                    x=data[:, 0],
-                    y=data[:, 2],
-                    mode="lines",
-                    line={"color": "green", "width": 2},
-                    name="Trajectory",
-                    legendgroup="trajectory",
-                    showlegend=False,
-                ),
-                row=1,
-                col=2,
-            )
-            fig.add_trace(
-                go.Scatter(
-                    x=data[:, 1],
-                    y=data[:, 2],
-                    mode="lines",
-                    line={"color": "green", "width": 2},
-                    name="Trajectory",
-                    legendgroup="trajectory",
-                    showlegend=False,
-                ),
-                row=2,
-                col=1,
-            )
+        for i, (xi, yi, row, col) in enumerate(subplots):
+            if traj_vel_norm is not None:
+                marker = {
+                    "size": 4,
+                    "color": traj_vel_norm,
+                    "colorscale": cmap,
+                    "showscale": (i == 0),
+                    "colorbar": colorbar_cfg if i == 0 else None,
+                }
+                fig.add_trace(
+                    go.Scatter(
+                        x=data[:, xi], y=data[:, yi], mode="markers", marker=marker,
+                        name="Trajectory", legendgroup="trajectory", showlegend=(i == 0),
+                    ),
+                    row=row, col=col,
+                )
+            else:
+                fig.add_trace(
+                    go.Scatter(
+                        x=data[:, xi], y=data[:, yi], mode="lines",
+                        line={"color": "green", "width": 2},
+                        name="Trajectory", legendgroup="trajectory", showlegend=(i == 0),
+                    ),
+                    row=row, col=col,
+                )
 
     # Plot nodes if available and requested
     if show in ("both", "nodes") and has_nodes:
         data = result.nodes[var_name]
-
-        if node_vel_norm is not None:
-            # Use markers colored by velocity magnitude
-            # Don't show colorbar if trajectory already has one
-            show_colorbar = traj_vel_norm is None
-            marker_common = {
-                "size": 8,
-                "color": node_vel_norm,
-                "colorscale": cmap,
-                "showscale": show_colorbar,
-                "colorbar": {
-                    "title": "‖velocity‖",
-                    "x": 1.02,
-                    "y": 0.5,
-                    "len": 0.9,
+        # Only show colorbar on nodes if trajectory doesn't have one
+        show_node_colorbar = (traj_vel_norm is None) and (node_vel_norm is not None)
+        for i, (xi, yi, row, col) in enumerate(subplots):
+            if node_vel_norm is not None:
+                marker = {
+                    "size": 8,
+                    "color": node_vel_norm,
+                    "colorscale": cmap,
+                    "showscale": show_node_colorbar and (i == 0),
+                    "colorbar": colorbar_cfg if (show_node_colorbar and i == 0) else None,
+                    "line": {"color": "white", "width": 1},
                 }
-                if show_colorbar
-                else None,
-                "line": {"color": "white", "width": 1},
-            }
+            else:
+                marker = {"color": "cyan", "size": 6}
             fig.add_trace(
                 go.Scatter(
-                    x=data[:, 0],
-                    y=data[:, 1],
-                    mode="markers",
-                    marker=marker_common,
-                    name="Nodes",
-                    legendgroup="nodes",
-                    showlegend=True,
+                    x=data[:, xi], y=data[:, yi], mode="markers", marker=marker,
+                    name="Nodes", legendgroup="nodes", showlegend=(i == 0),
                 ),
-                row=1,
-                col=1,
-            )
-            marker_no_colorbar = {**marker_common, "showscale": False, "colorbar": None}
-            fig.add_trace(
-                go.Scatter(
-                    x=data[:, 0],
-                    y=data[:, 2],
-                    mode="markers",
-                    marker=marker_no_colorbar,
-                    name="Nodes",
-                    legendgroup="nodes",
-                    showlegend=False,
-                ),
-                row=1,
-                col=2,
-            )
-            fig.add_trace(
-                go.Scatter(
-                    x=data[:, 1],
-                    y=data[:, 2],
-                    mode="markers",
-                    marker=marker_no_colorbar,
-                    name="Nodes",
-                    legendgroup="nodes",
-                    showlegend=False,
-                ),
-                row=2,
-                col=1,
-            )
-        else:
-            # Simple markers without velocity coloring
-            fig.add_trace(
-                go.Scatter(
-                    x=data[:, 0],
-                    y=data[:, 1],
-                    mode="markers",
-                    marker={"color": "cyan", "size": 6},
-                    name="Nodes",
-                    legendgroup="nodes",
-                    showlegend=True,
-                ),
-                row=1,
-                col=1,
-            )
-            fig.add_trace(
-                go.Scatter(
-                    x=data[:, 0],
-                    y=data[:, 2],
-                    mode="markers",
-                    marker={"color": "cyan", "size": 6},
-                    name="Nodes",
-                    legendgroup="nodes",
-                    showlegend=False,
-                ),
-                row=1,
-                col=2,
-            )
-            fig.add_trace(
-                go.Scatter(
-                    x=data[:, 1],
-                    y=data[:, 2],
-                    mode="markers",
-                    marker={"color": "cyan", "size": 6},
-                    name="Nodes",
-                    legendgroup="nodes",
-                    showlegend=False,
-                ),
-                row=2,
-                col=1,
+                row=row, col=col,
             )
 
     # Set axis titles
