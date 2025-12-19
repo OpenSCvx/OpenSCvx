@@ -4,15 +4,21 @@ from plotly.subplots import make_subplots
 from openscvx.algorithms import OptimizationResults
 
 
-def _get_var_dim(result: OptimizationResults, var_name: str, var_list: list) -> int:
-    """Get dimensionality of a variable from the metadata."""
+def _get_var(result: OptimizationResults, var_name: str, var_list: list):
+    """Get a variable object by name from the metadata list."""
     for var in var_list:
         if var.name == var_name:
-            s = var._slice
-            if isinstance(s, slice):
-                return (s.stop or 1) - (s.start or 0)
-            return 1
+            return var
     raise ValueError(f"Variable '{var_name}' not found")
+
+
+def _get_var_dim(result: OptimizationResults, var_name: str, var_list: list) -> int:
+    """Get dimensionality of a variable from the metadata."""
+    var = _get_var(result, var_name, var_list)
+    s = var._slice
+    if isinstance(s, slice):
+        return (s.stop or 1) - (s.start or 0)
+    return 1
 
 
 def _add_component_traces(
@@ -24,8 +30,25 @@ def _add_component_traces(
     col: int,
     show_legend: bool,
     show: str = "both",
+    min_val: float | None = None,
+    max_val: float | None = None,
 ):
-    """Add traces for a single component of a variable to a subplot."""
+    """Add traces for a single component of a variable to a subplot.
+
+    Args:
+        fig: Plotly figure to add traces to
+        result: Optimization results
+        var_name: Name of the variable
+        component_idx: Index of the component to plot
+        row: Subplot row
+        col: Subplot column
+        show_legend: Whether to show legend entries
+        show: What to plot - "both", "nodes", or "trajectory"
+        min_val: Optional minimum bound to show as horizontal line
+        max_val: Optional maximum bound to show as horizontal line
+    """
+    import numpy as np
+
     t_nodes = result.nodes["time"].flatten()
     has_trajectory = bool(result.trajectory) and var_name in result.trajectory
     t_full = result.trajectory["time"].flatten() if has_trajectory else None
@@ -62,6 +85,23 @@ def _add_component_traces(
                 legendgroup="nodes",
                 marker={"color": "cyan", "size": 6, "symbol": "circle"},
             ),
+            row=row,
+            col=col,
+        )
+
+    # Add horizontal bound lines if provided
+    # Only add if finite (skip -inf/inf bounds)
+    if min_val is not None and np.isfinite(min_val):
+        fig.add_hline(
+            y=min_val,
+            line={"color": "red", "width": 1.5, "dash": "dash"},
+            row=row,
+            col=col,
+        )
+    if max_val is not None and np.isfinite(max_val):
+        fig.add_hline(
+            y=max_val,
+            line={"color": "red", "width": 1.5, "dash": "dash"},
             row=row,
             col=col,
         )
@@ -213,8 +253,23 @@ def plot_states(
     for idx, (_, var_name, comp_idx) in enumerate(components):
         row = (idx // n_cols) + 1
         col = (idx % n_cols) + 1
+
+        # Get bounds for this component
+        var = _get_var(result, var_name, result._states)
+        min_val = var.min[comp_idx] if var.min is not None else None
+        max_val = var.max[comp_idx] if var.max is not None else None
+
         _add_component_traces(
-            fig, result, var_name, comp_idx, row, col, show_legend=(idx == 0), show=show
+            fig,
+            result,
+            var_name,
+            comp_idx,
+            row,
+            col,
+            show_legend=(idx == 0),
+            show=show,
+            min_val=min_val,
+            max_val=max_val,
         )
 
     # Add x-axis labels to bottom row
@@ -369,8 +424,23 @@ def plot_controls(
     for idx, (_, var_name, comp_idx) in enumerate(components):
         row = (idx // n_cols) + 1
         col = (idx % n_cols) + 1
+
+        # Get bounds for this component
+        var = _get_var(result, var_name, result._controls)
+        min_val = var.min[comp_idx] if var.min is not None else None
+        max_val = var.max[comp_idx] if var.max is not None else None
+
         _add_component_traces(
-            fig, result, var_name, comp_idx, row, col, show_legend=(idx == 0), show=show
+            fig,
+            result,
+            var_name,
+            comp_idx,
+            row,
+            col,
+            show_legend=(idx == 0),
+            show=show,
+            min_val=min_val,
+            max_val=max_val,
         )
 
     # Add x-axis labels to bottom row
