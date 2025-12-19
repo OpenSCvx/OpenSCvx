@@ -23,7 +23,10 @@ grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 import openscvx as ox
-from examples.plotting import plot_animation
+from examples.plotting_viser import (
+    create_animated_plotting_server,
+    create_scp_animated_plotting_server,
+)
 from openscvx import Problem
 from openscvx.utils import gen_vertices, rot
 
@@ -240,7 +243,7 @@ problem = Problem(
     N=n,
 )
 
-problem.settings.prp.dt = 0.1
+problem.settings.prp.dt = 0.01
 
 
 problem.settings.scp.w_tr = 2e0  # Weight on the Trust Reigon
@@ -273,5 +276,19 @@ if __name__ == "__main__":
 
     results.update(plotting_dict)
 
-    plot_animation(results, problem.settings).show()
-    # plot_animation_pyqtgraph(results, problem.settings)
+    # Create both visualization servers (viser auto-assigns ports)
+    traj_server = create_animated_plotting_server(
+        results,
+        thrust_key="thrust_force",
+        viewcone_scale=10.0,
+        show_control_plot="thrust_force",
+        show_control_norm_plot="thrust_force",
+    )
+    scp_server = create_scp_animated_plotting_server(
+        results,
+        attitude_stride=3,
+        frame_duration_ms=200,
+    )
+
+    # Keep both servers running
+    traj_server.sleep_forever()

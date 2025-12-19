@@ -23,7 +23,6 @@ grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 import openscvx as ox
-from examples.plotting import plot_animation
 from openscvx import Problem
 
 n = 12  # Number of Nodes
@@ -229,5 +228,3 @@ if __name__ == "__main__":
     results = problem.post_process()
 
     results.update(plotting_dict)
-
-    plot_animation(results, problem.settings).show()

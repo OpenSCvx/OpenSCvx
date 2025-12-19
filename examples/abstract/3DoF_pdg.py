@@ -21,8 +21,12 @@ grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 import openscvx as ox
-from examples.plotting import plot_control_norm, plot_xy_xz_yz
+from examples.plotting_viser import (
+    create_pdg_animated_plotting_server,
+    create_scp_animated_plotting_server,
+)
 from openscvx import Problem
+from openscvx.plotting import plot_controls, plot_projections_2d, plot_states, plot_vector_norm
 
 n = 10
 total_time = 95.0  # Total simulation time
@@ -159,6 +163,7 @@ problem.settings.cvx.solver_args = {"enforce_dpp": True}
 plotting_dict = {
     "rho_min": rho_min,
     "rho_max": rho_max,
+    "glideslope_angle_deg": 86.0,
 }
 
 if __name__ == "__main__":
@@ -167,12 +172,26 @@ if __name__ == "__main__":
     results = problem.post_process()
     results.update(plotting_dict)
 
-    # plot_animation_3DoF_rocket(results, problem.settings).show()
-    # plot_scp_animation(results, problem.settings).show()
-    # plot_state(results, problem.settings).show()
-    # plot_control(results, problem.settings).show()
-    plot_control_norm(results, problem.settings).show()
-    plot_xy_xz_yz(results, problem.settings).show()
+    plot_states(results, ["position", "velocity"]).show()
+    plot_controls(results, ["thrust"]).show()
+    plot_vector_norm(results, "thrust", bounds=(rho_min, rho_max)).show()
+    plot_projections_2d(results, velocity_var_name="velocity").show()
 
-    # If installed with extras, you can use the following to plot with pyqtgraph
-    # plot_animation_pyqtgraph(results, problem.settings)
+    # Create PDG trajectory visualization
+    # scene_scale=100 brings 2000m scale down to ~20m for viser
+    traj_server = create_pdg_animated_plotting_server(
+        results,
+        thrust_key="thrust",
+        glideslope_angle_deg=86.0,
+        scene_scale=100.0,
+    )
+
+    # Create SCP iteration visualization
+    scp_server = create_scp_animated_plotting_server(
+        results,
+        frame_duration_ms=200,
+        scene_scale=100.0,
+    )
+
+    # Keep servers running
+    traj_server.sleep_forever()
