@@ -39,13 +39,13 @@ from .plotting import (
     plot_control_component,
     plot_controls,
     plot_projections_2d,
-    plot_scp_iteration_animation,
     plot_state_component,
     plot_states,
     plot_trust_region_heatmap,
     plot_vector_norm,
     plot_virtual_control_heatmap,
 )
+from .scp_iteration_animation import plot_scp_iteration_animation
 
 __all__ = [
     # 2D plotting functions (plotly)
