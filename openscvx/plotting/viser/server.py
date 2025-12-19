@@ -3,6 +3,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import viser
+from viser.theme import TitlebarButton, TitlebarConfig
 
 
 def compute_velocity_colors(vel: np.ndarray, cmap_name: str = "viridis") -> np.ndarray:
@@ -56,8 +57,33 @@ def create_server(
         ViserServer instance with grid and origin frame
     """
     server = viser.ViserServer()
-    if dark_mode:
-        server.gui.configure_theme(dark_mode=True)
+
+    # Configure theme with OpenSCvx branding
+    # TitlebarButton and TitlebarConfig are TypedDict classes (create as plain dicts)
+    buttons = (
+        TitlebarButton(
+            text="Getting Started",
+            icon="Description",
+            href="https://haynec.github.io/OpenSCvx/latest/getting-started/",
+        ),
+        TitlebarButton(
+            text="Docs",
+            icon="Description",
+            href="https://haynec.github.io/OpenSCvx/",
+        ),
+        TitlebarButton(
+            text="GitHub",
+            icon="GitHub",
+            href="https://github.com/haynec/OpenSCvx",
+        ),
+    )
+
+    titlebar_config = TitlebarConfig(buttons=buttons, image=None)
+
+    server.gui.configure_theme(
+        titlebar_content=titlebar_config,
+        dark_mode=dark_mode,
+    )
 
     grid_size = compute_grid_size(pos)
     server.scene.add_grid(
