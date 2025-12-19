@@ -39,6 +39,7 @@ from .plotting import (
     plot_control_component,
     plot_controls,
     plot_projections_2d,
+    plot_scp_iteration_animation,
     plot_state_component,
     plot_states,
     plot_trust_region_heatmap,
@@ -56,6 +57,7 @@ __all__ = [
     "plot_vector_norm",
     "plot_trust_region_heatmap",
     "plot_virtual_control_heatmap",
+    "plot_scp_iteration_animation",
     # 3D visualization submodule (viser)
     "viser",
 ]

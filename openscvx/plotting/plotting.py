@@ -756,53 +756,50 @@ def plot_virtual_control_heatmap(result: OptimizationResults):
     return fig
 
 def plot_scp_iteration_animation(
-    result: OptimizationResults = None,
-    params: Config = None,
-    problem=None,
-    state_names=None,
-    control_names=None,
+    result: OptimizationResults,
+    state_names: list[str] | None = None,
+    control_names: list[str] | None = None,
 ):
     """Create an animated plot showing SCP iteration convergence.
 
+    Shows the evolution of states and controls across SCP iterations, including
+    multi-shot propagation trajectories (if available) and optimization nodes.
+
     Args:
-        result: Optimization results containing iteration history (optional if problem provided)
-        params: Configuration with state/control bounds and metadata (optional if problem provided)
-        problem: Problem instance to extract result and params from (optional)
-        state_names: Optional list of state names to include in the animation
-        control_names: Optional list of control names to include in the animation
+        result: Optimization results containing iteration history
+        state_names: Optional list of state names to include. If None, plots all states.
+        control_names: Optional list of control names to include. If None, plots all controls.
 
     Returns:
         Plotly figure with animation frames for each SCP iteration
+
+    Example:
+        >>> results = problem.solve()
+        >>> plot_scp_iteration_animation(results, ["position", "velocity"]).show()
     """
-    # If problem provided, extract result and params from it
-    if problem is not None:
-        if result is None:
-            # Check if post_process() was called and use propagated result
-            if hasattr(problem._solution, "_propagated_result"):
-                result = problem._solution._propagated_result
-            else:
-                from openscvx.algorithms import format_result
+    import numpy as np
 
-                result = format_result(problem, problem._solution, True)
-        if params is None:
-            params = problem.settings
+    if not result.X:
+        raise ValueError("No iteration history available in result.X")
 
-    if result is None or params is None:
-        raise ValueError("Must provide either (result, params) or problem")
+    # Derive dimensions from result data
+    n_x = result.X[0].shape[1]  # n_states from first iteration's X
+    n_u = result.U[0].shape[1]  # n_controls from first iteration's U
+
+    # Find time slice by looking for "time" state
+    time_slice = None
+    for state in result._states:
+        if state.name.lower() == "time":
+            time_slice = state._slice
+            break
 
     # Get iteration history
-    V_history = (
-        result.discretization_history
-        if hasattr(result, "discretization_history") and result.discretization_history
-        else []
-    )
+    V_history = result.discretization_history if result.discretization_history else []
     U_history = result.U
 
     # Extract multi-shot propagation trajectories from V_history
     X_prop_history = []  # Multi-shot propagated trajectories
     if V_history:
-        n_x = params.sim.n_states
-        n_u = params.sim.n_controls
         i4 = n_x + n_x * n_x + 2 * n_x * n_u
 
         for V in V_history:
@@ -927,21 +924,27 @@ def plot_scp_iteration_animation(
     for _ in range(2000):
         fig.add_trace(go.Scatter(x=[], y=[], mode="lines", showlegend=False))
 
-    time_slice = params.sim.time_slice
-
-    # Prepare bounds data for each subplot
+    # Prepare bounds data for each subplot (use bounds from variable metadata)
     state_bounds_data = {}
-    for state_idx, state in enumerate(expanded_states):
-        idx = state._slice.start
-        x_min = params.sim.x.min[idx] if params.sim.x.min is not None else -np.inf
-        x_max = params.sim.x.max[idx] if params.sim.x.max is not None else np.inf
+    for state_idx, exp_state in enumerate(expanded_states):
+        idx = exp_state._slice.start
+        # Find the parent state to get bounds
+        parent_name = exp_state.name.rsplit("_", 1)[0] if "_" in exp_state.name else exp_state.name
+        parent_state = _get_var(result, parent_name, result._states)
+        comp_idx = idx - (parent_state._slice.start if isinstance(parent_state._slice, slice) else parent_state._slice)
+        x_min = parent_state.min[comp_idx] if parent_state.min is not None else -np.inf
+        x_max = parent_state.max[comp_idx] if parent_state.max is not None else np.inf
         state_bounds_data[state_idx] = (x_min, x_max)
 
     control_bounds_data = {}
-    for control_idx, control in enumerate(expanded_controls):
-        idx = control._slice.start
-        u_min = params.sim.u.min[idx] if params.sim.u.min is not None else -np.inf
-        u_max = params.sim.u.max[idx] if params.sim.u.max is not None else np.inf
+    for control_idx, exp_control in enumerate(expanded_controls):
+        idx = exp_control._slice.start
+        # Find the parent control to get bounds
+        parent_name = exp_control.name.rsplit("_", 1)[0] if "_" in exp_control.name else exp_control.name
+        parent_control = _get_var(result, parent_name, result._controls)
+        comp_idx = idx - (parent_control._slice.start if isinstance(parent_control._slice, slice) else parent_control._slice)
+        u_min = parent_control.min[comp_idx] if parent_control.min is not None else -np.inf
+        u_max = parent_control.max[comp_idx] if parent_control.max is not None else np.inf
         control_bounds_data[control_idx] = (u_min, u_max)
 
     # Create animation frames
@@ -954,7 +957,7 @@ def plot_scp_iteration_animation(
         t_nodes = (
             X_nodes[:, time_slice].flatten()
             if time_slice is not None
-            else np.linspace(0, params.sim.total_time, X_nodes.shape[0])
+            else np.linspace(0, result.t_final, X_nodes.shape[0])
         )
 
         frame_data = []
