@@ -29,7 +29,6 @@ def _add_component_traces(
     row: int,
     col: int,
     show_legend: bool,
-    show: str = "both",
     min_val: float | None = None,
     max_val: float | None = None,
 ):
@@ -43,7 +42,6 @@ def _add_component_traces(
         row: Subplot row
         col: Subplot column
         show_legend: Whether to show legend entries
-        show: What to plot - "both", "nodes", or "trajectory"
         min_val: Optional minimum bound to show as horizontal line
         max_val: Optional maximum bound to show as horizontal line
     """
@@ -54,7 +52,7 @@ def _add_component_traces(
     t_full = result.trajectory["time"].flatten() if has_trajectory else None
 
     # Plot propagated trajectory if available
-    if show in ("both", "trajectory") and has_trajectory:
+    if has_trajectory:
         data = result.trajectory[var_name]
         y = data if data.ndim == 1 else data[:, component_idx]
         fig.add_trace(
@@ -72,7 +70,7 @@ def _add_component_traces(
         )
 
     # Plot optimization nodes
-    if show in ("both", "nodes") and var_name in result.nodes:
+    if var_name in result.nodes:
         data = result.nodes[var_name]
         y = data if data.ndim == 1 else data[:, component_idx]
         fig.add_trace(
@@ -116,7 +114,6 @@ def plot_state_component(
     result: OptimizationResults,
     state_name: str,
     component: int = 0,
-    show: str = "both",
 ) -> go.Figure:
     """Plot a single component of a state variable vs time.
 
@@ -127,7 +124,6 @@ def plot_state_component(
         result: Optimization results containing state trajectories
         state_name: Name of the state variable
         component: Component index (0-indexed). For scalar states, use 0.
-        show: What to plot - "both", "nodes", or "trajectory"
 
     Returns:
         Plotly figure with single plot
@@ -138,8 +134,6 @@ def plot_state_component(
     available = {s.name for s in result._states}
     if state_name not in available:
         raise ValueError(f"State '{state_name}' not found. Available: {sorted(available)}")
-    if show not in ("both", "nodes", "trajectory"):
-        raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
 
     dim = _get_var_dim(result, state_name, result._states)
     if component < 0 or component >= dim:
@@ -154,7 +148,7 @@ def plot_state_component(
     fig = go.Figure()
     fig.update_layout(title_text=label, template="plotly_dark")
 
-    if show in ("both", "trajectory") and has_trajectory:
+    if has_trajectory:
         data = result.trajectory[state_name]
         y = data if data.ndim == 1 else data[:, component]
         fig.add_trace(
@@ -167,7 +161,7 @@ def plot_state_component(
             )
         )
 
-    if show in ("both", "nodes") and state_name in result.nodes:
+    if state_name in result.nodes:
         data = result.nodes[state_name]
         y = data if data.ndim == 1 else data[:, component]
         fig.add_trace(
@@ -189,7 +183,6 @@ def plot_states(
     result: OptimizationResults,
     state_names: list[str] | None = None,
     include_private: bool = False,
-    show: str = "both",
     cols: int = 4,
 ) -> go.Figure:
     """Plot state variables in a subplot grid.
@@ -201,7 +194,6 @@ def plot_states(
         result: Optimization results containing state trajectories
         state_names: List of state names to plot. If None, plots all states.
         include_private: Whether to include private states (names starting with '_')
-        show: What to plot - "both", "nodes", or "trajectory"
         cols: Maximum number of columns in subplot grid
 
     Returns:
@@ -212,8 +204,6 @@ def plot_states(
         >>> plot_states(result, ["position", "velocity"])  # 6 subplots
         >>> plot_states(result)  # All states
     """
-    if show not in ("both", "nodes", "trajectory"):
-        raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
 
     states = result._states
     if not include_private:
@@ -267,7 +257,6 @@ def plot_states(
             row,
             col,
             show_legend=(idx == 0),
-            show=show,
             min_val=min_val,
             max_val=max_val,
         )
@@ -288,7 +277,6 @@ def plot_control_component(
     result: OptimizationResults,
     control_name: str,
     component: int = 0,
-    show: str = "both",
 ) -> go.Figure:
     """Plot a single component of a control variable vs time.
 
@@ -299,7 +287,6 @@ def plot_control_component(
         result: Optimization results containing control trajectories
         control_name: Name of the control variable
         component: Component index (0-indexed). For scalar controls, use 0.
-        show: What to plot - "both", "nodes", or "trajectory"
 
     Returns:
         Plotly figure with single plot
@@ -310,8 +297,6 @@ def plot_control_component(
     available = {c.name for c in result._controls}
     if control_name not in available:
         raise ValueError(f"Control '{control_name}' not found. Available: {sorted(available)}")
-    if show not in ("both", "nodes", "trajectory"):
-        raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
 
     dim = _get_var_dim(result, control_name, result._controls)
     if component < 0 or component >= dim:
@@ -326,7 +311,7 @@ def plot_control_component(
     fig = go.Figure()
     fig.update_layout(title_text=label, template="plotly_dark")
 
-    if show in ("both", "trajectory") and has_trajectory:
+    if has_trajectory:
         data = result.trajectory[control_name]
         y = data if data.ndim == 1 else data[:, component]
         fig.add_trace(
@@ -339,7 +324,7 @@ def plot_control_component(
             )
         )
 
-    if show in ("both", "nodes") and control_name in result.nodes:
+    if control_name in result.nodes:
         data = result.nodes[control_name]
         y = data if data.ndim == 1 else data[:, component]
         fig.add_trace(
@@ -361,7 +346,6 @@ def plot_controls(
     result: OptimizationResults,
     control_names: list[str] | None = None,
     include_private: bool = False,
-    show: str = "both",
     cols: int = 3,
 ) -> go.Figure:
     """Plot control variables in a subplot grid.
@@ -373,7 +357,6 @@ def plot_controls(
         result: Optimization results containing control trajectories
         control_names: List of control names to plot. If None, plots all controls.
         include_private: Whether to include private controls (names starting with '_')
-        show: What to plot - "both", "nodes", or "trajectory"
         cols: Maximum number of columns in subplot grid
 
     Returns:
@@ -383,8 +366,6 @@ def plot_controls(
         >>> plot_controls(result, ["thrust"])  # 3 subplots for x, y, z
         >>> plot_controls(result)  # All controls
     """
-    if show not in ("both", "nodes", "trajectory"):
-        raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
 
     controls = result._controls
     if not include_private:
@@ -438,7 +419,6 @@ def plot_controls(
             row,
             col,
             show_legend=(idx == 0),
-            show=show,
             min_val=min_val,
             max_val=max_val,
         )
@@ -493,7 +473,6 @@ def plot_projections_2d(
     var_name: str = "position",
     velocity_var_name: str | None = None,
     cmap: str = "viridis",
-    show: str = "both",
 ):
     """Plot XY, XZ, YZ projections of a 3D variable.
 
@@ -505,15 +484,11 @@ def plot_projections_2d(
         velocity_var_name: Optional name of velocity variable for coloring by speed.
             If provided, trajectory points are colored by velocity magnitude.
         cmap: Matplotlib colormap name for velocity coloring (default: "viridis")
-        show: What to plot - "both", "nodes", or "trajectory"
 
     Returns:
         Plotly figure with three subplots (XY, XZ, YZ planes)
     """
     import numpy as np
-
-    if show not in ("both", "nodes", "trajectory"):
-        raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
 
     has_trajectory = bool(result.trajectory) and var_name in result.trajectory
     has_nodes = var_name in result.nodes
@@ -548,8 +523,8 @@ def plot_projections_2d(
     # Colorbar config (only shown once)
     colorbar_cfg = {"title": "‖velocity‖", "x": 1.02, "y": 0.5, "len": 0.9}
 
-    # Plot trajectory if available and requested
-    if show in ("both", "trajectory") and has_trajectory:
+    # Plot trajectory if available
+    if has_trajectory:
         data = result.trajectory[var_name]
         for i, (xi, yi, row, col) in enumerate(subplots):
             if traj_vel_norm is not None:
@@ -588,8 +563,8 @@ def plot_projections_2d(
                     col=col,
                 )
 
-    # Plot nodes if available and requested
-    if show in ("both", "nodes") and has_nodes:
+    # Plot nodes if available
+    if has_nodes:
         data = result.nodes[var_name]
         # Only show colorbar on nodes if trajectory doesn't have one
         show_node_colorbar = (traj_vel_norm is None) and (node_vel_norm is not None)
@@ -653,7 +628,6 @@ def plot_vector_norm(
     result: OptimizationResults,
     var_name: str,
     bounds: tuple[float, float] | None = None,
-    show: str = "both",
 ):
     """Plot the 2-norm of a vector variable over time.
 
@@ -663,15 +637,11 @@ def plot_vector_norm(
         result: Optimization results containing trajectories
         var_name: Name of the vector variable (state or control)
         bounds: Optional (min, max) bounds to show as horizontal dashed lines
-        show: What to plot - "both", "nodes", or "trajectory"
 
     Returns:
         Plotly figure
     """
     import numpy as np
-
-    if show not in ("both", "nodes", "trajectory"):
-        raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
 
     has_trajectory = bool(result.trajectory) and var_name in result.trajectory
     has_nodes = var_name in result.nodes
@@ -686,8 +656,8 @@ def plot_vector_norm(
 
     fig = go.Figure()
 
-    # Plot trajectory norm if available and requested
-    if show in ("both", "trajectory") and has_trajectory:
+    # Plot trajectory norm if available
+    if has_trajectory:
         t_full = result.trajectory["time"].flatten()
         data = result.trajectory[var_name]
         norm = np.linalg.norm(data, axis=1)
@@ -702,8 +672,8 @@ def plot_vector_norm(
             )
         )
 
-    # Plot node norms if available and requested
-    if show in ("both", "nodes") and has_nodes:
+    # Plot node norms if available
+    if has_nodes:
         t_nodes = result.nodes["time"].flatten()
         data = result.nodes[var_name]
         norm = np.linalg.norm(data, axis=1)
