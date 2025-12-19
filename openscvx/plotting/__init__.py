@@ -6,10 +6,20 @@ that can be composed together, not a complete solution that tries to do
 everything for you.
 
 **2D Plots** (plotly-based):
-    Direct imports for time series, projections, and heatmaps::
+    Two-layer API for time series visualization::
 
-        from openscvx.plotting import plot_projections_2d, plot_vector_norm
+        from openscvx.plotting import plot_states, plot_controls, plot_vector_norm
+
+        # High-level: subplot grid with individual scaling per component
+        plot_states(results, ["position", "velocity"]).show()
+        plot_controls(results, ["thrust"]).show()
+
+        # Low-level: single component
+        plot_state_component(results, "position", component=2).show()  # z only
+
+        # Specialized plots
         plot_vector_norm(results, "thrust", bounds=(rho_min, rho_max)).show()
+        plot_projections_2d(results, velocity_var_name="velocity").show()
 
 **3D Visualization** (viser-based):
     The ``viser`` submodule provides composable primitives for building
@@ -26,9 +36,11 @@ For problem-specific visualization examples (drones, rockets, etc.), see
 
 from . import viser
 from .plotting import (
-    plot_control,
+    plot_control_component,
+    plot_controls,
     plot_projections_2d,
-    plot_state,
+    plot_state_component,
+    plot_states,
     plot_trust_region_heatmap,
     plot_vector_norm,
     plot_virtual_control_heatmap,
@@ -36,8 +48,10 @@ from .plotting import (
 
 __all__ = [
     # 2D plotting functions (plotly)
-    "plot_state",
-    "plot_control",
+    "plot_state_component",
+    "plot_states",
+    "plot_control_component",
+    "plot_controls",
     "plot_projections_2d",
     "plot_vector_norm",
     "plot_trust_region_heatmap",

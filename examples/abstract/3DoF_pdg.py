@@ -26,7 +26,7 @@ from examples.plotting_viser import (
     create_scp_animated_plotting_server,
 )
 from openscvx import Problem
-from openscvx.plotting import plot_projections_2d, plot_vector_norm
+from openscvx.plotting import plot_controls, plot_projections_2d, plot_states, plot_vector_norm
 
 n = 10
 total_time = 95.0  # Total simulation time
@@ -172,8 +172,8 @@ if __name__ == "__main__":
     results = problem.post_process()
     results.update(plotting_dict)
 
-    # plot_state(results, problem.settings).show()
-    # plot_control(results, problem.settings).show()
+    plot_states(results, ["position", "velocity"]).show()
+    plot_controls(results, ["thrust"]).show()
     plot_vector_norm(results, "thrust", bounds=(rho_min, rho_max)).show()
     plot_projections_2d(results, velocity_var_name="velocity").show()
 

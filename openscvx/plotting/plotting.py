@@ -15,7 +15,7 @@ def _get_var_dim(result: OptimizationResults, var_name: str, var_list: list) -> 
     raise ValueError(f"Variable '{var_name}' not found")
 
 
-def _plot_timeseries(
+def _add_component_traces(
     fig: go.Figure,
     result: OptimizationResults,
     var_name: str,
@@ -25,7 +25,7 @@ def _plot_timeseries(
     show_legend: bool,
     show: str = "both",
 ):
-    """Add traces for a single component of a variable to the figure."""
+    """Add traces for a single component of a variable to a subplot."""
     t_nodes = result.nodes["time"].flatten()
     has_trajectory = bool(result.trajectory) and var_name in result.trajectory
     t_full = result.trajectory["time"].flatten() if has_trajectory else None
@@ -67,20 +67,33 @@ def _plot_timeseries(
         )
 
 
-def plot_state(
+# =============================================================================
+# State Plotting
+# =============================================================================
+
+
+def plot_state_component(
     result: OptimizationResults,
     state_name: str,
+    component: int = 0,
     show: str = "both",
-):
-    """Plot a single state variable (all components on one figure).
+) -> go.Figure:
+    """Plot a single component of a state variable vs time.
+
+    This is the low-level function for plotting one scalar value over time.
+    For plotting all components of a state, use plot_states().
 
     Args:
         result: Optimization results containing state trajectories
-        state_name: Name of the state to plot
+        state_name: Name of the state variable
+        component: Component index (0-indexed). For scalar states, use 0.
         show: What to plot - "both", "nodes", or "trajectory"
 
     Returns:
-        Plotly figure
+        Plotly figure with single plot
+
+    Example:
+        >>> plot_state_component(result, "position", 2)  # Plot z-component
     """
     available = {s.name for s in result._states}
     if state_name not in available:
@@ -89,27 +102,46 @@ def plot_state(
         raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
 
     dim = _get_var_dim(result, state_name, result._states)
+    if component < 0 or component >= dim:
+        raise ValueError(f"Component {component} out of range for '{state_name}' (dim={dim})")
+
     t_nodes = result.nodes["time"].flatten()
     has_trajectory = bool(result.trajectory) and state_name in result.trajectory
     t_full = result.trajectory["time"].flatten() if has_trajectory else None
 
+    label = f"{state_name}_{component}" if dim > 1 else state_name
+
     fig = go.Figure()
-    fig.update_layout(title_text=state_name, template="plotly_dark")
+    fig.update_layout(title_text=label, template="plotly_dark")
 
-    for i in range(dim):
-        label = f"{state_name}_{i}" if dim > 1 else state_name
+    if show in ("both", "trajectory") and has_trajectory:
+        data = result.trajectory[state_name]
+        y = data if data.ndim == 1 else data[:, component]
+        fig.add_trace(
+            go.Scatter(
+                x=t_full,
+                y=y,
+                mode="lines",
+                name="Trajectory",
+                line={"color": "green", "width": 2},
+            )
+        )
 
-        if show in ("both", "trajectory") and has_trajectory:
-            data = result.trajectory[state_name]
-            y = data if data.ndim == 1 else data[:, i]
-            fig.add_trace(go.Scatter(x=t_full, y=y, mode="lines", name=f"{label} (traj)"))
-
-        if show in ("both", "nodes") and state_name in result.nodes:
-            data = result.nodes[state_name]
-            y = data if data.ndim == 1 else data[:, i]
-            fig.add_trace(go.Scatter(x=t_nodes, y=y, mode="markers", name=f"{label} (nodes)"))
+    if show in ("both", "nodes") and state_name in result.nodes:
+        data = result.nodes[state_name]
+        y = data if data.ndim == 1 else data[:, component]
+        fig.add_trace(
+            go.Scatter(
+                x=t_nodes,
+                y=y,
+                mode="markers",
+                name="Nodes",
+                marker={"color": "cyan", "size": 6},
+            )
+        )
 
     fig.update_xaxes(title_text="Time (s)")
+    fig.update_yaxes(title_text=label)
     return fig
 
 
@@ -118,20 +150,31 @@ def plot_states(
     state_names: list[str] | None = None,
     include_private: bool = False,
     show: str = "both",
-):
-    """Plot multiple state variables in a subplot grid.
+    cols: int = 4,
+) -> go.Figure:
+    """Plot state variables in a subplot grid.
+
+    Each component of each state gets its own subplot with individual y-axis
+    scaling. This is the primary function for visualizing state trajectories.
 
     Args:
         result: Optimization results containing state trajectories
-        state_names: Optional list of state names to plot; defaults to all states
+        state_names: List of state names to plot. If None, plots all states.
         include_private: Whether to include private states (names starting with '_')
         show: What to plot - "both", "nodes", or "trajectory"
+        cols: Maximum number of columns in subplot grid
 
     Returns:
-        Plotly figure with state trajectory subplots
+        Plotly figure with subplot grid
+
+    Examples:
+        >>> plot_states(result, ["position"])  # 3 subplots for x, y, z
+        >>> plot_states(result, ["position", "velocity"])  # 6 subplots
+        >>> plot_states(result)  # All states
     """
     if show not in ("both", "nodes", "trajectory"):
         raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
+
     states = result._states
     if not include_private:
         states = [s for s in states if not s.name.startswith("_")]
@@ -141,7 +184,12 @@ def plot_states(
         missing = set(state_names) - available
         if missing:
             raise ValueError(f"States not found in result: {missing}")
-        states = [s for s in states if s.name in state_names]
+        # Preserve order from state_names
+        state_order = {name: i for i, name in enumerate(state_names)}
+        states = sorted(
+            [s for s in states if s.name in state_names],
+            key=lambda s: state_order[s.name],
+        )
 
     # Build list of (display_name, var_name, component_idx)
     components = []
@@ -153,7 +201,10 @@ def plot_states(
             for i in range(dim):
                 components.append((f"{s.name}_{i}", s.name, i))
 
-    n_cols = min(7, len(components))
+    if not components:
+        raise ValueError("No state components to plot")
+
+    n_cols = min(cols, len(components))
     n_rows = (len(components) + n_cols - 1) // n_cols
 
     fig = make_subplots(rows=n_rows, cols=n_cols, subplot_titles=[c[0] for c in components])
@@ -162,30 +213,44 @@ def plot_states(
     for idx, (_, var_name, comp_idx) in enumerate(components):
         row = (idx // n_cols) + 1
         col = (idx % n_cols) + 1
-        _plot_timeseries(
+        _add_component_traces(
             fig, result, var_name, comp_idx, row, col, show_legend=(idx == 0), show=show
         )
 
-    for i in range(1, n_rows + 1):
-        fig.update_xaxes(title_text="Time (s)", row=i, col=1)
+    # Add x-axis labels to bottom row
+    for col_idx in range(1, n_cols + 1):
+        fig.update_xaxes(title_text="Time (s)", row=n_rows, col=col_idx)
 
     return fig
 
 
-def plot_control(
+# =============================================================================
+# Control Plotting
+# =============================================================================
+
+
+def plot_control_component(
     result: OptimizationResults,
     control_name: str,
+    component: int = 0,
     show: str = "both",
-):
-    """Plot a single control variable (all components on one figure).
+) -> go.Figure:
+    """Plot a single component of a control variable vs time.
+
+    This is the low-level function for plotting one scalar control over time.
+    For plotting all components of a control, use plot_controls().
 
     Args:
         result: Optimization results containing control trajectories
-        control_name: Name of the control to plot
+        control_name: Name of the control variable
+        component: Component index (0-indexed). For scalar controls, use 0.
         show: What to plot - "both", "nodes", or "trajectory"
 
     Returns:
-        Plotly figure
+        Plotly figure with single plot
+
+    Example:
+        >>> plot_control_component(result, "thrust", 0)  # Plot thrust_x
     """
     available = {c.name for c in result._controls}
     if control_name not in available:
@@ -194,27 +259,46 @@ def plot_control(
         raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
 
     dim = _get_var_dim(result, control_name, result._controls)
+    if component < 0 or component >= dim:
+        raise ValueError(f"Component {component} out of range for '{control_name}' (dim={dim})")
+
     t_nodes = result.nodes["time"].flatten()
     has_trajectory = bool(result.trajectory) and control_name in result.trajectory
     t_full = result.trajectory["time"].flatten() if has_trajectory else None
 
+    label = f"{control_name}_{component}" if dim > 1 else control_name
+
     fig = go.Figure()
-    fig.update_layout(title_text=control_name, template="plotly_dark")
+    fig.update_layout(title_text=label, template="plotly_dark")
 
-    for i in range(dim):
-        label = f"{control_name}_{i}" if dim > 1 else control_name
+    if show in ("both", "trajectory") and has_trajectory:
+        data = result.trajectory[control_name]
+        y = data if data.ndim == 1 else data[:, component]
+        fig.add_trace(
+            go.Scatter(
+                x=t_full,
+                y=y,
+                mode="lines",
+                name="Trajectory",
+                line={"color": "green", "width": 2},
+            )
+        )
 
-        if show in ("both", "trajectory") and has_trajectory:
-            data = result.trajectory[control_name]
-            y = data if data.ndim == 1 else data[:, i]
-            fig.add_trace(go.Scatter(x=t_full, y=y, mode="lines", name=f"{label} (traj)"))
-
-        if show in ("both", "nodes") and control_name in result.nodes:
-            data = result.nodes[control_name]
-            y = data if data.ndim == 1 else data[:, i]
-            fig.add_trace(go.Scatter(x=t_nodes, y=y, mode="markers", name=f"{label} (nodes)"))
+    if show in ("both", "nodes") and control_name in result.nodes:
+        data = result.nodes[control_name]
+        y = data if data.ndim == 1 else data[:, component]
+        fig.add_trace(
+            go.Scatter(
+                x=t_nodes,
+                y=y,
+                mode="markers",
+                name="Nodes",
+                marker={"color": "cyan", "size": 6},
+            )
+        )
 
     fig.update_xaxes(title_text="Time (s)")
+    fig.update_yaxes(title_text=label)
     return fig
 
 
@@ -223,20 +307,30 @@ def plot_controls(
     control_names: list[str] | None = None,
     include_private: bool = False,
     show: str = "both",
-):
-    """Plot multiple control variables in a subplot grid.
+    cols: int = 3,
+) -> go.Figure:
+    """Plot control variables in a subplot grid.
+
+    Each component of each control gets its own subplot with individual y-axis
+    scaling. This is the primary function for visualizing control trajectories.
 
     Args:
         result: Optimization results containing control trajectories
-        control_names: Optional list of control names to plot; defaults to all controls
+        control_names: List of control names to plot. If None, plots all controls.
         include_private: Whether to include private controls (names starting with '_')
         show: What to plot - "both", "nodes", or "trajectory"
+        cols: Maximum number of columns in subplot grid
 
     Returns:
-        Plotly figure with control trajectory subplots
+        Plotly figure with subplot grid
+
+    Examples:
+        >>> plot_controls(result, ["thrust"])  # 3 subplots for x, y, z
+        >>> plot_controls(result)  # All controls
     """
     if show not in ("both", "nodes", "trajectory"):
         raise ValueError(f"show must be 'both', 'nodes', or 'trajectory', got '{show}'")
+
     controls = result._controls
     if not include_private:
         controls = [c for c in controls if not c.name.startswith("_")]
@@ -246,7 +340,12 @@ def plot_controls(
         missing = set(control_names) - available
         if missing:
             raise ValueError(f"Controls not found in result: {missing}")
-        controls = [c for c in controls if c.name in control_names]
+        # Preserve order from control_names
+        control_order = {name: i for i, name in enumerate(control_names)}
+        controls = sorted(
+            [c for c in controls if c.name in control_names],
+            key=lambda c: control_order[c.name],
+        )
 
     # Build list of (display_name, var_name, component_idx)
     components = []
@@ -258,7 +357,10 @@ def plot_controls(
             for i in range(dim):
                 components.append((f"{c.name}_{i}", c.name, i))
 
-    n_cols = min(3, len(components))
+    if not components:
+        raise ValueError("No control components to plot")
+
+    n_cols = min(cols, len(components))
     n_rows = (len(components) + n_cols - 1) // n_cols
 
     fig = make_subplots(rows=n_rows, cols=n_cols, subplot_titles=[c[0] for c in components])
@@ -267,12 +369,13 @@ def plot_controls(
     for idx, (_, var_name, comp_idx) in enumerate(components):
         row = (idx // n_cols) + 1
         col = (idx % n_cols) + 1
-        _plot_timeseries(
+        _add_component_traces(
             fig, result, var_name, comp_idx, row, col, show_legend=(idx == 0), show=show
         )
 
-    for i in range(1, n_rows + 1):
-        fig.update_xaxes(title_text="Time (s)", row=i, col=1)
+    # Add x-axis labels to bottom row
+    for col_idx in range(1, n_cols + 1):
+        fig.update_xaxes(title_text="Time (s)", row=n_rows, col=col_idx)
 
     return fig
 
