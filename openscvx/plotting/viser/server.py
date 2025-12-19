@@ -3,7 +3,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import viser
-from viser.theme import TitlebarButton, TitlebarConfig
+from viser.theme import TitlebarButton, TitlebarConfig, TitlebarImage
 
 
 def compute_velocity_colors(vel: np.ndarray, cmap_name: str = "viridis") -> np.ndarray:
@@ -78,7 +78,18 @@ def create_server(
         ),
     )
 
-    titlebar_config = TitlebarConfig(buttons=buttons, image=None)
+    # Add OpenSCvx logo to titlebar (loaded from GitHub)
+    logo_url = (
+        "https://raw.githubusercontent.com/haynec/OpenSCvx/main/figures/openscvx_logo_square.png"
+    )
+    image = TitlebarImage(
+        image_url_light=logo_url,
+        image_url_dark=logo_url,  # Use same logo for both themes
+        image_alt="OpenSCvx",
+        href="https://github.com/haynec/OpenSCvx",
+    )
+
+    titlebar_config = TitlebarConfig(buttons=buttons, image=image)
 
     server.gui.configure_theme(
         titlebar_content=titlebar_config,
