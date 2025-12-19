@@ -46,6 +46,8 @@ class TestPlotStatesFunction:
         state1 = Mock()
         state1.name = "state_x"
         state1._slice = slice(0, 3)
+        state1.min = None
+        state1.max = None
         result._states = [state1]
         result._controls = []
 
@@ -79,10 +81,14 @@ class TestPlotStatesFunction:
         pos_state = Mock()
         pos_state.name = "position"
         pos_state._slice = slice(0, 2)
+        pos_state.min = None
+        pos_state.max = None
 
         vel_state = Mock()
         vel_state.name = "velocity"
         vel_state._slice = slice(2, 4)
+        vel_state.min = None
+        vel_state.max = None
 
         result._states = [pos_state, vel_state]
         result._controls = []
@@ -112,10 +118,14 @@ class TestPlotStatesFunction:
         pos_state = Mock()
         pos_state.name = "position"
         pos_state._slice = slice(0, 2)
+        pos_state.min = None
+        pos_state.max = None
 
         vel_state = Mock()
         vel_state.name = "velocity"
         vel_state._slice = slice(2, 4)
+        vel_state.min = None
+        vel_state.max = None
 
         result._states = [pos_state, vel_state]
         result._controls = []
@@ -142,6 +152,8 @@ class TestPlotStatesFunction:
         state = Mock()
         state.name = "state_x"
         state._slice = slice(0, 3)
+        state.min = None
+        state.max = None
         result._states = [state]
         result._controls = []
 
@@ -169,10 +181,14 @@ class TestPlotStatesFunction:
         state = Mock()
         state.name = "state_x"
         state._slice = slice(0, 2)
+        state.min = None
+        state.max = None
 
         aug_state = Mock()
         aug_state.name = "_ctcs_aug_0"
         aug_state._slice = slice(2, 3)
+        aug_state.min = None
+        aug_state.max = None
 
         result._states = [state, aug_state]
         result._controls = []
@@ -201,10 +217,14 @@ class TestPlotStatesFunction:
         state = Mock()
         state.name = "state_x"
         state._slice = slice(0, 2)
+        state.min = None
+        state.max = None
 
         aug_state = Mock()
         aug_state.name = "_ctcs_aug_0"
         aug_state._slice = slice(2, 3)
+        aug_state.min = None
+        aug_state.max = None
 
         result._states = [state, aug_state]
         result._controls = []
@@ -238,6 +258,8 @@ class TestPlotStateComponentFunction:
         state = Mock()
         state.name = "position"
         state._slice = slice(0, 3)
+        state.min = None
+        state.max = None
         result._states = [state]
         result._controls = []
 
@@ -291,6 +313,8 @@ class TestPlotControlsFunction:
         control = Mock()
         control.name = "control_u"
         control._slice = slice(0, 2)
+        control.min = None
+        control.max = None
         result._controls = [control]
         result._states = []
 
@@ -324,10 +348,14 @@ class TestPlotControlsFunction:
         thrust_control = Mock()
         thrust_control.name = "thrust"
         thrust_control._slice = slice(0, 2)
+        thrust_control.min = None
+        thrust_control.max = None
 
         torque_control = Mock()
         torque_control.name = "torque"
         torque_control._slice = slice(2, 3)
+        torque_control.min = None
+        torque_control.max = None
 
         result._controls = [thrust_control, torque_control]
         result._states = []
@@ -356,10 +384,14 @@ class TestPlotControlsFunction:
         thrust_control = Mock()
         thrust_control.name = "thrust"
         thrust_control._slice = slice(0, 2)
+        thrust_control.min = None
+        thrust_control.max = None
 
         torque_control = Mock()
         torque_control.name = "torque"
         torque_control._slice = slice(2, 3)
+        torque_control.min = None
+        torque_control.max = None
 
         result._controls = [thrust_control, torque_control]
         result._states = []
@@ -385,6 +417,8 @@ class TestPlotControlsFunction:
         control = Mock()
         control.name = "control_u"
         control._slice = slice(0, 2)
+        control.min = None
+        control.max = None
         result._controls = [control]
         result._states = []
 
@@ -424,6 +458,8 @@ class TestPlotControlComponentFunction:
         control = Mock()
         control.name = "thrust"
         control._slice = slice(0, 3)
+        control.min = None
+        control.max = None
         result._controls = [control]
         result._states = []
 
