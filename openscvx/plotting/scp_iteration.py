@@ -80,8 +80,10 @@ def plot_scp_iteration_animation(
     states = result._states if hasattr(result, "_states") and result._states else []
     controls = result._controls if hasattr(result, "_controls") and result._controls else []
 
-    # Filter out augmented states
-    filtered_states = [s for s in states if "ctcs_aug" not in s.name.lower()]
+    # Filter out augmented states and time (time is a special state, not a physical variable)
+    filtered_states = [
+        s for s in states if "ctcs_aug" not in s.name.lower() and s.name.lower() != "time"
+    ]
     states = filtered_states
     controls = controls if controls else []
 
@@ -117,19 +119,23 @@ def plot_scp_iteration_animation(
                 for i in range(n_comp):
 
                     class Component:
-                        def __init__(self, idx, parent, comp_idx):
-                            self.name = f"{parent}_{comp_idx}"
+                        def __init__(self, idx, parent_var, parent_name, comp_idx):
+                            self.name = f"{parent_name}_{comp_idx}"
                             self._slice = slice(idx, idx + 1)
+                            self._parent = parent_var  # Store reference to parent variable
+                            self._comp_idx = comp_idx
 
-                    expanded.append(Component(start + i, var.name, i))
+                    expanded.append(Component(start + i, var, var.name, i))
             else:
 
                 class Single:
-                    def __init__(self, name, idx):
+                    def __init__(self, parent_var, name, idx):
                         self.name = name
                         self._slice = slice(idx, idx + 1)
+                        self._parent = parent_var  # Store reference to parent variable
+                        self._comp_idx = 0
 
-                expanded.append(Single(var.name, start))
+                expanded.append(Single(var, var.name, start))
         return expanded
 
     expanded_states = expand_variables(states)
@@ -179,32 +185,18 @@ def plot_scp_iteration_animation(
     # Prepare bounds data for each subplot (use bounds from variable metadata)
     state_bounds_data = {}
     for state_idx, exp_state in enumerate(expanded_states):
-        idx = exp_state._slice.start
-        # Find the parent state to get bounds
-        parent_name = exp_state.name.rsplit("_", 1)[0] if "_" in exp_state.name else exp_state.name
-        parent_state = _get_var(result, parent_name, result._states)
-        comp_idx = idx - (
-            parent_state._slice.start
-            if isinstance(parent_state._slice, slice)
-            else parent_state._slice
-        )
+        # Use stored parent variable reference instead of string manipulation
+        parent_state = exp_state._parent
+        comp_idx = exp_state._comp_idx
         x_min = parent_state.min[comp_idx] if parent_state.min is not None else -np.inf
         x_max = parent_state.max[comp_idx] if parent_state.max is not None else np.inf
         state_bounds_data[state_idx] = (x_min, x_max)
 
     control_bounds_data = {}
     for control_idx, exp_control in enumerate(expanded_controls):
-        idx = exp_control._slice.start
-        # Find the parent control to get bounds
-        parent_name = (
-            exp_control.name.rsplit("_", 1)[0] if "_" in exp_control.name else exp_control.name
-        )
-        parent_control = _get_var(result, parent_name, result._controls)
-        comp_idx = idx - (
-            parent_control._slice.start
-            if isinstance(parent_control._slice, slice)
-            else parent_control._slice
-        )
+        # Use stored parent variable reference instead of string manipulation
+        parent_control = exp_control._parent
+        comp_idx = exp_control._comp_idx
         u_min = parent_control.min[comp_idx] if parent_control.min is not None else -np.inf
         u_max = parent_control.max[comp_idx] if parent_control.max is not None else np.inf
         control_bounds_data[control_idx] = (u_min, u_max)
@@ -535,8 +527,12 @@ def plot_scp_iterations(
     if X_prop_history:
         n_iterations = min(n_iterations, len(X_prop_history))
 
-    # Filter states and controls
-    states = [s for s in result._states if "ctcs_aug" not in s.name.lower()]
+    # Filter states and controls (exclude ctcs_aug and time)
+    states = [
+        s
+        for s in result._states
+        if "ctcs_aug" not in s.name.lower() and s.name.lower() != "time"
+    ]
     controls = list(result._controls) if result._controls else []
 
     state_filter = set(state_names) if state_names else None
