@@ -67,15 +67,54 @@ def add_animated_plotly_vline(
         # Add to animation callbacks
         update_callbacks.append(update_plot)
     """
-    # Add vertical line to figure
-    fig.add_vline(
-        x=time_array[0],
-        line_dash=line_dash,
-        line_color=line_color,
-        line_width=line_width,
-        annotation_text=annotation_text,
-        annotation_position=annotation_position,
-    )
+    # Detect number of subplots in the figure
+    # Count unique xaxis/yaxis references in the layout
+    n_subplots = 1
+    if hasattr(fig, "_grid_ref") and fig._grid_ref is not None:
+        # Figure created with make_subplots - use grid dimensions
+        n_rows = len(fig._grid_ref)
+        n_cols = len(fig._grid_ref[0]) if n_rows > 0 else 1
+        n_subplots = n_rows * n_cols
+
+    # Track which shapes are our vlines (before adding new ones)
+    n_existing_shapes = len(fig.layout.shapes) if fig.layout.shapes else 0
+
+    # Add vertical line to each subplot
+    if n_subplots == 1:
+        # Single plot - add one vline
+        fig.add_vline(
+            x=time_array[0],
+            line_dash=line_dash,
+            line_color=line_color,
+            line_width=line_width,
+            annotation_text=annotation_text,
+            annotation_position=annotation_position,
+        )
+    else:
+        # Multiple subplots - add vline to each
+        # Determine grid layout
+        n_rows = len(fig._grid_ref)
+        n_cols = len(fig._grid_ref[0]) if n_rows > 0 else 1
+
+        for row_idx in range(n_rows):
+            for col_idx in range(n_cols):
+                # Add vline to this subplot
+                # Only add annotation to first subplot to avoid clutter
+                show_annotation = row_idx == 0 and col_idx == 0
+                fig.add_vline(
+                    x=time_array[0],
+                    line_dash=line_dash,
+                    line_color=line_color,
+                    line_width=line_width,
+                    annotation_text=annotation_text if show_annotation else None,
+                    annotation_position=annotation_position if show_annotation else None,
+                    row=row_idx + 1,
+                    col=col_idx + 1,
+                )
+
+    # Track indices of shapes we added
+    n_new_shapes = len(fig.layout.shapes) - n_existing_shapes
+    vline_shape_indices = list(range(n_existing_shapes, n_existing_shapes + n_new_shapes))
 
     # Add to viser GUI
     if folder_name:
@@ -95,10 +134,11 @@ def add_animated_plotly_vline(
             current_time = time_array[frame_idx]
             idx = min(frame_idx, len(time_array) - 1)
 
-        # Update vertical line position (last shape added)
+        # Update all vertical line positions
         current_time = time_array[idx]
-        fig.layout.shapes[-1].x0 = current_time
-        fig.layout.shapes[-1].x1 = current_time
+        for shape_idx in vline_shape_indices:
+            fig.layout.shapes[shape_idx].x0 = current_time
+            fig.layout.shapes[shape_idx].x1 = current_time
 
         # Trigger viser update
         plot_handle.figure = fig
@@ -206,7 +246,6 @@ def add_animated_vector_norm_plot(
     results: OptimizationResults,
     var_name: str,
     bounds: tuple[float, float] | None = None,
-    show: str = "both",
     title: str | None = None,
     folder_name: str | None = None,
     aspect: float = 1.5,
@@ -223,7 +262,6 @@ def add_animated_vector_norm_plot(
         results: Optimization results containing variable data
         var_name: Name of the state or control variable to plot
         bounds: Optional (min, max) bounds to display on plot
-        show: What to plot - "both", "nodes", or "trajectory"
         title: Optional custom title for the plot (defaults to "‖{var_name}‖₂")
         folder_name: Optional GUI folder name to organize plots
         aspect: Aspect ratio for plot display (width/height)
@@ -260,7 +298,7 @@ def add_animated_vector_norm_plot(
         return None, None
 
     # Create figure using existing plotting function
-    fig = plot_vector_norm(results, var_name, bounds=bounds, show=show)
+    fig = plot_vector_norm(results, var_name, bounds=bounds)
 
     # Update title if custom title provided
     if title is not None:

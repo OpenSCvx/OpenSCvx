@@ -14,7 +14,7 @@ import numpy as np
 import viser
 
 from openscvx.algorithms import OptimizationResults
-from openscvx.plotting import plot_control
+from openscvx.plotting import plot_controls
 from openscvx.plotting.viser import (
     add_animated_plotly_vline,
     add_animated_trail,
@@ -218,31 +218,8 @@ def create_animated_plotting_server(
         has_in_nodes = show_control_plot in results.nodes
 
         if has_in_trajectory or has_in_nodes:
-            # Create figure using plot_control
-            import plotly.graph_objects as go
-
-            fig = plot_control(results, show_control_plot, show="both")
-
-            # Clean up legend: hide all node entries and unify their color
-            node_color = "cyan"
-            for trace in fig.data:
-                if "(nodes)" in trace.name.lower() or "nodes" in trace.name.lower():
-                    trace.showlegend = False
-                    trace.legendgroup = "nodes"
-                    trace.marker.color = node_color
-
-            # Add single "Nodes" legend entry
-            fig.add_trace(
-                go.Scatter(
-                    x=[None],
-                    y=[None],
-                    mode="markers",
-                    marker={"color": node_color, "size": 6},
-                    name="Nodes",
-                    legendgroup="nodes",
-                    showlegend=True,
-                )
-            )
+            # Create figure using plot_controls (with list of one control)
+            fig = plot_controls(results, [show_control_plot])
 
             # Determine data source for vertical line position
             if has_in_trajectory:
