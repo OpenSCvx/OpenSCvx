@@ -11,7 +11,6 @@ from openscvx.config import Config
 
 from .autotuning import update_scp_weights
 from .base import Algorithm
-from .optimization_results import OptimizationResults
 from .solver_state import SolverState
 
 if TYPE_CHECKING:
@@ -62,49 +61,6 @@ def PTR_init(
     )
 
     return cpg_solve
-
-
-def format_result(problem, state: "SolverState", converged: bool) -> OptimizationResults:
-    """Formats the solver state as an OptimizationResults object.
-
-    Directly passes trajectory arrays from solver state to results - no object
-    construction needed. Results store pure arrays, settings store metadata.
-
-    Args:
-        problem: The Problem instance (for symbolic metadata and settings).
-        state: The SolverState to extract results from.
-        converged: Whether the optimization converged.
-
-    Returns:
-        OptimizationResults containing the solution data.
-    """
-    # Build nodes dictionary with all states and controls
-    nodes_dict = {}
-
-    # Add all states (user-defined and augmented)
-    for sym_state in problem.symbolic.states:
-        nodes_dict[sym_state.name] = state.x[:, sym_state._slice]
-
-    # Add all controls (user-defined and augmented)
-    for control in problem.symbolic.controls:
-        nodes_dict[control.name] = state.u[:, control._slice]
-
-    return OptimizationResults(
-        converged=converged,
-        t_final=state.x[:, problem.settings.sim.time_slice][-1],
-        nodes=nodes_dict,
-        trajectory={},  # Populated by post_process
-        _states=problem.symbolic.states_prop,  # Use propagation states for trajectory dict
-        _controls=problem.symbolic.controls,
-        X=state.X,  # Single source of truth - x and u are properties
-        U=state.U,
-        discretization_history=state.V_history,
-        J_tr_history=state.J_tr,
-        J_vb_history=state.J_vb,
-        J_vc_history=state.J_vc,
-        TR_history=state.TR_history,
-        VC_history=state.VC_history,
-    )
 
 
 def PTR_step(

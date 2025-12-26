@@ -28,7 +28,6 @@ from openscvx.algorithms import (
     OptimizationResults,
     PenalizedTrustRegion,
     SolverState,
-    format_result,
 )
 from openscvx.config import (
     Config,
@@ -330,6 +329,47 @@ class Problem:
         slices.update({control.name: control.slice for control in self.symbolic.controls})
         return slices
 
+    def _format_result(self, state: SolverState, converged: bool) -> OptimizationResults:
+        """Format solver state as an OptimizationResults object.
+
+        Converts the internal solver state into a user-facing results object,
+        mapping state/control arrays to named fields based on symbolic metadata.
+
+        Args:
+            state: The SolverState to extract results from.
+            converged: Whether the optimization converged.
+
+        Returns:
+            OptimizationResults containing the solution data.
+        """
+        # Build nodes dictionary with all states and controls
+        nodes_dict = {}
+
+        # Add all states (user-defined and augmented)
+        for sym_state in self.symbolic.states:
+            nodes_dict[sym_state.name] = state.x[:, sym_state._slice]
+
+        # Add all controls (user-defined and augmented)
+        for control in self.symbolic.controls:
+            nodes_dict[control.name] = state.u[:, control._slice]
+
+        return OptimizationResults(
+            converged=converged,
+            t_final=state.x[:, self.settings.sim.time_slice][-1],
+            nodes=nodes_dict,
+            trajectory={},  # Populated by post_process
+            _states=self.symbolic.states_prop,  # Use propagation states for trajectory dict
+            _controls=self.symbolic.controls,
+            X=state.X,  # Single source of truth - x and u are properties
+            U=state.U,
+            discretization_history=state.V_history,
+            J_tr_history=state.J_tr,
+            J_vb_history=state.J_vb,
+            J_vc_history=state.J_vc,
+            TR_history=state.TR_history,
+            VC_history=state.VC_history,
+        )
+
     def initialize(self):
         """Compile dynamics, constraints, and solvers; prepare for optimization.
 
@@ -594,7 +634,7 @@ class Problem:
         # Store solution state
         self._solution = copy.deepcopy(self._state)
 
-        return format_result(self, self._state, self._state.k <= k_max)
+        return self._format_result(self._state, self._state.k <= k_max)
 
     def post_process(self) -> OptimizationResults:
         """Propagate solution through full nonlinear dynamics for high-fidelity trajectory.
@@ -615,7 +655,7 @@ class Problem:
         pr = profiling.profiling_start(self.settings.dev.profiling)
 
         # Create result from stored solution state
-        result = format_result(self, self._solution, self._solution.k <= self.settings.scp.k_max)
+        result = self._format_result(self._solution, self._solution.k <= self.settings.scp.k_max)
 
         t_0_post = time.time()
         result = propagate_trajectory_results(
