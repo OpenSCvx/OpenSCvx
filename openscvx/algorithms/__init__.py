@@ -31,6 +31,44 @@ class MyAlgorithmState(AlgorithmState):
     my_custom_field: float = 0.0
 ```
 
+.. note::
+    ``AlgorithmState`` currently combines iteration metrics (costs, weights),
+    trajectory history, and discretization data. A future refactor may separate
+    these concerns into distinct classes for clearer data flow:
+
+    ```python
+    @dataclass
+    class AlgorithmState:
+        # Mutable iteration state
+        k: int
+        J_tr: float
+        J_vb: float
+        J_vc: float
+        w_tr: float
+        lam_cost: float
+        lam_vc: ...
+        lam_vb: float
+
+    @dataclass
+    class TrajectoryHistory:
+        # Accumulated trajectory solutions
+        X: List[np.ndarray]
+        U: List[np.ndarray]
+
+        @property
+        def x(self): return self.X[-1]
+
+        @property
+        def u(self): return self.U[-1]
+
+    @dataclass
+    class DebugHistory:
+        # Optional diagnostic data (discretization matrices, etc.)
+        V_history: List[np.ndarray]
+        VC_history: List[np.ndarray]
+        TR_history: List[np.ndarray]
+    ```
+
 Current Implementations:
     - :class:`PenalizedTrustRegion`: Penalized Trust Region (PTR) algorithm
 """
