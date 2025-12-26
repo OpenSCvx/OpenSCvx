@@ -26,8 +26,7 @@ os.environ["EQX_ON_ERROR"] = "nan"
 
 from openscvx.algorithms import (
     OptimizationResults,
-    PTR_init,
-    PTR_step,
+    PenalizedTrustRegion,
     SolverState,
     format_result,
 )
@@ -194,7 +193,7 @@ class Problem:
         # settings (like uniform_time_grid) between __init__ and initialize()
         self._optimal_control_problem: cp.Problem = None
         self._discretization_solver: callable = None
-        self.cpg_solve = None
+        self._algorithm_init_data = None
 
         # Set up emitter & thread only if printing is enabled
         if self.settings.dev.printing:
@@ -226,6 +225,9 @@ class Problem:
 
         # Final solution state (saved after successful solve)
         self._solution: Optional[SolverState] = None
+
+        # SCP algorithm (currently hardcoded to PTR)
+        self._algorithm = PenalizedTrustRegion()
 
     @property
     def parameters(self):
@@ -441,9 +443,9 @@ class Problem:
             save_compiled=self.settings.sim.save_compiled,
         )
 
-        # Initialize the PTR loop
+        # Initialize the SCP algorithm
         print("Initializing the SCvx Subproblem Solver...")
-        self.cpg_solve = PTR_init(
+        self._algorithm_init_data = self._algorithm.initialize(
             self._parameters,  # Plain dict for JAX/CVXPy
             self._optimal_control_problem,
             self._discretization_solver,
@@ -518,13 +520,13 @@ class Problem:
         if self._state is None:
             raise ValueError("Problem has not been initialized. Call initialize() first")
 
-        converged = PTR_step(
+        converged = self._algorithm.step(
             self._parameters,  # Plain dict for JAX/CVXPy
             self.settings,
             self._state,
             self._optimal_control_problem,
             self._discretization_solver,
-            self.cpg_solve,
+            self._algorithm_init_data,
             self.emitter_function,
             self._compiled_constraints,
         )
