@@ -4,41 +4,41 @@ This module provides implementations of SCvx (Successive Convexification) algori
 for solving non-convex trajectory optimization problems through iterative convex
 approximation.
 
-Current Implementations:
-    PTR (Penalized Trust Region): The default SCvx algorithm using trust region
-        methods with penalty-based constraint handling. Includes adaptive parameter
-        tuning and virtual control relaxation.
-
-Planned Architecture (ABC-based):
-
-A base class will be introduced to enable pluggable algorithm implementations.
-This will enable users to implement custom SCvx variants or research algorithms.
-Future algorithms will implement the SCvxAlgorithm interface:
+All algorithms inherit from :class:`Algorithm`, enabling pluggable algorithm
+implementations and custom SCvx variants:
 
 ```python
-# algorithms/base.py (planned):
-class SCvxAlgorithm(ABC):
+class Algorithm(ABC):
     @abstractmethod
-    def initialize(self, lowered: LoweredProblem) -> SolverState:
-        '''Initialize solver state from a lowered problem.'''
+    def initialize(self, params, ocp, discretization_solver,
+                   settings, jax_constraints) -> Any:
+        '''Initialize algorithm and return algorithm-specific data.'''
         ...
 
     @abstractmethod
-    def step(self, state: SolverState, solver: ConvexSolver) -> SolverState:
+    def step(self, params, settings, state, ocp, discretization_solver,
+             init_data, emitter_function, jax_constraints) -> bool:
         '''Execute one iteration of the algorithm.'''
         ...
 ```
+
+Current Implementations:
+    - :class:`PenalizedTrustRegion`: Penalized Trust Region (PTR) algorithm
 """
 
+from .base import Algorithm
 from .optimization_results import OptimizationResults
-from .ptr import PTR_init, PTR_step, format_result
+from .ptr import PenalizedTrustRegion, PTR_init, PTR_step, format_result
 from .solver_state import SolverState
 
 __all__ = [
+    # Base class
+    "Algorithm",
     # Core state and results
     "SolverState",
     "OptimizationResults",
     # PTR algorithm
+    "PenalizedTrustRegion",
     "PTR_init",
     "PTR_step",
     "format_result",

@@ -1,7 +1,7 @@
 import pickle
 import time
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import cvxpy as cp
 import numpy as np
@@ -10,6 +10,7 @@ import numpy.linalg as la
 from openscvx.config import Config
 
 from .autotuning import update_scp_weights
+from .base import Algorithm
 from .optimization_results import OptimizationResults
 from .solver_state import SolverState
 
@@ -341,3 +342,95 @@ def PTR_subproblem(
         vc_mat,
         abs(tr_mat),
     )
+
+
+class PenalizedTrustRegion(Algorithm):
+    """Penalized Trust Region (PTR) successive convexification algorithm.
+
+    PTR is the default SCvx algorithm that uses trust region methods with
+    penalty-based constraint handling. It includes adaptive parameter tuning
+    and virtual control relaxation for handling infeasible subproblems.
+
+    This class provides a minimal wrapper around the functional PTR implementation,
+    conforming to the Algorithm interface while delegating to the underlying
+    PTR_init and PTR_step functions.
+
+    Example:
+        Using PTR with a Problem::
+
+            from openscvx.algorithms import PenalizedTrustRegion
+
+            problem = Problem(dynamics, constraints, states, controls, N, time)
+            problem.initialize()
+            result = problem.solve()
+
+    References:
+        Successive Convexification for Fuel-Optimal Powered Landing with
+        Aerodynamic Drag and Non-Convex Constraints (Szmuk & Acikmese, 2016)
+    """
+
+    def initialize(
+        self,
+        params: dict,
+        ocp: cp.Problem,
+        discretization_solver: callable,
+        settings: Config,
+        jax_constraints: "LoweredJaxConstraints",
+    ) -> Any:
+        """Initialize PTR algorithm.
+
+        Performs warm-start solve to initialize DPP and JAX jacobians.
+        If CVXPyGen is enabled, loads the generated solver.
+
+        Args:
+            params: Problem parameters dictionary
+            ocp: CVXPy optimal control problem
+            discretization_solver: Compiled discretization solver
+            settings: Configuration object
+            jax_constraints: JIT-compiled constraint functions
+
+        Returns:
+            cpg_solve handle if CVXPyGen is enabled, None otherwise.
+        """
+        return PTR_init(params, ocp, discretization_solver, settings, jax_constraints)
+
+    def step(
+        self,
+        params: dict,
+        settings: Config,
+        state: SolverState,
+        ocp: cp.Problem,
+        discretization_solver: callable,
+        init_data: Any,
+        emitter_function: callable,
+        jax_constraints: "LoweredJaxConstraints",
+    ) -> bool:
+        """Execute one PTR iteration.
+
+        Solves the convex subproblem, updates state in place, and checks
+        convergence based on trust region, virtual buffer, and virtual
+        control costs.
+
+        Args:
+            params: Problem parameters dictionary
+            settings: Configuration object
+            state: Mutable solver state (modified in place)
+            ocp: CVXPy optimal control problem
+            discretization_solver: Compiled discretization solver
+            init_data: cpg_solve handle from initialize()
+            emitter_function: Callback for iteration progress
+            jax_constraints: JIT-compiled constraint functions
+
+        Returns:
+            True if J_tr, J_vb, and J_vc are all below their thresholds.
+        """
+        return PTR_step(
+            params,
+            settings,
+            state,
+            ocp,
+            discretization_solver,
+            init_data,
+            emitter_function,
+            jax_constraints,
+        )
