@@ -10,17 +10,20 @@ implementations and custom SCvx variants:
 ```python
 class Algorithm(ABC):
     @abstractmethod
-    def initialize(self, params, ocp, discretization_solver,
-                   settings, jax_constraints, solve_ocp) -> None:
-        '''Initialize algorithm (store solve_ocp callable, warm-start, etc.).'''
+    def initialize(self, ocp, discretization_solver, jax_constraints,
+                   solve_ocp, emitter, params, settings) -> None:
+        '''Store compiled infrastructure and warm-start solvers.'''
         ...
 
     @abstractmethod
-    def step(self, params, settings, state, ocp, discretization_solver,
-             emitter_function, jax_constraints) -> bool:
-        '''Execute one iteration of the algorithm.'''
+    def step(self, state, params, settings) -> bool:
+        '''Execute one iteration using stored infrastructure.'''
         ...
 ```
+
+Immutable components (ocp, discretization_solver, jax_constraints, etc.) are stored
+during ``initialize()``. Mutable configuration (params, settings) is passed per-step
+to support runtime parameter updates and tolerance tuning.
 
 :class:`AlgorithmState` holds mutable state during SCP iterations. Algorithms
 that require additional state can subclass it:

@@ -243,73 +243,87 @@ class Algorithm(ABC):
     delegating state management to the AlgorithmState dataclass.
 
     The two core methods mirror the SCP workflow:
-    - initialize: Prepare algorithm-specific state (e.g., warm-start solvers)
+    - initialize: Store compiled infrastructure and warm-start solvers
     - step: Execute one convex subproblem iteration
+
+    Immutable components (ocp, discretization_solver, jax_constraints, etc.) are
+    stored during initialize(). Mutable configuration (params, settings) is passed
+    per-step to support runtime parameter updates and tolerance tuning.
+
+    Note:
+        Avoid storing mutable iteration state (costs, weights, trajectories) on
+        ``self``. All iteration state should live in :class:`AlgorithmState` or
+        a subclass thereof, passed explicitly to ``step()``. This keeps algorithm
+        classes stateless w.r.t. iteration, making data flow explicit and staying
+        close to functional programming principles where possible.
 
     Example:
         Implementing a custom algorithm::
 
             class MyAlgorithm(Algorithm):
-                def initialize(self, params, ocp, discretization_solver,
-                               settings, jax_constraints, solve_ocp):
-                    # Setup algorithm (store solve callable, warm-start, etc.)
+                def initialize(self, ocp, discretization_solver,
+                               jax_constraints, solve_ocp, emitter,
+                               params, settings):
+                    # Store compiled infrastructure
+                    self._ocp = ocp
+                    self._discretization_solver = discretization_solver
+                    self._jax_constraints = jax_constraints
                     self._solve_ocp = solve_ocp
+                    self._emitter = emitter
+                    # Warm-start with initial params/settings...
 
-                def step(self, params, settings, state, ocp, discretization_solver,
-                         emitter_function, jax_constraints):
-                    # Run one iteration, mutate state, return convergence
+                def step(self, state, params, settings):
+                    # Run one iteration using self._* and per-step params/settings
                     return converged
     """
 
     @abstractmethod
     def initialize(
         self,
-        params: dict,
         ocp: "cp.Problem",
         discretization_solver: callable,
-        settings: "Config",
         jax_constraints: "LoweredJaxConstraints",
         solve_ocp: callable,
+        emitter: callable,
+        params: dict,
+        settings: "Config",
     ) -> None:
-        """Initialize the algorithm.
+        """Initialize the algorithm and store compiled infrastructure.
 
-        This method performs any setup required before the SCP loop begins,
-        such as warm-starting solvers or storing solver configuration.
+        This method stores immutable components and performs any setup required
+        before the SCP loop begins (e.g., warm-starting solvers). The params and
+        settings are passed for warm-start but may change between steps.
 
         Args:
-            params: Problem parameters dictionary (for JAX/CVXPy)
             ocp: The CVXPy optimal control problem
             discretization_solver: Compiled discretization solver function
-            settings: Configuration object with SCP, simulation, and solver settings
             jax_constraints: JIT-compiled JAX constraint functions
             solve_ocp: Callable that solves the OCP (captures solver config)
+            emitter: Callback for emitting iteration progress data
+            params: Problem parameters dictionary (for warm-start only)
+            settings: Configuration object (for warm-start only)
         """
         ...
 
     @abstractmethod
     def step(
         self,
+        state: AlgorithmState,
         params: dict,
         settings: "Config",
-        state: AlgorithmState,
-        ocp: "cp.Problem",
-        discretization_solver: callable,
-        emitter_function: callable,
-        jax_constraints: "LoweredJaxConstraints",
     ) -> bool:
         """Execute one iteration of the SCP algorithm.
 
         This method solves a single convex subproblem, updates the algorithm
         state in place, and returns whether convergence criteria are met.
 
+        Uses stored infrastructure (ocp, discretization_solver, etc.) with
+        per-step params and settings to support runtime modifications.
+
         Args:
-            params: Problem parameters dictionary
-            settings: Configuration object
             state: Mutable algorithm state (modified in place)
-            ocp: The CVXPy optimal control problem
-            discretization_solver: Compiled discretization solver function
-            emitter_function: Callback for emitting iteration progress data
-            jax_constraints: JIT-compiled JAX constraint functions
+            params: Problem parameters dictionary (may change between steps)
+            settings: Configuration object (may change between steps)
 
         Returns:
             True if convergence criteria are satisfied, False otherwise.

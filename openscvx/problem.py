@@ -511,12 +511,13 @@ class Problem:
         # Initialize the SCP algorithm
         print("Initializing the SCvx Subproblem Solver...")
         self._algorithm.initialize(
-            self._parameters,  # Plain dict for JAX/CVXPy
             self._optimal_control_problem,
             self._discretization_solver,
-            self.settings,
             self._compiled_constraints,
             self._solve_ocp,
+            self.emitter_function,
+            self._parameters,  # For warm-start only
+            self.settings,  # For warm-start only
         )
         print("✓ SCvx Subproblem Solver initialized")
 
@@ -587,13 +588,9 @@ class Problem:
             raise ValueError("Problem has not been initialized. Call initialize() first")
 
         converged = self._algorithm.step(
-            self._parameters,  # Plain dict for JAX/CVXPy
-            self.settings,
             self._state,
-            self._optimal_control_problem,
-            self._discretization_solver,
-            self.emitter_function,
-            self._compiled_constraints,
+            self._parameters,  # May change between steps
+            self.settings,  # May change between steps
         )
 
         # Return dict matching original API
