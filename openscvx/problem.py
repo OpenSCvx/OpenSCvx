@@ -698,3 +698,32 @@ class Problem:
 
         profiling.profiling_end(pr, "postprocess")
         return result
+
+    def citation(self) -> str:
+        """Return BibTeX citations for all components used in this problem.
+
+        Aggregates citations from the algorithm and other components (discretization,
+        convex solver, etc.) Each section is prefixed with a comment indicating which component the
+        citation is for.
+
+        Returns:
+            Formatted string containing all BibTeX citations with comments.
+
+        Example:
+            Print all citations for a problem::
+
+                problem = Problem(dynamics, constraints, states, controls, N, time)
+                print(problem.citation())
+        """
+        sections = []
+
+        # Algorithm citations
+        algo_citations = self._algorithm.citation()
+        if algo_citations:
+            algo_name = type(self._algorithm).__name__
+            sections.append(f"% Algorithm: {algo_name}")
+            sections.extend(algo_citations)
+
+        # Future: add citations from discretization, constraint formulations, etc.
+
+        return "\n\n".join(sections)

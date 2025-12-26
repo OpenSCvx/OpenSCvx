@@ -6,7 +6,7 @@ optimization problems through iterative convex approximation.
 
 import time
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 import cvxpy as cp
 import numpy as np
@@ -329,3 +329,22 @@ class PenalizedTrustRegion(Algorithm):
             vc_mat,
             abs(tr_mat),
         )
+
+    def citation(self) -> List[str]:
+        """Return BibTeX citations for the PTR algorithm.
+
+        Returns:
+            List containing the BibTeX entry for the PTR paper.
+        """
+        return [
+            """@article{drusvyatskiy2018error,
+  title={Error bounds, quadratic growth, and linear convergence of proximal methods},
+  author={Drusvyatskiy, Dmitriy and Lewis, Adrian S},
+  journal={Mathematics of operations research},
+  volume={43},
+  number={3},
+  pages={919--948},
+  year={2018},
+  publisher={INFORMS}
+}"""
+        ]

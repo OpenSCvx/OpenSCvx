@@ -329,3 +329,22 @@ class Algorithm(ABC):
             True if convergence criteria are satisfied, False otherwise.
         """
         ...
+
+    @abstractmethod
+    def citation(self) -> List[str]:
+        """Return BibTeX citations for this algorithm.
+
+        Implementations should return a list of BibTeX entry strings for the
+        papers that should be cited when using this algorithm.
+
+        Returns:
+            List of BibTeX citation strings.
+
+        Example:
+            Getting citations for an algorithm::
+
+                algorithm = PenalizedTrustRegion()
+                for bibtex in algorithm.citation():
+                    print(bibtex)
+        """
+        ...
