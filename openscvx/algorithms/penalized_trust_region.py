@@ -16,8 +16,7 @@ import numpy.linalg as la
 from openscvx.config import Config
 
 from .autotuning import update_scp_weights
-from .base import Algorithm
-from .solver_state import SolverState
+from .base import Algorithm, AlgorithmState
 
 if TYPE_CHECKING:
     from openscvx.lowered import LoweredJaxConstraints
@@ -86,7 +85,7 @@ class PenalizedTrustRegion(Algorithm):
             ocp.param_dict["x_term"].value = settings.sim.x.final
 
         # Create temporary state for initialization solve
-        init_state = SolverState.from_settings(settings)
+        init_state = AlgorithmState.from_settings(settings)
 
         # Solve a dumb problem to initialize DPP and JAX jacobians
         _ = self._subproblem(
@@ -105,7 +104,7 @@ class PenalizedTrustRegion(Algorithm):
         self,
         params: dict,
         settings: Config,
-        state: SolverState,
+        state: AlgorithmState,
         ocp: cp.Problem,
         discretization_solver: callable,
         init_data: Any,
@@ -200,7 +199,7 @@ class PenalizedTrustRegion(Algorithm):
         self,
         params,
         cpg_solve,
-        state: SolverState,
+        state: AlgorithmState,
         discretization_solver,
         ocp: cp.Problem,
         settings: Config,

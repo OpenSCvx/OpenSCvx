@@ -29,7 +29,7 @@ Future solvers will implement the ConvexSolver interface:
 # solvers/base.py (planned):
 class ConvexSolver(ABC):
     @abstractmethod
-    def build_subproblem(self, state: SolverState, lowered: LoweredProblem):
+    def build_subproblem(self, state: AlgorithmState, lowered: LoweredProblem):
         '''Build the convex subproblem from current state.'''
         ...
 

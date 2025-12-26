@@ -22,20 +22,28 @@ class Algorithm(ABC):
         ...
 ```
 
+:class:`AlgorithmState` holds mutable state during SCP iterations. Algorithms
+that require additional state can subclass it:
+
+```python
+@dataclass
+class MyAlgorithmState(AlgorithmState):
+    my_custom_field: float = 0.0
+```
+
 Current Implementations:
     - :class:`PenalizedTrustRegion`: Penalized Trust Region (PTR) algorithm
 """
 
-from .base import Algorithm
+from .base import Algorithm, AlgorithmState
 from .optimization_results import OptimizationResults
 from .penalized_trust_region import PenalizedTrustRegion
-from .solver_state import SolverState
 
 __all__ = [
     # Base class
     "Algorithm",
-    # Core state and results
-    "SolverState",
+    "AlgorithmState",
+    # Core results
     "OptimizationResults",
     # PTR algorithm
     "PenalizedTrustRegion",

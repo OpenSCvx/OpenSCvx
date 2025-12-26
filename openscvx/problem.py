@@ -25,9 +25,9 @@ import jax
 os.environ["EQX_ON_ERROR"] = "nan"
 
 from openscvx.algorithms import (
+    AlgorithmState,
     OptimizationResults,
     PenalizedTrustRegion,
-    SolverState,
 )
 from openscvx.config import (
     Config,
@@ -220,10 +220,10 @@ class Problem:
         self._compiled_constraints: Optional[LoweredJaxConstraints] = None
 
         # Solver state (created fresh for each solve)
-        self._state: Optional[SolverState] = None
+        self._state: Optional[AlgorithmState] = None
 
         # Final solution state (saved after successful solve)
-        self._solution: Optional[SolverState] = None
+        self._solution: Optional[AlgorithmState] = None
 
         # SCP algorithm (currently hardcoded to PTR)
         self._algorithm = PenalizedTrustRegion()
@@ -260,14 +260,14 @@ class Problem:
                     self._lowered.cvxpy_params[name].value = value
 
     @property
-    def state(self) -> Optional[SolverState]:
+    def state(self) -> Optional[AlgorithmState]:
         """Access the current solver state.
 
         The solver state contains all mutable state from the SCP iterations,
         including current guesses, costs, weights, and history.
 
         Returns:
-            SolverState if initialized, None otherwise
+            AlgorithmState if initialized, None otherwise
 
         Example:
             When using `Problem.step()` can use the state to check convergence _etc._
@@ -329,14 +329,14 @@ class Problem:
         slices.update({control.name: control.slice for control in self.symbolic.controls})
         return slices
 
-    def _format_result(self, state: SolverState, converged: bool) -> OptimizationResults:
+    def _format_result(self, state: AlgorithmState, converged: bool) -> OptimizationResults:
         """Format solver state as an OptimizationResults object.
 
         Converts the internal solver state into a user-facing results object,
         mapping state/control arrays to named fields based on symbolic metadata.
 
         Args:
-            state: The SolverState to extract results from.
+            state: The AlgorithmState to extract results from.
             converged: Whether the optimization converged.
 
         Returns:
@@ -495,7 +495,7 @@ class Problem:
         print("✓ SCvx Subproblem Solver initialized")
 
         # Create fresh solver state
-        self._state = SolverState.from_settings(self.settings)
+        self._state = AlgorithmState.from_settings(self.settings)
 
         t_f_while = time.time()
         self.timing_init = t_f_while - t_0_while
@@ -509,7 +509,7 @@ class Problem:
     def reset(self):
         """Reset solver state to re-run optimization from initial conditions.
 
-        Creates fresh SolverState while preserving compiled dynamics and solvers.
+        Creates fresh AlgorithmState while preserving compiled dynamics and solvers.
         Use this to run multiple optimizations without re-initializing.
 
         Raises:
@@ -528,7 +528,7 @@ class Problem:
             raise ValueError("Problem has not been initialized. Call initialize() first")
 
         # Create fresh solver state from settings
-        self._state = SolverState.from_settings(self.settings)
+        self._state = AlgorithmState.from_settings(self.settings)
 
         # Reset solution
         self._solution = None
