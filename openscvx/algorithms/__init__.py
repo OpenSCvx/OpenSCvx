@@ -28,7 +28,7 @@ Current Implementations:
 
 from .base import Algorithm
 from .optimization_results import OptimizationResults
-from .penalized_trust_region import PenalizedTrustRegion, PTR_init, PTR_step
+from .penalized_trust_region import PenalizedTrustRegion
 from .solver_state import SolverState
 
 __all__ = [
@@ -39,6 +39,4 @@ __all__ = [
     "OptimizationResults",
     # PTR algorithm
     "PenalizedTrustRegion",
-    "PTR_init",
-    "PTR_step",
 ]
