@@ -10,6 +10,10 @@ Current Implementations:
         with support for multiple backend solvers (CLARABEL, etc.).
         Includes optional code generation via cvxpygen for improved performance.
 
+Note:
+    CVXPyGen setup logic is currently in :class:`Problem`. When the
+    ``ConvexSolver`` base class is implemented, this setup will move here.
+
 Planned Architecture (ABC-based):
 
 A base class will be introduced to enable pluggable solver implementations.

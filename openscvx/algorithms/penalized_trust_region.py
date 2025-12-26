@@ -4,10 +4,9 @@ This module implements the PTR algorithm for solving non-convex trajectory
 optimization problems through iterative convex approximation.
 """
 
-import pickle
 import time
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import cvxpy as cp
 import numpy as np
@@ -48,11 +47,12 @@ class PenalizedTrustRegion(Algorithm):
         discretization_solver: callable,
         settings: Config,
         jax_constraints: "LoweredJaxConstraints",
-    ) -> Any:
+        solve_ocp: callable,
+    ) -> None:
         """Initialize PTR algorithm.
 
-        Performs warm-start solve to initialize DPP and JAX jacobians.
-        If CVXPyGen is enabled, loads the generated solver.
+        Stores solver callable and performs a warm-start solve to
+        initialize DPP and JAX jacobians.
 
         Args:
             params: Problem parameters dictionary
@@ -60,23 +60,9 @@ class PenalizedTrustRegion(Algorithm):
             discretization_solver: Compiled discretization solver
             settings: Configuration object
             jax_constraints: JIT-compiled constraint functions
-
-        Returns:
-            cpg_solve handle if CVXPyGen is enabled, None otherwise.
+            solve_ocp: Callable that solves the OCP
         """
-        if settings.cvx.cvxpygen:
-            try:
-                from solver.cpg_solver import cpg_solve
-
-                with open("solver/problem.pickle", "rb") as f:
-                    pickle.load(f)
-            except ImportError:
-                raise ImportError(
-                    "cvxpygen solver not found. Make sure cvxpygen is installed and code generation"
-                    " has been run. Install with: pip install openscvx[cvxpygen]"
-                )
-        else:
-            cpg_solve = None
+        self._solve_ocp = solve_ocp
 
         if "x_init" in ocp.param_dict:
             ocp.param_dict["x_init"].value = settings.sim.x.initial
@@ -90,15 +76,12 @@ class PenalizedTrustRegion(Algorithm):
         # Solve a dumb problem to initialize DPP and JAX jacobians
         _ = self._subproblem(
             params.items(),
-            cpg_solve,
             init_state,
             discretization_solver,
             ocp,
             settings,
             jax_constraints,
         )
-
-        return cpg_solve
 
     def step(
         self,
@@ -107,7 +90,6 @@ class PenalizedTrustRegion(Algorithm):
         state: AlgorithmState,
         ocp: cp.Problem,
         discretization_solver: callable,
-        init_data: Any,
         emitter_function: callable,
         jax_constraints: "LoweredJaxConstraints",
     ) -> bool:
@@ -123,7 +105,6 @@ class PenalizedTrustRegion(Algorithm):
             state: Mutable solver state (modified in place)
             ocp: CVXPy optimal control problem
             discretization_solver: Compiled discretization solver
-            init_data: cpg_solve handle from initialize()
             emitter_function: Callback for iteration progress
             jax_constraints: JIT-compiled constraint functions
 
@@ -147,7 +128,6 @@ class PenalizedTrustRegion(Algorithm):
             tr_mat,
         ) = self._subproblem(
             params.items(),
-            init_data,
             state,
             discretization_solver,
             ocp,
@@ -198,7 +178,6 @@ class PenalizedTrustRegion(Algorithm):
     def _subproblem(
         self,
         params,
-        cpg_solve,
         state: AlgorithmState,
         discretization_solver,
         ocp: cp.Problem,
@@ -209,7 +188,6 @@ class PenalizedTrustRegion(Algorithm):
 
         Args:
             params: Problem parameters (as items iterator)
-            cpg_solve: CVXPyGen solver handle (or None)
             state: Current solver state
             discretization_solver: Compiled discretization solver
             ocp: CVXPy optimal control problem
@@ -277,15 +255,9 @@ class PenalizedTrustRegion(Algorithm):
         ocp.param_dict["lam_vc"].value = state.lam_vc
         ocp.param_dict["lam_vb"].value = state.lam_vb
 
-        if settings.cvx.cvxpygen:
-            t0 = time.time()
-            ocp.register_solve("CPG", cpg_solve)
-            ocp.solve(method="CPG", **settings.cvx.solver_args)
-            subprop_time = time.time() - t0
-        else:
-            t0 = time.time()
-            ocp.solve(solver=settings.cvx.solver, **settings.cvx.solver_args)
-            subprop_time = time.time() - t0
+        t0 = time.time()
+        self._solve_ocp()
+        subprop_time = time.time() - t0
 
         x_new_guess = (
             settings.sim.S_x @ ocp.var_dict["x"].value.T + np.expand_dims(settings.sim.c_x, axis=1)

@@ -7,7 +7,7 @@ during SCP iterations.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, List, Union
+from typing import TYPE_CHECKING, List, Union
 
 import numpy as np
 
@@ -243,7 +243,7 @@ class Algorithm(ABC):
     delegating state management to the AlgorithmState dataclass.
 
     The two core methods mirror the SCP workflow:
-    - initialize: Prepare algorithm-specific solver state (e.g., warm-start data)
+    - initialize: Prepare algorithm-specific state (e.g., warm-start solvers)
     - step: Execute one convex subproblem iteration
 
     Example:
@@ -251,12 +251,12 @@ class Algorithm(ABC):
 
             class MyAlgorithm(Algorithm):
                 def initialize(self, params, ocp, discretization_solver,
-                               settings, jax_constraints):
-                    # Setup and return any algorithm-specific data
-                    return my_init_data
+                               settings, jax_constraints, solve_ocp):
+                    # Setup algorithm (store solve callable, warm-start, etc.)
+                    self._solve_ocp = solve_ocp
 
                 def step(self, params, settings, state, ocp, discretization_solver,
-                         init_data, emitter_function, jax_constraints):
+                         emitter_function, jax_constraints):
                     # Run one iteration, mutate state, return convergence
                     return converged
     """
@@ -269,11 +269,12 @@ class Algorithm(ABC):
         discretization_solver: callable,
         settings: "Config",
         jax_constraints: "LoweredJaxConstraints",
-    ) -> Any:
-        """Initialize the algorithm and return algorithm-specific data.
+        solve_ocp: callable,
+    ) -> None:
+        """Initialize the algorithm.
 
         This method performs any setup required before the SCP loop begins,
-        such as warm-starting solvers or pre-compiling solver code.
+        such as warm-starting solvers or storing solver configuration.
 
         Args:
             params: Problem parameters dictionary (for JAX/CVXPy)
@@ -281,10 +282,7 @@ class Algorithm(ABC):
             discretization_solver: Compiled discretization solver function
             settings: Configuration object with SCP, simulation, and solver settings
             jax_constraints: JIT-compiled JAX constraint functions
-
-        Returns:
-            Algorithm-specific initialization data to be passed to step().
-            For example, PTR returns a cpg_solve handle for CVXPyGen.
+            solve_ocp: Callable that solves the OCP (captures solver config)
         """
         ...
 
@@ -296,7 +294,6 @@ class Algorithm(ABC):
         state: AlgorithmState,
         ocp: "cp.Problem",
         discretization_solver: callable,
-        init_data: Any,
         emitter_function: callable,
         jax_constraints: "LoweredJaxConstraints",
     ) -> bool:
@@ -311,7 +308,6 @@ class Algorithm(ABC):
             state: Mutable algorithm state (modified in place)
             ocp: The CVXPy optimal control problem
             discretization_solver: Compiled discretization solver function
-            init_data: Algorithm-specific data returned from initialize()
             emitter_function: Callback for emitting iteration progress data
             jax_constraints: JIT-compiled JAX constraint functions
 

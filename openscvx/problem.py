@@ -15,6 +15,7 @@ Example:
 
 import copy
 import os
+import pickle
 import queue
 import threading
 import time
@@ -192,7 +193,7 @@ class Problem:
         # settings (like uniform_time_grid) between __init__ and initialize()
         self._optimal_control_problem: cp.Problem = None
         self._discretization_solver: callable = None
-        self._algorithm_init_data = None
+        self._solve_ocp: callable = None  # Solver callable (built during initialize)
 
         # Set up emitter & thread only if printing is enabled
         if self.settings.dev.printing:
@@ -483,14 +484,39 @@ class Problem:
             save_compiled=self.settings.sim.save_compiled,
         )
 
+        # Build solver callable (handle CVXPyGen if enabled)
+        if self.settings.cvx.cvxpygen:
+            try:
+                from solver.cpg_solver import cpg_solve
+
+                with open("solver/problem.pickle", "rb") as f:
+                    pickle.load(f)
+                self._optimal_control_problem.register_solve("CPG", cpg_solve)
+                solver_args = self.settings.cvx.solver_args
+                self._solve_ocp = lambda: self._optimal_control_problem.solve(
+                    method="CPG", **solver_args
+                )
+            except ImportError:
+                raise ImportError(
+                    "cvxpygen solver not found. Make sure cvxpygen is installed and code "
+                    "generation has been run. Install with: pip install openscvx[cvxpygen]"
+                )
+        else:
+            solver = self.settings.cvx.solver
+            solver_args = self.settings.cvx.solver_args
+            self._solve_ocp = lambda: self._optimal_control_problem.solve(
+                solver=solver, **solver_args
+            )
+
         # Initialize the SCP algorithm
         print("Initializing the SCvx Subproblem Solver...")
-        self._algorithm_init_data = self._algorithm.initialize(
+        self._algorithm.initialize(
             self._parameters,  # Plain dict for JAX/CVXPy
             self._optimal_control_problem,
             self._discretization_solver,
             self.settings,
             self._compiled_constraints,
+            self._solve_ocp,
         )
         print("✓ SCvx Subproblem Solver initialized")
 
@@ -566,7 +592,6 @@ class Problem:
             self._state,
             self._optimal_control_problem,
             self._discretization_solver,
-            self._algorithm_init_data,
             self.emitter_function,
             self._compiled_constraints,
         )

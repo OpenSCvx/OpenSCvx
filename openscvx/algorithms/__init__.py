@@ -11,13 +11,13 @@ implementations and custom SCvx variants:
 class Algorithm(ABC):
     @abstractmethod
     def initialize(self, params, ocp, discretization_solver,
-                   settings, jax_constraints) -> Any:
-        '''Initialize algorithm and return algorithm-specific data.'''
+                   settings, jax_constraints, solve_ocp) -> None:
+        '''Initialize algorithm (store solve_ocp callable, warm-start, etc.).'''
         ...
 
     @abstractmethod
     def step(self, params, settings, state, ocp, discretization_solver,
-             init_data, emitter_function, jax_constraints) -> bool:
+             emitter_function, jax_constraints) -> bool:
         '''Execute one iteration of the algorithm.'''
         ...
 ```
