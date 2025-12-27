@@ -717,6 +717,8 @@ class Problem:
         """
         sections = []
 
+        sections.append(r"% --- AUTO-GENERATED CITATIONS FOR OPENSCVX CONFIGURATION ---")
+
         # Algorithm citations
         algo_citations = self._algorithm.citation()
         if algo_citations:
@@ -726,5 +728,7 @@ class Problem:
             sections.append(f"{header}\n\n{citations}")
 
         # Future: add citations from discretization, constraint formulations, etc.
+
+        sections.append(r"% --- END AUTO-GENERATED CITATIONS")
 
         return "\n\n".join(sections)
