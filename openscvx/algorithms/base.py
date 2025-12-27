@@ -243,6 +243,7 @@ class Algorithm(ABC):
     delegating state management to the AlgorithmState dataclass.
 
     The two core methods mirror the SCP workflow:
+
     - initialize: Store compiled infrastructure and warm-start solvers
     - step: Execute one convex subproblem iteration
 
@@ -250,7 +251,7 @@ class Algorithm(ABC):
     stored during initialize(). Mutable configuration (params, settings) is passed
     per-step to support runtime parameter updates and tolerance tuning.
 
-    Note:
+    !!! tip "Statefullness"
         Avoid storing mutable iteration state (costs, weights, trajectories) on
         ``self``. All iteration state should live in :class:`AlgorithmState` or
         a subclass thereof, passed explicitly to ``step()``. This keeps algorithm

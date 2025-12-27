@@ -34,7 +34,7 @@ class MyAlgorithmState(AlgorithmState):
     my_custom_field: float = 0.0
 ```
 
-.. note::
+Note:
     ``AlgorithmState`` currently combines iteration metrics (costs, weights),
     trajectory history, and discretization data. A future refactor may separate
     these concerns into distinct classes for clearer data flow:
@@ -73,7 +73,8 @@ class MyAlgorithmState(AlgorithmState):
     ```
 
 Current Implementations:
-    - :class:`PenalizedTrustRegion`: Penalized Trust Region (PTR) algorithm
+
+- :class:`PenalizedTrustRegion`: Penalized Trust Region (PTR) algorithm
 """
 
 from .base import Algorithm, AlgorithmState
