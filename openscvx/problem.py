@@ -721,8 +721,9 @@ class Problem:
         algo_citations = self._algorithm.citation()
         if algo_citations:
             algo_name = type(self._algorithm).__name__
-            sections.append(f"% Algorithm: {algo_name}")
-            sections.extend(algo_citations)
+            header = f"% Algorithm: {algo_name}"
+            citations = "\n".join(algo_citations)
+            sections.append(f"{header}\n\n{citations}")
 
         # Future: add citations from discretization, constraint formulations, etc.
 

@@ -26,9 +26,21 @@ warnings.filterwarnings("ignore")
 class PenalizedTrustRegion(Algorithm):
     """Penalized Trust Region (PTR) successive convexification algorithm.
 
-    PTR is the default SCvx algorithm that uses trust region methods with
-    penalty-based constraint handling. It includes adaptive parameter tuning
-    and virtual control relaxation for handling infeasible subproblems.
+    PTR solves non-convex trajectory optimization problems through iterative
+    convex approximation. Each subproblem balances competing cost terms:
+
+    - **Trust region penalty**: Discourages large deviations from the previous
+      iterate, keeping the solution within the region where linearization is valid.
+    - **Virtual control**: Relaxes dynamics constraints, penalized to drive
+      defects toward zero as the algorithm converges.
+    - **Virtual buffer**: Relaxes non-convex constraints, similarly penalized
+      to enforce feasibility at convergence.
+    - **Problem objective and other terms**: The user-defined cost (e.g., minimum
+      fuel, minimum time) and any additional penalty terms.
+
+    The interplay between these terms guides the optimization: the trust region
+    anchors the solution near the linearization point while virtual terms allow
+    temporary constraint violations that shrink over iterations.
 
     Example:
         Using PTR with a Problem::
@@ -337,7 +349,7 @@ class PenalizedTrustRegion(Algorithm):
             List containing the BibTeX entry for the PTR paper.
         """
         return [
-            """@article{drusvyatskiy2018error,
+            r"""@article{drusvyatskiy2018error,
   title={Error bounds, quadratic growth, and linear convergence of proximal methods},
   author={Drusvyatskiy, Dmitriy and Lewis, Adrian S},
   journal={Mathematics of operations research},
@@ -346,5 +358,27 @@ class PenalizedTrustRegion(Algorithm):
   pages={919--948},
   year={2018},
   publisher={INFORMS}
-}"""
+}""",
+            r"""@article{szmuk2020successive,
+  title={Successive convexification for real-time six-degree-of-freedom powered descent guidance
+    with state-triggered constraints},
+  author={Szmuk, Michael and Reynolds, Taylor P and A{\c{c}}{\i}kme{\c{s}}e, Beh{\c{c}}et},
+  journal={Journal of Guidance, Control, and Dynamics},
+  volume={43},
+  number={8},
+  pages={1399--1413},
+  year={2020},
+  publisher={American Institute of Aeronautics and Astronautics}
+}""",
+            r"""@article{reynolds2020dual,
+  title={Dual quaternion-based powered descent guidance with state-triggered constraints},
+  author={Reynolds, Taylor P and Szmuk, Michael and Malyuta, Danylo and Mesbahi, Mehran and
+    A{\c{c}}{\i}kme{\c{s}}e, Beh{\c{c}}et and Carson III, John M},
+  journal={Journal of Guidance, Control, and Dynamics},
+  volume={43},
+  number={9},
+  pages={1584--1599},
+  year={2020},
+  publisher={American Institute of Aeronautics and Astronautics}
+}""",
         ]
