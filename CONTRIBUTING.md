@@ -147,7 +147,21 @@ See the `[tool.ruff]` section in `pyproject.toml` for our configuration.
 
 #### Testing
 
-OpenSCvx uses the `pytest` framework to organize the automated testing.
+OpenSCvx uses `pytest` for automated testing. Tests run automatically via GitHub Actions:
+
+- **[tests-unit.yml](.github/workflows/tests-unit.yml)**: Runs on every PR - fast unit tests including the brachistochrone benchmark
+- **[tests-integration.yml](.github/workflows/tests-integration.yml)**: Runs weekly - full example problems as a smoke test
+
+##### Running Tests Locally
+
+For faster feedback during development, run tests locally:
+
+```bash
+pytest tests/                              # All unit tests
+pytest tests/test_brachistochrone.py -v    # Just the brachistochrone benchmark
+pytest -v -m "not integration"             # Skip expensive integration tests
+pytest -v -m integration                   # Only integration tests (runs test_examples.py)
+```
 
 ##### Brachistochrone Problem
 
@@ -156,34 +170,6 @@ The [brachistochrone problem](https://en.wikipedia.org/wiki/Brachistochrone_curv
 - **Analytical solution exists**: We can validate numerical results against the exact cycloid curve
 - **Small and fast**: The problem converges quickly, making it ideal for CI/CD pipelines
 - **Representative**: It exercises core features like free final time optimization and nonlinear dynamics
-
-Run the test suite with:
-
-```bash
-pytest tests/
-```
-
-For faster iteration during development, run only the brachistochrone tests:
-
-```bash
-pytest tests/test_brachistochrone.py -v
-```
-
-##### Integration Tests
-
-The full example problems in `tests/test_examples.py` are marked as `integration` tests since they're more expensive to run. To run only integration tests:
-
-```bash
-pytest -v -m integration
-```
-
-To skip integration tests during development:
-
-```bash
-pytest -v -m "not integration"
-```
-
-Unit tests run automatically on every PR via [tests-unit.yml](.github/workflows/tests-unit.yml). Integration tests run weekly as a smoke test via [tests-integration.yml](.github/workflows/tests-integration.yml) to avoid slowing down the PR workflow.
 
 ##### Test-Driven Development
 
