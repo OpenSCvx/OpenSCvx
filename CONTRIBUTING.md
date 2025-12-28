@@ -178,3 +178,36 @@ While we do not strictly follow [test driven development (TDD)](https://en.wikip
 For example, the [symbolic-expression layer](openscvx/symbolic/__init__.py) is well covered by [tests](tests/symbolic/) which were written simultaneously with the symbolic layer.
 
 The extensive test suite helps ensure that new features and refactors don't break existing functionality.
+
+#### Documentation
+
+We use [MkDocs](https://www.mkdocs.org/) with [Material](https://squidfunk.github.io/mkdocs-material/) theme for documentation, hosted at [haynec.github.io/OpenSCvx](https://haynec.github.io/OpenSCvx/).
+
+API reference is auto-generated from docstrings using [mkdocstrings](https://mkdocstrings.github.io/). Please use [Google-style docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings) for all public functions and classes:
+
+```python
+def solve(self, max_iterations: int = 100) -> OptimizationResult:
+    """Solve the trajectory optimization problem.
+
+    Args:
+        max_iterations: Maximum number of SCP iterations.
+
+    Returns:
+        The optimization result containing the trajectory and convergence info.
+
+    Raises:
+        ConvergenceError: If the solver fails to converge.
+    """
+```
+
+To preview documentation locally, first install the dependencies:
+
+```bash
+pip install mkdocs-material mkdocstrings-python mkdocs-gen-files mkdocs-literate-nav mkdocs-section-index
+```
+
+Then serve the documentation locally:
+
+```bash
+mkdocs serve
+```
