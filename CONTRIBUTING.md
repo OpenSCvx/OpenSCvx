@@ -169,6 +169,22 @@ For faster iteration during development, run only the brachistochrone tests:
 pytest tests/test_brachistochrone.py -v
 ```
 
+##### Integration Tests
+
+The full example problems in `tests/test_examples.py` are marked as `integration` tests since they're more expensive to run. To run only integration tests:
+
+```bash
+pytest -v -m integration
+```
+
+To skip integration tests during development:
+
+```bash
+pytest -v -m "not integration"
+```
+
+Unit tests run automatically on every PR via [tests-unit.yml](.github/workflows/tests-unit.yml). Integration tests run weekly as a smoke test via [tests-integration.yml](.github/workflows/tests-integration.yml) to avoid slowing down the PR workflow.
+
 ##### Test-Driven Development
 
 While we do not strictly follow [test driven development (TDD)](https://en.wikipedia.org/wiki/Test-driven_development), we aim to keep a representative test-suite where it makes sense to do so and leverage TDD when possible.
