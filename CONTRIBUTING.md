@@ -4,8 +4,10 @@
 
 To set up OpenSCvx for local development, first clone the repository and create a virtual environment:
 
+> **Note:** These instructions use SSH URLs. If you haven't set up SSH keys with GitHub, see [Connecting to GitHub with SSH](https://docs.github.com/en/authentication/connecting-to-github-with-ssh).
+
 ```bash
-git clone https://github.com/haynec/OpenSCvx.git
+git clone git@github.com:haynec/OpenSCvx.git
 cd OpenSCvx
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
@@ -27,7 +29,7 @@ For additional features, you can install optional dependencies:
 If you prefer using [uv](https://github.com/astral-sh/uv) for faster dependency resolution:
 
 ```bash
-git clone https://github.com/haynec/OpenSCvx.git
+git clone git@github.com:haynec/OpenSCvx.git
 cd OpenSCvx
 uv venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
@@ -54,22 +56,22 @@ To set up a fork for development:
 
 2. Clone your fork locally:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/OpenSCvx.git
+   git clone git@github.com:YOUR_USERNAME/OpenSCvx.git
    cd OpenSCvx
    ```
 
 3. Add the upstream repository as a remote:
    ```bash
-   git remote add upstream https://github.com/haynec/OpenSCvx.git
+   git remote add upstream git@github.com:haynec/OpenSCvx.git
    ```
 
 4. Verify your remotes:
    ```bash
    git remote -v
-   # origin    https://github.com/YOUR_USERNAME/OpenSCvx.git (fetch)
-   # origin    https://github.com/YOUR_USERNAME/OpenSCvx.git (push)
-   # upstream  https://github.com/haynec/OpenSCvx.git (fetch)
-   # upstream  https://github.com/haynec/OpenSCvx.git (push)
+   # origin    git@github.com:YOUR_USERNAME/OpenSCvx.git (fetch)
+   # origin    git@github.com:YOUR_USERNAME/OpenSCvx.git (push)
+   # upstream  git@github.com:haynec/OpenSCvx.git (fetch)
+   # upstream  git@github.com:haynec/OpenSCvx.git (push)
    ```
 
 5. Keep your fork up to date by periodically pulling from upstream:
