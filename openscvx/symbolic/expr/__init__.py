@@ -54,6 +54,11 @@ Module Organization:
         Direction Cosine Matrix), `SSMP` (4×4 skew-symmetric matrix for quaternion
         dynamics), and `SSM` (3×3 skew-symmetric matrix for cross products).
 
+    Lie Algebra Operations (lie.py):
+        Lie algebra operations for rigid body dynamics including `AdjointDual`
+        (coadjoint operator for Coriolis/centrifugal forces) and `Adjoint`
+        (Lie bracket for twist-on-twist action).
+
     Constraint Specifications (constraint.py):
         `NodalConstraint` for enforcing constraints at discrete nodes and `CTCS` for
         continuous-time constraint satisfaction.
@@ -92,6 +97,9 @@ from .expr import (
     to_expr,
     traverse,
 )
+
+# Lie algebra operations
+from .lie import Adjoint, AdjointDual
 
 # Linear algebra operations
 from .linalg import Diag, Norm, Sum, Transpose
@@ -183,6 +191,9 @@ __all__ = [
     "QDCM",
     "SSMP",
     "SSM",
+    # Lie algebra operations
+    "AdjointDual",
+    "Adjoint",
     # Specialized constraints
     "NodalConstraint",
     "CrossNodeConstraint",
