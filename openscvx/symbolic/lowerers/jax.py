@@ -118,6 +118,8 @@ from openscvx.symbolic.expr import (
     SSMP,
     Abs,
     Add,
+    Adjoint,
+    AdjointDual,
     Concat,
     Constant,
     Constraint,
@@ -877,6 +879,96 @@ class JaxLowerer:
             return jnp.array([[0, -wz, wy], [wz, 0, -wx], [-wy, wx, 0]])
 
         return ssm_fn
+
+    @visitor(AdjointDual)
+    def _visit_adjoint_dual(self, node: AdjointDual):
+        """Lower coadjoint operator ad* for rigid body dynamics.
+
+        Computes the coadjoint action ad*_ξ(μ) which represents Coriolis and
+        centrifugal forces in rigid body dynamics. This is the key term in
+        Newton-Euler equations.
+
+        For se(3), given twist ξ = [v; ω] and momentum μ = [f; τ]:
+
+            ad*_ξ(μ) = [ ω × f + v × τ ]
+                       [     ω × τ     ]
+
+        This appears in the equations of motion as:
+            M @ ξ_dot = F_ext - ad*_ξ(M @ ξ)
+
+        Args:
+            node: AdjointDual expression node
+
+        Returns:
+            Function (x, u, node, params) -> 6D coadjoint result
+
+        Note:
+            Convention: twist = [v; ω] (linear velocity, angular velocity)
+                       momentum = [f; τ] (force, torque)
+        """
+        f_twist = self.lower(node.twist)
+        f_momentum = self.lower(node.momentum)
+
+        def adjoint_dual_fn(x, u, node, params):
+            twist = f_twist(x, u, node, params)
+            momentum = f_momentum(x, u, node, params)
+
+            # Extract components: twist = [v; ω], momentum = [f; τ]
+            v = twist[:3]  # Linear velocity
+            omega = twist[3:]  # Angular velocity
+            f = momentum[:3]  # Force (or linear momentum)
+            tau = momentum[3:]  # Torque (or angular momentum)
+
+            # Coadjoint action: ad*_ξ(μ) = [ω × f + v × τ; ω × τ]
+            linear_part = jnp.cross(omega, f) + jnp.cross(v, tau)
+            angular_part = jnp.cross(omega, tau)
+
+            return jnp.concatenate([linear_part, angular_part])
+
+        return adjoint_dual_fn
+
+    @visitor(Adjoint)
+    def _visit_adjoint(self, node: Adjoint):
+        """Lower adjoint operator ad (Lie bracket) for twist-on-twist action.
+
+        Computes the adjoint action ad_ξ₁(ξ₂) which represents the Lie bracket
+        [ξ₁, ξ₂] of two twists. Used for velocity propagation and acceleration
+        computation in kinematic chains.
+
+        For se(3), given twists ξ₁ = [v₁; ω₁] and ξ₂ = [v₂; ω₂]:
+
+            ad_ξ₁(ξ₂) = [ ω₁ × v₂ - ω₂ × v₁ ]
+                        [     ω₁ × ω₂       ]
+
+        Args:
+            node: Adjoint expression node
+
+        Returns:
+            Function (x, u, node, params) -> 6D Lie bracket result
+
+        Note:
+            The Lie bracket is antisymmetric: [ξ₁, ξ₂] = -[ξ₂, ξ₁]
+        """
+        f_twist1 = self.lower(node.twist1)
+        f_twist2 = self.lower(node.twist2)
+
+        def adjoint_fn(x, u, node, params):
+            twist1 = f_twist1(x, u, node, params)
+            twist2 = f_twist2(x, u, node, params)
+
+            # Extract components: twist = [v; ω]
+            v1 = twist1[:3]
+            omega1 = twist1[3:]
+            v2 = twist2[:3]
+            omega2 = twist2[3:]
+
+            # Lie bracket: [ξ₁, ξ₂] = [ω₁ × v₂ - ω₂ × v₁; ω₁ × ω₂]
+            linear_part = jnp.cross(omega1, v2) - jnp.cross(omega2, v1)
+            angular_part = jnp.cross(omega1, omega2)
+
+            return jnp.concatenate([linear_part, angular_part])
+
+        return adjoint_fn
 
     @visitor(Diag)
     def _visit_diag(self, node: Diag):
