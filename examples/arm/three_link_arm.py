@@ -43,7 +43,7 @@ L3 = 0.2  # Elbow to end-effector
 inertia = np.array([0.05, 0.03, 0.01])
 
 # Number of discretization nodes
-n = 6
+n = 3
 total_time = 2.0
 
 # =============================================================================
@@ -165,8 +165,8 @@ for state in states:
     )
 
 # End-effector target constraint at final node (commented out for debugging)
-ee_tolerance = 0.10  # 10cm tolerance
-ee_target_constraint = (ox.linalg.Norm(p_ee - target, ord="inf") <= ee_tolerance).at([n - 1])
+ee_tolerance = 0.01  # 1cm tolerance
+ee_target_constraint = (ox.linalg.Norm(p_ee - target, ord=2) <= ee_tolerance).at([n - 1])
 constraints.append(ee_target_constraint)
 
 # =============================================================================
@@ -174,10 +174,11 @@ constraints.append(ee_target_constraint)
 # =============================================================================
 
 np.random.seed(42)  # For reproducibility
-angle.guess = np.linspace(angle.initial, np.zeros(3), n)
+# Terminal angles that reach the target (from workspace analysis)
+q_terminal = np.deg2rad([47.8, -38.6, 62.4])
+angle.guess = np.linspace(angle.initial, q_terminal, n)
 velocity.guess = np.zeros((n, 3))
-# Random torques within 50% of bounds to help break symmetry
-torque.guess = np.random.uniform(-0.5, 0.5, (n, 3)) * torque.max
+torque.guess = np.zeros((n, 3))
 
 # =============================================================================
 # Problem Setup
@@ -204,6 +205,7 @@ problem.settings.prp.dt = 0.01
 problem.settings.scp.w_tr = 1e1
 problem.settings.scp.lam_cost = 1e2
 problem.settings.scp.lam_vc = 1e1
+problem.settings.scp.lam_vb = 1e2
 
 if __name__ == "__main__":
     print("3-Link Arm Trajectory Optimization with Product of Exponentials FK")
