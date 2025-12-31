@@ -55,9 +55,11 @@ Module Organization:
         dynamics), and `SSM` (3×3 skew-symmetric matrix for cross products).
 
     Lie Algebra Operations (lie.py):
-        Lie algebra operations for rigid body dynamics including `AdjointDual`
-        (coadjoint operator for Coriolis/centrifugal forces) and `Adjoint`
-        (Lie bracket for twist-on-twist action).
+        Lie algebra operations for rigid body dynamics. Built-in operators include
+        `AdjointDual` (coadjoint for Coriolis/centrifugal forces) and `Adjoint`
+        (Lie bracket). jaxlie-backed operators (requires `pip install openscvx[lie]`)
+        include `SO3Exp`, `SO3Log`, `SE3Exp`, and `SE3Log` for exponential and
+        logarithm maps on rotation and rigid transformation groups.
 
     Constraint Specifications (constraint.py):
         `NodalConstraint` for enforcing constraints at discrete nodes and `CTCS` for
@@ -99,7 +101,7 @@ from .expr import (
 )
 
 # Lie algebra operations
-from .lie import Adjoint, AdjointDual
+from .lie import Adjoint, AdjointDual, SE3Exp, SE3Log, SO3Exp, SO3Log
 
 # Linear algebra operations
 from .linalg import Diag, Norm, Sum, Transpose
@@ -194,6 +196,10 @@ __all__ = [
     # Lie algebra operations
     "AdjointDual",
     "Adjoint",
+    "SO3Exp",
+    "SO3Log",
+    "SE3Exp",
+    "SE3Log",
     # Specialized constraints
     "NodalConstraint",
     "CrossNodeConstraint",

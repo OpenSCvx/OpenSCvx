@@ -48,6 +48,9 @@ cvxpygen = [
 stl = [
     "stljax",
 ]
+lie = [
+    "jaxlie",
+]
 test = [
     "pytest",
     "scipy",

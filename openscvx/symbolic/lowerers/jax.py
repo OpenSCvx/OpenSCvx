@@ -159,6 +159,12 @@ from openscvx.symbolic.expr import (
     Vstack,
 )
 from openscvx.symbolic.expr.control import Control
+from openscvx.symbolic.expr.lie import (
+    SE3Exp,
+    SE3Log,
+    SO3Exp,
+    SO3Log,
+)
 from openscvx.symbolic.expr.state import State
 
 _JAX_VISITORS: Dict[Type[Expr], Callable] = {}
@@ -969,6 +975,101 @@ class JaxLowerer:
             return jnp.concatenate([linear_part, angular_part])
 
         return adjoint_fn
+
+    @visitor(SO3Exp)
+    def _visit_so3_exp(self, node: SO3Exp):
+        """Lower SO3 exponential map using jaxlie.
+
+        Maps a 3D rotation vector (axis-angle) to a 3×3 rotation matrix
+        using jaxlie's numerically robust implementation.
+
+        Args:
+            node: SO3Exp expression node
+
+        Returns:
+            Function (x, u, node, params) -> 3×3 rotation matrix
+        """
+        import jaxlie
+
+        f_omega = self.lower(node.omega)
+
+        def so3_exp_fn(x, u, node, params):
+            omega = f_omega(x, u, node, params)
+            return jaxlie.SO3.exp(omega).as_matrix()
+
+        return so3_exp_fn
+
+    @visitor(SO3Log)
+    def _visit_so3_log(self, node: SO3Log):
+        """Lower SO3 logarithm map using jaxlie.
+
+        Maps a 3×3 rotation matrix to a 3D rotation vector (axis-angle)
+        using jaxlie's numerically robust implementation.
+
+        Args:
+            node: SO3Log expression node
+
+        Returns:
+            Function (x, u, node, params) -> 3D rotation vector
+        """
+        import jaxlie
+
+        f_rotation = self.lower(node.rotation)
+
+        def so3_log_fn(x, u, node, params):
+            rotation = f_rotation(x, u, node, params)
+            return jaxlie.SO3.from_matrix(rotation).log()
+
+        return so3_log_fn
+
+    @visitor(SE3Exp)
+    def _visit_se3_exp(self, node: SE3Exp):
+        """Lower SE3 exponential map using jaxlie.
+
+        Maps a 6D twist vector [v; ω] to a 4×4 homogeneous transformation
+        matrix using jaxlie's numerically robust implementation.
+
+        The twist convention [v; ω] (linear first, angular second) matches
+        jaxlie's SE3 tangent parameterization, so no reordering is needed.
+
+        Args:
+            node: SE3Exp expression node
+
+        Returns:
+            Function (x, u, node, params) -> 4×4 transformation matrix
+        """
+        import jaxlie
+
+        f_twist = self.lower(node.twist)
+
+        def se3_exp_fn(x, u, node, params):
+            twist = f_twist(x, u, node, params)
+            return jaxlie.SE3.exp(twist).as_matrix()
+
+        return se3_exp_fn
+
+    @visitor(SE3Log)
+    def _visit_se3_log(self, node: SE3Log):
+        """Lower SE3 logarithm map using jaxlie.
+
+        Maps a 4×4 homogeneous transformation matrix to a 6D twist vector
+        [v; ω] using jaxlie's numerically robust implementation.
+
+        Args:
+            node: SE3Log expression node
+
+        Returns:
+            Function (x, u, node, params) -> 6D twist vector
+        """
+        import jaxlie
+
+        f_transform = self.lower(node.transform)
+
+        def se3_log_fn(x, u, node, params):
+            transform = f_transform(x, u, node, params)
+            return jaxlie.SE3.from_matrix(transform).log()
+
+        return se3_log_fn
 
     @visitor(Diag)
     def _visit_diag(self, node: Diag):
