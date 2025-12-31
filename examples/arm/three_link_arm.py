@@ -28,6 +28,7 @@ sys.path.append(grandparent_dir)
 
 import openscvx as ox
 from openscvx import Problem
+from openscvx.plotting import plot_scp_iterations
 
 # =============================================================================
 # Robot Parameters
@@ -81,31 +82,31 @@ T_home = np.array(
 # =============================================================================
 
 # Joint angles (3,)
-q = ox.State("q", shape=(3,))
-q.max = np.array([np.pi, np.pi / 2, np.pi])
-q.min = np.array([-np.pi, -np.pi / 2, -np.pi])
-q.initial = np.array([0.0, 0.0, 0.0])
-q.final = [("free", 0.0), ("free", 0.0), ("free", 0.0)]
+angle = ox.State("angle", shape=(3,))
+angle.max = np.array([np.pi, np.pi / 2, np.pi])
+angle.min = np.array([-np.pi, -np.pi / 2, -np.pi])
+angle.initial = np.array([0.0, 0.0, 0.0])
+angle.final = [("free", 0.0), ("free", 0.0), ("free", 0.0)]
 
 # Joint velocities (3,)
-qd = ox.State("qd", shape=(3,))
-qd.max = np.array([5.0, 5.0, 5.0])
-qd.min = np.array([-5.0, -5.0, -5.0])
-qd.initial = np.array([0.0, 0.0, 0.0])
-qd.final = np.array([0.0, 0.0, 0.0])
+velocity = ox.State("velocity", shape=(3,))
+velocity.max = np.array([5.0, 5.0, 5.0])
+velocity.min = np.array([-5.0, -5.0, -5.0])
+velocity.initial = np.array([0.0, 0.0, 0.0])
+velocity.final = np.array([0.0, 0.0, 0.0])
 
-states = [q, qd]
+states = [angle, velocity]
 
 # =============================================================================
 # Controls
 # =============================================================================
 
 # Joint torques (3,)
-tau = ox.Control("tau", shape=(3,))
-tau.max = np.array([10.0, 5.0, 2.0])
-tau.min = np.array([-10.0, -5.0, -2.0])
+torque = ox.Control("torque", shape=(3,))
+torque.max = np.array([10.0, 5.0, 2.0])
+torque.min = np.array([-10.0, -5.0, -2.0])
 
-controls = [tau]
+controls = [torque]
 
 # =============================================================================
 # Forward Kinematics using Product of Exponentials
@@ -117,9 +118,9 @@ xi_1 = ox.Constant(screw_axes[0])
 xi_2 = ox.Constant(screw_axes[1])
 xi_3 = ox.Constant(screw_axes[2])
 
-twist_1 = xi_1 * q[0]
-twist_2 = xi_2 * q[1]
-twist_3 = xi_3 * q[2]
+twist_1 = xi_1 * angle[0]
+twist_2 = xi_2 * angle[1]
+twist_3 = xi_3 * angle[2]
 
 # Exponential maps for each joint
 T_01 = ox.lie.SE3Exp(twist_1)  # 4x4 transform
@@ -142,8 +143,8 @@ p_ee = ox.Concat(T_ee[0, 3], T_ee[1, 3], T_ee[2, 3])
 I_inv = ox.Constant(1.0 / inertia)
 
 dynamics = {
-    "q": qd,
-    "qd": I_inv * tau,  # Element-wise: qdd_i = tau_i / I_i
+    "angle": velocity,
+    "velocity": I_inv * torque,  # Element-wise: qdd_i = tau_i / I_i
 }
 
 # =============================================================================
@@ -164,19 +165,19 @@ for state in states:
     )
 
 # End-effector target constraint at final node (commented out for debugging)
-# ee_tolerance = 0.01  # 1cm tolerance
-# ee_target_constraint = (
-#     ox.linalg.Norm(p_ee - target, ord="inf") <= ee_tolerance
-# ).at([n - 1])
-# constraints.append(ee_target_constraint)
+ee_tolerance = 0.10  # 10cm tolerance
+ee_target_constraint = (ox.linalg.Norm(p_ee - target, ord="inf") <= ee_tolerance).at([n - 1])
+constraints.append(ee_target_constraint)
 
 # =============================================================================
 # Initial Guesses
 # =============================================================================
 
-q.guess = np.linspace(q.initial, np.zeros(3), n)
-qd.guess = np.zeros((n, 3))
-tau.guess = np.zeros((n, 3))
+np.random.seed(42)  # For reproducibility
+angle.guess = np.linspace(angle.initial, np.zeros(3), n)
+velocity.guess = np.zeros((n, 3))
+# Random torques within 50% of bounds to help break symmetry
+torque.guess = np.random.uniform(-0.5, 0.5, (n, 3)) * torque.max
 
 # =============================================================================
 # Problem Setup
@@ -217,7 +218,7 @@ if __name__ == "__main__":
     results = problem.post_process()
 
     # Extract final joint angles
-    final_q = results.trajectory["q"][-1]
+    final_q = results.trajectory["angle"][-1]
 
     print()
     print("Results:")
@@ -235,6 +236,8 @@ if __name__ == "__main__":
         T3 = jaxlie.SE3.exp(screw_axes[2] * q_vals[2]).as_matrix()
         T_final = T1 @ T2 @ T3 @ T_home
         return T_final[:3, 3]
+
+    plot_scp_iterations(results).show()
 
     tgt = target.value
     final_ee = compute_ee_position(final_q)
