@@ -134,6 +134,7 @@ from openscvx.symbolic.expr import (
     CTCS,
     Abs,
     Add,
+    Block,
     Concat,
     Constant,
     Cos,
@@ -142,6 +143,7 @@ from openscvx.symbolic.expr import (
     Equality,
     Exp,
     Expr,
+    Hstack,
     Huber,
     Index,
     Inequality,
@@ -165,6 +167,7 @@ from openscvx.symbolic.expr import (
     Sum,
     Tan,
     Transpose,
+    Vstack,
 )
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.state import State
@@ -1158,6 +1161,57 @@ class CvxpyLowerer:
         rows = [self.lower(row) for row in node.rows]
         # Stack rows vertically
         return cp.vstack(rows)
+
+    @visitor(Hstack)
+    def _visit_hstack(self, node: Hstack) -> cp.Expression:
+        """Lower horizontal stacking to CVXPy expression.
+
+        Stacks expressions horizontally using cp.hstack. Preserves DCP properties.
+
+        Args:
+            node: Hstack expression node with multiple arrays
+
+        Returns:
+            CVXPy expression representing horizontal stack of arrays
+        """
+        arrays = [self.lower(arr) for arr in node.arrays]
+        return cp.hstack(arrays)
+
+    @visitor(Vstack)
+    def _visit_vstack(self, node: Vstack) -> cp.Expression:
+        """Lower vertical stacking to CVXPy expression.
+
+        Stacks expressions vertically using cp.vstack. Preserves DCP properties.
+
+        Args:
+            node: Vstack expression node with multiple arrays
+
+        Returns:
+            CVXPy expression representing vertical stack of arrays
+        """
+        arrays = [self.lower(arr) for arr in node.arrays]
+        return cp.vstack(arrays)
+
+    @visitor(Block)
+    def _visit_block(self, node: Block) -> cp.Expression:
+        """Lower block matrix construction to CVXPy expression.
+
+        Assembles a block matrix from nested lists of expressions using cp.bmat.
+        This is the CVXPy equivalent of numpy.block() for block matrix construction.
+
+        Args:
+            node: Block expression node with 2D nested structure of expressions
+
+        Returns:
+            CVXPy expression representing the assembled block matrix
+
+        Note:
+            cp.bmat preserves DCP properties when all blocks are DCP-compliant.
+            Block matrices are commonly used for constraint aggregation.
+        """
+        # Lower each block expression
+        block_exprs = [[self.lower(block) for block in row] for row in node.blocks]
+        return cp.bmat(block_exprs)
 
 
 def lower_to_cvxpy(expr: Expr, variable_map: Dict[str, cp.Expression] = None) -> cp.Expression:
