@@ -499,23 +499,22 @@ class Block(Expr):
         """Initialize a block matrix construction.
 
         Args:
-            blocks: A 2D nested list of expressions. The outer list contains rows,
-                    and each inner list contains the blocks for that row.
+            blocks: A nested list of expressions. Can be either:
+                    - 2D: [[row1_blocks], [row2_blocks], ...] for multiple rows
+                    - 1D: [block1, block2, ...] for a single row (auto-promoted to [[...]])
                     Raw values (numbers, lists, numpy arrays) are automatically
                     converted to Constant expressions.
 
         Raises:
-            ValueError: If blocks is empty or not a 2D nested structure
+            ValueError: If blocks is empty
         """
         if not blocks:
             raise ValueError("Block requires at least one row")
 
-        # Ensure blocks is a 2D structure
+        # Auto-promote 1D list to 2D (matching numpy.block behavior)
+        # e.g., Block([a, b]) -> Block([[a, b]])
         if not isinstance(blocks[0], (list, tuple)):
-            raise ValueError(
-                "Block requires a 2D nested list structure. "
-                "For a single row of blocks, use [[block1, block2, ...]]"
-            )
+            blocks = [blocks]
 
         # Convert all blocks to expressions
         self.blocks = [[to_expr(block) for block in row] for row in blocks]

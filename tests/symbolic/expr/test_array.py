@@ -787,13 +787,30 @@ def test_block_creation_with_expressions():
     assert block.children()[1] is y
 
 
-def test_block_requires_2d_structure():
-    """Test that Block raises error for non-2D structure."""
+def test_block_1d_list_auto_promotes():
+    """Test that Block auto-promotes 1D list to 2D (matching numpy.block)."""
     from openscvx.symbolic.expr import Block
 
-    with pytest.raises(ValueError) as exc:
-        Block([1, 2, 3])  # 1D list, not 2D
-    assert "2D nested list" in str(exc.value)
+    # 1D list should be auto-promoted to [[...]]
+    block = Block([1, 2, 3])
+
+    assert isinstance(block, Block)
+    assert len(block.blocks) == 1  # Single row
+    assert len(block.blocks[0]) == 3  # Three columns
+    assert block.check_shape() == (1, 3)
+
+
+def test_block_1d_list_with_matrices():
+    """Test that Block([a, b]) works like numpy.block([a, b])."""
+    from openscvx.symbolic.expr import Block
+
+    a = Constant(np.array([[1, 2], [3, 4]]))
+    b = Constant(np.array([[5, 6], [7, 8]]))
+
+    # This should work (auto-promoted to [[a, b]])
+    block = Block([a, b])
+
+    assert block.check_shape() == (2, 4)  # Same as np.block([a, b])
 
 
 def test_block_requires_consistent_row_lengths():

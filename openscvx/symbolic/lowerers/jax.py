@@ -465,11 +465,26 @@ class JaxLowerer:
 
     @visitor(Index)
     def _visit_index(self, node: Index):
-        """Lower indexing/slicing operation to JAX function."""
-        # lower the "base" expr into a fn(x,u,node), then index it
+        """Lower indexing/slicing operation to JAX function.
+
+        For multi-dimensional indexing, the base array is reshaped to its
+        original shape before applying the index. This is necessary because
+        State variables are stored flattened in the state vector.
+        """
         f_base = self.lower(node.base)
         idx = node.index
-        return lambda x, u, node, params: jnp.atleast_1d(f_base(x, u, node, params))[idx]
+        base_shape = node.base.check_shape()
+
+        def index_fn(x, u, node_arg, params):
+            arr = f_base(x, u, node_arg, params)
+            # Reshape to original shape for multi-dimensional indexing
+            if len(base_shape) > 1:
+                arr = arr.reshape(base_shape)
+            else:
+                arr = jnp.atleast_1d(arr)
+            return arr[idx]
+
+        return index_fn
 
     @visitor(Concat)
     def _visit_concat(self, node: Concat):
