@@ -786,16 +786,32 @@ def test_block_shape_width_mismatch_raises():
     assert "inconsistent widths" in str(exc.value)
 
 
-def test_block_shape_3d_raises():
-    """Test that 3D blocks raise error."""
+def test_block_shape_3d_supported():
+    """Test that 3D blocks are supported with correct shape inference."""
     from openscvx.symbolic.expr import Block
 
-    a = Constant(np.zeros((2, 3, 4)))  # 3D - not supported
+    # 3D blocks with shape (2, 3, 4)
+    a = Constant(np.zeros((2, 3, 4)))
+    b = Constant(np.zeros((2, 5, 4)))  # Same height (2), different width (5), same depth (4)
+    c = Constant(np.zeros((3, 3, 4)))  # Different height (3), same width (3), same depth (4)
+    d = Constant(np.zeros((3, 5, 4)))  # Different height (3), different width (5), same depth (4)
 
-    block = Block([[a]])
+    block = Block([[a, b], [c, d]])
+    shape = block.check_shape()
+    assert shape == (5, 8, 4)  # (2+3) x (3+5) x 4
+
+
+def test_block_shape_3d_trailing_mismatch_raises():
+    """Test that 3D blocks with mismatched trailing dimensions raise error."""
+    from openscvx.symbolic.expr import Block
+
+    a = Constant(np.zeros((2, 3, 4)))  # depth 4
+    b = Constant(np.zeros((2, 3, 5)))  # depth 5 - mismatch!
+
+    block = Block([[a, b]])
     with pytest.raises(ValueError) as exc:
         block.check_shape()
-    assert "3 dimensions" in str(exc.value)
+    assert "trailing dimensions" in str(exc.value)
 
 
 # --- Block: Canonicalization ---
@@ -914,6 +930,31 @@ def test_block_jax_scalars():
     assert result.shape == (2, 2)
 
 
+def test_block_jax_3d_tensors():
+    """Test JAX lowering of Block with 3D tensors."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Block
+    from openscvx.symbolic.lower import lower_to_jax
+
+    # Create 3D blocks
+    a = Constant(np.ones((2, 3, 4)))
+    b = Constant(np.ones((2, 2, 4)) * 2)
+    c = Constant(np.ones((1, 3, 4)) * 3)
+    d = Constant(np.ones((1, 2, 4)) * 4)
+
+    block = Block([[a, b], [c, d]])
+    fn = lower_to_jax(block)
+    result = fn(None, None, None, None)
+
+    assert result.shape == (3, 5, 4)  # (2+1) x (3+2) x 4
+    # Check that values are correctly placed
+    assert jnp.allclose(result[0:2, 0:3, :], 1.0)  # a
+    assert jnp.allclose(result[0:2, 3:5, :], 2.0)  # b
+    assert jnp.allclose(result[2:3, 0:3, :], 3.0)  # c
+    assert jnp.allclose(result[2:3, 3:5, :], 4.0)  # d
+
+
 # --- Block: CVXPy Lowering ---
 
 
@@ -957,3 +998,19 @@ def test_block_cvxpy_with_variables():
     result = lowerer.lower(block)
     assert isinstance(result, cp.Expression)
     assert result.shape == (2, 2)
+
+
+def test_block_cvxpy_3d_raises():
+    """Test that CVXPy lowering raises NotImplementedError for 3D blocks."""
+    from openscvx.symbolic.expr import Block
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    a = Constant(np.zeros((2, 3, 4)))  # 3D tensor
+
+    block = Block([[a]])
+    lowerer = CvxpyLowerer()
+
+    with pytest.raises(NotImplementedError) as exc:
+        lowerer.lower(block)
+    assert "dimension > 2" in str(exc.value)
+    assert "JAX lowering" in str(exc.value)

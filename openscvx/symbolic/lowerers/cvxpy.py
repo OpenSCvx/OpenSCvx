@@ -1205,10 +1205,25 @@ class CvxpyLowerer:
         Returns:
             CVXPy expression representing the assembled block matrix
 
+        Raises:
+            NotImplementedError: If any block has more than 2 dimensions
+
         Note:
             cp.bmat preserves DCP properties when all blocks are DCP-compliant.
             Block matrices are commonly used for constraint aggregation.
+            For 3D+ tensors, use JAX lowering instead.
         """
+        # Check for 3D+ blocks - CVXPy's bmat only supports 2D
+        for i, row in enumerate(node.blocks):
+            for j, block in enumerate(row):
+                block_shape = block.check_shape()
+                if len(block_shape) > 2:
+                    raise NotImplementedError(
+                        f"CVXPy does not support Block with tensors of dimension > 2. "
+                        f"Block[{i}][{j}] has shape {block_shape} ({len(block_shape)}D). "
+                        f"For N-D tensor block assembly, use JAX lowering instead."
+                    )
+
         # Lower each block expression
         block_exprs = [[self.lower(block) for block in row] for row in node.blocks]
         return cp.bmat(block_exprs)

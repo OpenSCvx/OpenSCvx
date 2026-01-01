@@ -440,11 +440,12 @@ class Vstack(Expr):
 
 
 class Block(Expr):
-    """Block matrix construction from nested arrays of expressions.
+    """Block matrix/tensor construction from nested arrays of expressions.
 
-    Assembles a block matrix from a nested list of expressions, analogous to
-    numpy.block(). Each inner list represents a row of blocks, and blocks within
-    the same row are concatenated horizontally, while rows are stacked vertically.
+    Assembles a block matrix (or N-D tensor) from a nested list of expressions,
+    analogous to numpy.block(). Each inner list represents a row of blocks, and
+    blocks within the same row are concatenated horizontally, while rows are
+    stacked vertically.
 
     This provides a convenient way to construct matrices from sub-expressions
     without manually nesting Stack/Hstack/Vstack operations.
@@ -488,8 +489,10 @@ class Block(Expr):
     Note:
         - All blocks in the same row must have the same height (first dimension)
         - All blocks in the same column must have the same width (second dimension)
+        - For N-D tensors (3D+), all trailing dimensions must match across all blocks
         - Scalar values and raw Python lists are automatically wrapped via to_expr()
         - 1D arrays are treated as row vectors when determining block dimensions
+        - N-D tensors are supported for JAX lowering; CVXPy only supports 2D blocks
     """
 
     def __init__(self, blocks):
@@ -536,8 +539,12 @@ class Block(Expr):
     def check_shape(self) -> Tuple[int, ...]:
         """Validate block dimensions and compute output shape.
 
+        For 2D blocks, returns (total_rows, total_cols). For N-D blocks,
+        returns the shape after assembling blocks along the first two axes,
+        with trailing dimensions preserved.
+
         Returns:
-            Tuple of (total_rows, total_cols) for the assembled block matrix
+            Tuple representing the assembled block array shape
 
         Raises:
             ValueError: If block dimensions are incompatible
@@ -548,16 +555,34 @@ class Block(Expr):
         # Get shapes of all blocks
         block_shapes = [[block.check_shape() for block in row] for row in self.blocks]
 
-        # Normalize shapes: treat scalars as (1,) and 1D as (1, n)
+        # Determine the maximum dimensionality across all blocks
+        max_ndim = max(len(shape) for row in block_shapes for shape in row)
+        max_ndim = max(max_ndim, 2)  # At least 2D for block assembly
+
+        # Normalize shapes: pad to max_ndim by prepending 1s
+        # Scalars () -> (1, 1, ...), 1D (n,) -> (1, n, ...), etc.
         def normalize_shape(shape):
             if len(shape) == 0:
-                return (1, 1)
-            elif len(shape) == 1:
-                return (1, shape[0])
+                return (1,) * max_ndim
+            elif len(shape) < max_ndim:
+                # Prepend 1s to match max_ndim
+                return (1,) * (max_ndim - len(shape)) + shape
             else:
                 return shape
 
         normalized_shapes = [[normalize_shape(shape) for shape in row] for row in block_shapes]
+
+        # Validate trailing dimensions (dims 2+) match across ALL blocks
+        if max_ndim > 2:
+            trailing_shape = normalized_shapes[0][0][2:]
+            for i, row_shapes in enumerate(normalized_shapes):
+                for j, shape in enumerate(row_shapes):
+                    if shape[2:] != trailing_shape:
+                        raise ValueError(
+                            f"Block[{i}][{j}] has trailing dimensions {shape[2:]}, "
+                            f"but Block[0][0] has {trailing_shape}. "
+                            f"All blocks must have matching dimensions beyond the first two."
+                        )
 
         # Compute row heights (first dimension of each row must match)
         row_heights = []
@@ -581,18 +606,12 @@ class Block(Expr):
                 )
             col_widths.append(widths[0])
 
-        # Validate that all blocks have at most 2 dimensions
-        for i, row_shapes in enumerate(block_shapes):
-            for j, shape in enumerate(row_shapes):
-                if len(shape) > 2:
-                    raise ValueError(
-                        f"Block[{i}][{j}] has {len(shape)} dimensions. "
-                        f"Block only supports scalars, 1D, and 2D arrays."
-                    )
-
         total_rows = sum(row_heights)
         total_cols = sum(col_widths)
 
+        # Return shape with trailing dimensions if present
+        if max_ndim > 2:
+            return (total_rows, total_cols) + normalized_shapes[0][0][2:]
         return (total_rows, total_cols)
 
     def __repr__(self):

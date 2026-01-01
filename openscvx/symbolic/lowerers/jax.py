@@ -776,25 +776,48 @@ class JaxLowerer:
     def _visit_block(self, node: Block):
         """Lower block matrix construction to JAX function.
 
-        Assembles a block matrix from nested lists of expressions using jnp.block.
-        Each block is lowered recursively and the results are assembled into the
-        same nested structure expected by jnp.block.
+        Assembles a block matrix from nested lists of expressions. For 2D blocks,
+        uses jnp.block directly. For N-D blocks (3D+), manually assembles along
+        the first two dimensions using concatenate, since jnp.block concatenates
+        along the last axes (not what we want for block matrix semantics).
 
         Args:
             node: Block expression node with 2D nested structure of expressions
 
         Returns:
-            Function (x, u, node, params) -> assembled block matrix
+            Function (x, u, node, params) -> assembled block matrix/tensor
         """
         # Lower each block expression
         block_fns = [[self.lower(block) for block in row] for row in node.blocks]
 
         def block_fn(x, u, node, params):
-            # Evaluate all blocks and assemble into nested list structure
+            # Evaluate all blocks
             block_values = [
                 [jnp.atleast_1d(fn(x, u, node, params)) for fn in row] for row in block_fns
             ]
-            return jnp.block(block_values)
+
+            # Check if any block is 3D+ (need manual assembly)
+            max_ndim = max(arr.ndim for row in block_values for arr in row)
+
+            if max_ndim <= 2:
+                # For 2D, jnp.block works correctly
+                return jnp.block(block_values)
+            else:
+                # For N-D, manually assemble along axes 0 and 1
+                # First, ensure all blocks have the same number of dimensions
+                def promote_to_ndim(arr, target_ndim):
+                    while arr.ndim < target_ndim:
+                        arr = jnp.expand_dims(arr, axis=0)
+                    return arr
+
+                block_values = [
+                    [promote_to_ndim(arr, max_ndim) for arr in row] for row in block_values
+                ]
+
+                # Concatenate each row along axis 1 (horizontal)
+                row_results = [jnp.concatenate(row, axis=1) for row in block_values]
+                # Concatenate rows along axis 0 (vertical)
+                return jnp.concatenate(row_results, axis=0)
 
         return block_fn
 
