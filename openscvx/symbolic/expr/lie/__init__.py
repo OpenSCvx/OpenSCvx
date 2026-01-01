@@ -7,24 +7,13 @@ spatial vectors (twists and wrenches).
 
 The module provides two tiers of functionality:
 
-**Tier 1: Built-in operators (no additional dependencies)**
+**Built-in operators** work out of the box and include adjoint/coadjoint
+operators for dynamics (_e.g._ ``Adjoint``, ``AdjointDual``) and frame transformations
+(_e.g._ ``SE3Adjoint``, ``SE3AdjointDual``).
 
-These operators are implemented using simple cross products and work out of the box:
-
-- ``AdjointDual``: Coadjoint operator ad*(ξ, μ) for Coriolis/centrifugal forces
-- ``Adjoint``: Lie bracket [ξ₁, ξ₂] for twist-on-twist action
-- ``SE3Adjoint``: Big adjoint Ad_T for transforming twists between frames
-- ``SE3AdjointDual``: Big coadjoint Ad*_T for transforming wrenches between frames
-
-**Tier 2: jaxlie-backed operators (requires ``pip install openscvx[lie]``)**
-
-These operators wrap `jaxlie <https://github.com/brentyi/jaxlie>`_ for robust
-Lie group exponential/logarithm maps:
-
-- ``SO3Exp``: so(3) → SO(3) exponential map (3D vector → 3×3 rotation)
-- ``SO3Log``: SO(3) → so(3) logarithm map (3×3 rotation → 3D vector)
-- ``SE3Exp``: se(3) → SE(3) exponential map (6D vector → 4×4 transform)
-- ``SE3Log``: SE(3) → se(3) logarithm map (4×4 transform → 6D vector)
+**jaxlie-backed operators** require ``pip install openscvx[lie]`` and provide
+exponential/logarithm maps for SO(3) and SE(3) groups (_e.g._ ``SO3Exp``, ``SO3Log``,
+``SE3Exp``, ``SE3Log``).
 
 Conventions:
     - Twist (spatial velocity): ξ = [v; ω] where v ∈ ℝ³ is linear velocity
