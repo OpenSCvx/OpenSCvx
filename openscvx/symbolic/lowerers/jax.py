@@ -118,6 +118,7 @@ from openscvx.symbolic.expr import (
     SSMP,
     Abs,
     Add,
+    Block,
     Concat,
     Constant,
     Constraint,
@@ -770,6 +771,32 @@ class JaxLowerer:
             return jnp.vstack(arrays)
 
         return vstack_fn
+
+    @visitor(Block)
+    def _visit_block(self, node: Block):
+        """Lower block matrix construction to JAX function.
+
+        Assembles a block matrix from nested lists of expressions using jnp.block.
+        Each block is lowered recursively and the results are assembled into the
+        same nested structure expected by jnp.block.
+
+        Args:
+            node: Block expression node with 2D nested structure of expressions
+
+        Returns:
+            Function (x, u, node, params) -> assembled block matrix
+        """
+        # Lower each block expression
+        block_fns = [[self.lower(block) for block in row] for row in node.blocks]
+
+        def block_fn(x, u, node, params):
+            # Evaluate all blocks and assemble into nested list structure
+            block_values = [
+                [jnp.atleast_1d(fn(x, u, node, params)) for fn in row] for row in block_fns
+            ]
+            return jnp.block(block_values)
+
+        return block_fn
 
     @visitor(QDCM)
     def _visit_qdcm(self, node: QDCM):

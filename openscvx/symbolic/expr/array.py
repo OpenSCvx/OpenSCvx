@@ -17,6 +17,9 @@ Key Operations:
     - `Hstack` - Horizontal stacking (along columns for 2D arrays)
     - `Vstack` - Vertical stacking (along rows for 2D arrays)
 
+- **Block Matrix Construction:**
+    - `Block` - Assemble block matrices from nested arrays (like numpy.block)
+
 All operations follow NumPy conventions for shapes and indexing behavior, enabling
 familiar array manipulation patterns in symbolic optimization problems.
 
@@ -60,7 +63,18 @@ Example:
         C = ox.State("C", shape=(2, 4))
         tall = Vstack([A, C])    # Result shape (5, 4)
 
-    Building rotation matrices with stacking::
+    Building rotation matrices with Block (recommended)::
+
+        import openscvx as ox
+        from openscvx.symbolic.expr.array import Block
+
+        theta = ox.Variable("theta", shape=(1,))
+        R = Block([
+            [ox.Cos(theta), -ox.Sin(theta)],
+            [ox.Sin(theta),  ox.Cos(theta)]
+        ])  # 2D rotation matrix, shape (2, 2)
+
+    Building rotation matrices with stacking (alternative)::
 
         import openscvx as ox
         from openscvx.symbolic.expr.array import Stack, Hstack
@@ -423,3 +437,168 @@ class Vstack(Expr):
     def __repr__(self):
         arrays_repr = ", ".join(repr(arr) for arr in self.arrays)
         return f"Vstack([{arrays_repr}])"
+
+
+class Block(Expr):
+    """Block matrix construction from nested arrays of expressions.
+
+    Assembles a block matrix from a nested list of expressions, analogous to
+    numpy.block(). Each inner list represents a row of blocks, and blocks within
+    the same row are concatenated horizontally, while rows are stacked vertically.
+
+    This provides a convenient way to construct matrices from sub-expressions
+    without manually nesting Stack/Hstack/Vstack operations.
+
+    Attributes:
+        blocks: 2D nested list of expressions forming the block structure
+
+    Example:
+        Build a 2D rotation matrix::
+
+            import openscvx as ox
+            from openscvx.symbolic.expr.array import Block
+
+            theta = ox.Variable("theta", shape=(1,))
+            R = Block([
+                [ox.Cos(theta), -ox.Sin(theta)],
+                [ox.Sin(theta),  ox.Cos(theta)]
+            ])  # Result shape (2, 2)
+
+        Build a block diagonal matrix::
+
+            A = ox.State("A", shape=(2, 2))
+            B = ox.State("B", shape=(3, 3))
+            zeros_23 = ox.Constant(np.zeros((2, 3)))
+            zeros_32 = ox.Constant(np.zeros((3, 2)))
+            block_diag = Block([
+                [A, zeros_23],
+                [zeros_32, B]
+            ])  # Result shape (5, 5)
+
+        Build from scalars and expressions::
+
+            x = ox.State("x", shape=(1,))
+            y = ox.State("y", shape=(1,))
+            # Scalars are automatically promoted to 1D arrays
+            M = Block([
+                [x, 0],
+                [0, y]
+            ])  # Result shape (2, 2)
+
+    Note:
+        - All blocks in the same row must have the same height (first dimension)
+        - All blocks in the same column must have the same width (second dimension)
+        - Scalar values and raw Python lists are automatically wrapped via to_expr()
+        - 1D arrays are treated as row vectors when determining block dimensions
+    """
+
+    def __init__(self, blocks):
+        """Initialize a block matrix construction.
+
+        Args:
+            blocks: A 2D nested list of expressions. The outer list contains rows,
+                    and each inner list contains the blocks for that row.
+                    Raw values (numbers, lists, numpy arrays) are automatically
+                    converted to Constant expressions.
+
+        Raises:
+            ValueError: If blocks is empty or not a 2D nested structure
+        """
+        if not blocks:
+            raise ValueError("Block requires at least one row")
+
+        # Ensure blocks is a 2D structure
+        if not isinstance(blocks[0], (list, tuple)):
+            raise ValueError(
+                "Block requires a 2D nested list structure. "
+                "For a single row of blocks, use [[block1, block2, ...]]"
+            )
+
+        # Convert all blocks to expressions
+        self.blocks = [[to_expr(block) for block in row] for row in blocks]
+
+        # Validate consistent row lengths
+        row_lengths = [len(row) for row in self.blocks]
+        if len(set(row_lengths)) > 1:
+            raise ValueError(
+                f"All rows must have the same number of blocks. Got row lengths: {row_lengths}"
+            )
+
+    def children(self):
+        """Return all block expressions in row-major order."""
+        return [block for row in self.blocks for block in row]
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize by recursively canonicalizing all blocks."""
+        canonical_blocks = [[block.canonicalize() for block in row] for row in self.blocks]
+        return Block(canonical_blocks)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Validate block dimensions and compute output shape.
+
+        Returns:
+            Tuple of (total_rows, total_cols) for the assembled block matrix
+
+        Raises:
+            ValueError: If block dimensions are incompatible
+        """
+        n_block_rows = len(self.blocks)
+        n_block_cols = len(self.blocks[0])
+
+        # Get shapes of all blocks
+        block_shapes = [[block.check_shape() for block in row] for row in self.blocks]
+
+        # Normalize shapes: treat scalars as (1,) and 1D as (1, n)
+        def normalize_shape(shape):
+            if len(shape) == 0:
+                return (1, 1)
+            elif len(shape) == 1:
+                return (1, shape[0])
+            else:
+                return shape
+
+        normalized_shapes = [[normalize_shape(shape) for shape in row] for row in block_shapes]
+
+        # Compute row heights (first dimension of each row must match)
+        row_heights = []
+        for i, row_shapes in enumerate(normalized_shapes):
+            heights = [s[0] for s in row_shapes]
+            if len(set(heights)) > 1:
+                raise ValueError(
+                    f"Block row {i} has inconsistent heights: {heights}. "
+                    f"All blocks in a row must have the same height."
+                )
+            row_heights.append(heights[0])
+
+        # Compute column widths (second dimension of each column must match)
+        col_widths = []
+        for j in range(n_block_cols):
+            widths = [normalized_shapes[i][j][1] for i in range(n_block_rows)]
+            if len(set(widths)) > 1:
+                raise ValueError(
+                    f"Block column {j} has inconsistent widths: {widths}. "
+                    f"All blocks in a column must have the same width."
+                )
+            col_widths.append(widths[0])
+
+        # Validate that all blocks have at most 2 dimensions
+        for i, row_shapes in enumerate(block_shapes):
+            for j, shape in enumerate(row_shapes):
+                if len(shape) > 2:
+                    raise ValueError(
+                        f"Block[{i}][{j}] has {len(shape)} dimensions. "
+                        f"Block only supports scalars, 1D, and 2D arrays."
+                    )
+
+        total_rows = sum(row_heights)
+        total_cols = sum(col_widths)
+
+        return (total_rows, total_cols)
+
+    def __repr__(self):
+        rows_repr = []
+        for row in self.blocks:
+            blocks_repr = ", ".join(repr(block) for block in row)
+            rows_repr.append(f"[{blocks_repr}]")
+        inner = ", ".join(rows_repr)
+        return f"Block([{inner}])"
