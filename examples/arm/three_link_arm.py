@@ -138,7 +138,10 @@ p_ee = ox.Concat(T_ee[0, 3], T_ee[1, 3], T_ee[2, 3])
 # Dynamics (simplified second-order)
 # =============================================================================
 # Using simplified dynamics: I * qdd = tau
-# Full manipulator dynamics would use M(q), C(q,qd), G(q)
+#
+# Note: Full manipulator dynamics M(q)q̈ + C(q,q̇)q̇ + G(q) = τ are not needed
+# here. This example demonstrates the Lie algebra functionality (SE3Exp for
+# Product of Exponentials FK), which is independent of the dynamics model.
 
 I_inv = ox.Constant(1.0 / inertia)
 
