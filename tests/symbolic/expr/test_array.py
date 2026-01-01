@@ -88,6 +88,33 @@ def test_index_out_of_bounds_raises():
         index.check_shape()
 
 
+def test_index_2d_slicing():
+    """Test multi-dimensional slicing like A[0:2, 1:3]."""
+    from openscvx.symbolic.expr import State
+
+    A = State("A", shape=(5, 4))
+    sliced = A[0:2, 1:3]
+    assert sliced.check_shape() == (2, 2)
+
+
+def test_index_row_extraction():
+    """Test row extraction like A[2, :]."""
+    from openscvx.symbolic.expr import State
+
+    A = State("A", shape=(5, 4))
+    row = A[2, :]
+    assert row.check_shape() == (4,)
+
+
+def test_index_column_extraction():
+    """Test column extraction like A[:, 1]."""
+    from openscvx.symbolic.expr import State
+
+    A = State("A", shape=(5, 4))
+    col = A[:, 1]
+    assert col.check_shape() == (5,)
+
+
 # --- Index: Canonicalization ---
 
 
@@ -132,6 +159,73 @@ def test_index_and_slice():
 
     assert out_slice.shape == (2,)
     assert jnp.allclose(out_slice, x[1:3])
+
+
+def test_index_jax_2d_slicing():
+    """Test JAX lowering of 2D slicing like A[0:2, 1:3]."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    # Create a 5x4 matrix state
+    x = jnp.arange(20.0).reshape(5, 4)
+    A = State("A", (5, 4))
+    A._slice = slice(0, 20)
+
+    # 2D slice
+    expr = A[0:2, 1:3]
+    fn = lower_to_jax(expr)
+
+    # Need to reshape x to match state's expected shape
+    result = fn(x.flatten(), None, None, None)
+
+    assert result.shape == (2, 2)
+    assert jnp.allclose(result, x[0:2, 1:3])
+
+
+def test_index_jax_row_extraction():
+    """Test JAX lowering of row extraction like A[2, :]."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    # Create a 5x4 matrix state
+    x = jnp.arange(20.0).reshape(5, 4)
+    A = State("A", (5, 4))
+    A._slice = slice(0, 20)
+
+    # Row extraction
+    expr = A[2, :]
+    fn = lower_to_jax(expr)
+
+    result = fn(x.flatten(), None, None, None)
+
+    assert result.shape == (4,)
+    assert jnp.allclose(result, x[2, :])
+
+
+def test_index_jax_column_extraction():
+    """Test JAX lowering of column extraction like A[:, 1]."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    # Create a 5x4 matrix state
+    x = jnp.arange(20.0).reshape(5, 4)
+    A = State("A", (5, 4))
+    A._slice = slice(0, 20)
+
+    # Column extraction
+    expr = A[:, 1]
+    fn = lower_to_jax(expr)
+
+    result = fn(x.flatten(), None, None, None)
+
+    assert result.shape == (5,)
+    assert jnp.allclose(result, x[:, 1])
 
 
 # --- Index: CVXPy Lowering ---
