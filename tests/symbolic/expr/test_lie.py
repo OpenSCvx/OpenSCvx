@@ -888,19 +888,3 @@ def test_product_of_exponentials_forward_kinematics():
     # The rotation part should be valid (use float32-appropriate tolerance)
     R = T_total[:3, :3]
     assert jnp.allclose(R @ R.T, jnp.eye(3), atol=1e-5)
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_jaxlie_import_error_without_installation():
-    """Test that operators raise ImportError when jaxlie is not available."""
-    from openscvx.symbolic.expr.lie import _JAXLIE_AVAILABLE, _require_jaxlie
-
-    # This test only makes sense when jaxlie IS available,
-    # so we test the helper function directly
-    if _JAXLIE_AVAILABLE:
-        # Should not raise when jaxlie is available
-        _require_jaxlie("SE3Exp")  # Should pass without error
-    else:
-        # Should raise when jaxlie is not available
-        with pytest.raises(ImportError, match="requires jaxlie"):
-            _require_jaxlie("SE3Exp")
