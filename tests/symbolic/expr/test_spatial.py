@@ -472,72 +472,57 @@ def test_6dof_rigid_body_dynamics_symbolic():
     """Test the fully symbolic 6DOF rigid body dynamics against reference JAX implementation."""
 
     # Define symbolic utility functions (from drone racing example)
+    from openscvx.symbolic.expr import Block
+
     def symbolic_qdcm(q_normalized):
         """Quaternion to Direction Cosine Matrix conversion using symbolic expressions"""
         # Assume q is already normalized
         w, x, y, z = q_normalized[0], q_normalized[1], q_normalized[2], q_normalized[3]
 
-        # Create DCM elements
-        r11 = Constant(1.0) - Constant(2.0) * (y * y + z * z)
-        r12 = Constant(2.0) * (x * y - z * w)
-        r13 = Constant(2.0) * (x * z + y * w)
-
-        r21 = Constant(2.0) * (x * y + z * w)
-        r22 = Constant(1.0) - Constant(2.0) * (x * x + z * z)
-        r23 = Constant(2.0) * (y * z - x * w)
-
-        r31 = Constant(2.0) * (x * z - y * w)
-        r32 = Constant(2.0) * (y * z + x * w)
-        r33 = Constant(1.0) - Constant(2.0) * (x * x + y * y)
-
-        # Stack into 3x3 matrix
-        from openscvx.symbolic.expr import Stack
-
-        row1 = Concat(r11, r12, r13)
-        row2 = Concat(r21, r22, r23)
-        row3 = Concat(r31, r32, r33)
-
-        return Stack([row1, row2, row3])
+        # Create DCM elements and assemble into 3x3 matrix
+        return Block(
+            [
+                [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - z * w), 2.0 * (x * z + y * w)],
+                [2.0 * (x * y + z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - x * w)],
+                [2.0 * (x * z - y * w), 2.0 * (y * z + x * w), 1.0 - 2.0 * (x * x + y * y)],
+            ]
+        )
 
     def symbolic_ssmp(w):
         """Angular rate to 4x4 skew symmetric matrix for quaternion dynamics"""
-        from openscvx.symbolic.expr import Stack
-
         x, y, z = w[0], w[1], w[2]
-        zero = Constant(0.0)
 
-        # Create SSMP matrix
-        row1 = Concat(zero, -x, -y, -z)
-        row2 = Concat(x, zero, z, -y)
-        row3 = Concat(y, -z, zero, x)
-        row4 = Concat(z, y, -x, zero)
-
-        return Stack([row1, row2, row3, row4])
+        return Block(
+            [
+                [0.0, -x, -y, -z],
+                [x, 0.0, z, -y],
+                [y, -z, 0.0, x],
+                [z, y, -x, 0.0],
+            ]
+        )
 
     def symbolic_ssm(w):
         """Angular rate to 3x3 skew symmetric matrix"""
-        from openscvx.symbolic.expr import Stack
-
         x, y, z = w[0], w[1], w[2]
-        zero = Constant(0.0)
 
-        # Create SSM matrix
-        row1 = Concat(zero, -z, y)
-        row2 = Concat(z, zero, -x)
-        row3 = Concat(-y, x, zero)
-
-        return Stack([row1, row2, row3])
+        return Block(
+            [
+                [0.0, -z, y],
+                [z, 0.0, -x],
+                [-y, x, 0.0],
+            ]
+        )
 
     def symbolic_diag(v):
         """Create diagonal matrix from vector"""
-        from openscvx.symbolic.expr import Stack
-
         if len(v) == 3:
-            zero = Constant(0.0)
-            row1 = Concat(v[0], zero, zero)
-            row2 = Concat(zero, v[1], zero)
-            row3 = Concat(zero, zero, v[2])
-            return Stack([row1, row2, row3])
+            return Block(
+                [
+                    [v[0], 0.0, 0.0],
+                    [0.0, v[1], 0.0],
+                    [0.0, 0.0, v[2]],
+                ]
+            )
         else:
             raise NotImplementedError("Only 3x3 diagonal matrices supported")
 

@@ -154,62 +154,53 @@ def symbolic_qdcm(q):
 
     w, x, y, z = q_normalized[0], q_normalized[1], q_normalized[2], q_normalized[3]
 
-    # Create DCM elements
-    r11 = 1.0 - 2.0 * (y * y + z * z)
-    r12 = 2.0 * (x * y - z * w)
-    r13 = 2.0 * (x * z + y * w)
-
-    r21 = 2.0 * (x * y + z * w)
-    r22 = 1.0 - 2.0 * (x * x + z * z)
-    r23 = 2.0 * (y * z - x * w)
-
-    r31 = 2.0 * (x * z - y * w)
-    r32 = 2.0 * (y * z + x * w)
-    r33 = 1.0 - 2.0 * (x * x + y * y)
-
-    # Stack into 3x3 matrix
-    row1 = ox.Concat(r11, r12, r13)
-    row2 = ox.Concat(r21, r22, r23)
-    row3 = ox.Concat(r31, r32, r33)
-
-    return ox.Stack([row1, row2, row3])
+    # Create DCM elements and assemble into 3x3 matrix
+    return ox.Block(
+        [
+            [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - z * w), 2.0 * (x * z + y * w)],
+            [2.0 * (x * y + z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - x * w)],
+            [2.0 * (x * z - y * w), 2.0 * (y * z + x * w), 1.0 - 2.0 * (x * x + y * y)],
+        ]
+    )
 
 
 def symbolic_ssmp(w):
     """Angular rate to 4x4 skew symmetric matrix for quaternion dynamics"""
     x, y, z = w[0], w[1], w[2]
-    zero = 0.0
 
-    # Create SSMP matrix
-    row1 = ox.Concat(zero, -x, -y, -z)
-    row2 = ox.Concat(x, zero, z, -y)
-    row3 = ox.Concat(y, -z, zero, x)
-    row4 = ox.Concat(z, y, -x, zero)
-
-    return ox.Stack([row1, row2, row3, row4])
+    return ox.Block(
+        [
+            [0.0, -x, -y, -z],
+            [x, 0.0, z, -y],
+            [y, -z, 0.0, x],
+            [z, y, -x, 0.0],
+        ]
+    )
 
 
 def symbolic_ssm(w):
     """Angular rate to 3x3 skew symmetric matrix"""
     x, y, z = w[0], w[1], w[2]
-    zero = 0.0
 
-    # Create SSM matrix
-    row1 = ox.Concat(zero, -z, y)
-    row2 = ox.Concat(z, zero, -x)
-    row3 = ox.Concat(-y, x, zero)
-
-    return ox.Stack([row1, row2, row3])
+    return ox.Block(
+        [
+            [0.0, -z, y],
+            [z, 0.0, -x],
+            [-y, x, 0.0],
+        ]
+    )
 
 
 def symbolic_diag(v):
     """Create diagonal matrix from vector"""
     if len(v) == 3:
-        zero = 0.0
-        row1 = ox.Concat(v[0], zero, zero)
-        row2 = ox.Concat(zero, v[1], zero)
-        row3 = ox.Concat(zero, zero, v[2])
-        return ox.Stack([row1, row2, row3])
+        return ox.Block(
+            [
+                [v[0], 0.0, 0.0],
+                [0.0, v[1], 0.0],
+                [0.0, 0.0, v[2]],
+            ]
+        )
     else:
         raise NotImplementedError("Only 3x3 diagonal matrices supported")
 
