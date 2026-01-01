@@ -54,6 +54,7 @@ lie = [
 test = [
     "pytest",
     "scipy",
+    "jaxlie",
 ]
 
 [tool.setuptools.packages.find]
