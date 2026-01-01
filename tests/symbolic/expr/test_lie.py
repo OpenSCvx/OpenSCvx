@@ -1,17 +1,14 @@
 """Tests for Lie algebra operation nodes.
 
-This module tests Lie algebra operation nodes for rigid body dynamics:
+This module tests Lie algebra operation nodes for rigid body dynamics.
 
-- AdjointDual: Coadjoint operator ad* for Coriolis/centrifugal forces
-- Adjoint: Lie bracket for twist-on-twist action
+Tests are organized by node/node-group, with each section containing:
 
-Tests cover:
-
-- Node creation and properties
-- Shape checking
-- Canonicalization
-- Lowering to JAX (with slices)
-- Mathematical correctness against reference implementations
+1. Creation & Tree Structure
+2. Shape Checking
+3. Canonicalization
+4. JAX Lowering
+5. Mathematical Properties (where applicable)
 """
 
 import jax.numpy as jnp
@@ -81,11 +78,72 @@ def adjoint_ref(twist1: jnp.ndarray, twist2: jnp.ndarray) -> jnp.ndarray:
     return jnp.concatenate([linear_part, angular_part])
 
 
+def se3_adjoint_ref(T: jnp.ndarray) -> jnp.ndarray:
+    """Reference implementation of SE3 Adjoint matrix.
+
+    For SE(3) with rotation R and translation p:
+        Ad_T = [ R      0   ]
+               [ [p]×R  R   ]
+
+    Args:
+        T: 4×4 homogeneous transformation matrix
+
+    Returns:
+        6×6 adjoint matrix
+    """
+    R = T[:3, :3]
+    p = T[:3, 3]
+
+    # Skew-symmetric matrix [p]×
+    p_skew = jnp.array([[0, -p[2], p[1]], [p[2], 0, -p[0]], [-p[1], p[0], 0]])
+
+    # Build 6×6 matrix
+    top_row = jnp.hstack([R, jnp.zeros((3, 3))])
+    bottom_row = jnp.hstack([p_skew @ R, R])
+
+    return jnp.vstack([top_row, bottom_row])
+
+
+def se3_adjoint_dual_ref(T: jnp.ndarray) -> jnp.ndarray:
+    """Reference implementation of SE3 coadjoint matrix.
+
+    For SE(3) with rotation R and translation p:
+        Ad*_T = [ R     [p]×R ]
+                [ 0       R   ]
+
+    Args:
+        T: 4×4 homogeneous transformation matrix
+
+    Returns:
+        6×6 coadjoint matrix
+    """
+    R = T[:3, :3]
+    p = T[:3, 3]
+
+    # Skew-symmetric matrix [p]×
+    p_skew = jnp.array([[0, -p[2], p[1]], [p[2], 0, -p[0]], [-p[1], p[0], 0]])
+
+    # Build 6×6 matrix
+    top_row = jnp.hstack([R, p_skew @ R])
+    bottom_row = jnp.hstack([jnp.zeros((3, 3)), R])
+
+    return jnp.vstack([top_row, bottom_row])
+
+
+# Check if jaxlie is available for conditional test execution
+try:
+    import jaxlie
+
+    _JAXLIE_AVAILABLE = True
+except ImportError:
+    _JAXLIE_AVAILABLE = False
+
+
 # =============================================================================
 # AdjointDual
 # =============================================================================
 
-# --- AdjointDual: Basic Usage ---
+# --- AdjointDual: Creation & Tree Structure ---
 
 
 def test_adjoint_dual_creation_and_properties():
@@ -217,6 +275,9 @@ def test_adjoint_dual_jax_lowering():
         assert jnp.allclose(result, expected, atol=1e-12)
 
 
+# --- AdjointDual: Mathematical Properties ---
+
+
 def test_adjoint_dual_euler_equation():
     """Test that ad*_ξ(μ) reduces to ω × (J @ ω) for pure rotation.
 
@@ -246,11 +307,14 @@ def test_adjoint_dual_euler_equation():
 def test_adjoint_dual_rigid_body_dynamics():
     """Test AdjointDual in the context of rigid body dynamics.
 
-    For a rigid body with spatial inertia M and twist ξ, the bias force is:
-        b = ad*_ξ(M @ ξ)
+    For a rigid body:
+        M @ ξ_dot = F_ext - ad*_ξ(M @ ξ)
 
-    For the special case of pure rotation with diagonal inertia J:
-        b = [0; ω × (J @ ω)]
+    For twist ξ = [v; ω] and momentum μ = M @ ξ = [m*v; J @ ω]:
+        ad*_ξ(μ) = [ω × (m*v) + v × (J @ ω); ω × (J @ ω)]
+
+    The linear part has an extra term v × (J @ ω) due to momentum coupling,
+    but for body-fixed frames with the body at rest this often simplifies.
     """
     # Diagonal spatial inertia (m*I for linear, J for angular)
     m = 2.0
@@ -280,11 +344,103 @@ def test_adjoint_dual_rigid_body_dynamics():
     assert jnp.allclose(result, expected, atol=1e-12)
 
 
+def test_adjoint_dual_newton_euler_dynamics():
+    """Test Newton-Euler dynamics formulation using Lie algebra operators.
+
+    For a rigid body:
+        M @ ξ_dot = F_ext - ad*_ξ(M @ ξ)
+
+    Compare against the traditional formulation.
+
+    For twist ξ = [v; ω] and momentum μ = M @ ξ = [m*v; J @ ω]:
+        ad*_ξ(μ) = [ω × (m*v) + v × (J @ ω); ω × (J @ ω)]
+
+    The linear part has an extra term v × (J @ ω) due to momentum coupling,
+    but for body-fixed frames with the body at rest this often simplifies.
+    """
+    # Parameters
+    m = 2.0  # mass
+    J = jnp.array([0.5, 1.0, 1.5])  # diagonal inertia
+
+    # State: twist = [v; ω]
+    v = jnp.array([1.0, 0.5, -0.2])  # linear velocity
+    omega = jnp.array([0.1, -0.2, 0.3])  # angular velocity
+    twist_val = jnp.concatenate([v, omega])
+
+    # Momentum: μ = [m*v; J*ω] for diagonal inertia
+    p = m * v  # linear momentum
+    L = J * omega  # angular momentum (element-wise for diagonal J)
+    momentum_val = jnp.concatenate([p, L])
+
+    # Lie algebra formulation: ad*_ξ(μ)
+    twist_state = State("twist", (6,))
+    twist_state._slice = slice(0, 6)
+
+    ad_dual_expr = AdjointDual(twist_state, Constant(momentum_val))
+    lie_fn = lower_to_jax(ad_dual_expr)
+    lie_result = lie_fn(twist_val, None, None, None)
+
+    # Manual computation using the formula:
+    # ad*_ξ(μ) = [ω × p + v × L; ω × L]
+    linear_bias = jnp.cross(omega, p) + jnp.cross(v, L)
+    angular_bias = jnp.cross(omega, L)
+    expected = jnp.concatenate([linear_bias, angular_bias])
+
+    # Results should match
+    assert jnp.allclose(lie_result, expected, atol=1e-12)
+
+
+def test_adjoint_dual_combined_with_dynamics():
+    """Test using AdjointDual in a complete dynamics expression."""
+    from openscvx.symbolic.expr import Control
+
+    # Create symbolic state and control
+    twist = State("twist", (6,))
+    twist._slice = slice(0, 6)
+
+    wrench = Control("wrench", (6,))
+    wrench._slice = slice(0, 6)
+
+    # Parameters
+    m = 1.0
+    J = np.diag([0.1, 0.2, 0.3])
+    M = np.block([[m * np.eye(3), np.zeros((3, 3))], [np.zeros((3, 3)), J]])
+    M_inv = np.linalg.inv(M)
+
+    # Dynamics: twist_dot = M_inv @ (wrench - ad*_twist(M @ twist))
+    M_param = Constant(M)
+    M_inv_param = Constant(M_inv)
+
+    momentum = M_param @ twist
+    bias_force = AdjointDual(twist, momentum)
+    twist_dot = M_inv_param @ (wrench - bias_force)
+
+    # Lower and evaluate
+    fn = lower_to_jax(twist_dot)
+
+    # Test values
+    twist_val = jnp.array([1.0, 0.5, -0.2, 0.1, -0.2, 0.3])
+    wrench_val = jnp.array([0.5, 0.0, 0.0, 0.01, -0.02, 0.01])
+
+    # twist goes in x (state), wrench goes in u (control)
+    result = fn(twist_val, wrench_val, None, None)
+
+    # Result should be 6D
+    assert result.shape == (6,)
+
+    # Verify against manual computation
+    momentum_val = M @ twist_val
+    bias_val = adjoint_dual_ref(twist_val, momentum_val)
+    expected = M_inv @ (wrench_val - bias_val)
+
+    assert jnp.allclose(result, expected, atol=1e-12)
+
+
 # =============================================================================
 # Adjoint
 # =============================================================================
 
-# --- Adjoint: Basic Usage ---
+# --- Adjoint: Creation & Tree Structure ---
 
 
 def test_adjoint_creation_and_properties():
@@ -409,6 +565,9 @@ def test_adjoint_jax_lowering():
         assert jnp.allclose(result, expected, atol=1e-12)
 
 
+# --- Adjoint: Mathematical Properties ---
+
+
 def test_adjoint_antisymmetry():
     """Test that [ξ₁, ξ₂] = -[ξ₂, ξ₁]."""
     twist1 = jnp.array([0.1, 0.2, -0.3, 0.4, -0.1, 0.2])
@@ -439,517 +598,10 @@ def test_adjoint_jacobi_identity():
 
 
 # =============================================================================
-# Integration Tests
-# =============================================================================
-
-
-def test_newton_euler_dynamics_with_lie_algebra():
-    """Test Newton-Euler dynamics formulation using Lie algebra operators.
-
-    For a rigid body:
-        M @ ξ_dot = F_ext - ad*_ξ(M @ ξ)
-
-    Compare against the traditional formulation.
-
-    For twist ξ = [v; ω] and momentum μ = M @ ξ = [m*v; J @ ω]:
-        ad*_ξ(μ) = [ω × (m*v) + v × (J @ ω); ω × (J @ ω)]
-
-    The linear part has an extra term v × (J @ ω) due to momentum coupling,
-    but for body-fixed frames with the body at rest this often simplifies.
-    """
-    # Parameters
-    m = 2.0  # mass
-    J = jnp.array([0.5, 1.0, 1.5])  # diagonal inertia
-
-    # State: twist = [v; ω]
-    v = jnp.array([1.0, 0.5, -0.2])  # linear velocity
-    omega = jnp.array([0.1, -0.2, 0.3])  # angular velocity
-    twist_val = jnp.concatenate([v, omega])
-
-    # Momentum: μ = [m*v; J*ω] for diagonal inertia
-    p = m * v  # linear momentum
-    L = J * omega  # angular momentum (element-wise for diagonal J)
-    momentum_val = jnp.concatenate([p, L])
-
-    # Lie algebra formulation: ad*_ξ(μ)
-    twist_state = State("twist", (6,))
-    twist_state._slice = slice(0, 6)
-
-    ad_dual_expr = AdjointDual(twist_state, Constant(momentum_val))
-    lie_fn = lower_to_jax(ad_dual_expr)
-    lie_result = lie_fn(twist_val, None, None, None)
-
-    # Manual computation using the formula:
-    # ad*_ξ(μ) = [ω × p + v × L; ω × L]
-    linear_bias = jnp.cross(omega, p) + jnp.cross(v, L)
-    angular_bias = jnp.cross(omega, L)
-    expected = jnp.concatenate([linear_bias, angular_bias])
-
-    # Results should match
-    assert jnp.allclose(lie_result, expected, atol=1e-12)
-
-
-def test_adjoint_dual_combined_with_dynamics():
-    """Test using AdjointDual in a complete dynamics expression."""
-    from openscvx.symbolic.expr import Control
-
-    # Create symbolic state and control
-    twist = State("twist", (6,))
-    twist._slice = slice(0, 6)
-
-    wrench = Control("wrench", (6,))
-    wrench._slice = slice(0, 6)
-
-    # Parameters
-    m = 1.0
-    J = np.diag([0.1, 0.2, 0.3])
-    M = np.block([[m * np.eye(3), np.zeros((3, 3))], [np.zeros((3, 3)), J]])
-    M_inv = np.linalg.inv(M)
-
-    # Dynamics: twist_dot = M_inv @ (wrench - ad*_twist(M @ twist))
-    M_param = Constant(M)
-    M_inv_param = Constant(M_inv)
-
-    momentum = M_param @ twist
-    bias_force = AdjointDual(twist, momentum)
-    twist_dot = M_inv_param @ (wrench - bias_force)
-
-    # Lower and evaluate
-    fn = lower_to_jax(twist_dot)
-
-    # Test values
-    twist_val = jnp.array([1.0, 0.5, -0.2, 0.1, -0.2, 0.3])
-    wrench_val = jnp.array([0.5, 0.0, 0.0, 0.01, -0.02, 0.01])
-
-    # twist goes in x (state), wrench goes in u (control)
-    result = fn(twist_val, wrench_val, None, None)
-
-    # Result should be 6D
-    assert result.shape == (6,)
-
-    # Verify against manual computation
-    momentum_val = M @ twist_val
-    bias_val = adjoint_dual_ref(twist_val, momentum_val)
-    expected = M_inv @ (wrench_val - bias_val)
-
-    assert jnp.allclose(result, expected, atol=1e-12)
-
-
-# Check if jaxlie is available for conditional test execution
-try:
-    import jaxlie
-
-    _JAXLIE_AVAILABLE = True
-except ImportError:
-    _JAXLIE_AVAILABLE = False
-
-
-# --- SO3Exp ---
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_so3_exp_creation_and_properties():
-    """Test that SO3Exp can be created and has correct properties."""
-    from openscvx.symbolic.expr import SO3Exp
-
-    omega = State("omega", (3,))
-    so3_exp = SO3Exp(omega)
-
-    assert so3_exp.children() == [omega]
-    assert repr(so3_exp) == f"SO3Exp({omega!r})"
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_so3_exp_shape_inference():
-    """Test that SO3Exp infers shape (3, 3) from 3D input."""
-    from openscvx.symbolic.expr import SO3Exp
-
-    omega = State("omega", (3,))
-    so3_exp = SO3Exp(omega)
-
-    assert so3_exp.check_shape() == (3, 3)
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_so3_exp_shape_validation():
-    """Test that SO3Exp raises error for non-3D input."""
-    from openscvx.symbolic.expr import SO3Exp
-
-    omega = State("omega", (6,))
-    so3_exp = SO3Exp(omega)
-
-    with pytest.raises(ValueError, match=r"SO3Exp expects omega with shape \(3,\)"):
-        so3_exp.check_shape()
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_so3_exp_jax_lowering():
-    """Test SO3Exp lowering to JAX against jaxlie directly."""
-    from openscvx.symbolic.expr import SO3Exp
-
-    test_cases = [
-        jnp.array([0.0, 0.0, 0.0]),  # Identity
-        jnp.array([0.0, 0.0, jnp.pi / 2]),  # 90° about z
-        jnp.array([0.1, -0.2, 0.3]),  # General rotation
-        jnp.array([0.0, 0.0, 1e-8]),  # Small angle (tests numerical stability)
-    ]
-
-    for omega_val in test_cases:
-        omega = State("omega", (3,))
-        omega._slice = slice(0, 3)
-
-        so3_exp = SO3Exp(omega)
-        fn = lower_to_jax(so3_exp)
-        result = fn(omega_val, None, None, None)
-
-        # Compare against jaxlie directly
-        expected = jaxlie.SO3.exp(omega_val).as_matrix()
-
-        assert result.shape == (3, 3)
-        assert jnp.allclose(result, expected, atol=1e-10)
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_so3_exp_rotation_properties():
-    """Test that SO3Exp produces valid rotation matrices."""
-    from openscvx.symbolic.expr import SO3Exp
-
-    omega = State("omega", (3,))
-    omega._slice = slice(0, 3)
-
-    so3_exp = SO3Exp(omega)
-    fn = lower_to_jax(so3_exp)
-
-    omega_val = jnp.array([0.5, -0.3, 0.7])
-    R = fn(omega_val, None, None, None)
-
-    # Check orthogonality: R @ R.T = I (use float32-appropriate tolerance)
-    assert jnp.allclose(R @ R.T, jnp.eye(3), atol=1e-5)
-
-    # Check determinant = 1 (proper rotation)
-    assert jnp.allclose(jnp.linalg.det(R), 1.0, atol=1e-5)
-
-
-# --- SO3Log ---
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_so3_log_creation_and_properties():
-    """Test that SO3Log can be created and has correct properties."""
-    from openscvx.symbolic.expr import SO3Log
-
-    R = State("R", (3, 3))
-    so3_log = SO3Log(R)
-
-    assert so3_log.children() == [R]
-    assert repr(so3_log) == f"SO3Log({R!r})"
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_so3_log_shape_inference():
-    """Test that SO3Log infers shape (3,) from 3x3 input."""
-    from openscvx.symbolic.expr import SO3Log
-
-    R = State("R", (3, 3))
-    so3_log = SO3Log(R)
-
-    assert so3_log.check_shape() == (3,)
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_so3_log_shape_validation():
-    """Test that SO3Log raises error for non-3x3 input."""
-    from openscvx.symbolic.expr import SO3Log
-
-    R = State("R", (4, 4))
-    so3_log = SO3Log(R)
-
-    with pytest.raises(ValueError, match=r"SO3Log expects rotation with shape \(3, 3\)"):
-        so3_log.check_shape()
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_so3_exp_log_roundtrip():
-    """Test that SO3Log(SO3Exp(omega)) ≈ omega."""
-    from openscvx.symbolic.expr import SO3Exp, SO3Log
-
-    omega_val = jnp.array([0.3, -0.5, 0.2])
-
-    # Create SO3Exp
-    omega = State("omega", (3,))
-    omega._slice = slice(0, 3)
-    so3_exp = SO3Exp(omega)
-    exp_fn = lower_to_jax(so3_exp)
-    R = exp_fn(omega_val, None, None, None)
-
-    # Create SO3Log with constant input
-    so3_log = SO3Log(Constant(R))
-    log_fn = lower_to_jax(so3_log)
-    omega_recovered = log_fn(None, None, None, None)
-
-    assert jnp.allclose(omega_recovered, omega_val, atol=1e-10)
-
-
-# --- SE3Exp ---
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_se3_exp_creation_and_properties():
-    """Test that SE3Exp can be created and has correct properties."""
-    from openscvx.symbolic.expr import SE3Exp
-
-    twist = State("twist", (6,))
-    se3_exp = SE3Exp(twist)
-
-    assert se3_exp.children() == [twist]
-    assert repr(se3_exp) == f"SE3Exp({twist!r})"
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_se3_exp_shape_inference():
-    """Test that SE3Exp infers shape (4, 4) from 6D input."""
-    from openscvx.symbolic.expr import SE3Exp
-
-    twist = State("twist", (6,))
-    se3_exp = SE3Exp(twist)
-
-    assert se3_exp.check_shape() == (4, 4)
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_se3_exp_shape_validation():
-    """Test that SE3Exp raises error for non-6D input."""
-    from openscvx.symbolic.expr import SE3Exp
-
-    twist = State("twist", (3,))
-    se3_exp = SE3Exp(twist)
-
-    with pytest.raises(ValueError, match=r"SE3Exp expects twist with shape \(6,\)"):
-        se3_exp.check_shape()
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_se3_exp_jax_lowering():
-    """Test SE3Exp lowering to JAX against jaxlie directly."""
-    from openscvx.symbolic.expr import SE3Exp
-
-    test_cases = [
-        jnp.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),  # Identity
-        jnp.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),  # Pure translation
-        jnp.array([0.0, 0.0, 0.0, 0.0, 0.0, jnp.pi / 2]),  # Pure rotation about z
-        jnp.array([0.1, 0.2, 0.3, 0.1, -0.2, 0.15]),  # General twist
-    ]
-
-    for twist_val in test_cases:
-        twist = State("twist", (6,))
-        twist._slice = slice(0, 6)
-
-        se3_exp = SE3Exp(twist)
-        fn = lower_to_jax(se3_exp)
-        result = fn(twist_val, None, None, None)
-
-        # Compare against jaxlie directly
-        expected = jaxlie.SE3.exp(twist_val).as_matrix()
-
-        assert result.shape == (4, 4)
-        assert jnp.allclose(result, expected, atol=1e-10)
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_se3_exp_homogeneous_matrix_structure():
-    """Test that SE3Exp produces valid homogeneous transformation matrices."""
-    from openscvx.symbolic.expr import SE3Exp
-
-    twist = State("twist", (6,))
-    twist._slice = slice(0, 6)
-
-    se3_exp = SE3Exp(twist)
-    fn = lower_to_jax(se3_exp)
-
-    twist_val = jnp.array([0.5, -0.3, 0.7, 0.1, 0.2, -0.1])
-    T = fn(twist_val, None, None, None)
-
-    # Check last row is [0, 0, 0, 1]
-    assert jnp.allclose(T[3, :], jnp.array([0.0, 0.0, 0.0, 1.0]), atol=1e-5)
-
-    # Check rotation part is orthogonal (use float32-appropriate tolerance)
-    R = T[:3, :3]
-    assert jnp.allclose(R @ R.T, jnp.eye(3), atol=1e-5)
-
-    # Check determinant of rotation = 1
-    assert jnp.allclose(jnp.linalg.det(R), 1.0, atol=1e-5)
-
-
-# --- SE3Log ---
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_se3_log_creation_and_properties():
-    """Test that SE3Log can be created and has correct properties."""
-    from openscvx.symbolic.expr import SE3Log
-
-    T = State("T", (4, 4))
-    se3_log = SE3Log(T)
-
-    assert se3_log.children() == [T]
-    assert repr(se3_log) == f"SE3Log({T!r})"
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_se3_log_shape_inference():
-    """Test that SE3Log infers shape (6,) from 4x4 input."""
-    from openscvx.symbolic.expr import SE3Log
-
-    T = State("T", (4, 4))
-    se3_log = SE3Log(T)
-
-    assert se3_log.check_shape() == (6,)
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_se3_log_shape_validation():
-    """Test that SE3Log raises error for non-4x4 input."""
-    from openscvx.symbolic.expr import SE3Log
-
-    T = State("T", (3, 3))
-    se3_log = SE3Log(T)
-
-    with pytest.raises(ValueError, match=r"SE3Log expects transform with shape \(4, 4\)"):
-        se3_log.check_shape()
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_se3_exp_log_roundtrip():
-    """Test that SE3Log(SE3Exp(twist)) ≈ twist."""
-    from openscvx.symbolic.expr import SE3Exp, SE3Log
-
-    twist_val = jnp.array([0.3, -0.5, 0.2, 0.1, -0.15, 0.08])
-
-    # Create SE3Exp
-    twist = State("twist", (6,))
-    twist._slice = slice(0, 6)
-    se3_exp = SE3Exp(twist)
-    exp_fn = lower_to_jax(se3_exp)
-    T = exp_fn(twist_val, None, None, None)
-
-    # Create SE3Log with constant input
-    se3_log = SE3Log(Constant(T))
-    log_fn = lower_to_jax(se3_log)
-    twist_recovered = log_fn(None, None, None, None)
-
-    assert jnp.allclose(twist_recovered, twist_val, atol=1e-10)
-
-
-# --- Integration Tests for Product of Exponentials ---
-
-
-@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
-def test_product_of_exponentials_forward_kinematics():
-    """Test using SE3Exp for Product of Exponentials forward kinematics.
-
-    Implements a simple 2-joint arm:
-    - Joint 1: Rotation about z-axis at origin
-    - Joint 2: Rotation about z-axis at (1, 0, 0)
-
-    This tests the core use case for multi-link arm kinematics.
-    """
-    from openscvx.symbolic.expr import SE3Exp
-
-    # Joint angles
-    q1_val = jnp.array([jnp.pi / 4])  # 45 degrees
-    q2_val = jnp.array([jnp.pi / 4])  # 45 degrees
-
-    # Screw axes in home configuration
-    # Joint 1: rotation about z at origin -> [v; ω] = [0, 0, 0, 0, 0, 1]
-    screw1 = jnp.array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
-
-    # Joint 2: rotation about z at (1, 0, 0)
-    # v = -ω × r = -[0, 0, 1] × [1, 0, 0] = [0, 1, 0]
-    screw2 = jnp.array([0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
-
-    # Compute T1 = exp(screw1 * q1)
-    twist1 = Constant(screw1 * q1_val[0])
-    se3_exp1 = SE3Exp(twist1)
-    fn1 = lower_to_jax(se3_exp1)
-    T1 = fn1(None, None, None, None)
-
-    # Compute T2 = exp(screw2 * q2)
-    twist2 = Constant(screw2 * q2_val[0])
-    se3_exp2 = SE3Exp(twist2)
-    fn2 = lower_to_jax(se3_exp2)
-    T2 = fn2(None, None, None, None)
-
-    # Forward kinematics: T = T1 @ T2 @ T_home
-    # For simplicity, assume T_home = I (end-effector at origin in home config)
-    T_total = T1 @ T2
-
-    # Verify result makes sense
-    assert T_total.shape == (4, 4)
-    assert jnp.allclose(T_total[3, :], jnp.array([0.0, 0.0, 0.0, 1.0]), atol=1e-5)
-
-    # The rotation part should be valid (use float32-appropriate tolerance)
-    R = T_total[:3, :3]
-    assert jnp.allclose(R @ R.T, jnp.eye(3), atol=1e-5)
-
-
-# =============================================================================
 # SE3Adjoint (Big Adjoint Ad_T)
 # =============================================================================
 
-
-def se3_adjoint_ref(T: jnp.ndarray) -> jnp.ndarray:
-    """Reference implementation of SE3 Adjoint matrix.
-
-    For SE(3) with rotation R and translation p:
-        Ad_T = [ R      0   ]
-               [ [p]×R  R   ]
-
-    Args:
-        T: 4×4 homogeneous transformation matrix
-
-    Returns:
-        6×6 adjoint matrix
-    """
-    R = T[:3, :3]
-    p = T[:3, 3]
-
-    # Skew-symmetric matrix [p]×
-    p_skew = jnp.array([[0, -p[2], p[1]], [p[2], 0, -p[0]], [-p[1], p[0], 0]])
-
-    # Build 6×6 matrix
-    top_row = jnp.hstack([R, jnp.zeros((3, 3))])
-    bottom_row = jnp.hstack([p_skew @ R, R])
-
-    return jnp.vstack([top_row, bottom_row])
-
-
-def se3_adjoint_dual_ref(T: jnp.ndarray) -> jnp.ndarray:
-    """Reference implementation of SE3 coadjoint matrix.
-
-    For SE(3) with rotation R and translation p:
-        Ad*_T = [ R     [p]×R ]
-                [ 0       R   ]
-
-    Args:
-        T: 4×4 homogeneous transformation matrix
-
-    Returns:
-        6×6 coadjoint matrix
-    """
-    R = T[:3, :3]
-    p = T[:3, 3]
-
-    # Skew-symmetric matrix [p]×
-    p_skew = jnp.array([[0, -p[2], p[1]], [p[2], 0, -p[0]], [-p[1], p[0], 0]])
-
-    # Build 6×6 matrix
-    top_row = jnp.hstack([R, p_skew @ R])
-    bottom_row = jnp.hstack([jnp.zeros((3, 3)), R])
-
-    return jnp.vstack([top_row, bottom_row])
-
-
-# --- SE3Adjoint: Basic Usage ---
+# --- SE3Adjoint: Creation & Tree Structure ---
 
 
 def test_se3_adjoint_creation_and_properties():
@@ -1053,6 +705,9 @@ def test_se3_adjoint_jax_lowering_general():
     assert jnp.allclose(result, expected, atol=1e-10)
 
 
+# --- SE3Adjoint: Mathematical Properties ---
+
+
 def test_se3_adjoint_composition():
     """Test that Ad_{T1 @ T2} = Ad_{T1} @ Ad_{T2}."""
     # Two random transforms
@@ -1075,7 +730,7 @@ def test_se3_adjoint_composition():
 # SE3AdjointDual (Big Coadjoint Ad*_T)
 # =============================================================================
 
-# --- SE3AdjointDual: Basic Usage ---
+# --- SE3AdjointDual: Creation & Tree Structure ---
 
 
 def test_se3_adjoint_dual_creation_and_properties():
@@ -1148,6 +803,9 @@ def test_se3_adjoint_dual_jax_lowering_general():
     assert jnp.allclose(result, expected, atol=1e-10)
 
 
+# --- SE3AdjointDual: Mathematical Properties ---
+
+
 def test_se3_adjoint_dual_transpose_inverse_relation():
     """Test that Ad*_T = (Ad_T)^{-T}."""
     theta = np.pi / 6
@@ -1193,3 +851,394 @@ def test_se3_adjoint_power_pairing():
     power_b = jnp.dot(F_b, xi_b)
 
     assert jnp.allclose(power_a, power_b, atol=1e-6)
+
+
+# =============================================================================
+# SO3Exp (requires jaxlie)
+# =============================================================================
+
+# --- SO3Exp: Creation & Tree Structure ---
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_so3_exp_creation_and_properties():
+    """Test that SO3Exp can be created and has correct properties."""
+    from openscvx.symbolic.expr import SO3Exp
+
+    omega = State("omega", (3,))
+    so3_exp = SO3Exp(omega)
+
+    assert so3_exp.children() == [omega]
+    assert repr(so3_exp) == f"SO3Exp({omega!r})"
+
+
+# --- SO3Exp: Shape Checking ---
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_so3_exp_shape_inference():
+    """Test that SO3Exp infers shape (3, 3) from 3D input."""
+    from openscvx.symbolic.expr import SO3Exp
+
+    omega = State("omega", (3,))
+    so3_exp = SO3Exp(omega)
+
+    assert so3_exp.check_shape() == (3, 3)
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_so3_exp_shape_validation():
+    """Test that SO3Exp raises error for non-3D input."""
+    from openscvx.symbolic.expr import SO3Exp
+
+    omega = State("omega", (6,))
+    so3_exp = SO3Exp(omega)
+
+    with pytest.raises(ValueError, match=r"SO3Exp expects omega with shape \(3,\)"):
+        so3_exp.check_shape()
+
+
+# --- SO3Exp: JAX Lowering ---
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_so3_exp_jax_lowering():
+    """Test SO3Exp lowering to JAX against jaxlie directly."""
+    from openscvx.symbolic.expr import SO3Exp
+
+    test_cases = [
+        jnp.array([0.0, 0.0, 0.0]),  # Identity
+        jnp.array([0.0, 0.0, jnp.pi / 2]),  # 90° about z
+        jnp.array([0.1, -0.2, 0.3]),  # General rotation
+        jnp.array([0.0, 0.0, 1e-8]),  # Small angle (tests numerical stability)
+    ]
+
+    for omega_val in test_cases:
+        omega = State("omega", (3,))
+        omega._slice = slice(0, 3)
+
+        so3_exp = SO3Exp(omega)
+        fn = lower_to_jax(so3_exp)
+        result = fn(omega_val, None, None, None)
+
+        # Compare against jaxlie directly
+        expected = jaxlie.SO3.exp(omega_val).as_matrix()
+
+        assert result.shape == (3, 3)
+        assert jnp.allclose(result, expected, atol=1e-10)
+
+
+# --- SO3Exp: Mathematical Properties ---
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_so3_exp_rotation_properties():
+    """Test that SO3Exp produces valid rotation matrices."""
+    from openscvx.symbolic.expr import SO3Exp
+
+    omega = State("omega", (3,))
+    omega._slice = slice(0, 3)
+
+    so3_exp = SO3Exp(omega)
+    fn = lower_to_jax(so3_exp)
+
+    omega_val = jnp.array([0.5, -0.3, 0.7])
+    R = fn(omega_val, None, None, None)
+
+    # Check orthogonality: R @ R.T = I (use float32-appropriate tolerance)
+    assert jnp.allclose(R @ R.T, jnp.eye(3), atol=1e-5)
+
+    # Check determinant = 1 (proper rotation)
+    assert jnp.allclose(jnp.linalg.det(R), 1.0, atol=1e-5)
+
+
+# =============================================================================
+# SO3Log (requires jaxlie)
+# =============================================================================
+
+# --- SO3Log: Creation & Tree Structure ---
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_so3_log_creation_and_properties():
+    """Test that SO3Log can be created and has correct properties."""
+    from openscvx.symbolic.expr import SO3Log
+
+    R = State("R", (3, 3))
+    so3_log = SO3Log(R)
+
+    assert so3_log.children() == [R]
+    assert repr(so3_log) == f"SO3Log({R!r})"
+
+
+# --- SO3Log: Shape Checking ---
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_so3_log_shape_inference():
+    """Test that SO3Log infers shape (3,) from 3x3 input."""
+    from openscvx.symbolic.expr import SO3Log
+
+    R = State("R", (3, 3))
+    so3_log = SO3Log(R)
+
+    assert so3_log.check_shape() == (3,)
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_so3_log_shape_validation():
+    """Test that SO3Log raises error for non-3x3 input."""
+    from openscvx.symbolic.expr import SO3Log
+
+    R = State("R", (4, 4))
+    so3_log = SO3Log(R)
+
+    with pytest.raises(ValueError, match=r"SO3Log expects rotation with shape \(3, 3\)"):
+        so3_log.check_shape()
+
+
+# --- SO3Log: Mathematical Properties ---
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_so3_exp_log_roundtrip():
+    """Test that SO3Log(SO3Exp(omega)) ≈ omega."""
+    from openscvx.symbolic.expr import SO3Exp, SO3Log
+
+    omega_val = jnp.array([0.3, -0.5, 0.2])
+
+    # Create SO3Exp
+    omega = State("omega", (3,))
+    omega._slice = slice(0, 3)
+    so3_exp = SO3Exp(omega)
+    exp_fn = lower_to_jax(so3_exp)
+    R = exp_fn(omega_val, None, None, None)
+
+    # Create SO3Log with constant input
+    so3_log = SO3Log(Constant(R))
+    log_fn = lower_to_jax(so3_log)
+    omega_recovered = log_fn(None, None, None, None)
+
+    assert jnp.allclose(omega_recovered, omega_val, atol=1e-10)
+
+
+# =============================================================================
+# SE3Exp (requires jaxlie)
+# =============================================================================
+
+# --- SE3Exp: Creation & Tree Structure ---
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_se3_exp_creation_and_properties():
+    """Test that SE3Exp can be created and has correct properties."""
+    from openscvx.symbolic.expr import SE3Exp
+
+    twist = State("twist", (6,))
+    se3_exp = SE3Exp(twist)
+
+    assert se3_exp.children() == [twist]
+    assert repr(se3_exp) == f"SE3Exp({twist!r})"
+
+
+# --- SE3Exp: Shape Checking ---
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_se3_exp_shape_inference():
+    """Test that SE3Exp infers shape (4, 4) from 6D input."""
+    from openscvx.symbolic.expr import SE3Exp
+
+    twist = State("twist", (6,))
+    se3_exp = SE3Exp(twist)
+
+    assert se3_exp.check_shape() == (4, 4)
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_se3_exp_shape_validation():
+    """Test that SE3Exp raises error for non-6D input."""
+    from openscvx.symbolic.expr import SE3Exp
+
+    twist = State("twist", (3,))
+    se3_exp = SE3Exp(twist)
+
+    with pytest.raises(ValueError, match=r"SE3Exp expects twist with shape \(6,\)"):
+        se3_exp.check_shape()
+
+
+# --- SE3Exp: JAX Lowering ---
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_se3_exp_jax_lowering():
+    """Test SE3Exp lowering to JAX against jaxlie directly."""
+    from openscvx.symbolic.expr import SE3Exp
+
+    test_cases = [
+        jnp.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),  # Identity
+        jnp.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),  # Pure translation
+        jnp.array([0.0, 0.0, 0.0, 0.0, 0.0, jnp.pi / 2]),  # Pure rotation about z
+        jnp.array([0.1, 0.2, 0.3, 0.1, -0.2, 0.15]),  # General twist
+    ]
+
+    for twist_val in test_cases:
+        twist = State("twist", (6,))
+        twist._slice = slice(0, 6)
+
+        se3_exp = SE3Exp(twist)
+        fn = lower_to_jax(se3_exp)
+        result = fn(twist_val, None, None, None)
+
+        # Compare against jaxlie directly
+        expected = jaxlie.SE3.exp(twist_val).as_matrix()
+
+        assert result.shape == (4, 4)
+        assert jnp.allclose(result, expected, atol=1e-10)
+
+
+# --- SE3Exp: Mathematical Properties ---
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_se3_exp_homogeneous_matrix_structure():
+    """Test that SE3Exp produces valid homogeneous transformation matrices."""
+    from openscvx.symbolic.expr import SE3Exp
+
+    twist = State("twist", (6,))
+    twist._slice = slice(0, 6)
+
+    se3_exp = SE3Exp(twist)
+    fn = lower_to_jax(se3_exp)
+
+    twist_val = jnp.array([0.5, -0.3, 0.7, 0.1, 0.2, -0.1])
+    T = fn(twist_val, None, None, None)
+
+    # Check last row is [0, 0, 0, 1]
+    assert jnp.allclose(T[3, :], jnp.array([0.0, 0.0, 0.0, 1.0]), atol=1e-5)
+
+    # Check rotation part is orthogonal (use float32-appropriate tolerance)
+    R = T[:3, :3]
+    assert jnp.allclose(R @ R.T, jnp.eye(3), atol=1e-5)
+
+    # Check determinant of rotation = 1
+    assert jnp.allclose(jnp.linalg.det(R), 1.0, atol=1e-5)
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_product_of_exponentials_forward_kinematics():
+    """Test using SE3Exp for Product of Exponentials forward kinematics.
+
+    Implements a simple 2-joint arm:
+    - Joint 1: Rotation about z-axis at origin
+    - Joint 2: Rotation about z-axis at (1, 0, 0)
+
+    This tests the core use case for multi-link arm kinematics.
+    """
+    from openscvx.symbolic.expr import SE3Exp
+
+    # Joint angles
+    q1_val = jnp.array([jnp.pi / 4])  # 45 degrees
+    q2_val = jnp.array([jnp.pi / 4])  # 45 degrees
+
+    # Screw axes in home configuration
+    # Joint 1: rotation about z at origin -> [v; ω] = [0, 0, 0, 0, 0, 1]
+    screw1 = jnp.array([0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
+
+    # Joint 2: rotation about z at (1, 0, 0)
+    # v = -ω × r = -[0, 0, 1] × [1, 0, 0] = [0, 1, 0]
+    screw2 = jnp.array([0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
+
+    # Compute T1 = exp(screw1 * q1)
+    twist1 = Constant(screw1 * q1_val[0])
+    se3_exp1 = SE3Exp(twist1)
+    fn1 = lower_to_jax(se3_exp1)
+    T1 = fn1(None, None, None, None)
+
+    # Compute T2 = exp(screw2 * q2)
+    twist2 = Constant(screw2 * q2_val[0])
+    se3_exp2 = SE3Exp(twist2)
+    fn2 = lower_to_jax(se3_exp2)
+    T2 = fn2(None, None, None, None)
+
+    # Forward kinematics: T = T1 @ T2 @ T_home
+    # For simplicity, assume T_home = I (end-effector at origin in home config)
+    T_total = T1 @ T2
+
+    # Verify result makes sense
+    assert T_total.shape == (4, 4)
+    assert jnp.allclose(T_total[3, :], jnp.array([0.0, 0.0, 0.0, 1.0]), atol=1e-5)
+
+    # The rotation part should be valid (use float32-appropriate tolerance)
+    R = T_total[:3, :3]
+    assert jnp.allclose(R @ R.T, jnp.eye(3), atol=1e-5)
+
+
+# =============================================================================
+# SE3Log (requires jaxlie)
+# =============================================================================
+
+# --- SE3Log: Creation & Tree Structure ---
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_se3_log_creation_and_properties():
+    """Test that SE3Log can be created and has correct properties."""
+    from openscvx.symbolic.expr import SE3Log
+
+    T = State("T", (4, 4))
+    se3_log = SE3Log(T)
+
+    assert se3_log.children() == [T]
+    assert repr(se3_log) == f"SE3Log({T!r})"
+
+
+# --- SE3Log: Shape Checking ---
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_se3_log_shape_inference():
+    """Test that SE3Log infers shape (6,) from 4x4 input."""
+    from openscvx.symbolic.expr import SE3Log
+
+    T = State("T", (4, 4))
+    se3_log = SE3Log(T)
+
+    assert se3_log.check_shape() == (6,)
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_se3_log_shape_validation():
+    """Test that SE3Log raises error for non-4x4 input."""
+    from openscvx.symbolic.expr import SE3Log
+
+    T = State("T", (3, 3))
+    se3_log = SE3Log(T)
+
+    with pytest.raises(ValueError, match=r"SE3Log expects transform with shape \(4, 4\)"):
+        se3_log.check_shape()
+
+
+# --- SE3Log: Mathematical Properties ---
+
+
+@pytest.mark.skipif(not _JAXLIE_AVAILABLE, reason="jaxlie not installed")
+def test_se3_exp_log_roundtrip():
+    """Test that SE3Log(SE3Exp(twist)) ≈ twist."""
+    from openscvx.symbolic.expr import SE3Exp, SE3Log
+
+    twist_val = jnp.array([0.3, -0.5, 0.2, 0.1, -0.15, 0.08])
+
+    # Create SE3Exp
+    twist = State("twist", (6,))
+    twist._slice = slice(0, 6)
+    se3_exp = SE3Exp(twist)
+    exp_fn = lower_to_jax(se3_exp)
+    T = exp_fn(twist_val, None, None, None)
+
+    # Create SE3Log with constant input
+    se3_log = SE3Log(Constant(T))
+    log_fn = lower_to_jax(se3_log)
+    twist_recovered = log_fn(None, None, None, None)
+
+    assert jnp.allclose(twist_recovered, twist_val, atol=1e-10)
