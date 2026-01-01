@@ -944,6 +944,20 @@ def test_block_canonicalize():
     assert all(isinstance(b, Constant) for b in result.blocks[0])
 
 
+def test_block_canonicalize_single_element_unwraps():
+    """Test that Block([[a]]) unwraps to just a during canonicalization."""
+    from openscvx.symbolic.expr import Block, State
+
+    a = State("a", shape=(2, 2))
+    block = Block([[a]])
+
+    result = block.canonicalize()
+
+    # Should unwrap to the inner element, not remain a Block
+    assert result is a
+    assert not isinstance(result, Block)
+
+
 # --- Block: JAX Lowering ---
 
 

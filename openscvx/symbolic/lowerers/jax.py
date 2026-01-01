@@ -805,10 +805,10 @@ class JaxLowerer:
         # Lower each block expression
         block_fns = [[self.lower(block) for block in row] for row in node.blocks]
 
-        def block_fn(x, u, node, params):
+        def block_fn(x, u, node_arg, params):
             # Evaluate all blocks
             block_values = [
-                [jnp.atleast_1d(fn(x, u, node, params)) for fn in row] for row in block_fns
+                [jnp.atleast_1d(fn(x, u, node_arg, params)) for fn in row] for row in block_fns
             ]
 
             # Check if any block is 3D+ (need manual assembly)

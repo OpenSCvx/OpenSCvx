@@ -532,8 +532,17 @@ class Block(Expr):
         return [block for row in self.blocks for block in row]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize by recursively canonicalizing all blocks."""
+        """Canonicalize by recursively canonicalizing all blocks.
+
+        If the block contains only a single element ([[a]]), returns the
+        canonicalized element directly to simplify the expression tree.
+        """
         canonical_blocks = [[block.canonicalize() for block in row] for row in self.blocks]
+
+        # Unwrap single-element blocks
+        if len(canonical_blocks) == 1 and len(canonical_blocks[0]) == 1:
+            return canonical_blocks[0][0]
+
         return Block(canonical_blocks)
 
     def check_shape(self) -> Tuple[int, ...]:
