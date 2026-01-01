@@ -735,7 +735,136 @@ def test_vstack_vectors():
     assert result.shape == (2, 2)
 
 
-# --- Hstack & Vstack: CVXPy Lowering --- TODO: (norrisg)
+# --- Hstack & Vstack: CVXPy Lowering ---
+
+
+def test_hstack_cvxpy_constants():
+    """Test CVXPy lowering of Hstack with constant arrays."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Hstack
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    arr1 = Constant(np.array([1.0, 2.0]))
+    arr2 = Constant(np.array([3.0, 4.0, 5.0]))
+    expr = Hstack([arr1, arr2])
+
+    lowerer = CvxpyLowerer()
+    result = lowerer.lower(expr)
+
+    assert isinstance(result, cp.Expression)
+    assert result.shape == (5,)
+    assert np.allclose(result.value, np.array([1.0, 2.0, 3.0, 4.0, 5.0]))
+
+
+def test_hstack_cvxpy_2d_arrays():
+    """Test CVXPy lowering of Hstack with 2D arrays (proper horizontal stacking)."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Hstack
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    # 2D arrays: should stack horizontally along axis 1
+    # Note: Constant squeezes, so we use non-singleton dimensions
+    arr1 = Constant(np.array([[1.0, 2.0], [3.0, 4.0]]))  # (2, 2)
+    arr2 = Constant(np.array([[5.0, 6.0], [7.0, 8.0]]))  # (2, 2)
+    expr = Hstack([arr1, arr2])
+
+    lowerer = CvxpyLowerer()
+    result = lowerer.lower(expr)
+
+    assert isinstance(result, cp.Expression)
+    assert result.shape == (2, 4)
+    expected = np.array([[1.0, 2.0, 5.0, 6.0], [3.0, 4.0, 7.0, 8.0]])
+    assert np.allclose(result.value, expected)
+
+
+def test_hstack_cvxpy_with_variables():
+    """Test CVXPy lowering of Hstack with CVXPy variables."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Hstack, State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable(4, name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    s1 = State("s1", (2,))
+    s1._slice = slice(0, 2)
+    s2 = State("s2", (2,))
+    s2._slice = slice(2, 4)
+
+    expr = Hstack([s1, s2])
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+    assert result.shape == (4,)
+
+
+def test_vstack_cvxpy_constants():
+    """Test CVXPy lowering of Vstack with constant row vectors."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Vstack
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    # CVXPy vstack works with row vectors (1, n) -> (k, n)
+    arr1 = Constant(np.array([[1.0, 2.0]]))  # (1, 2)
+    arr2 = Constant(np.array([[3.0, 4.0]]))  # (1, 2)
+    arr3 = Constant(np.array([[5.0, 6.0]]))  # (1, 2)
+    expr = Vstack([arr1, arr2, arr3])
+
+    lowerer = CvxpyLowerer()
+    result = lowerer.lower(expr)
+
+    assert isinstance(result, cp.Expression)
+    assert result.shape == (3, 2)
+    expected = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+    assert np.allclose(result.value, expected)
+
+
+def test_vstack_cvxpy_vectors():
+    """Test CVXPy lowering of Vstack with 1D vectors (promotes to 2D)."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Vstack
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    arr1 = Constant(np.array([1.0, 2.0]))  # (2,)
+    arr2 = Constant(np.array([3.0, 4.0]))  # (2,)
+    expr = Vstack([arr1, arr2])
+
+    lowerer = CvxpyLowerer()
+    result = lowerer.lower(expr)
+
+    assert isinstance(result, cp.Expression)
+    assert result.shape == (2, 2)
+    expected = np.array([[1.0, 2.0], [3.0, 4.0]])
+    assert np.allclose(result.value, expected)
+
+
+def test_vstack_cvxpy_with_variables():
+    """Test CVXPy lowering of Vstack with CVXPy variables."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import State, Vstack
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable(4, name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    s1 = State("s1", (2,))
+    s1._slice = slice(0, 2)
+    s2 = State("s2", (2,))
+    s2._slice = slice(2, 4)
+
+    expr = Vstack([s1, s2])
+
+    result = lowerer.lower(expr)
+    assert isinstance(result, cp.Expression)
+    assert result.shape == (2, 2)
 
 
 # =============================================================================

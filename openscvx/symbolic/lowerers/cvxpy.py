@@ -1166,7 +1166,9 @@ class CvxpyLowerer:
     def _visit_hstack(self, node: Hstack) -> cp.Expression:
         """Lower horizontal stacking to CVXPy expression.
 
-        Stacks expressions horizontally using cp.hstack. Preserves DCP properties.
+        For 1D arrays, uses cp.hstack (concatenation). For 2D+ arrays, uses
+        cp.bmat with a single row to achieve proper horizontal stacking along
+        axis 1, matching numpy.hstack semantics.
 
         Args:
             node: Hstack expression node with multiple arrays
@@ -1175,7 +1177,15 @@ class CvxpyLowerer:
             CVXPy expression representing horizontal stack of arrays
         """
         arrays = [self.lower(arr) for arr in node.arrays]
-        return cp.hstack(arrays)
+
+        # Check dimensionality from the symbolic node's shape
+        shape = node.check_shape()
+        if len(shape) == 1:
+            # 1D: simple concatenation
+            return cp.hstack(arrays)
+        else:
+            # 2D+: use bmat with single row for proper horizontal stacking
+            return cp.bmat([arrays])
 
     @visitor(Vstack)
     def _visit_vstack(self, node: Vstack) -> cp.Expression:
