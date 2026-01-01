@@ -22,6 +22,8 @@ from openscvx.symbolic.expr import (
     Adjoint,
     AdjointDual,
     Constant,
+    SE3Adjoint,
+    SE3AdjointDual,
     State,
 )
 from openscvx.symbolic.lower import lower_to_jax
@@ -888,3 +890,306 @@ def test_product_of_exponentials_forward_kinematics():
     # The rotation part should be valid (use float32-appropriate tolerance)
     R = T_total[:3, :3]
     assert jnp.allclose(R @ R.T, jnp.eye(3), atol=1e-5)
+
+
+# =============================================================================
+# SE3Adjoint (Big Adjoint Ad_T)
+# =============================================================================
+
+
+def se3_adjoint_ref(T: jnp.ndarray) -> jnp.ndarray:
+    """Reference implementation of SE3 Adjoint matrix.
+
+    For SE(3) with rotation R and translation p:
+        Ad_T = [ R      0   ]
+               [ [p]×R  R   ]
+
+    Args:
+        T: 4×4 homogeneous transformation matrix
+
+    Returns:
+        6×6 adjoint matrix
+    """
+    R = T[:3, :3]
+    p = T[:3, 3]
+
+    # Skew-symmetric matrix [p]×
+    p_skew = jnp.array([[0, -p[2], p[1]], [p[2], 0, -p[0]], [-p[1], p[0], 0]])
+
+    # Build 6×6 matrix
+    top_row = jnp.hstack([R, jnp.zeros((3, 3))])
+    bottom_row = jnp.hstack([p_skew @ R, R])
+
+    return jnp.vstack([top_row, bottom_row])
+
+
+def se3_adjoint_dual_ref(T: jnp.ndarray) -> jnp.ndarray:
+    """Reference implementation of SE3 coadjoint matrix.
+
+    For SE(3) with rotation R and translation p:
+        Ad*_T = [ R     [p]×R ]
+                [ 0       R   ]
+
+    Args:
+        T: 4×4 homogeneous transformation matrix
+
+    Returns:
+        6×6 coadjoint matrix
+    """
+    R = T[:3, :3]
+    p = T[:3, 3]
+
+    # Skew-symmetric matrix [p]×
+    p_skew = jnp.array([[0, -p[2], p[1]], [p[2], 0, -p[0]], [-p[1], p[0], 0]])
+
+    # Build 6×6 matrix
+    top_row = jnp.hstack([R, p_skew @ R])
+    bottom_row = jnp.hstack([jnp.zeros((3, 3)), R])
+
+    return jnp.vstack([top_row, bottom_row])
+
+
+# --- SE3Adjoint: Basic Usage ---
+
+
+def test_se3_adjoint_creation_and_properties():
+    """Test that SE3Adjoint can be created and has correct properties."""
+    T = State("T", (4, 4))
+    ad_T = SE3Adjoint(T)
+
+    assert ad_T.children() == [T]
+    assert repr(ad_T) == f"Ad({T!r})"
+
+
+def test_se3_adjoint_with_constant():
+    """Test that SE3Adjoint can be created with constant input."""
+    T_val = np.eye(4)
+    ad_T = SE3Adjoint(T_val)
+
+    assert len(ad_T.children()) == 1
+    assert isinstance(ad_T.children()[0], Constant)
+
+
+# --- SE3Adjoint: Shape Checking ---
+
+
+def test_se3_adjoint_shape_inference():
+    """Test that SE3Adjoint infers shape (6, 6) from 4×4 input."""
+    T = State("T", (4, 4))
+    ad_T = SE3Adjoint(T)
+
+    assert ad_T.check_shape() == (6, 6)
+
+
+def test_se3_adjoint_shape_validation():
+    """Test that SE3Adjoint raises error for non-4×4 input."""
+    T = State("T", (3, 3))
+    ad_T = SE3Adjoint(T)
+
+    with pytest.raises(ValueError, match=r"SE3Adjoint expects transform with shape \(4, 4\)"):
+        ad_T.check_shape()
+
+
+# --- SE3Adjoint: JAX Lowering ---
+
+
+def test_se3_adjoint_jax_lowering_identity():
+    """Test SE3Adjoint with identity transform."""
+    T_val = jnp.eye(4)
+
+    ad_T = SE3Adjoint(Constant(T_val))
+    fn = lower_to_jax(ad_T)
+    result = fn(None, None, None, None)
+
+    # For identity transform, Ad_I = I (6×6 identity)
+    assert result.shape == (6, 6)
+    assert jnp.allclose(result, jnp.eye(6), atol=1e-10)
+
+
+def test_se3_adjoint_jax_lowering_pure_rotation():
+    """Test SE3Adjoint with pure rotation (no translation)."""
+    # 90 degree rotation about z-axis
+    c, s = 0.0, 1.0  # cos(90°), sin(90°)
+    T_val = jnp.array([[c, -s, 0, 0], [s, c, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+
+    ad_T = SE3Adjoint(Constant(T_val))
+    fn = lower_to_jax(ad_T)
+    result = fn(None, None, None, None)
+
+    expected = se3_adjoint_ref(T_val)
+
+    assert result.shape == (6, 6)
+    assert jnp.allclose(result, expected, atol=1e-10)
+
+
+def test_se3_adjoint_jax_lowering_pure_translation():
+    """Test SE3Adjoint with pure translation (no rotation)."""
+    T_val = jnp.array([[1, 0, 0, 1.0], [0, 1, 0, 2.0], [0, 0, 1, 3.0], [0, 0, 0, 1]])
+
+    ad_T = SE3Adjoint(Constant(T_val))
+    fn = lower_to_jax(ad_T)
+    result = fn(None, None, None, None)
+
+    expected = se3_adjoint_ref(T_val)
+
+    assert result.shape == (6, 6)
+    assert jnp.allclose(result, expected, atol=1e-10)
+
+
+def test_se3_adjoint_jax_lowering_general():
+    """Test SE3Adjoint with general transform (rotation + translation)."""
+    # General SE(3) transform
+    theta = np.pi / 4  # 45 degree rotation about z
+    c, s = np.cos(theta), np.sin(theta)
+    T_val = jnp.array([[c, -s, 0, 0.5], [s, c, 0, -0.3], [0, 0, 1, 1.2], [0, 0, 0, 1]])
+
+    ad_T = SE3Adjoint(Constant(T_val))
+    fn = lower_to_jax(ad_T)
+    result = fn(None, None, None, None)
+
+    expected = se3_adjoint_ref(T_val)
+
+    assert result.shape == (6, 6)
+    assert jnp.allclose(result, expected, atol=1e-10)
+
+
+def test_se3_adjoint_composition():
+    """Test that Ad_{T1 @ T2} = Ad_{T1} @ Ad_{T2}."""
+    # Two random transforms
+    T1 = jnp.array([[1, 0, 0, 1.0], [0, 0, -1, 0.5], [0, 1, 0, 0.2], [0, 0, 0, 1]])
+    T2 = jnp.array([[0, -1, 0, -0.3], [1, 0, 0, 0.7], [0, 0, 1, 1.0], [0, 0, 0, 1]])
+
+    # Compose transforms
+    T12 = T1 @ T2
+
+    # Compute adjoints
+    Ad_T1 = se3_adjoint_ref(T1)
+    Ad_T2 = se3_adjoint_ref(T2)
+    Ad_T12 = se3_adjoint_ref(T12)
+
+    # Check composition property
+    assert jnp.allclose(Ad_T12, Ad_T1 @ Ad_T2, atol=1e-6)
+
+
+# =============================================================================
+# SE3AdjointDual (Big Coadjoint Ad*_T)
+# =============================================================================
+
+# --- SE3AdjointDual: Basic Usage ---
+
+
+def test_se3_adjoint_dual_creation_and_properties():
+    """Test that SE3AdjointDual can be created and has correct properties."""
+    T = State("T", (4, 4))
+    ad_dual_T = SE3AdjointDual(T)
+
+    assert ad_dual_T.children() == [T]
+    assert repr(ad_dual_T) == f"Ad_dual({T!r})"
+
+
+def test_se3_adjoint_dual_with_constant():
+    """Test that SE3AdjointDual can be created with constant input."""
+    T_val = np.eye(4)
+    ad_dual_T = SE3AdjointDual(T_val)
+
+    assert len(ad_dual_T.children()) == 1
+    assert isinstance(ad_dual_T.children()[0], Constant)
+
+
+# --- SE3AdjointDual: Shape Checking ---
+
+
+def test_se3_adjoint_dual_shape_inference():
+    """Test that SE3AdjointDual infers shape (6, 6) from 4×4 input."""
+    T = State("T", (4, 4))
+    ad_dual_T = SE3AdjointDual(T)
+
+    assert ad_dual_T.check_shape() == (6, 6)
+
+
+def test_se3_adjoint_dual_shape_validation():
+    """Test that SE3AdjointDual raises error for non-4×4 input."""
+    T = State("T", (3, 3))
+    ad_dual_T = SE3AdjointDual(T)
+
+    with pytest.raises(ValueError, match=r"SE3AdjointDual expects transform with shape \(4, 4\)"):
+        ad_dual_T.check_shape()
+
+
+# --- SE3AdjointDual: JAX Lowering ---
+
+
+def test_se3_adjoint_dual_jax_lowering_identity():
+    """Test SE3AdjointDual with identity transform."""
+    T_val = jnp.eye(4)
+
+    ad_dual_T = SE3AdjointDual(Constant(T_val))
+    fn = lower_to_jax(ad_dual_T)
+    result = fn(None, None, None, None)
+
+    # For identity transform, Ad*_I = I (6×6 identity)
+    assert result.shape == (6, 6)
+    assert jnp.allclose(result, jnp.eye(6), atol=1e-10)
+
+
+def test_se3_adjoint_dual_jax_lowering_general():
+    """Test SE3AdjointDual with general transform."""
+    theta = np.pi / 3  # 60 degree rotation about z
+    c, s = np.cos(theta), np.sin(theta)
+    T_val = jnp.array([[c, -s, 0, 0.8], [s, c, 0, -0.4], [0, 0, 1, 0.6], [0, 0, 0, 1]])
+
+    ad_dual_T = SE3AdjointDual(Constant(T_val))
+    fn = lower_to_jax(ad_dual_T)
+    result = fn(None, None, None, None)
+
+    expected = se3_adjoint_dual_ref(T_val)
+
+    assert result.shape == (6, 6)
+    assert jnp.allclose(result, expected, atol=1e-10)
+
+
+def test_se3_adjoint_dual_transpose_inverse_relation():
+    """Test that Ad*_T = (Ad_T)^{-T}."""
+    theta = np.pi / 6
+    c, s = np.cos(theta), np.sin(theta)
+    T_val = jnp.array([[c, -s, 0, 1.0], [s, c, 0, 0.5], [0, 0, 1, -0.3], [0, 0, 0, 1]])
+
+    Ad_T = se3_adjoint_ref(T_val)
+    Ad_dual_T = se3_adjoint_dual_ref(T_val)
+
+    # Ad*_T should equal (Ad_T)^{-T} = (Ad_T^{-1})^T
+    Ad_T_inv_T = jnp.linalg.inv(Ad_T).T
+
+    assert jnp.allclose(Ad_dual_T, Ad_T_inv_T, atol=1e-6)
+
+
+def test_se3_adjoint_power_pairing():
+    """Test that power pairing is preserved under coordinate transformation.
+
+    If ξ_b = Ad_T @ ξ_a and F_a = Ad_T^T @ F_b, then:
+        <F_a, ξ_a> = <F_b, ξ_b>
+
+    where <·,·> is the inner product (power = F^T @ ξ).
+
+    Note: Power preservation uses Ad_T^T, not Ad*_T. The coadjoint Ad*_T = (Ad_T)^{-T}
+    is a different operator used in Lie theory contexts.
+    """
+    theta = np.pi / 4
+    c, s = np.cos(theta), np.sin(theta)
+    T_val = jnp.array([[c, -s, 0, 0.5], [s, c, 0, 0.3], [0, 0, 1, 0.8], [0, 0, 0, 1]])
+
+    # Random twist and wrench
+    xi_a = jnp.array([1.0, -0.5, 0.3, 0.2, -0.1, 0.4])
+    F_b = jnp.array([2.0, 1.0, -0.5, 0.3, 0.2, -0.1])
+
+    Ad_T = se3_adjoint_ref(T_val)
+
+    # Transform twist with Ad_T, wrench with Ad_T^T
+    xi_b = Ad_T @ xi_a
+    F_a = Ad_T.T @ F_b
+
+    # Power pairing should be preserved
+    power_a = jnp.dot(F_a, xi_a)
+    power_b = jnp.dot(F_b, xi_b)
+
+    assert jnp.allclose(power_a, power_b, atol=1e-6)

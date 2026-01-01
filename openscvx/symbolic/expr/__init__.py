@@ -101,7 +101,16 @@ from .expr import (
 )
 
 # Lie algebra operations
-from .lie import Adjoint, AdjointDual, SE3Exp, SE3Log, SO3Exp, SO3Log
+from .lie import (
+    Adjoint,
+    AdjointDual,
+    SE3Adjoint,
+    SE3AdjointDual,
+    SE3Exp,
+    SE3Log,
+    SO3Exp,
+    SO3Log,
+)
 
 # Linear algebra operations
 from .linalg import Diag, Norm, Sum, Transpose
@@ -196,6 +205,8 @@ __all__ = [
     # Lie algebra operations
     "AdjointDual",
     "Adjoint",
+    "SE3Adjoint",
+    "SE3AdjointDual",
     "SO3Exp",
     "SO3Log",
     "SE3Exp",

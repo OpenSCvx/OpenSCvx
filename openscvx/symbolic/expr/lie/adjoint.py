@@ -190,3 +190,168 @@ class Adjoint(Expr):
 
     def __repr__(self):
         return f"ad({self.twist1!r}, {self.twist2!r})"
+
+
+class SE3Adjoint(Expr):
+    """SE(3) Adjoint representation Ad_T for transforming twists between frames.
+
+    Computes the 6×6 adjoint matrix Ad_T that transforms twists from one
+    coordinate frame to another. Given a transformation T_ab from frame A to
+    frame B, the adjoint transforms a twist expressed in frame A to frame B:
+
+        ξ_b = Ad_{T_ab} @ ξ_a
+
+    For SE(3), given T with rotation R and translation p:
+
+        Ad_T = [ R      0   ]
+               [ [p]×R  R   ]
+
+    where [p]× is the 3×3 skew-symmetric matrix of p.
+
+    This is essential for:
+
+    - Velocity propagation through kinematic chains
+    - Computing geometric Jacobians for manipulators
+    - Recursive Newton-Euler dynamics algorithms
+
+    Attributes:
+        transform: 4×4 homogeneous transformation matrix
+
+    Example:
+        Transform a body twist to the world frame::
+
+            import openscvx as ox
+
+            T_world_body = forward_kinematics(q)  # 4×4 transform
+            twist_body = ox.State("twist_body", shape=(6,))
+
+            # Transform twist to world frame
+            Ad_T = ox.lie.SE3Adjoint(T_world_body)  # 6×6 matrix
+            twist_world = Ad_T @ twist_body
+
+        Compute geometric Jacobian columns::
+
+            # Each column of the geometric Jacobian is Ad_{T_0i} @ ξ_i
+            J_col_i = ox.lie.SE3Adjoint(T_0_to_i) @ screw_axis_i
+
+    Note:
+        The adjoint satisfies: Ad_{T1 @ T2} = Ad_{T1} @ Ad_{T2}
+
+    See Also:
+        - SE3AdjointDual: For transforming wrenches between frames
+        - Adjoint: The small adjoint (Lie bracket) for twist-on-twist action
+    """
+
+    def __init__(self, transform):
+        """Initialize SE3 Adjoint operator.
+
+        Args:
+            transform: 4×4 homogeneous transformation matrix with shape (4, 4)
+        """
+        self.transform = to_expr(transform)
+
+    def children(self):
+        return [self.transform]
+
+    def canonicalize(self) -> "Expr":
+        transform = self.transform.canonicalize()
+        return SE3Adjoint(transform)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Check that input is a 4×4 matrix and return output shape.
+
+        Returns:
+            tuple: Shape (6, 6) for the adjoint matrix
+
+        Raises:
+            ValueError: If transform does not have shape (4, 4)
+        """
+        transform_shape = self.transform.check_shape()
+        if transform_shape != (4, 4):
+            raise ValueError(
+                f"SE3Adjoint expects transform with shape (4, 4), got {transform_shape}"
+            )
+        return (6, 6)
+
+    def __repr__(self):
+        return f"Ad({self.transform!r})"
+
+
+class SE3AdjointDual(Expr):
+    """SE(3) coadjoint representation Ad*_T for transforming wrenches between frames.
+
+    Computes the 6×6 coadjoint matrix Ad*_T that transforms wrenches from one
+    coordinate frame to another. Given a transformation T_ab from frame A to
+    frame B, the coadjoint transforms a wrench expressed in frame B to frame A:
+
+        F_a = Ad*_{T_ab} @ F_b
+
+    For SE(3), given T with rotation R and translation p:
+
+        Ad*_T = [ R     [p]×R ]
+                [ 0       R   ]
+
+    This is the transpose-inverse of Ad_T: Ad*_T = (Ad_T)^{-T}
+
+    This is essential for:
+
+    - Force/torque propagation in dynamics
+    - Transforming wrenches between end-effector and base frames
+    - Recursive Newton-Euler dynamics algorithms
+
+    Attributes:
+        transform: 4×4 homogeneous transformation matrix
+
+    Example:
+        Transform a wrench from end-effector to base frame::
+
+            import openscvx as ox
+
+            T_base_ee = forward_kinematics(q)  # 4×4 transform
+            wrench_ee = ox.Control("wrench_ee", shape=(6,))
+
+            # Transform wrench to base frame
+            Ad_star_T = ox.lie.SE3AdjointDual(T_base_ee)  # 6×6 matrix
+            wrench_base = Ad_star_T @ wrench_ee
+
+    Note:
+        The coadjoint is related to the adjoint by: Ad*_T = (Ad_T)^{-T}
+
+    See Also:
+        - SE3Adjoint: For transforming twists between frames
+        - AdjointDual: The small coadjoint for Coriolis/centrifugal forces
+    """
+
+    def __init__(self, transform):
+        """Initialize SE3 coadjoint operator.
+
+        Args:
+            transform: 4×4 homogeneous transformation matrix with shape (4, 4)
+        """
+        self.transform = to_expr(transform)
+
+    def children(self):
+        return [self.transform]
+
+    def canonicalize(self) -> "Expr":
+        transform = self.transform.canonicalize()
+        return SE3AdjointDual(transform)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Check that input is a 4×4 matrix and return output shape.
+
+        Returns:
+            tuple: Shape (6, 6) for the coadjoint matrix
+
+        Raises:
+            ValueError: If transform does not have shape (4, 4)
+        """
+        transform_shape = self.transform.check_shape()
+        if transform_shape != (4, 4):
+            raise ValueError(
+                f"SE3AdjointDual expects transform with shape (4, 4), got {transform_shape}"
+            )
+        return (6, 6)
+
+    def __repr__(self):
+        return f"Ad_dual({self.transform!r})"

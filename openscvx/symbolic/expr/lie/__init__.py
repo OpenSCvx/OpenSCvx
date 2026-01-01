@@ -13,6 +13,8 @@ These operators are implemented using simple cross products and work out of the 
 
 - ``AdjointDual``: Coadjoint operator ad*(ξ, μ) for Coriolis/centrifugal forces
 - ``Adjoint``: Lie bracket [ξ₁, ξ₂] for twist-on-twist action
+- ``SE3Adjoint``: Big adjoint Ad_T for transforming twists between frames
+- ``SE3AdjointDual``: Big coadjoint Ad*_T for transforming wrenches between frames
 
 **Tier 2: jaxlie-backed operators (requires ``pip install openscvx[lie]``)**
 
@@ -60,7 +62,7 @@ References:
 """
 
 # Core operators - no dependencies
-from .adjoint import Adjoint, AdjointDual
+from .adjoint import Adjoint, AdjointDual, SE3Adjoint, SE3AdjointDual
 
 # jaxlie-backed operators - optional dependency
 try:
@@ -87,6 +89,8 @@ except ImportError:
 __all__ = [
     "AdjointDual",
     "Adjoint",
+    "SE3Adjoint",
+    "SE3AdjointDual",
     "SO3Exp",
     "SO3Log",
     "SE3Exp",

@@ -147,6 +147,8 @@ from openscvx.symbolic.expr import (
     Parameter,
     PositivePart,
     Power,
+    SE3Adjoint,
+    SE3AdjointDual,
     Sin,
     SmoothReLU,
     Sqrt,
@@ -975,6 +977,86 @@ class JaxLowerer:
             return jnp.concatenate([linear_part, angular_part])
 
         return adjoint_fn
+
+    @visitor(SE3Adjoint)
+    def _visit_se3_adjoint(self, node: SE3Adjoint):
+        """Lower SE3 Adjoint (big Ad) for transforming twists between frames.
+
+        Computes the 6×6 adjoint matrix Ad_T that transforms twists:
+            ξ_b = Ad_{T_ab} @ ξ_a
+
+        For SE(3) with rotation R and translation p:
+            Ad_T = [ R      0   ]
+                   [ [p]×R  R   ]
+
+        Args:
+            node: SE3Adjoint expression node
+
+        Returns:
+            Function (x, u, node, params) -> 6×6 adjoint matrix
+        """
+        f_transform = self.lower(node.transform)
+
+        def se3_adjoint_fn(x, u, node, params):
+            T = f_transform(x, u, node, params)
+
+            # Extract rotation and translation from 4×4 homogeneous matrix
+            R = T[:3, :3]
+            p = T[:3, 3]
+
+            # Build skew-symmetric matrix [p]×
+            p_skew = jnp.array([[0, -p[2], p[1]], [p[2], 0, -p[0]], [-p[1], p[0], 0]])
+
+            # Build 6×6 adjoint matrix
+            # Ad_T = [ R      0   ]
+            #        [ [p]×R  R   ]
+            top_row = jnp.hstack([R, jnp.zeros((3, 3))])
+            bottom_row = jnp.hstack([p_skew @ R, R])
+
+            return jnp.vstack([top_row, bottom_row])
+
+        return se3_adjoint_fn
+
+    @visitor(SE3AdjointDual)
+    def _visit_se3_adjoint_dual(self, node: SE3AdjointDual):
+        """Lower SE3 coadjoint (big Ad*) for transforming wrenches between frames.
+
+        Computes the 6×6 coadjoint matrix Ad*_T that transforms wrenches:
+            F_a = Ad*_{T_ab} @ F_b
+
+        For SE(3) with rotation R and translation p:
+            Ad*_T = [ R     [p]×R ]
+                    [ 0       R   ]
+
+        This is the transpose-inverse of Ad_T.
+
+        Args:
+            node: SE3AdjointDual expression node
+
+        Returns:
+            Function (x, u, node, params) -> 6×6 coadjoint matrix
+        """
+        f_transform = self.lower(node.transform)
+
+        def se3_adjoint_dual_fn(x, u, node, params):
+            T = f_transform(x, u, node, params)
+
+            # Extract rotation and translation from 4×4 homogeneous matrix
+            R = T[:3, :3]
+            p = T[:3, 3]
+
+            # Build skew-symmetric matrix [p]×
+            p_skew = jnp.array([[0, -p[2], p[1]], [p[2], 0, -p[0]], [-p[1], p[0], 0]])
+
+            # Build 6×6 coadjoint matrix
+            # Ad*_T = [ R     [p]×R ]
+            #         [ 0       R   ]
+            top_row = jnp.hstack([R, p_skew @ R])
+            bottom_row = jnp.hstack([jnp.zeros((3, 3)), R])
+
+            return jnp.vstack([top_row, bottom_row])
+
+        return se3_adjoint_dual_fn
 
     @visitor(SO3Exp)
     def _visit_so3_exp(self, node: SO3Exp):
