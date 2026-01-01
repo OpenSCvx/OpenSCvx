@@ -451,7 +451,8 @@ class Block(Expr):
     without manually nesting Stack/Hstack/Vstack operations.
 
     Attributes:
-        blocks: 2D nested list of expressions forming the block structure
+        blocks: Nested list of expressions forming the block structure (each
+            expression can be a scalar, 1D, 2D, or N-D tensor)
 
     Example:
         Build a 2D rotation matrix::
