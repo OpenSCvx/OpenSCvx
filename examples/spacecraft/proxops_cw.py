@@ -94,20 +94,13 @@ for state in states:
 cone_half_angle = 20 * np.pi / 180  # 20 degree half-angle
 constraints.append(
     ox.ctcs(ox.linalg.Norm(position[1:]) <= np.tan(cone_half_angle) * (-position[0])).over(
-        (n - 2, n - 1)
+        (n_nodes-2, n_nodes-1)
     )
 )
-# Enforce entrance to the cone from greater than 25m away
-constraints.append((-position[0] >= 25.0).at([n - 2]))
+# Enforce entrance to the cone at safe distance
+constraints.append((-position[0] >= 20.0).at([n_nodes-2]))
 
 # Clohessy-Wiltshire dynamics
-# x_dot = vx
-# y_dot = vy
-# z_dot = vz
-# vx_dot = 3n²x + 2n·vy + ax
-# vy_dot = -2n·vx + ay
-# vz_dot = -n²z + az
-
 dynamics = {
     "position": velocity,
     "velocity": Concat(
