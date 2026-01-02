@@ -2,7 +2,9 @@
 
 This example demonstrates optimal trajectory generation for spacecraft
 proximity operations and docking using the Clohessy-Wiltshire (CW) equations
-for relative motion in a circular orbit. The problem includes:
+for relative motion in a circular orbit.
+See https://en.wikipedia.org/wiki/Clohessy%E2%80%93Wiltshire_equations for further details.
+The problem includes:
 
 - 3D relative position and velocity dynamics (CW equations)
 - Fuel-optimal control (minimize delta-v)
@@ -33,6 +35,7 @@ from examples.plotting_viser import (
 )
 from openscvx import Concat, Problem
 from openscvx.plotting import plot_scp_iterations
+from openscvx.plotting.viser import add_glideslope_cone
 
 # Problem parameters
 n_nodes = 3  # Number of discretization nodes
@@ -57,13 +60,13 @@ velocity = ox.State("velocity", shape=(3,))
 v_max = 2.0  # Maximum relative velocity [m/s]
 velocity.max = np.array([v_max, v_max, v_max])
 velocity.min = np.array([-v_max, -v_max, -v_max])
-velocity.initial = np.array([0.0, 0.0, 0.0])
+velocity.initial = [0.0, 2.0, 0.0]
 velocity.final = np.array([0.0, 0.0, 0.0])  # Zero relative velocity at docking
 velocity.guess = np.zeros((n_nodes, 3))
 
 # Define control: acceleration from thrusters [ax, ay, az] in m/s^2
 accel = ox.Control("accel", shape=(3,))
-a_max = 0.01  # Maximum acceleration [m/s^2] (typical for reaction control thrusters)
+a_max = 0.1  # Maximum acceleration [m/s^2] (typical for reaction control thrusters)
 accel.max = np.array([a_max, a_max, a_max])
 accel.min = np.array([-a_max, -a_max, -a_max])
 accel.guess = np.zeros((n_nodes, 3))
@@ -90,8 +93,12 @@ for state in states:
 # and stay within a cone centered on the -x axis
 cone_half_angle = 20 * np.pi / 180  # 20 degree half-angle
 constraints.append(
-    ox.ctcs(ox.linalg.Norm(position[1:]) <= np.tan(cone_half_angle) * (-position[0])).over((1,2))
+    ox.ctcs(ox.linalg.Norm(position[1:]) <= np.tan(cone_half_angle) * (-position[0])).over(
+        (n - 2, n - 1)
+    )
 )
+# Enforce entrance to the cone from greater than 25m away
+constraints.append((-position[0] >= 25.0).at([n - 2]))
 
 # Clohessy-Wiltshire dynamics
 # x_dot = vx
@@ -115,7 +122,7 @@ time = ox.Time(
     initial=0.0,
     final=("free", total_time),
     min=0.0,
-    max=2 * total_time,
+    max=total_time,
 )
 
 # Build the problem
@@ -150,13 +157,36 @@ if __name__ == "__main__":
     plot_scp_iterations(results).show()
 
     # Create animation
-    traj_server = create_animated_plotting_server(results, thrust_key="accel")
+    traj_server = create_animated_plotting_server(results, thrust_key="accel", show_grid=False)
+
+    # Add R-bar approach cone (opens in -x direction)
+    add_glideslope_cone(
+        traj_server,
+        apex=(0, 0, 0),
+        height=20.0,  # Cone extends 100m in -x direction
+        glideslope_angle_deg=cone_half_angle * 180 / np.pi,
+        axis=(-1, 0, 0),  # R-bar: negative radial direction
+        color=(200, 80, 80),
+        opacity=0.5,
+    )
 
     # Create SCP iteration visualization
     scp_server = create_scp_animated_plotting_server(
         results,
         frame_duration_ms=200,
         scene_scale=1.0,
+        show_grid=False,
+    )
+
+    # Add R-bar approach cone to SCP visualization
+    add_glideslope_cone(
+        scp_server,
+        apex=(0, 0, 0),
+        height=20.0,
+        glideslope_angle_deg=cone_half_angle * 180 / np.pi,
+        axis=(-1, 0, 0),
+        color=(200, 80, 80),
+        opacity=0.5,
     )
 
     scp_server.sleep_forever()
