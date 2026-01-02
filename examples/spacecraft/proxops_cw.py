@@ -3,7 +3,7 @@
 This example demonstrates optimal trajectory generation for spacecraft
 proximity operations and docking using the Clohessy-Wiltshire (CW) equations
 for relative motion in a circular orbit.
-See https://en.wikipedia.org/wiki/Clohessy%E2%80%93Wiltshire_equations for further details.
+See [Clohessy-Wiltshire equations](https://en.wikipedia.org/wiki/Clohessy%E2%80%93Wiltshire_equations) for further details.
 The problem includes:
 
 - 3D relative position and velocity dynamics (CW equations)
@@ -12,10 +12,10 @@ The problem includes:
 - Approach cone constraint for safe docking corridor
 - Final docking at target (origin)
 
-The CW frame convention:
-- x: radial direction (outward from Earth)
-- y: along-track direction (velocity direction)
-- z: cross-track direction (normal to orbit plane)
+!!! tip "The CW frame convention:"
+    - x: radial direction (outward from Earth)
+    - y: along-track direction (velocity direction)
+    - z: cross-track direction (normal to orbit plane)
 """
 
 import os
@@ -88,7 +88,7 @@ for state in states:
     )
 
 # R-bar approach cone constraint (from below, -x direction)
-# Enforces sqrt(y² + z²) <= tan(θ) * (-x)
+# Enforces sqrt(y^2 + z^2) <= tan(theta) * (-x)
 # This requires the spacecraft to approach from negative x (below target)
 # and stay within a cone centered on the -x axis
 cone_half_angle = 20 * np.pi / 180  # 20 degree half-angle
