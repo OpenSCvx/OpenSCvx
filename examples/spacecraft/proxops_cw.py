@@ -33,7 +33,7 @@ from examples.plotting_viser import (
     create_animated_plotting_server,
     create_scp_animated_plotting_server,
 )
-from openscvx import Concat, Problem
+from openscvx import Problem
 from openscvx.plotting import plot_scp_iterations
 from openscvx.plotting.viser import add_glideslope_cone
 
@@ -103,7 +103,7 @@ constraints.append((-position[0] >= 20.0).at([n_nodes-2]))
 # Clohessy-Wiltshire dynamics
 dynamics = {
     "position": velocity,
-    "velocity": Concat(
+    "velocity": ox.Concat(
         3 * n**2 * position[0] + 2 * n * velocity[1] + accel[0],
         -2 * n * velocity[0] + accel[1],
         -(n**2) * position[2] + accel[2],
