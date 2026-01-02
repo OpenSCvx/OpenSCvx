@@ -3,7 +3,8 @@
 This example demonstrates optimal trajectory generation for spacecraft
 proximity operations and docking using the Clohessy-Wiltshire (CW) equations
 for relative motion in a circular orbit.
-See [Clohessy-Wiltshire equations](https://en.wikipedia.org/wiki/Clohessy%E2%80%93Wiltshire_equations) for further details.
+See [Clohessy-Wiltshire equations](https://en.wikipedia.org/wiki/Clohessy%E2%80%93Wiltshire_equations)
+for further details.
 The problem includes:
 
 - 3D relative position and velocity dynamics (CW equations)
@@ -94,11 +95,11 @@ for state in states:
 cone_half_angle = 20 * np.pi / 180  # 20 degree half-angle
 constraints.append(
     ox.ctcs(ox.linalg.Norm(position[1:]) <= np.tan(cone_half_angle) * (-position[0])).over(
-        (n_nodes-2, n_nodes-1)
+        (n_nodes - 2, n_nodes - 1)
     )
 )
 # Enforce entrance to the cone at safe distance
-constraints.append((-position[0] >= 20.0).at([n_nodes-2]))
+constraints.append((-position[0] >= 20.0).at([n_nodes - 2]))
 
 # Clohessy-Wiltshire dynamics
 dynamics = {
