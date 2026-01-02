@@ -228,14 +228,16 @@ def _generate_cone_mesh(
     height: float,
     half_angle_deg: float,
     n_segments: int = 32,
+    axis: np.ndarray | tuple = (0.0, 0.0, 1.0),
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Generate a cone mesh with apex at given position, opening upward.
+    """Generate a cone mesh with apex at given position, opening along specified axis.
 
     Args:
         apex: Apex position (3,) - the tip of the cone
-        height: Height of the cone (extends in +Z direction from apex)
-        half_angle_deg: Half-angle of the cone from the vertical axis in degrees
+        height: Height of the cone (extends along axis direction from apex)
+        half_angle_deg: Half-angle of the cone from the axis in degrees
         n_segments: Number of segments around the circumference
+        axis: Unit vector direction the cone opens toward (default +Z)
 
     Returns:
         Tuple of (vertices, faces) where vertices is (V, 3) and faces is (F, 3)
@@ -243,21 +245,36 @@ def _generate_cone_mesh(
     half_angle_rad = np.radians(half_angle_deg)
     base_radius = height * np.tan(half_angle_rad)
 
+    # Normalize axis
+    axis = np.asarray(axis, dtype=np.float32)
+    axis = axis / np.linalg.norm(axis)
+
+    # Build orthonormal basis: find two vectors perpendicular to axis
+    # Pick a reference vector not parallel to axis
+    if abs(axis[0]) < 0.9:
+        ref = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    else:
+        ref = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+
+    # Gram-Schmidt to get perpendicular vectors
+    u = ref - np.dot(ref, axis) * axis
+    u = u / np.linalg.norm(u)
+    v = np.cross(axis, u)
+
     # Vertices: apex + base circle points
     vertices = [apex.copy()]  # Apex at index 0
+
+    # Base center position
+    base_center = apex + height * axis
 
     # Base circle vertices
     for i in range(n_segments):
         angle = 2 * np.pi * i / n_segments
-        x = apex[0] + base_radius * np.cos(angle)
-        y = apex[1] + base_radius * np.sin(angle)
-        z = apex[2] + height
-        vertices.append([x, y, z])
+        offset = base_radius * (np.cos(angle) * u + np.sin(angle) * v)
+        vertices.append(base_center + offset)
 
     # Center of base for closing the bottom
-    base_center = apex.copy()
-    base_center[2] += height
-    vertices.append(base_center)  # Index n_segments + 1
+    vertices.append(base_center.copy())  # Index n_segments + 1
 
     vertices = np.array(vertices, dtype=np.float32)
 
@@ -287,25 +304,28 @@ def add_glideslope_cone(
     apex: np.ndarray | tuple = (0.0, 0.0, 0.0),
     height: float = 2000.0,
     glideslope_angle_deg: float = 86.0,
+    axis: np.ndarray | tuple = (0.0, 0.0, 1.0),
     color: tuple[int, int, int] = (100, 200, 100),
     opacity: float = 0.2,
     wireframe: bool = False,
     n_segments: int = 32,
 ) -> viser.MeshHandle:
-    """Add a glideslope constraint cone to the scene.
+    """Add a glideslope/approach constraint cone to the scene.
 
     The glideslope constraint typically has the form:
-        ||position_xy|| <= tan(angle) * position_z
+        ||position_perp|| <= tan(angle) * position_along_axis
 
-    This creates a cone with apex at the landing site, opening upward.
+    This creates a cone with apex at the target, opening along the specified axis.
 
     Args:
         server: ViserServer instance
-        apex: Apex position (landing site), default is origin
+        apex: Apex position (docking/landing site), default is origin
         height: Height of the cone visualization
-        glideslope_angle_deg: Glideslope angle in degrees (measured from vertical).
-            For constraint ||r_xy|| <= tan(theta) * z, pass theta here.
+        glideslope_angle_deg: Glideslope angle in degrees (measured from axis).
+            For constraint ||r_perp|| <= tan(theta) * r_axis, pass theta here.
             Common values: 86 deg (very wide), 70 deg (moderate), 45 deg (steep)
+        axis: Unit vector direction the cone opens toward. Default (0,0,1) for +Z.
+            Use (-1,0,0) for R-bar approach (from below in radial direction).
         color: RGB color tuple
         opacity: Opacity (0-1)
         wireframe: If True, render as wireframe
@@ -316,7 +336,7 @@ def add_glideslope_cone(
     """
     apex = np.asarray(apex, dtype=np.float32)
 
-    vertices, faces = _generate_cone_mesh(apex, height, glideslope_angle_deg, n_segments)
+    vertices, faces = _generate_cone_mesh(apex, height, glideslope_angle_deg, n_segments, axis=axis)
 
     handle = server.scene.add_mesh_simple(
         "/constraints/glideslope_cone",
