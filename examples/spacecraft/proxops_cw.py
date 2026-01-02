@@ -36,7 +36,7 @@ from openscvx.plotting import plot_scp_iterations
 
 # Problem parameters
 n_nodes = 3  # Number of discretization nodes
-total_time = 300.0  # Total maneuver time in seconds (5 minutes)
+total_time = 180.0  # Total maneuver time in seconds
 
 # Orbital parameters (ISS-like orbit at ~400 km altitude)
 mu = 3.986004418e14  # Earth gravitational parameter [m^3/s^2]
@@ -48,7 +48,7 @@ n = np.sqrt(mu / a**3)  # Mean motion [rad/s] (~0.00113 rad/s)
 position = ox.State("position", shape=(3,))
 position.max = np.array([100.0, 100.0, 100.0])
 position.min = np.array([-100.0, -100.0, -100.0])
-position.initial = np.array([0.0, -100.0, 0.0])  # Start 500m behind target (V-bar approach)
+position.initial = np.array([0.0, -100.0, 0.0])  # Start 100m behind target (V-bar position)
 position.final = np.array([0.0, 0.0, 0.0])  # Dock at origin
 position.guess = np.linspace(position.initial, position.final, n_nodes)
 
@@ -79,10 +79,19 @@ constraints = []
 for state in states:
     constraints.extend(
         [
-            ox.ctcs(state <= state.max, idx=0),
-            ox.ctcs(state.min <= state, idx=0),
+            ox.ctcs(state <= state.max),
+            ox.ctcs(state.min <= state),
         ]
     )
+
+# R-bar approach cone constraint (from below, -x direction)
+# Enforces sqrt(y² + z²) <= tan(θ) * (-x)
+# This requires the spacecraft to approach from negative x (below target)
+# and stay within a cone centered on the -x axis
+cone_half_angle = 20 * np.pi / 180  # 20 degree half-angle
+constraints.append(
+    ox.ctcs(ox.linalg.Norm(position[1:]) <= np.tan(cone_half_angle) * (-position[0])).over((1,2))
+)
 
 # Clohessy-Wiltshire dynamics
 # x_dot = vx
@@ -141,7 +150,7 @@ if __name__ == "__main__":
     plot_scp_iterations(results).show()
 
     # Create animation
-    scp_server = create_animated_plotting_server(results)
+    traj_server = create_animated_plotting_server(results, thrust_key="accel")
 
     # Create SCP iteration visualization
     scp_server = create_scp_animated_plotting_server(
