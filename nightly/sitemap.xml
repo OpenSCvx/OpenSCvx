@@ -109,6 +109,10 @@
          <lastmod>2026-01-03</lastmod>
     </url>
     <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/examples/arm/three_link_arm/</loc>
+         <lastmod>2026-01-03</lastmod>
+    </url>
+    <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/examples/car/dubins_car/</loc>
          <lastmod>2026-01-03</lastmod>
     </url>
@@ -414,6 +418,22 @@
     </url>
     <url>
          <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/expr/variable/</loc>
+         <lastmod>2026-01-03</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/expr/lie/</loc>
+         <lastmod>2026-01-03</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/expr/lie/adjoint/</loc>
+         <lastmod>2026-01-03</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/expr/lie/se3/</loc>
+         <lastmod>2026-01-03</lastmod>
+    </url>
+    <url>
+         <loc>https://haynec.github.io/OpenSCvx/nightly/reference/symbolic/expr/lie/so3/</loc>
          <lastmod>2026-01-03</lastmod>
     </url>
     <url>
