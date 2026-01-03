@@ -73,7 +73,7 @@ Module Organization:
 from .arithmetic import Add, Div, MatMul, Mul, Neg, Power, Sub
 
 # Array operations
-from .array import Concat, Hstack, Index, Stack, Vstack
+from .array import Block, Concat, Hstack, Index, Stack, Vstack
 
 # Specialized constraints
 from .constraint import (
@@ -196,6 +196,7 @@ __all__ = [
     "Stack",
     "Hstack",
     "Vstack",
+    "Block",
     "Norm",
     "Diag",
     # Spatial/3D operations
