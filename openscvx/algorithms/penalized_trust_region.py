@@ -23,6 +23,41 @@ if TYPE_CHECKING:
 warnings.filterwarnings("ignore")
 
 
+def _set_param(prob: cp.Problem, name: str, value: np.ndarray) -> None:
+    """Set a CVXPY parameter with helpful error messages on failure.
+
+    Args:
+        prob: The CVXPY problem containing the parameter.
+        name: The parameter name in prob.param_dict.
+        value: The value to assign.
+
+    Raises:
+        ValueError: If the value is not real, with diagnostic information.
+    """
+    try:
+        prob.param_dict[name].value = value
+    except ValueError as e:
+        if "must be real" in str(e):
+            arr = np.asarray(value)
+            nan_mask = ~np.isfinite(arr)
+            nan_indices = np.argwhere(nan_mask)
+
+            # Build list of "index -> value" strings
+            index_value_strs = [
+                f"  {tuple(int(i) for i in idx)} -> {arr[tuple(idx)]}" for idx in nan_indices[:20]
+            ]
+            if len(nan_indices) > 20:
+                index_value_strs.append(f"  ... and {len(nan_indices) - 20} more")
+
+            arr_str = np.array2string(arr, threshold=200, edgeitems=3, max_line_width=120)
+            msg = (
+                f"Parameter '{name}' with shape {arr.shape} contains {len(nan_indices)} non-real"
+                " value(s):\n" + "\n".join(index_value_strs) + f"\n\n{name} = {arr_str}"
+            )
+            raise ValueError(msg) from e
+        raise
+
+
 class PenalizedTrustRegion(Algorithm):
     """Penalized Trust Region (PTR) successive convexification algorithm.
 
