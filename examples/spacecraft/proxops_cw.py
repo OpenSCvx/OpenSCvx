@@ -39,7 +39,7 @@ from openscvx.plotting import plot_scp_iterations
 from openscvx.plotting.viser import add_glideslope_cone
 
 # Problem parameters
-n_nodes = 3  # Number of discretization nodes
+n_nodes = 5  # Number of discretization nodes
 total_time = 180.0  # Total maneuver time in seconds
 
 # Orbital parameters (ISS-like orbit at ~400 km altitude)
@@ -95,11 +95,11 @@ for state in states:
 cone_half_angle = 20 * np.pi / 180  # 20 degree half-angle
 constraints.append(
     ox.ctcs(ox.linalg.Norm(position[1:]) <= np.tan(cone_half_angle) * (-position[0])).over(
-        (n_nodes - 2, n_nodes - 1)
+        (n_nodes - 3, n_nodes - 1)
     )
 )
 # Enforce entrance to the cone at safe distance
-constraints.append((-position[0] >= 20.0).at([n_nodes - 2]))
+constraints.append((-position[0] >= 20.0).at([n_nodes - 3]))
 
 # Clohessy-Wiltshire dynamics
 dynamics = {
@@ -130,11 +130,13 @@ problem = Problem(
 )
 
 # Solver settings (FOH is default, no need to set explicitly)
+problem.settings.dis.dis_type = "ZOH"
 problem.settings.scp.k_max = 100
 problem.settings.scp.w_tr = 1e0
 problem.settings.scp.w_tr_adapt = 1.2
 problem.settings.scp.lam_cost = 1e-1
 problem.settings.scp.lam_vc = 1e1
+problem.settings.scp.lam_vb = 1e0
 
 # Plotting metadata
 plotting_dict = {
