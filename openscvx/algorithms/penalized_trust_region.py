@@ -23,6 +23,41 @@ if TYPE_CHECKING:
 warnings.filterwarnings("ignore")
 
 
+def _set_param(prob: cp.Problem, name: str, value: np.ndarray) -> None:
+    """Set a CVXPY parameter with helpful error messages on failure.
+
+    Args:
+        prob: The CVXPY problem containing the parameter.
+        name: The parameter name in prob.param_dict.
+        value: The value to assign.
+
+    Raises:
+        ValueError: If the value is not real, with diagnostic information.
+    """
+    try:
+        prob.param_dict[name].value = value
+    except ValueError as e:
+        if "must be real" in str(e):
+            arr = np.asarray(value)
+            nan_mask = ~np.isfinite(arr)
+            nan_indices = np.argwhere(nan_mask)
+
+            # Build list of "index -> value" strings
+            index_value_strs = [
+                f"  {tuple(int(i) for i in idx)} -> {arr[tuple(idx)]}" for idx in nan_indices[:20]
+            ]
+            if len(nan_indices) > 20:
+                index_value_strs.append(f"  ... and {len(nan_indices) - 20} more")
+
+            arr_str = np.array2string(arr, threshold=200, edgeitems=3, max_line_width=120)
+            msg = (
+                f"Parameter '{name}' with shape {arr.shape} contains {len(nan_indices)} non-real"
+                " value(s):\n" + "\n".join(index_value_strs) + f"\n\n{name} = {arr_str}"
+            )
+            raise ValueError(msg) from e
+        raise
+
+
 class PenalizedTrustRegion(Algorithm):
     """Penalized Trust Region (PTR) successive convexification algorithm.
 
@@ -95,10 +130,10 @@ class PenalizedTrustRegion(Algorithm):
         self._emitter = emitter
 
         if "x_init" in ocp.param_dict:
-            ocp.param_dict["x_init"].value = settings.sim.x.initial
+            _set_param(ocp, "x_init", settings.sim.x.initial)
 
         if "x_term" in ocp.param_dict:
-            ocp.param_dict["x_term"].value = settings.sim.x.final
+            _set_param(ocp, "x_term", settings.sim.x.final)
 
         # Create temporary state for initialization solve
         init_state = AlgorithmState.from_settings(settings)
@@ -211,8 +246,8 @@ class PenalizedTrustRegion(Algorithm):
         Returns:
             Tuple containing solution data, costs, and timing information.
         """
-        self._ocp.param_dict["x_bar"].value = state.x
-        self._ocp.param_dict["u_bar"].value = state.u
+        _set_param(self._ocp, "x_bar", state.x)
+        _set_param(self._ocp, "u_bar", state.u)
 
         param_dict = params
 
@@ -221,38 +256,50 @@ class PenalizedTrustRegion(Algorithm):
             state.x, state.u.astype(float), param_dict
         )
 
-        self._ocp.param_dict["A_d"].value = A_bar.__array__()
-        self._ocp.param_dict["B_d"].value = B_bar.__array__()
-        self._ocp.param_dict["C_d"].value = C_bar.__array__()
-        self._ocp.param_dict["x_prop"].value = x_prop.__array__()
+        _set_param(self._ocp, "A_d", A_bar.__array__())
+        _set_param(self._ocp, "B_d", B_bar.__array__())
+        _set_param(self._ocp, "C_d", C_bar.__array__())
+        _set_param(self._ocp, "x_prop", x_prop.__array__())
         dis_time = time.time() - t0
 
         # Update nodal constraint linearization parameters
         # TODO: (norrisg) investigate why we are passing `0` for the node here
         if self._jax_constraints.nodal:
             for g_id, constraint in enumerate(self._jax_constraints.nodal):
-                self._ocp.param_dict["g_" + str(g_id)].value = np.asarray(
-                    constraint.func(state.x, state.u, 0, param_dict)
+                _set_param(
+                    self._ocp,
+                    f"g_{g_id}",
+                    np.asarray(constraint.func(state.x, state.u, 0, param_dict)),
                 )
-                self._ocp.param_dict["grad_g_x_" + str(g_id)].value = np.asarray(
-                    constraint.grad_g_x(state.x, state.u, 0, param_dict)
+                _set_param(
+                    self._ocp,
+                    f"grad_g_x_{g_id}",
+                    np.asarray(constraint.grad_g_x(state.x, state.u, 0, param_dict)),
                 )
-                self._ocp.param_dict["grad_g_u_" + str(g_id)].value = np.asarray(
-                    constraint.grad_g_u(state.x, state.u, 0, param_dict)
+                _set_param(
+                    self._ocp,
+                    f"grad_g_u_{g_id}",
+                    np.asarray(constraint.grad_g_u(state.x, state.u, 0, param_dict)),
                 )
 
         # Update cross-node constraint linearization parameters
         if self._jax_constraints.cross_node:
             for g_id, constraint in enumerate(self._jax_constraints.cross_node):
                 # Cross-node constraints take (X, U, params) not (x, u, node, params)
-                self._ocp.param_dict["g_cross_" + str(g_id)].value = np.asarray(
-                    constraint.func(state.x, state.u, param_dict)
+                _set_param(
+                    self._ocp,
+                    f"g_cross_{g_id}",
+                    np.asarray(constraint.func(state.x, state.u, param_dict)),
                 )
-                self._ocp.param_dict["grad_g_X_cross_" + str(g_id)].value = np.asarray(
-                    constraint.grad_g_X(state.x, state.u, param_dict)
+                _set_param(
+                    self._ocp,
+                    f"grad_g_X_cross_{g_id}",
+                    np.asarray(constraint.grad_g_X(state.x, state.u, param_dict)),
                 )
-                self._ocp.param_dict["grad_g_U_cross_" + str(g_id)].value = np.asarray(
-                    constraint.grad_g_U(state.x, state.u, param_dict)
+                _set_param(
+                    self._ocp,
+                    f"grad_g_U_cross_{g_id}",
+                    np.asarray(constraint.grad_g_U(state.x, state.u, param_dict)),
                 )
 
         # Convex constraints are already lowered and handled in the OCP, no action needed here
@@ -263,10 +310,10 @@ class PenalizedTrustRegion(Algorithm):
             state.lam_vc = np.ones((settings.scp.n - 1, settings.sim.n_states)) * state.lam_vc
 
         # Update CVXPy parameters from state
-        self._ocp.param_dict["w_tr"].value = state.w_tr
-        self._ocp.param_dict["lam_cost"].value = state.lam_cost
-        self._ocp.param_dict["lam_vc"].value = state.lam_vc
-        self._ocp.param_dict["lam_vb"].value = state.lam_vb
+        _set_param(self._ocp, "w_tr", state.w_tr)
+        _set_param(self._ocp, "lam_cost", state.lam_cost)
+        _set_param(self._ocp, "lam_vc", state.lam_vc)
+        _set_param(self._ocp, "lam_vb", state.lam_vb)
 
         t0 = time.time()
         self._solve_ocp()
