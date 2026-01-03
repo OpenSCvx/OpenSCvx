@@ -1,22 +1,25 @@
-"""Solver state management for SCP iterations.
+"""Base class for successive convexification algorithms.
 
-This module contains the SolverState dataclass that holds all mutable state
-during successive convex programming iterations. By separating solver state
-from problem definition, we enable clean reset() functionality and prevent
-accidental mutation of initial conditions.
+This module defines the abstract interface that all SCP algorithm implementations
+must follow, along with the AlgorithmState dataclass that holds mutable state
+during SCP iterations.
 """
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, List, Union
 
 import numpy as np
 
 if TYPE_CHECKING:
+    import cvxpy as cp
+
     from openscvx.config import Config
+    from openscvx.lowered.jax_constraints import LoweredJaxConstraints
 
 
 @dataclass
-class SolverState:
+class AlgorithmState:
     """Mutable state for SCP iterations.
 
     This dataclass holds all state that changes during the solve process.
@@ -200,8 +203,8 @@ class SolverState:
         return V_final[:, i3:i4].reshape(self.N - 1, self.n_x, self.n_u)
 
     @classmethod
-    def from_settings(cls, settings: "Config") -> "SolverState":
-        """Create initial solver state from configuration.
+    def from_settings(cls, settings: "Config") -> "AlgorithmState":
+        """Create initial algorithm state from configuration.
 
         Copies only the trajectory arrays from settings, leaving all metadata
         (bounds, boundary conditions, etc.) in the original settings object.
@@ -210,7 +213,7 @@ class SolverState:
             settings: Configuration object containing initial guesses and SCP parameters
 
         Returns:
-            Fresh SolverState initialized from settings with copied arrays
+            Fresh AlgorithmState initialized from settings with copied arrays
         """
         return cls(
             k=1,
@@ -230,3 +233,119 @@ class SolverState:
             VC_history=[],
             TR_history=[],
         )
+
+
+class Algorithm(ABC):
+    """Abstract base class for successive convexification algorithms.
+
+    This class defines the interface for SCP algorithms used in trajectory
+    optimization. Implementations should remain minimal and functional,
+    delegating state management to the AlgorithmState dataclass.
+
+    The two core methods mirror the SCP workflow:
+
+    - initialize: Store compiled infrastructure and warm-start solvers
+    - step: Execute one convex subproblem iteration
+
+    Immutable components (ocp, discretization_solver, jax_constraints, etc.) are
+    stored during initialize(). Mutable configuration (params, settings) is passed
+    per-step to support runtime parameter updates and tolerance tuning.
+
+    !!! tip "Statefullness"
+        Avoid storing mutable iteration state (costs, weights, trajectories) on
+        ``self``. All iteration state should live in :class:`AlgorithmState` or
+        a subclass thereof, passed explicitly to ``step()``. This keeps algorithm
+        classes stateless w.r.t. iteration, making data flow explicit and staying
+        close to functional programming principles where possible.
+
+    Example:
+        Implementing a custom algorithm::
+
+            class MyAlgorithm(Algorithm):
+                def initialize(self, ocp, discretization_solver,
+                               jax_constraints, solve_ocp, emitter,
+                               params, settings):
+                    # Store compiled infrastructure
+                    self._ocp = ocp
+                    self._discretization_solver = discretization_solver
+                    self._jax_constraints = jax_constraints
+                    self._solve_ocp = solve_ocp
+                    self._emitter = emitter
+                    # Warm-start with initial params/settings...
+
+                def step(self, state, params, settings):
+                    # Run one iteration using self._* and per-step params/settings
+                    return converged
+    """
+
+    @abstractmethod
+    def initialize(
+        self,
+        ocp: "cp.Problem",
+        discretization_solver: callable,
+        jax_constraints: "LoweredJaxConstraints",
+        solve_ocp: callable,
+        emitter: callable,
+        params: dict,
+        settings: "Config",
+    ) -> None:
+        """Initialize the algorithm and store compiled infrastructure.
+
+        This method stores immutable components and performs any setup required
+        before the SCP loop begins (e.g., warm-starting solvers). The params and
+        settings are passed for warm-start but may change between steps.
+
+        Args:
+            ocp: The CVXPy optimal control problem
+            discretization_solver: Compiled discretization solver function
+            jax_constraints: JIT-compiled JAX constraint functions
+            solve_ocp: Callable that solves the OCP (captures solver config)
+            emitter: Callback for emitting iteration progress data
+            params: Problem parameters dictionary (for warm-start only)
+            settings: Configuration object (for warm-start only)
+        """
+        ...
+
+    @abstractmethod
+    def step(
+        self,
+        state: AlgorithmState,
+        params: dict,
+        settings: "Config",
+    ) -> bool:
+        """Execute one iteration of the SCP algorithm.
+
+        This method solves a single convex subproblem, updates the algorithm
+        state in place, and returns whether convergence criteria are met.
+
+        Uses stored infrastructure (ocp, discretization_solver, etc.) with
+        per-step params and settings to support runtime modifications.
+
+        Args:
+            state: Mutable algorithm state (modified in place)
+            params: Problem parameters dictionary (may change between steps)
+            settings: Configuration object (may change between steps)
+
+        Returns:
+            True if convergence criteria are satisfied, False otherwise.
+        """
+        ...
+
+    @abstractmethod
+    def citation(self) -> List[str]:
+        """Return BibTeX citations for this algorithm.
+
+        Implementations should return a list of BibTeX entry strings for the
+        papers that should be cited when using this algorithm.
+
+        Returns:
+            List of BibTeX citation strings.
+
+        Example:
+            Getting citations for an algorithm::
+
+                algorithm = PenalizedTrustRegion()
+                for bibtex in algorithm.citation():
+                    print(bibtex)
+        """
+        ...

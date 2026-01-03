@@ -22,7 +22,7 @@ def test_cvxpygen_optional_import():
     """Test that cvxpygen import is optional."""
     # This should not raise an ImportError
     try:
-        from openscvx.algorithms import PTR_init  # noqa: F401
+        from openscvx.algorithms import PenalizedTrustRegion  # noqa: F401
         from openscvx.solvers import optimal_control_problem  # noqa: F401
 
         assert True

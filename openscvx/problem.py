@@ -15,6 +15,7 @@ Example:
 
 import copy
 import os
+import pickle
 import queue
 import threading
 import time
@@ -25,11 +26,9 @@ import jax
 os.environ["EQX_ON_ERROR"] = "nan"
 
 from openscvx.algorithms import (
+    AlgorithmState,
     OptimizationResults,
-    PTR_init,
-    PTR_step,
-    SolverState,
-    format_result,
+    PenalizedTrustRegion,
 )
 from openscvx.config import (
     Config,
@@ -194,7 +193,7 @@ class Problem:
         # settings (like uniform_time_grid) between __init__ and initialize()
         self._optimal_control_problem: cp.Problem = None
         self._discretization_solver: callable = None
-        self.cpg_solve = None
+        self._solve_ocp: callable = None  # Solver callable (built during initialize)
 
         # Set up emitter & thread only if printing is enabled
         if self.settings.dev.printing:
@@ -222,10 +221,13 @@ class Problem:
         self._compiled_constraints: Optional[LoweredJaxConstraints] = None
 
         # Solver state (created fresh for each solve)
-        self._state: Optional[SolverState] = None
+        self._state: Optional[AlgorithmState] = None
 
         # Final solution state (saved after successful solve)
-        self._solution: Optional[SolverState] = None
+        self._solution: Optional[AlgorithmState] = None
+
+        # SCP algorithm (currently hardcoded to PTR)
+        self._algorithm = PenalizedTrustRegion()
 
     @property
     def parameters(self):
@@ -259,14 +261,14 @@ class Problem:
                     self._lowered.cvxpy_params[name].value = value
 
     @property
-    def state(self) -> Optional[SolverState]:
+    def state(self) -> Optional[AlgorithmState]:
         """Access the current solver state.
 
         The solver state contains all mutable state from the SCP iterations,
         including current guesses, costs, weights, and history.
 
         Returns:
-            SolverState if initialized, None otherwise
+            AlgorithmState if initialized, None otherwise
 
         Example:
             When using `Problem.step()` can use the state to check convergence _etc._
@@ -327,6 +329,47 @@ class Problem:
         slices.update({state.name: state.slice for state in self.symbolic.states})
         slices.update({control.name: control.slice for control in self.symbolic.controls})
         return slices
+
+    def _format_result(self, state: AlgorithmState, converged: bool) -> OptimizationResults:
+        """Format solver state as an OptimizationResults object.
+
+        Converts the internal solver state into a user-facing results object,
+        mapping state/control arrays to named fields based on symbolic metadata.
+
+        Args:
+            state: The AlgorithmState to extract results from.
+            converged: Whether the optimization converged.
+
+        Returns:
+            OptimizationResults containing the solution data.
+        """
+        # Build nodes dictionary with all states and controls
+        nodes_dict = {}
+
+        # Add all states (user-defined and augmented)
+        for sym_state in self.symbolic.states:
+            nodes_dict[sym_state.name] = state.x[:, sym_state._slice]
+
+        # Add all controls (user-defined and augmented)
+        for control in self.symbolic.controls:
+            nodes_dict[control.name] = state.u[:, control._slice]
+
+        return OptimizationResults(
+            converged=converged,
+            t_final=state.x[:, self.settings.sim.time_slice][-1],
+            nodes=nodes_dict,
+            trajectory={},  # Populated by post_process
+            _states=self.symbolic.states_prop,  # Use propagation states for trajectory dict
+            _controls=self.symbolic.controls,
+            X=state.X,  # Single source of truth - x and u are properties
+            U=state.U,
+            discretization_history=state.V_history,
+            J_tr_history=state.J_tr,
+            J_vb_history=state.J_vb,
+            J_vc_history=state.J_vc,
+            TR_history=state.TR_history,
+            VC_history=state.VC_history,
+        )
 
     def initialize(self):
         """Compile dynamics, constraints, and solvers; prepare for optimization.
@@ -441,19 +484,45 @@ class Problem:
             save_compiled=self.settings.sim.save_compiled,
         )
 
-        # Initialize the PTR loop
+        # Build solver callable (handle CVXPyGen if enabled)
+        if self.settings.cvx.cvxpygen:
+            try:
+                from solver.cpg_solver import cpg_solve
+
+                with open("solver/problem.pickle", "rb") as f:
+                    pickle.load(f)
+                self._optimal_control_problem.register_solve("CPG", cpg_solve)
+                solver_args = self.settings.cvx.solver_args
+                self._solve_ocp = lambda: self._optimal_control_problem.solve(
+                    method="CPG", **solver_args
+                )
+            except ImportError:
+                raise ImportError(
+                    "cvxpygen solver not found. Make sure cvxpygen is installed and code "
+                    "generation has been run. Install with: pip install openscvx[cvxpygen]"
+                )
+        else:
+            solver = self.settings.cvx.solver
+            solver_args = self.settings.cvx.solver_args
+            self._solve_ocp = lambda: self._optimal_control_problem.solve(
+                solver=solver, **solver_args
+            )
+
+        # Initialize the SCP algorithm
         print("Initializing the SCvx Subproblem Solver...")
-        self.cpg_solve = PTR_init(
-            self._parameters,  # Plain dict for JAX/CVXPy
+        self._algorithm.initialize(
             self._optimal_control_problem,
             self._discretization_solver,
-            self.settings,
             self._compiled_constraints,
+            self._solve_ocp,
+            self.emitter_function,
+            self._parameters,  # For warm-start only
+            self.settings,  # For warm-start only
         )
         print("✓ SCvx Subproblem Solver initialized")
 
         # Create fresh solver state
-        self._state = SolverState.from_settings(self.settings)
+        self._state = AlgorithmState.from_settings(self.settings)
 
         t_f_while = time.time()
         self.timing_init = t_f_while - t_0_while
@@ -467,7 +536,7 @@ class Problem:
     def reset(self):
         """Reset solver state to re-run optimization from initial conditions.
 
-        Creates fresh SolverState while preserving compiled dynamics and solvers.
+        Creates fresh AlgorithmState while preserving compiled dynamics and solvers.
         Use this to run multiple optimizations without re-initializing.
 
         Raises:
@@ -486,7 +555,7 @@ class Problem:
             raise ValueError("Problem has not been initialized. Call initialize() first")
 
         # Create fresh solver state from settings
-        self._state = SolverState.from_settings(self.settings)
+        self._state = AlgorithmState.from_settings(self.settings)
 
         # Reset solution
         self._solution = None
@@ -518,15 +587,10 @@ class Problem:
         if self._state is None:
             raise ValueError("Problem has not been initialized. Call initialize() first")
 
-        converged = PTR_step(
-            self._parameters,  # Plain dict for JAX/CVXPy
-            self.settings,
+        converged = self._algorithm.step(
             self._state,
-            self._optimal_control_problem,
-            self._discretization_solver,
-            self.cpg_solve,
-            self.emitter_function,
-            self._compiled_constraints,
+            self._parameters,  # May change between steps
+            self.settings,  # May change between steps
         )
 
         # Return dict matching original API
@@ -592,7 +656,7 @@ class Problem:
         # Store solution state
         self._solution = copy.deepcopy(self._state)
 
-        return format_result(self, self._state, self._state.k <= k_max)
+        return self._format_result(self._state, self._state.k <= k_max)
 
     def post_process(self) -> OptimizationResults:
         """Propagate solution through full nonlinear dynamics for high-fidelity trajectory.
@@ -613,7 +677,7 @@ class Problem:
         pr = profiling.profiling_start(self.settings.dev.profiling)
 
         # Create result from stored solution state
-        result = format_result(self, self._solution, self._solution.k <= self.settings.scp.k_max)
+        result = self._format_result(self._solution, self._solution.k <= self.settings.scp.k_max)
 
         t_0_post = time.time()
         result = propagate_trajectory_results(
@@ -634,3 +698,37 @@ class Problem:
 
         profiling.profiling_end(pr, "postprocess")
         return result
+
+    def citation(self) -> str:
+        """Return BibTeX citations for all components used in this problem.
+
+        Aggregates citations from the algorithm and other components (discretization,
+        convex solver, etc.) Each section is prefixed with a comment indicating which component the
+        citation is for.
+
+        Returns:
+            Formatted string containing all BibTeX citations with comments.
+
+        Example:
+            Print all citations for a problem::
+
+                problem = Problem(dynamics, constraints, states, controls, N, time)
+                print(problem.citation())
+        """
+        sections = []
+
+        sections.append(r"% --- AUTO-GENERATED CITATIONS FOR OPENSCVX CONFIGURATION ---")
+
+        # Algorithm citations
+        algo_citations = self._algorithm.citation()
+        if algo_citations:
+            algo_name = type(self._algorithm).__name__
+            header = f"% Algorithm: {algo_name}"
+            citations = "\n".join(algo_citations)
+            sections.append(f"{header}\n\n{citations}")
+
+        # Future: add citations from discretization, constraint formulations, etc.
+
+        sections.append(r"% --- END AUTO-GENERATED CITATIONS")
+
+        return "\n\n".join(sections)

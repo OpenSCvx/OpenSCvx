@@ -5,6 +5,7 @@ os.environ["EQX_ON_ERROR"] = "nan"
 
 # Cache management
 # Core symbolic expressions - flat namespace for most common functions
+import openscvx.symbolic.expr.lie as lie
 import openscvx.symbolic.expr.linalg as linalg
 import openscvx.symbolic.expr.spatial as spatial
 import openscvx.symbolic.expr.stl as stl
@@ -116,6 +117,7 @@ __all__ = [
     "stl",
     "spatial",
     "linalg",
+    "lie",
     # Expert mode types
     "ByofSpec",
 ]
