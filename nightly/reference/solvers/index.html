@@ -4934,6 +4934,12 @@ solved using one of these solver backends.</p>
   <p>CVXPy Solver: The default solver backend using CVXPy's modeling language
     with support for multiple backend solvers (CLARABEL, etc.).
     Includes optional code generation via cvxpygen for improved performance.</p>
+</details>
+
+<details class="note" open>
+  <summary>Note</summary>
+  <p>CVXPyGen setup logic is currently in :class:<code>Problem</code>. When the
+<code>ConvexSolver</code> base class is implemented, this setup will move here.</p>
 </details>        <p>Planned Architecture (ABC-based):</p>
 <p>A base class will be introduced to enable pluggable solver implementations.
 This will enable users to implement custom solver backends such as:</p>
@@ -4949,7 +4955,7 @@ This will enable users to implement custom solver backends such as:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># solvers/base.py (planned):</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">ConvexSolver</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="nd">@abstractmethod</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">build_subproblem</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">SolverState</span><span class="p">,</span> <span class="n">lowered</span><span class="p">:</span> <span class="n">LoweredProblem</span><span class="p">):</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">build_subproblem</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">AlgorithmState</span><span class="p">,</span> <span class="n">lowered</span><span class="p">:</span> <span class="n">LoweredProblem</span><span class="p">):</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">        </span><span class="sd">&#39;&#39;&#39;Build the convex subproblem from current state.&#39;&#39;&#39;</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="o">...</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
