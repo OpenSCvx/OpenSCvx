@@ -58,6 +58,7 @@ def create_animated_plotting_server(
     target_radius: float = 1.0,
     show_control_plot: str | None = None,
     show_control_norm_plot: str | None = None,
+    show_grid: bool = True,
 ) -> viser.ViserServer:
     """Create an animated trajectory visualization server.
 
@@ -101,6 +102,7 @@ def create_animated_plotting_server(
             showing each control component vs time with animated markers
         show_control_norm_plot: If provided with a control name, displays norm plot
             showing ‖control‖₂ vs time with animated marker
+        show_grid: Whether to show the grid (default True)
 
     Returns:
         ViserServer instance (animation runs in background thread)
@@ -135,7 +137,7 @@ def create_animated_plotting_server(
     colors = compute_velocity_colors(vel)
 
     # Create server
-    server = create_server(pos)
+    server = create_server(pos, show_grid=show_grid)
 
     # Add static elements
     if "vertices" in results:
@@ -257,6 +259,7 @@ def create_scp_animated_plotting_server(
     frame_duration_ms: int = 500,
     scene_scale: float = 1.0,
     cmap_name: str = "viridis",
+    show_grid: bool = True,
 ) -> viser.ViserServer:
     """Create an animated visualization of SCP iteration convergence.
 
@@ -289,6 +292,7 @@ def create_scp_animated_plotting_server(
         scene_scale: Divide all positions by this factor. Use >1 for large-scale
             trajectories (e.g., 100.0 for km-scale problems).
         cmap_name: Matplotlib colormap name for iteration coloring (default: "viridis")
+        show_grid: Whether to show the grid (default True)
 
     Returns:
         ViserServer instance (animation runs in background thread)
@@ -322,7 +326,7 @@ def create_scp_animated_plotting_server(
         attitudes = [X[:, attitude_slice] for X in X_history]
 
     # Create server using final iteration's positions for grid sizing
-    server = create_server(positions[-1])
+    server = create_server(positions[-1], show_grid=show_grid)
 
     # Add static elements (gates, obstacles) if present
     if "vertices" in results:

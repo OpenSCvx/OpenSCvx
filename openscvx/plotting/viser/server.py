@@ -46,12 +46,14 @@ def compute_grid_size(pos: np.ndarray, padding: float = 1.2) -> float:
 def create_server(
     pos: np.ndarray,
     dark_mode: bool = True,
+    show_grid: bool = True,
 ) -> viser.ViserServer:
     """Create a viser server with basic scene setup.
 
     Args:
         pos: Position array for computing grid size
         dark_mode: Whether to use dark theme
+        show_grid: Whether to show the grid (default True)
 
     Returns:
         ViserServer instance with grid and origin frame
@@ -96,13 +98,14 @@ def create_server(
         dark_mode=dark_mode,
     )
 
-    grid_size = compute_grid_size(pos)
-    server.scene.add_grid(
-        "/grid",
-        width=grid_size,
-        height=grid_size,
-        position=np.array([0.0, 0.0, 0.0]),
-    )
+    if show_grid:
+        grid_size = compute_grid_size(pos)
+        server.scene.add_grid(
+            "/grid",
+            width=grid_size,
+            height=grid_size,
+            position=np.array([0.0, 0.0, 0.0]),
+        )
     server.scene.add_frame(
         "/origin",
         wxyz=(1.0, 0.0, 0.0, 0.0),
