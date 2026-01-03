@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING
 from openscvx.config import Config
 
 if TYPE_CHECKING:
-    from .solver_state import SolverState
+    from .base import AlgorithmState
 
 
-def update_scp_weights(state: "SolverState", settings: Config, scp_k: int):
+def update_scp_weights(state: "AlgorithmState", settings: Config, scp_k: int):
     """Update SCP weights and cost parameters based on iteration number.
 
     Args:
