@@ -4,12 +4,10 @@ This example demonstrates using ox.Vmap directly in constraints for data-paralle
 obstacle avoidance with numerous spherical obstacles.
 
 The approach:
+
 1. Stack all obstacle centers into a single array
 2. Use Vmap directly in the constraint to compute distances in parallel
 3. The vector-valued constraint is enforced element-wise
-
-This is much cleaner than the alternative of creating auxiliary states to track
-distances, then constraining those states.
 
 Compare with:
   - obstacle_avoidance.py (manual loop over 3 obstacles)
@@ -64,7 +62,7 @@ m = 1.0  # Mass
 g = -9.81  # Gravity
 
 # =============================================================================
-# Obstacle Configuration (36 obstacles in 3D grid)
+# Obstacle Configuration (3D grid)
 # =============================================================================
 
 obstacle_radius_min, obstacle_radius_max = 1.0, 2.5
@@ -101,7 +99,7 @@ print(f"Created {n_obstacles} obstacles")
 print(f"Obstacle centers shape: {obstacle_centers.shape}")
 
 # =============================================================================
-# Dynamics (simple double integrator - no auxiliary states needed!)
+# Dynamics (simple double integrator)
 # =============================================================================
 
 dynamics = {
