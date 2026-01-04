@@ -145,7 +145,7 @@ from .stl import Or
 from .variable import Variable
 
 # Vmap
-from .vmap import Placeholder, Vmap
+from .vmap import Vmap, _Placeholder
 
 __all__ = [
     # Core base classes and fundamental operations
@@ -224,5 +224,4 @@ __all__ = [
     "Or",
     # Vmap
     "Vmap",
-    "Placeholder",
 ]

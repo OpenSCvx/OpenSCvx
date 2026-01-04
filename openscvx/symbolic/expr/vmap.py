@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from .expr import Parameter
 
 
-class Placeholder(Leaf):
+class _Placeholder(Leaf):
     """Placeholder variable for use inside Vmap expressions.
 
     Placeholder is a symbolic leaf node that represents a single element from
@@ -163,7 +163,7 @@ class Vmap(Expr):
 
     def __init__(
         self,
-        fn: Callable[[Placeholder], Expr],
+        fn: Callable[[_Placeholder], Expr],
         over: Union[np.ndarray, Constant, "Parameter"],
         axis: int = 0,
     ):
@@ -215,7 +215,7 @@ class Vmap(Expr):
         per_elem_shape = tuple(s for i, s in enumerate(over_shape) if i != axis)
 
         # Create placeholder and build expression tree
-        self._placeholder = Placeholder(shape=per_elem_shape)
+        self._placeholder = _Placeholder(shape=per_elem_shape)
         self._child = fn(self._placeholder)
 
     @property
@@ -229,7 +229,7 @@ class Vmap(Expr):
         return self._axis
 
     @property
-    def placeholder(self) -> Placeholder:
+    def placeholder(self) -> _Placeholder:
         """The placeholder used in the inner expression."""
         return self._placeholder
 

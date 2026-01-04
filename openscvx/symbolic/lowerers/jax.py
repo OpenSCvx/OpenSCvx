@@ -147,7 +147,6 @@ from openscvx.symbolic.expr import (
     Norm,
     Or,
     Parameter,
-    Placeholder,
     PositivePart,
     Power,
     SE3Adjoint,
@@ -163,6 +162,7 @@ from openscvx.symbolic.expr import (
     Transpose,
     Vmap,
     Vstack,
+    _Placeholder,
 )
 from openscvx.symbolic.expr.control import Control
 from openscvx.symbolic.expr.lie import (
@@ -1384,8 +1384,8 @@ class JaxLowerer:
 
         return trajectory_constraint
 
-    @visitor(Placeholder)
-    def _visit_placeholder(self, node: Placeholder):
+    @visitor(_Placeholder)
+    def _visit_placeholder(self, node: _Placeholder):
         """Lower Placeholder to params lookup.
 
         Placeholder is used inside Vmap expressions. During lowering, the Vmap

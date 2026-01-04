@@ -21,10 +21,10 @@ from openscvx.symbolic.expr import (
     Constant,
     Norm,
     Parameter,
-    Placeholder,
     State,
     Variable,
     Vmap,
+    _Placeholder,
 )
 
 # =============================================================================
@@ -35,9 +35,9 @@ from openscvx.symbolic.expr import (
 def test_placeholder_creation_and_uniqueness():
     """Test Placeholder creation, shapes, and unique name generation."""
     # Basic creation with various shapes
-    p_scalar = Placeholder(shape=())
-    p_vector = Placeholder(shape=(3,))
-    p_matrix = Placeholder(shape=(3, 4))
+    p_scalar = _Placeholder(shape=())
+    p_vector = _Placeholder(shape=(3,))
+    p_matrix = _Placeholder(shape=(3, 4))
 
     assert p_scalar.shape == ()
     assert p_vector.shape == (3,)
@@ -67,7 +67,7 @@ def test_vmap_creation_with_numpy_array():
     assert vmap_expr.axis == 0
     assert not vmap_expr.is_parameter
     assert isinstance(vmap_expr.over, Constant)
-    assert isinstance(vmap_expr.placeholder, Placeholder)
+    assert isinstance(vmap_expr.placeholder, _Placeholder)
     assert vmap_expr.placeholder.shape == (3,)  # Per-element shape
 
 
@@ -410,5 +410,5 @@ def test_vmap_hash():
     assert vmap_expr.structural_hash() != vmap2.structural_hash()
 
     # Placeholders also have unique hashes
-    p1, p2 = Placeholder(shape=(3,)), Placeholder(shape=(3,))
+    p1, p2 = _Placeholder(shape=(3,)), _Placeholder(shape=(3,))
     assert p1.structural_hash() != p2.structural_hash()
