@@ -107,6 +107,7 @@ See Also:
 
 from typing import Any, Callable, Dict, Type
 
+import jax
 import jax.numpy as jnp
 from jax.lax import cond
 from jax.scipy.special import logsumexp
@@ -146,6 +147,7 @@ from openscvx.symbolic.expr import (
     Norm,
     Or,
     Parameter,
+    Placeholder,
     PositivePart,
     Power,
     SE3Adjoint,
@@ -159,6 +161,7 @@ from openscvx.symbolic.expr import (
     Sum,
     Tan,
     Transpose,
+    Vmap,
     Vstack,
 )
 from openscvx.symbolic.expr.control import Control
@@ -1380,3 +1383,70 @@ class JaxLowerer:
             return inner_fn(X, U, 0, params)
 
         return trajectory_constraint
+
+    @visitor(Placeholder)
+    def _visit_placeholder(self, node: Placeholder):
+        """Lower Placeholder to params lookup.
+
+        Placeholder is used inside Vmap expressions. During lowering, the Vmap
+        visitor injects the current batch element into params, and this visitor
+        retrieves it.
+
+        Args:
+            node: Placeholder expression node
+
+        Returns:
+            Function (x, u, node, params) -> params[placeholder_name]
+        """
+        name = node.name
+        return lambda x, u, node_idx, params: params[name]
+
+    @visitor(Vmap)
+    def _visit_vmap(self, node: Vmap):
+        """Lower Vmap to jax.vmap.
+
+        Handles two cases based on the type of the data source:
+
+        - **Constant/array**: Data is baked into the closure at lowering time,
+          equivalent to closure-captured values in BYOF.
+        - **Parameter**: Data is looked up from params dict at runtime,
+          allowing updates between SCP iterations.
+
+        Args:
+            node: Vmap expression node
+
+        Returns:
+            Function (x, u, node_idx, params) -> vmapped result
+
+        Example:
+            For ox.Vmap(lambda p: ox.linalg.Norm(x - p), over=points):
+            - points has shape (10, 3)
+            - Output has shape (10,) - one norm per point
+        """
+        inner_fn = self.lower(node._child)
+        placeholder_key = node._placeholder.name
+
+        if node.is_parameter:
+            # Parameter: runtime lookup from params dict
+            param_name = node._over.name
+
+            def vmapped_fn(x, u, node_idx, params):
+                # Look up the batched data from params at runtime
+                data = params[param_name]
+
+                def inner(v):
+                    return inner_fn(x, u, node_idx, {**params, placeholder_key: v})
+
+                return jax.vmap(inner)(data)
+
+        else:
+            # Constant/array: baked in at lowering time (closure-equivalent)
+            data = jnp.array(node._over.value)
+
+            def vmapped_fn(x, u, node_idx, params):
+                def inner(v):
+                    return inner_fn(x, u, node_idx, {**params, placeholder_key: v})
+
+                return jax.vmap(inner)(data)
+
+        return vmapped_fn
