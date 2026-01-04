@@ -1425,6 +1425,7 @@ class JaxLowerer:
         """
         inner_fn = self.lower(node._child)
         placeholder_key = node._placeholder.name
+        axis = node._axis
 
         if node.is_parameter:
             # Parameter: runtime lookup from params dict
@@ -1437,7 +1438,7 @@ class JaxLowerer:
                 def inner(v):
                     return inner_fn(x, u, node_idx, {**params, placeholder_key: v})
 
-                return jax.vmap(inner)(data)
+                return jax.vmap(inner, in_axes=axis)(data)
 
         else:
             # Constant/array: baked in at lowering time (closure-equivalent)
@@ -1447,6 +1448,6 @@ class JaxLowerer:
                 def inner(v):
                     return inner_fn(x, u, node_idx, {**params, placeholder_key: v})
 
-                return jax.vmap(inner)(data)
+                return jax.vmap(inner, in_axes=axis)(data)
 
         return vmapped_fn

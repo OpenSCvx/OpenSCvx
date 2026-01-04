@@ -270,6 +270,44 @@ def test_vmap_jax_constant():
     assert result.shape == (2, 3)
 
 
+def test_vmap_jax_axis_nonzero():
+    """Test JAX lowering of Vmap with axis != 0."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.lower import lower_to_jax
+
+    x = State("x", shape=(2,))
+    x._slice = slice(0, 2)
+
+    # Data shape (2, 3): axis=0 gives 2 elements of shape (3,),
+    # axis=1 gives 3 elements of shape (2,)
+    data = np.array(
+        [
+            [1.0, 2.0, 3.0],
+            [4.0, 5.0, 6.0],
+        ]
+    )
+
+    # Vmap over axis=1: iterate over 3 columns, each of shape (2,)
+    vmap_expr = Vmap(lambda col: Norm(x - col, ord=2), over=data, axis=1)
+
+    assert vmap_expr.check_shape() == (3,)  # 3 columns
+    assert vmap_expr.placeholder.shape == (2,)  # Each column is (2,)
+
+    fn = lower_to_jax(vmap_expr)
+
+    x_val = jnp.array([1.0, 4.0])  # Matches first column exactly
+    result = fn(x_val, None, None, {})
+
+    # Distances to each column: [1,4], [2,5], [3,6]
+    # dist to col0 = |[1,4] - [1,4]| = 0
+    # dist to col1 = |[1,4] - [2,5]| = |[-1,-1]| = sqrt(2)
+    # dist to col2 = |[1,4] - [3,6]| = |[-2,-2]| = sqrt(8)
+    expected = jnp.array([0.0, jnp.sqrt(2.0), jnp.sqrt(8.0)])
+    assert jnp.allclose(result, expected, atol=1e-12)
+    assert result.shape == (3,)
+
+
 # --- Vmap: JAX Lowering (Parameter/runtime lookup) ---
 
 
