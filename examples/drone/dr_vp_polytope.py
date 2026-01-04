@@ -111,10 +111,7 @@ polytope_point = np.array(
         [107.47, -50.00, 22.85],
     ]
 )
-init_poses = []
-for point in polytope_point:
-    init_poses.append(point)
-init_poses = init_poses
+init_poses = polytope_point  # Shape: (20, 3)
 ### Gate Parameters ###
 n_gates = 10
 gate_centers = [
@@ -162,9 +159,15 @@ constraints = []
 for state in states:
     constraints.extend([ox.ctcs(state <= state.max), ox.ctcs(state.min <= state)])
 
-# Add visibility constraints for polytope points using symbolic expressions
-for pose in init_poses:
-    constraints.append(ox.ctcs(g_vp(pose, position, attitude) <= 0.0))
+# Add visibility constraints using Vmap for parallel evaluation
+# Single CTCS constraint with vectorized evaluation over all polytope points
+visibility_constraint = ox.ctcs(
+    ox.Vmap(
+        lambda pose: g_vp(pose, position, attitude),
+        over=init_poses,
+    ) <= 0.0
+)
+constraints.append(visibility_constraint)
 
 # Add gate constraints using symbolic expressions
 for node, cen in zip(gate_nodes, A_gate_cen):
@@ -227,12 +230,9 @@ for _ in range(n_gates + 1):
 # Modify attitude to point sensor at targets
 R_sb = R_sb  # Sensor to body frame
 b = R_sb @ np.array([0, 1, 0])
+mean_target = np.mean(init_poses, axis=0)  # Average target position
 for k in range(n):
-    kp = []
-    for pose in init_poses:
-        kp.append(pose)
-    kp = np.mean(kp, axis=0)
-    a = kp - position_bar[k]
+    a = mean_target - position_bar[k]
     # Determine the direction cosine matrix that aligns the z-axis of the sensor frame with the
     # relative position vector
     q_xyz = np.cross(b, a)
