@@ -143,7 +143,7 @@ for state in states:
 # Single nodal constraint with vectorized evaluation over all target poses
 visibility_constraint = ox.Vmap(
     lambda pose: g_vp(pose, position, attitude),
-    over=init_poses,
+    batch=init_poses,
 ) <= 0.0
 constraints.append(visibility_constraint)
 

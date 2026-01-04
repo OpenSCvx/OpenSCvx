@@ -1429,7 +1429,7 @@ class JaxLowerer:
 
         if node.is_parameter:
             # Parameter: runtime lookup from params dict
-            param_name = node._over.name
+            param_name = node._batch.name
 
             def vmapped_fn(x, u, node_idx, params):
                 # Look up the batched data from params at runtime
@@ -1442,7 +1442,7 @@ class JaxLowerer:
 
         else:
             # Constant/array: baked in at lowering time (closure-equivalent)
-            data = jnp.array(node._over.value)
+            data = jnp.array(node._batch.value)
 
             def vmapped_fn(x, u, node_idx, params):
                 def inner(v):

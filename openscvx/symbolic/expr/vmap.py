@@ -4,7 +4,7 @@ This module provides symbolic support for JAX's vmap (vectorized map) operation,
 enabling efficient data-parallel computations over batched data within the
 symbolic expression framework.
 
-Vmap supports two modes based on the type of `over`:
+Vmap supports two modes based on the type of `batch`:
 
 - **Constant/array**: Values baked into the compiled function at trace time,
   equivalent to closure-captured values in BYOF. Use for static data.
@@ -23,14 +23,14 @@ Example:
         # Option 1: Baked-in data (closure-equivalent)
         distances = ox.Vmap(
             lambda pose: ox.linalg.Norm(position - pose),
-            over=init_poses  # or over=ox.Constant(init_poses)
+            batch=init_poses  # or batch=ox.Constant(init_poses)
         )
 
         # Option 2: Runtime-updateable Parameter
         refs = ox.Parameter("refs", shape=(10, 3), value=init_poses)
         distances = ox.Vmap(
             lambda pose: ox.linalg.Norm(position - pose),
-            over=refs
+            batch=refs
         )
 """
 
@@ -98,7 +98,7 @@ class Vmap(Expr):
     representing a single element from the batch. During lowering, this
     becomes a jax.vmap call.
 
-    The behavior depends on the type of `over`:
+    The behavior depends on the type of `batch`:
 
     - **numpy array or Constant**: Data is baked into the compiled function
       at trace time, equivalent to closure-captured values in BYOF.
@@ -106,11 +106,11 @@ class Vmap(Expr):
       allowing the same compiled code to be reused with different values.
 
     Attributes:
-        _over: The data source (Constant or Parameter)
+        _batch: The data source (Constant or Parameter)
         _axis (int): The axis to vmap over (default: 0)
         _placeholder (Placeholder): The placeholder used in the expression
         _child (Expr): The expression tree built from the user's lambda
-        _is_parameter (bool): Whether _over is a Parameter (runtime lookup)
+        _is_parameter (bool): Whether _batch is a Parameter (runtime lookup)
 
     Example:
         Compute distances to multiple reference points (baked-in)::
@@ -120,7 +120,7 @@ class Vmap(Expr):
 
             distances = ox.Vmap(
                 lambda pose: ox.linalg.Norm(position - pose),
-                over=init_poses
+                batch=init_poses
             )
             # distances has shape (3,)
 
@@ -131,7 +131,7 @@ class Vmap(Expr):
 
             dynamics["dist_state"] = ox.Vmap(
                 lambda pose: ox.linalg.Norm(position - pose),
-                over=refs
+                batch=refs
             )
 
             # Later, change the parameter value without recompiling:
@@ -164,7 +164,7 @@ class Vmap(Expr):
     def __init__(
         self,
         fn: Callable[[_Placeholder], Expr],
-        over: Union[np.ndarray, Constant, "Parameter"],
+        batch: Union[np.ndarray, Constant, "Parameter"],
         axis: int = 0,
     ):
         """Initialize a Vmap expression.
@@ -173,7 +173,7 @@ class Vmap(Expr):
             fn: A callable (typically a lambda) that takes a Placeholder and
                 returns a symbolic expression. The Placeholder represents a
                 single element from the batched data.
-            over: The data to vmap over. Can be:
+            batch: The batched data to vmap over. Can be:
                   - numpy array: baked into compiled function (closure-equivalent)
                   - Constant: baked into compiled function (closure-equivalent)
                   - Parameter: looked up from params dict at runtime
@@ -182,46 +182,46 @@ class Vmap(Expr):
         Example:
             Baked-in data::
 
-                ox.Vmap(lambda x: ox.linalg.Norm(x), over=points)
+                ox.Vmap(lambda x: ox.linalg.Norm(x), batch=points)
 
             With Parameter::
 
                 refs = ox.Parameter("refs", shape=(10, 3), value=points)
-                ox.Vmap(lambda ref: ox.linalg.Norm(position - ref), over=refs)
+                ox.Vmap(lambda ref: ox.linalg.Norm(position - ref), batch=refs)
         """
         from .expr import Parameter
 
         # Normalize input: wrap raw arrays in Constant
-        if isinstance(over, np.ndarray):
-            over = Constant(over)
-        elif not isinstance(over, (Constant, Parameter)):
+        if isinstance(batch, np.ndarray):
+            batch = Constant(batch)
+        elif not isinstance(batch, (Constant, Parameter)):
             # Try to convert to array then Constant
-            over = Constant(np.asarray(over))
+            batch = Constant(np.asarray(batch))
 
-        self._over = over
+        self._batch = batch
         self._axis = axis
-        self._is_parameter = isinstance(over, Parameter)
+        self._is_parameter = isinstance(batch, Parameter)
 
         # Get shape from the appropriate source
         if self._is_parameter:
-            over_shape = over.shape
+            batch_shape = batch.shape
         else:
             # Constant
-            over_shape = over.value.shape
+            batch_shape = batch.value.shape
 
         # Compute per-element shape by removing the vmap axis
-        if axis < 0 or axis >= len(over_shape):
-            raise ValueError(f"Vmap axis {axis} out of bounds for data with shape {over_shape}")
-        per_elem_shape = tuple(s for i, s in enumerate(over_shape) if i != axis)
+        if axis < 0 or axis >= len(batch_shape):
+            raise ValueError(f"Vmap axis {axis} out of bounds for data with shape {batch_shape}")
+        per_elem_shape = tuple(s for i, s in enumerate(batch_shape) if i != axis)
 
         # Create placeholder and build expression tree
         self._placeholder = _Placeholder(shape=per_elem_shape)
         self._child = fn(self._placeholder)
 
     @property
-    def over(self):
-        """The data source being vmapped over."""
-        return self._over
+    def batch(self):
+        """The batched data source being vmapped over."""
+        return self._batch
 
     @property
     def axis(self) -> int:
@@ -247,7 +247,7 @@ class Vmap(Expr):
                   collection in preprocessing.
         """
         if self._is_parameter:
-            return [self._child, self._over]
+            return [self._child, self._batch]
         else:
             return [self._child]
 
@@ -260,7 +260,7 @@ class Vmap(Expr):
         canon_child = self._child.canonicalize()
         # Create new Vmap with the canonicalized child
         new_vmap = Vmap.__new__(Vmap)
-        new_vmap._over = self._over
+        new_vmap._batch = self._batch
         new_vmap._axis = self._axis
         new_vmap._placeholder = self._placeholder
         new_vmap._child = canon_child
@@ -284,9 +284,9 @@ class Vmap(Expr):
         inner_shape = self._child.check_shape()
 
         if self._is_parameter:
-            batch_size = self._over.shape[self._axis]
+            batch_size = self._batch.shape[self._axis]
         else:
-            batch_size = self._over.value.shape[self._axis]
+            batch_size = self._batch.value.shape[self._axis]
 
         return (batch_size,) + inner_shape
 
@@ -302,10 +302,10 @@ class Vmap(Expr):
 
         if self._is_parameter:
             # Hash Parameter by name and shape (not value - value can change)
-            self._over._hash_into(hasher)
+            self._batch._hash_into(hasher)
         else:
             # Hash Constant by value (baked in, won't change)
-            hasher.update(self._over.value.tobytes())
+            hasher.update(self._batch.value.tobytes())
 
         self._child._hash_into(hasher)
 
@@ -316,6 +316,6 @@ class Vmap(Expr):
             str: Description of the Vmap
         """
         if self._is_parameter:
-            return f"Vmap(over=Parameter({self._over.name!r}), axis={self._axis})"
+            return f"Vmap(batch=Parameter({self._batch.name!r}), axis={self._axis})"
         else:
-            return f"Vmap(over=Constant(shape={self._over.value.shape}), axis={self._axis})"
+            return f"Vmap(batch=Constant(shape={self._batch.value.shape}), axis={self._axis})"

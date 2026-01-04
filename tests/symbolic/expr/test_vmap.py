@@ -61,12 +61,12 @@ def test_vmap_creation_with_numpy_array():
     x = Variable("x", shape=(3,))
     data = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])  # (2, 3)
 
-    vmap_expr = Vmap(lambda p: Norm(x - p), over=data)
+    vmap_expr = Vmap(lambda p: Norm(x - p), batch=data)
 
     assert isinstance(vmap_expr, Vmap)
     assert vmap_expr.axis == 0
     assert not vmap_expr.is_parameter
-    assert isinstance(vmap_expr.over, Constant)
+    assert isinstance(vmap_expr.batch, Constant)
     assert isinstance(vmap_expr.placeholder, _Placeholder)
     assert vmap_expr.placeholder.shape == (3,)  # Per-element shape
 
@@ -76,11 +76,11 @@ def test_vmap_creation_with_constant():
     x = Variable("x", shape=(3,))
     data = Constant(np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]))
 
-    vmap_expr = Vmap(lambda p: Norm(x - p), over=data)
+    vmap_expr = Vmap(lambda p: Norm(x - p), batch=data)
 
     assert isinstance(vmap_expr, Vmap)
     assert not vmap_expr.is_parameter
-    assert vmap_expr.over is data
+    assert vmap_expr.batch is data
 
 
 def test_vmap_creation_with_parameter():
@@ -89,11 +89,11 @@ def test_vmap_creation_with_parameter():
     data = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     refs = Parameter("refs", shape=(2, 3), value=data)
 
-    vmap_expr = Vmap(lambda p: Norm(x - p), over=refs)
+    vmap_expr = Vmap(lambda p: Norm(x - p), batch=refs)
 
     assert isinstance(vmap_expr, Vmap)
     assert vmap_expr.is_parameter
-    assert vmap_expr.over is refs
+    assert vmap_expr.batch is refs
 
 
 def test_vmap_children_constant():
@@ -101,7 +101,7 @@ def test_vmap_children_constant():
     x = Variable("x", shape=(3,))
     data = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
 
-    vmap_expr = Vmap(lambda p: Norm(x - p), over=data)
+    vmap_expr = Vmap(lambda p: Norm(x - p), batch=data)
     children = vmap_expr.children()
 
     # Constant case: only the inner expression is a child
@@ -115,7 +115,7 @@ def test_vmap_children_parameter():
     data = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
     refs = Parameter("refs", shape=(2, 3), value=data)
 
-    vmap_expr = Vmap(lambda p: Norm(x - p), over=refs)
+    vmap_expr = Vmap(lambda p: Norm(x - p), batch=refs)
     children = vmap_expr.children()
 
     # Parameter case: inner expression AND Parameter are children
@@ -131,14 +131,14 @@ def test_vmap_repr():
     data = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
 
     # Constant case
-    vmap_const = Vmap(lambda p: Norm(x - p), over=data)
+    vmap_const = Vmap(lambda p: Norm(x - p), batch=data)
     assert "Vmap" in repr(vmap_const)
     assert "Constant" in repr(vmap_const)
     assert "(2, 3)" in repr(vmap_const)
 
     # Parameter case
     refs = Parameter("refs", shape=(2, 3), value=data)
-    vmap_param = Vmap(lambda p: Norm(x - p), over=refs)
+    vmap_param = Vmap(lambda p: Norm(x - p), batch=refs)
     assert "Vmap" in repr(vmap_param)
     assert "Parameter" in repr(vmap_param)
     assert "refs" in repr(vmap_param)
@@ -152,7 +152,7 @@ def test_vmap_shape_vector_to_scalar():
     x = Variable("x", shape=(3,))
     data = np.random.randn(10, 3)  # 10 vectors of size 3
 
-    vmap_expr = Vmap(lambda p: Norm(x - p), over=data)
+    vmap_expr = Vmap(lambda p: Norm(x - p), batch=data)
 
     # Each Norm produces a scalar (), vmap over 10 elements -> (10,)
     assert vmap_expr.check_shape() == (10,)
@@ -164,7 +164,7 @@ def test_vmap_shape_vector_to_vector():
     data = np.random.randn(5, 3)  # 5 vectors of size 3
 
     # Return a vector difference instead of norm
-    vmap_expr = Vmap(lambda p: x - p, over=data)
+    vmap_expr = Vmap(lambda p: x - p, batch=data)
 
     # Each x - p produces (3,), vmap over 5 elements -> (5, 3)
     assert vmap_expr.check_shape() == (5, 3)
@@ -176,7 +176,7 @@ def test_vmap_shape_with_parameter():
     data = np.random.randn(7, 3)
     refs = Parameter("refs", shape=(7, 3), value=data)
 
-    vmap_expr = Vmap(lambda p: Norm(x - p), over=refs)
+    vmap_expr = Vmap(lambda p: Norm(x - p), batch=refs)
 
     assert vmap_expr.check_shape() == (7,)
 
@@ -186,7 +186,7 @@ def test_vmap_shape_scalar_per_element():
     x = Variable("x", shape=())
     data = np.array([1.0, 2.0, 3.0, 4.0, 5.0])  # 5 scalars
 
-    vmap_expr = Vmap(lambda p: x - p, over=data)
+    vmap_expr = Vmap(lambda p: x - p, batch=data)
 
     # Per-element is scalar, result is scalar, vmap over 5 -> (5,)
     assert vmap_expr.check_shape() == (5,)
@@ -198,7 +198,7 @@ def test_vmap_axis_out_of_bounds():
     data = np.random.randn(10, 3)  # shape (10, 3), valid axes: 0, 1
 
     with pytest.raises(ValueError, match="axis.*out of bounds"):
-        Vmap(lambda p: Norm(x - p), over=data, axis=5)
+        Vmap(lambda p: Norm(x - p), batch=data, axis=5)
 
 
 def test_vmap_axis_negative_invalid():
@@ -207,7 +207,7 @@ def test_vmap_axis_negative_invalid():
     data = np.random.randn(10, 3)
 
     with pytest.raises(ValueError, match="axis.*out of bounds"):
-        Vmap(lambda p: Norm(x - p), over=data, axis=-1)
+        Vmap(lambda p: Norm(x - p), batch=data, axis=-1)
 
 
 # --- Vmap: Canonicalization ---
@@ -219,7 +219,7 @@ def test_vmap_canonicalize():
     data = np.random.randn(5, 3)
     refs = Parameter("refs", shape=(5, 3), value=data)
 
-    vmap_expr = Vmap(lambda p: Norm((x + 0) - p), over=refs, axis=0)
+    vmap_expr = Vmap(lambda p: Norm((x + 0) - p), batch=refs, axis=0)
 
     canonical = vmap_expr.canonicalize()
 
@@ -250,7 +250,7 @@ def test_vmap_jax_constant():
     )
 
     # Test scalar output (norms)
-    vmap_norm = Vmap(lambda p: Norm(x - p, ord=2), over=refs)
+    vmap_norm = Vmap(lambda p: Norm(x - p, ord=2), batch=refs)
     fn_norm = lower_to_jax(vmap_norm)
 
     x_val = jnp.array([0.0, 0.0, 0.0])
@@ -260,7 +260,7 @@ def test_vmap_jax_constant():
     assert result.shape == (2,)
 
     # Test vector output (differences)
-    vmap_diff = Vmap(lambda p: x - p, over=refs)
+    vmap_diff = Vmap(lambda p: x - p, batch=refs)
     fn_diff = lower_to_jax(vmap_diff)
 
     x_val = jnp.array([1.0, 1.0, 1.0])
@@ -289,7 +289,7 @@ def test_vmap_jax_axis_nonzero():
     )
 
     # Vmap over axis=1: iterate over 3 columns, each of shape (2,)
-    vmap_expr = Vmap(lambda col: Norm(x - col, ord=2), over=data, axis=1)
+    vmap_expr = Vmap(lambda col: Norm(x - col, ord=2), batch=data, axis=1)
 
     assert vmap_expr.check_shape() == (3,)  # 3 columns
     assert vmap_expr.placeholder.shape == (2,)  # Each column is (2,)
@@ -323,7 +323,7 @@ def test_vmap_jax_parameter():
     refs_data = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
     refs = Parameter("refs", shape=(2, 3), value=refs_data)
 
-    vmap_expr = Vmap(lambda p: Norm(x - p, ord=2), over=refs)
+    vmap_expr = Vmap(lambda p: Norm(x - p, ord=2), batch=refs)
     fn = lower_to_jax(vmap_expr)
 
     x_val = jnp.array([0.0, 0.0, 0.0])
@@ -365,12 +365,12 @@ def test_vmap_constant_vs_parameter_same_values():
     )
 
     # Constant version (baked-in)
-    vmap_const = Vmap(lambda p: Norm(x - p, ord=2), over=data)
+    vmap_const = Vmap(lambda p: Norm(x - p, ord=2), batch=data)
     fn_const = lower_to_jax(vmap_const)
 
     # Parameter version (runtime lookup)
     refs = Parameter("refs", shape=(3, 3), value=data)
-    vmap_param = Vmap(lambda p: Norm(x - p, ord=2), over=refs)
+    vmap_param = Vmap(lambda p: Norm(x - p, ord=2), batch=refs)
     fn_param = lower_to_jax(vmap_param)
 
     # Test with several positions
@@ -400,13 +400,13 @@ def test_vmap_hash():
     x._slice = slice(0, 3)  # Required for hashing
     data = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
 
-    vmap_expr = Vmap(lambda p: Norm(x - p), over=data)
+    vmap_expr = Vmap(lambda p: Norm(x - p), batch=data)
 
     # Same instance is deterministic
     assert vmap_expr.structural_hash() == vmap_expr.structural_hash()
 
     # Different instances have different hashes (unique Placeholders)
-    vmap2 = Vmap(lambda p: Norm(x - p), over=data.copy())
+    vmap2 = Vmap(lambda p: Norm(x - p), batch=data.copy())
     assert vmap_expr.structural_hash() != vmap2.structural_hash()
 
     # Placeholders also have unique hashes

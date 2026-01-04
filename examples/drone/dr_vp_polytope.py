@@ -164,7 +164,7 @@ for state in states:
 visibility_constraint = ox.ctcs(
     ox.Vmap(
         lambda pose: g_vp(pose, position, attitude),
-        over=init_poses,
+        batch=init_poses,
     ) <= 0.0
 )
 constraints.append(visibility_constraint)
