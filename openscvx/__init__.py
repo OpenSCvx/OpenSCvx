@@ -51,6 +51,7 @@ from openscvx.symbolic.expr import (
     Sum,
     Tan,
     Variable,
+    Vmap,
     Vstack,
     ctcs,
 )
@@ -113,6 +114,8 @@ __all__ = [
     "NodalConstraint",
     "CTCS",
     "ctcs",
+    # Data parallelism
+    "Vmap",
     # Submodules
     "stl",
     "spatial",
