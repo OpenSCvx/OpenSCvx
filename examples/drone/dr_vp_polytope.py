@@ -165,7 +165,8 @@ visibility_constraint = ox.ctcs(
     ox.Vmap(
         lambda pose: g_vp(pose, position, attitude),
         batch=init_poses,
-    ) <= 0.0
+    )
+    <= 0.0
 )
 constraints.append(visibility_constraint)
 

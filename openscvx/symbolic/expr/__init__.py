@@ -145,7 +145,7 @@ from .stl import Or
 from .variable import Variable
 
 # Vmap
-from .vmap import Vmap, _Placeholder
+from .vmap import Vmap, _Placeholder  # noqa: F401
 
 __all__ = [
     # Core base classes and fundamental operations

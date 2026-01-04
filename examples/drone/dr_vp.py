@@ -117,10 +117,12 @@ for center in gate_centers:
 
 n_subs = 10
 np.random.seed(0)
-init_poses = np.array([
-    [100.0 + np.random.random() * 20.0, -60.0 + np.random.random() * 20.0, 20.0]
-    for _ in range(n_subs)
-])  # Shape: (n_subs, 3)
+init_poses = np.array(
+    [
+        [100.0 + np.random.random() * 20.0, -60.0 + np.random.random() * 20.0, 20.0]
+        for _ in range(n_subs)
+    ]
+)  # Shape: (n_subs, 3)
 
 
 # Define list of all states (needed for Problem and constraints)
@@ -145,7 +147,8 @@ visibility_constraint = ox.ctcs(
     ox.Vmap(
         lambda pose: g_vp(pose, position, attitude),
         batch=init_poses,
-    ) <= 0.0
+    )
+    <= 0.0
 )
 constraints.append(visibility_constraint)
 

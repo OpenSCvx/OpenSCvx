@@ -117,10 +117,12 @@ for center in gate_centers:
 
 n_subs = 10
 np.random.seed(5)
-init_poses = np.array([
-    [100.0 + np.random.random() * 20.0, -70.0 + np.random.random() * 20.0, 20.0]
-    for _ in range(n_subs)
-])  # Shape: (n_subs, 3)
+init_poses = np.array(
+    [
+        [100.0 + np.random.random() * 20.0, -70.0 + np.random.random() * 20.0, 20.0]
+        for _ in range(n_subs)
+    ]
+)  # Shape: (n_subs, 3)
 
 
 # Define list of all states (needed for Problem and constraints)
@@ -141,10 +143,13 @@ for state in states:
 
 # Add visibility constraints using Vmap for parallel evaluation
 # Single nodal constraint with vectorized evaluation over all target poses
-visibility_constraint = ox.Vmap(
-    lambda pose: g_vp(pose, position, attitude),
-    batch=init_poses,
-) <= 0.0
+visibility_constraint = (
+    ox.Vmap(
+        lambda pose: g_vp(pose, position, attitude),
+        batch=init_poses,
+    )
+    <= 0.0
+)
 constraints.append(visibility_constraint)
 
 # Add gate constraints using symbolic expressions
