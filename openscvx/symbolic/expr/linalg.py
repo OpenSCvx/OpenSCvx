@@ -51,7 +51,9 @@ Example:
 import hashlib
 from typing import Tuple
 
-from .expr import Expr, to_expr
+import numpy as np
+
+from .expr import Constant, Expr, to_expr
 
 
 class Transpose(Expr):
@@ -256,12 +258,16 @@ class Inv(Expr):
         return [self.operand]
 
     def canonicalize(self) -> "Expr":
-        """Canonicalize the operand with double inverse optimization."""
+        """Canonicalize the operand with double inverse optimization and constant folding."""
         operand = self.operand.canonicalize()
 
         # Double inverse optimization: Inv(Inv(A)) = A
         if isinstance(operand, Inv):
             return operand.operand
+
+        # Constant folding: compute inverse at canonicalization time
+        if isinstance(operand, Constant):
+            return Constant(np.linalg.inv(operand.value))
 
         return Inv(operand)
 
