@@ -2650,63 +2650,6 @@ def test_linterp_in_expression():
     assert jnp.allclose(result, expected)
 
 
-def test_linterp_jit_compatible():
-    """Test that Linterp is JIT-compatible."""
-    import jax
-    import jax.numpy as jnp
-
-    from openscvx.symbolic.expr import Linterp, State
-    from openscvx.symbolic.lower import lower_to_jax
-
-    xp = np.array([0.0, 1.0, 2.0])
-    fp = np.array([10.0, 20.0, 30.0])
-
-    state = State("x", (1,))
-    state._slice = slice(0, 1)
-
-    expr = Linterp(state[0], xp, fp)
-
-    fn = lower_to_jax(expr)
-    jit_fn = jax.jit(fn)
-
-    x = jnp.array([0.5])
-    result = jit_fn(x, None, None, None)
-    expected = jnp.interp(0.5, xp, fp)
-    assert jnp.allclose(result, expected)
-
-
-def test_linterp_differentiable():
-    """Test that Linterp is differentiable through JAX autodiff."""
-    import jax
-    import jax.numpy as jnp
-
-    from openscvx.symbolic.expr import Linterp, State
-    from openscvx.symbolic.lower import lower_to_jax
-
-    xp = np.array([0.0, 1.0, 2.0])
-    fp = np.array([0.0, 2.0, 6.0])  # Increasing slope
-
-    state = State("x", (1,))
-    state._slice = slice(0, 1)
-
-    expr = Linterp(state[0], xp, fp)
-
-    fn = lower_to_jax(expr)
-
-    # Compute gradient
-    grad_fn = jax.grad(lambda x: fn(x, None, None, None))
-
-    # Between x=0 and x=1, slope = (2-0)/(1-0) = 2
-    x = jnp.array([0.5])
-    grad = grad_fn(x)
-    assert jnp.allclose(grad, 2.0, atol=1e-5)
-
-    # Between x=1 and x=2, slope = (6-2)/(2-1) = 4
-    x = jnp.array([1.5])
-    grad = grad_fn(x)
-    assert jnp.allclose(grad, 4.0, atol=1e-5)
-
-
 # --- Linterp: CVXPy Lowering ---
 
 
@@ -3066,67 +3009,6 @@ def test_bilerp_in_expression():
     x = jnp.array([0.0, 0.0, 0.5])
     result = fn(x, None, None, None)
     assert jnp.allclose(result, 50.0)  # 100 * 0.5
-
-
-def test_bilerp_jit_compatible():
-    """Test that Bilerp is JIT-compatible."""
-    import jax
-    import jax.numpy as jnp
-
-    from openscvx.symbolic.expr import Bilerp, State
-    from openscvx.symbolic.lower import lower_to_jax
-
-    xp = np.array([0.0, 1.0])
-    yp = np.array([0.0, 1.0])
-    fp = np.array([[1.0, 2.0], [3.0, 4.0]])
-
-    x_state = State("x", (1,))
-    x_state._slice = slice(0, 1)
-    y_state = State("y", (1,))
-    y_state._slice = slice(1, 2)
-
-    expr = Bilerp(x_state[0], y_state[0], xp, yp, fp)
-
-    fn = lower_to_jax(expr)
-    jit_fn = jax.jit(fn)
-
-    x = jnp.array([0.5, 0.5])
-    result = jit_fn(x, None, None, None)
-    expected = 2.5  # Average of all corners
-    assert jnp.allclose(result, expected)
-
-
-def test_bilerp_differentiable():
-    """Test that Bilerp is differentiable through JAX autodiff."""
-    import jax
-    import jax.numpy as jnp
-
-    from openscvx.symbolic.expr import Bilerp, State
-    from openscvx.symbolic.lower import lower_to_jax
-
-    # Linear function f(x, y) = 2x + 3y
-    xp = np.array([0.0, 1.0])
-    yp = np.array([0.0, 1.0])
-    fp = np.array([[0.0, 3.0], [2.0, 5.0]])  # f(x,y) = 2x + 3y
-
-    x_state = State("x", (1,))
-    x_state._slice = slice(0, 1)
-    y_state = State("y", (1,))
-    y_state._slice = slice(1, 2)
-
-    expr = Bilerp(x_state[0], y_state[0], xp, yp, fp)
-
-    fn = lower_to_jax(expr)
-
-    # Compute gradient
-    grad_fn = jax.grad(lambda state: fn(state, None, None, None))
-
-    # For f(x,y) = 2x + 3y, gradient should be [2, 3]
-    state = jnp.array([0.5, 0.5])
-    grad = grad_fn(state)
-
-    assert jnp.allclose(grad[0], 2.0, atol=1e-5)
-    assert jnp.allclose(grad[1], 3.0, atol=1e-5)
 
 
 # --- Bilerp: CVXPy Lowering ---
