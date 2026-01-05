@@ -118,9 +118,11 @@ from .linalg import Diag, Norm, Sum, Transpose
 # Mathematical functions
 from .math import (
     Abs,
+    Bilerp,
     Cos,
     Exp,
     Huber,
+    Linterp,
     Log,
     LogSumExp,
     Max,
@@ -194,6 +196,8 @@ __all__ = [
     "Log",
     "LogSumExp",
     "Max",
+    "Linterp",
+    "Bilerp",
     # Linear algebra operations
     "Transpose",
     "Stack",

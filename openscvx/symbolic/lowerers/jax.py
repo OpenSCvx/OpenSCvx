@@ -121,6 +121,7 @@ from openscvx.symbolic.expr import (
     Add,
     Adjoint,
     AdjointDual,
+    Bilerp,
     Block,
     Concat,
     Constant,
@@ -136,6 +137,7 @@ from openscvx.symbolic.expr import (
     Huber,
     Index,
     Inequality,
+    Linterp,
     Log,
     LogSumExp,
     MatMul,
@@ -1451,3 +1453,77 @@ class JaxLowerer:
                 return jax.vmap(inner, in_axes=axis)(data)
 
         return vmapped_fn
+
+    @visitor(Linterp)
+    def _visit_linterp(self, node: Linterp):
+        """Lower 1D linear interpolation to JAX function.
+
+        Uses jnp.interp which performs piecewise linear interpolation.
+        For query points outside the data range, boundary values are returned.
+
+        Args:
+            node: Linterp expression node with xp, fp, and x
+
+        Returns:
+            Function (x, u, node, params) -> interpolated value(s)
+
+        Note:
+            The xp and fp arrays are typically constants (tabulated data),
+            while x is typically a symbolic expression (state or derived value).
+            jnp.interp is differentiable through JAX's autodiff.
+        """
+        f_xp = self.lower(node.xp)
+        f_fp = self.lower(node.fp)
+        f_x = self.lower(node.x)
+
+        def linterp_fn(x, u, node_idx, params):
+            xp_val = f_xp(x, u, node_idx, params)
+            fp_val = f_fp(x, u, node_idx, params)
+            x_val = f_x(x, u, node_idx, params)
+            return jnp.interp(x_val, xp_val, fp_val)
+
+        return linterp_fn
+
+    @visitor(Bilerp)
+    def _visit_bilerp(self, node: Bilerp):
+        """Lower 2D bilinear interpolation to JAX function.
+
+        Uses jax.scipy.ndimage.map_coordinates for bilinear interpolation on a
+        regular grid. For query points outside the grid, boundary values are
+        returned (clamping via mode='nearest').
+
+        Args:
+            node: Bilerp expression node with x, y, xp, yp, fp
+
+        Returns:
+            Function (x, u, node, params) -> interpolated scalar value
+
+        Note:
+            The grid arrays (xp, yp, fp) are typically constants (tabulated data),
+            while x and y are symbolic expressions (state or derived values).
+            Physical coordinates are converted to fractional indices before
+            interpolation. The implementation is differentiable through JAX's autodiff.
+        """
+        f_x = self.lower(node.x)
+        f_y = self.lower(node.y)
+        f_xp = self.lower(node.xp)
+        f_yp = self.lower(node.yp)
+        f_fp = self.lower(node.fp)
+
+        def bilerp_fn(x, u, node_idx, params):
+            x_val = f_x(x, u, node_idx, params)
+            y_val = f_y(x, u, node_idx, params)
+            xp_val = f_xp(x, u, node_idx, params)
+            yp_val = f_yp(x, u, node_idx, params)
+            fp_val = f_fp(x, u, node_idx, params)
+
+            # Convert physical coordinates to fractional indices
+            # jnp.interp maps physical coords to index space (handles non-uniform grids)
+            idx_x = jnp.interp(x_val, xp_val, jnp.arange(len(xp_val)))
+            idx_y = jnp.interp(y_val, yp_val, jnp.arange(len(yp_val)))
+
+            # Use map_coordinates with order=1 (bilinear) and mode='nearest' (clamp)
+            coords = jnp.array([[idx_x], [idx_y]])
+            return jax.scipy.ndimage.map_coordinates(fp_val, coords, order=1, mode="nearest")[0]
+
+        return bilerp_fn

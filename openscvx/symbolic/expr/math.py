@@ -697,3 +697,205 @@ class LogSumExp(Expr):
     def __repr__(self):
         inner = ", ".join(repr(op) for op in self.operands)
         return f"logsumexp({inner})"
+
+
+class Linterp(Expr):
+    """1D linear interpolation for symbolic expressions.
+
+    Computes the linear interpolant of data points (xp, fp) evaluated at x,
+    equivalent to jax.numpy.interp(x, xp, fp). For values outside the data range,
+    the boundary values are returned (no extrapolation).
+
+    This is useful for incorporating tabulated data (e.g., atmospheric properties,
+    engine thrust curves, aerodynamic coefficients) into trajectory optimization
+    dynamics and constraints.
+
+    Attributes:
+        x: Query point(s) at which to evaluate the interpolant (symbolic expression)
+        xp: 1D array of x-coordinates of data points (must be increasing)
+        fp: 1D array of y-coordinates of data points (same length as xp)
+
+    Example:
+        Interpolate atmospheric density from altitude table::
+
+            import openscvx as ox
+            import numpy as np
+
+            # US 1976 Standard Atmosphere data
+            alt_data = np.array([0, 5000, 10000, 15000, 20000])  # meters
+            rho_data = np.array([1.225, 0.736, 0.414, 0.195, 0.089])  # kg/m^3
+
+            altitude = ox.State("altitude", shape=(1,))
+            rho = ox.Linterp(altitude[0], alt_data, rho_data)
+
+            # rho can now be used in dynamics expressions
+            drag = 0.5 * rho * v**2 * Cd * S
+
+    Note:
+        - xp must be strictly increasing
+        - For query points outside [xp[0], xp[-1]], boundary values are returned
+    """
+
+    def __init__(self, x, xp, fp):
+        """Initialize a 1D linear interpolation node.
+
+        Args:
+            x: Query point(s) at which to evaluate the interpolant.
+                Can be a scalar or array symbolic expression.
+            xp: 1D array of x-coordinates of data points. Must be increasing.
+                Can be a numpy array or Constant expression.
+            fp: 1D array of y-coordinates of data points. Must have same length as xp.
+                Can be a numpy array or Constant expression.
+        """
+        self.x = to_expr(x)
+        self.xp = to_expr(xp)
+        self.fp = to_expr(fp)
+
+    def children(self):
+        return [self.x, self.xp, self.fp]
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize by canonicalizing all operands."""
+        x = self.x.canonicalize()
+        xp = self.xp.canonicalize()
+        fp = self.fp.canonicalize()
+        return Linterp(x, xp, fp)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Output shape matches the query point shape.
+
+        The interpolation is element-wise over x, so the output has
+        the same shape as the query points.
+
+        Returns:
+            tuple: Shape of the query point x
+
+        Raises:
+            ValueError: If xp and fp have different lengths or are not 1D
+        """
+        xp_shape = self.xp.check_shape()
+        fp_shape = self.fp.check_shape()
+
+        if len(xp_shape) != 1:
+            raise ValueError(f"Linterp xp must be 1D, got shape {xp_shape}")
+        if len(fp_shape) != 1:
+            raise ValueError(f"Linterp fp must be 1D, got shape {fp_shape}")
+        if xp_shape != fp_shape:
+            raise ValueError(
+                f"Linterp xp and fp must have same length, got {xp_shape} vs {fp_shape}"
+            )
+
+        return self.x.check_shape()
+
+    def __repr__(self):
+        return f"linterp({self.x!r}, {self.xp!r}, {self.fp!r})"
+
+
+class Bilerp(Expr):
+    """2D bilinear interpolation for symbolic expressions.
+
+    Performs bilinear interpolation on a regular 2D grid. Given grid points
+    (xp, yp) and corresponding values fp, computes the bilinearly interpolated
+    value at query point (x, y). For values outside the grid, boundary values
+    are returned (clamping, no extrapolation).
+
+    This is useful for incorporating 2D tabulated data (e.g., engine thrust
+    as a function of altitude and Mach number, aerodynamic coefficients as
+    a function of angle of attack and sideslip) into trajectory optimization.
+
+    Attributes:
+        x: Query x-coordinate (symbolic expression)
+        y: Query y-coordinate (symbolic expression)
+        xp: 1D array of x grid coordinates (must be increasing), length N
+        yp: 1D array of y grid coordinates (must be increasing), length M
+        fp: 2D array of values with shape (N, M), where fp[i, j] is the
+            value at grid point (xp[i], yp[j])
+
+    Example:
+        Interpolate engine thrust from altitude and Mach number::
+
+            import openscvx as ox
+            import numpy as np
+
+            # Grid coordinates
+            alt_grid = np.array([0, 5000, 10000, 15000, 20000])  # meters
+            mach_grid = np.array([0.0, 0.5, 1.0, 1.5, 2.0])
+
+            # Thrust values: thrust_table[i, j] = thrust at (alt_grid[i], mach_grid[j])
+            thrust_table = np.array([...])  # shape (5, 5)
+
+            altitude = ox.State("altitude", shape=(1,))
+            mach = ox.State("mach", shape=(1,))
+
+            thrust = ox.Bilerp(altitude[0], mach[0], alt_grid, mach_grid, thrust_table)
+
+    Note:
+        - xp and yp must be strictly increasing
+        - fp must have shape (len(xp), len(yp))
+        - For query points outside the grid, boundary values are returned
+        - This node is only supported in JAX lowering (dynamics/cost), not CVXPy
+    """
+
+    def __init__(self, x, y, xp, yp, fp):
+        """Initialize a 2D bilinear interpolation node.
+
+        Args:
+            x: Query x-coordinate. Can be a scalar symbolic expression.
+            y: Query y-coordinate. Can be a scalar symbolic expression.
+            xp: 1D array of x grid coordinates. Must be increasing.
+            yp: 1D array of y grid coordinates. Must be increasing.
+            fp: 2D array of values with shape (len(xp), len(yp)).
+        """
+        self.x = to_expr(x)
+        self.y = to_expr(y)
+        self.xp = to_expr(xp)
+        self.yp = to_expr(yp)
+        self.fp = to_expr(fp)
+
+    def children(self):
+        return [self.x, self.y, self.xp, self.yp, self.fp]
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize by canonicalizing all operands."""
+        x = self.x.canonicalize()
+        y = self.y.canonicalize()
+        xp = self.xp.canonicalize()
+        yp = self.yp.canonicalize()
+        fp = self.fp.canonicalize()
+        return Bilerp(x, y, xp, yp, fp)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Output shape is scalar (single interpolated value).
+
+        Returns:
+            tuple: Empty tuple (scalar output)
+
+        Raises:
+            ValueError: If grid arrays have invalid shapes
+        """
+        xp_shape = self.xp.check_shape()
+        yp_shape = self.yp.check_shape()
+        fp_shape = self.fp.check_shape()
+        x_shape = self.x.check_shape()
+        y_shape = self.y.check_shape()
+
+        if len(xp_shape) != 1:
+            raise ValueError(f"Bilerp xp must be 1D, got shape {xp_shape}")
+        if len(yp_shape) != 1:
+            raise ValueError(f"Bilerp yp must be 1D, got shape {yp_shape}")
+        if len(fp_shape) != 2:
+            raise ValueError(f"Bilerp fp must be 2D, got shape {fp_shape}")
+        if fp_shape != (xp_shape[0], yp_shape[0]):
+            raise ValueError(
+                f"Bilerp fp shape {fp_shape} must match (len(xp), len(yp)) = "
+                f"({xp_shape[0]}, {yp_shape[0]})"
+            )
+        if x_shape != ():
+            raise ValueError(f"Bilerp x must be scalar, got shape {x_shape}")
+        if y_shape != ():
+            raise ValueError(f"Bilerp y must be scalar, got shape {y_shape}")
+
+        return ()
+
+    def __repr__(self):
+        return f"bilerp({self.x!r}, {self.y!r}, {self.xp!r}, {self.yp!r}, {self.fp!r})"
