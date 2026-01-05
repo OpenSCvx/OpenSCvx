@@ -2728,3 +2728,426 @@ def test_cvxpy_linterp_not_implemented():
 
     with pytest.raises(NotImplementedError, match="Linear interpolation"):
         lowerer.lower(expr)
+
+
+# =============================================================================
+# Bilerp (2D Bilinear Interpolation)
+# =============================================================================
+
+
+def test_bilerp_creation():
+    """Test Bilerp node creation and properties."""
+    from openscvx.symbolic.expr import Bilerp, Constant
+
+    xp = np.array([0.0, 1.0, 2.0])
+    yp = np.array([0.0, 1.0])
+    fp = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])  # shape (3, 2)
+    x = Variable("x", shape=())
+    y = Variable("y", shape=())
+
+    interp = Bilerp(x, y, xp, yp, fp)
+    assert len(interp.children()) == 5
+    # Check that grid arrays were converted to Constant
+    assert isinstance(interp.xp, Constant)
+    assert isinstance(interp.yp, Constant)
+    assert isinstance(interp.fp, Constant)
+
+
+def test_bilerp_creation_with_expressions():
+    """Test Bilerp with symbolic query points."""
+    from openscvx.symbolic.expr import Bilerp, State
+
+    xp = np.array([0.0, 1.0, 2.0])
+    yp = np.array([0.0, 0.5, 1.0])
+    fp = np.random.rand(3, 3)
+
+    altitude = State("alt", shape=(1,))
+    mach = State("mach", shape=(1,))
+
+    interp = Bilerp(altitude[0], mach[0], xp, yp, fp)
+    assert len(interp.children()) == 5
+
+
+# --- Bilerp: Shape Checking ---
+
+
+def test_bilerp_shape_scalar_output():
+    """Test Bilerp output shape is scalar."""
+    from openscvx.symbolic.expr import Bilerp
+
+    xp = np.array([0.0, 1.0])
+    yp = np.array([0.0, 1.0])
+    fp = np.array([[1.0, 2.0], [3.0, 4.0]])
+    x = Variable("x", shape=())
+    y = Variable("y", shape=())
+
+    interp = Bilerp(x, y, xp, yp, fp)
+    assert interp.check_shape() == ()
+
+
+def test_bilerp_shape_invalid_xp():
+    """Test Bilerp raises error for non-1D xp."""
+    from openscvx.symbolic.expr import Bilerp
+
+    xp = np.array([[0.0, 1.0], [2.0, 3.0]])  # 2D - invalid
+    yp = np.array([0.0, 1.0])
+    fp = np.array([[1.0, 2.0], [3.0, 4.0]])
+    x = Variable("x", shape=())
+    y = Variable("y", shape=())
+
+    interp = Bilerp(x, y, xp, yp, fp)
+    with pytest.raises(ValueError, match="Bilerp xp must be 1D"):
+        interp.check_shape()
+
+
+def test_bilerp_shape_invalid_yp():
+    """Test Bilerp raises error for non-1D yp."""
+    from openscvx.symbolic.expr import Bilerp
+
+    xp = np.array([0.0, 1.0])
+    yp = np.array([[0.0, 1.0], [2.0, 3.0]])  # 2D - invalid
+    fp = np.array([[1.0, 2.0], [3.0, 4.0]])
+    x = Variable("x", shape=())
+    y = Variable("y", shape=())
+
+    interp = Bilerp(x, y, xp, yp, fp)
+    with pytest.raises(ValueError, match="Bilerp yp must be 1D"):
+        interp.check_shape()
+
+
+def test_bilerp_shape_invalid_fp():
+    """Test Bilerp raises error for non-2D fp."""
+    from openscvx.symbolic.expr import Bilerp
+
+    xp = np.array([0.0, 1.0])
+    yp = np.array([0.0, 1.0])
+    fp = np.array([1.0, 2.0, 3.0, 4.0])  # 1D - invalid
+    x = Variable("x", shape=())
+    y = Variable("y", shape=())
+
+    interp = Bilerp(x, y, xp, yp, fp)
+    with pytest.raises(ValueError, match="Bilerp fp must be 2D"):
+        interp.check_shape()
+
+
+def test_bilerp_shape_mismatched_fp():
+    """Test Bilerp raises error when fp shape doesn't match grid."""
+    from openscvx.symbolic.expr import Bilerp
+
+    xp = np.array([0.0, 1.0, 2.0])  # len 3
+    yp = np.array([0.0, 1.0])  # len 2
+    fp = np.array([[1.0, 2.0], [3.0, 4.0]])  # shape (2, 2), should be (3, 2)
+    x = Variable("x", shape=())
+    y = Variable("y", shape=())
+
+    interp = Bilerp(x, y, xp, yp, fp)
+    with pytest.raises(ValueError, match="Bilerp fp shape"):
+        interp.check_shape()
+
+
+def test_bilerp_shape_non_scalar_query():
+    """Test Bilerp raises error for non-scalar query points."""
+    from openscvx.symbolic.expr import Bilerp
+
+    xp = np.array([0.0, 1.0])
+    yp = np.array([0.0, 1.0])
+    fp = np.array([[1.0, 2.0], [3.0, 4.0]])
+    x = Variable("x", shape=(2,))  # Non-scalar - invalid
+    y = Variable("y", shape=())
+
+    interp = Bilerp(x, y, xp, yp, fp)
+    with pytest.raises(ValueError, match="Bilerp x must be scalar"):
+        interp.check_shape()
+
+
+# --- Bilerp: Canonicalization ---
+
+
+def test_bilerp_canonicalize_preserves_structure():
+    """Test that Bilerp canonicalization preserves structure."""
+    from openscvx.symbolic.expr import Bilerp
+
+    xp = np.array([0.0, 1.0])
+    yp = np.array([0.0, 1.0])
+    fp = np.array([[1.0, 2.0], [3.0, 4.0]])
+    x = Variable("x", shape=())
+    y = Variable("y", shape=())
+
+    interp = Bilerp(x, y, xp, yp, fp)
+    canonical = interp.canonicalize()
+
+    assert isinstance(canonical, Bilerp)
+
+
+def test_bilerp_canonicalize_recursively():
+    """Test that Bilerp canonicalization recurses into operands."""
+    from openscvx.symbolic.expr import Add, Bilerp, Constant
+
+    xp = np.array([0.0, 1.0])
+    yp = np.array([0.0, 1.0])
+    fp = np.array([[1.0, 2.0], [3.0, 4.0]])
+    x = Variable("x", shape=())
+    y = Variable("y", shape=())
+
+    # Bilerp with x + 0 should canonicalize to Bilerp with x
+    expr = Bilerp(Add(x, Constant(0.0)), y, xp, yp, fp)
+    canonical = expr.canonicalize()
+
+    assert isinstance(canonical, Bilerp)
+    assert canonical.x == x
+
+
+# --- Bilerp: JAX Lowering ---
+
+
+def test_bilerp_constant_query():
+    """Test Bilerp with constant query values."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Bilerp, Constant
+    from openscvx.symbolic.lower import lower_to_jax
+
+    # Simple 2x2 grid
+    xp = np.array([0.0, 1.0])
+    yp = np.array([0.0, 1.0])
+    fp = np.array([[0.0, 1.0], [2.0, 3.0]])  # fp[i, j] at (xp[i], yp[j])
+
+    # Query at center (0.5, 0.5) - should give average of all corners
+    expr = Bilerp(Constant(0.5), Constant(0.5), xp, yp, fp)
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    # Bilinear interp at (0.5, 0.5): (1-0.5)*(1-0.5)*0 + 0.5*(1-0.5)*2 + (1-0.5)*0.5*1 + 0.5*0.5*3
+    # = 0.25*0 + 0.25*2 + 0.25*1 + 0.25*3 = 0 + 0.5 + 0.25 + 0.75 = 1.5
+    expected = 1.5
+    assert jnp.allclose(result, expected)
+
+
+def test_bilerp_state_query():
+    """Test Bilerp with state variables as query."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Bilerp, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    # Thrust table example
+    alt_grid = np.array([0.0, 10000.0, 20000.0])
+    mach_grid = np.array([0.0, 1.0, 2.0])
+    # Thrust decreases with altitude, increases with Mach
+    thrust_table = np.array(
+        [
+            [100.0, 120.0, 140.0],  # alt=0
+            [80.0, 96.0, 112.0],  # alt=10000
+            [60.0, 72.0, 84.0],  # alt=20000
+        ]
+    )
+
+    altitude = State("alt", (1,))
+    altitude._slice = slice(0, 1)
+    mach = State("mach", (1,))
+    mach._slice = slice(1, 2)
+
+    expr = Bilerp(altitude[0], mach[0], alt_grid, mach_grid, thrust_table)
+
+    fn = lower_to_jax(expr)
+
+    # Test at grid point (0, 0)
+    x = jnp.array([0.0, 0.0])
+    result = fn(x, None, None, None)
+    assert jnp.allclose(result, 100.0)
+
+    # Test at grid point (10000, 1.0)
+    x = jnp.array([10000.0, 1.0])
+    result = fn(x, None, None, None)
+    assert jnp.allclose(result, 96.0)
+
+    # Test at grid point (20000, 2.0)
+    x = jnp.array([20000.0, 2.0])
+    result = fn(x, None, None, None)
+    assert jnp.allclose(result, 84.0)
+
+
+def test_bilerp_exact_grid_points():
+    """Test Bilerp returns exact values at grid points."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Bilerp, Constant
+    from openscvx.symbolic.lower import lower_to_jax
+
+    xp = np.array([0.0, 1.0, 2.0])
+    yp = np.array([0.0, 1.0])
+    fp = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+
+    # Test each grid point
+    for i, x_val in enumerate(xp):
+        for j, y_val in enumerate(yp):
+            expr = Bilerp(Constant(x_val), Constant(y_val), xp, yp, fp)
+            fn = lower_to_jax(expr)
+            result = fn(None, None, None, None)
+            assert jnp.allclose(result, fp[i, j]), f"Failed at ({x_val}, {y_val})"
+
+
+def test_bilerp_boundary_clamping():
+    """Test Bilerp clamping at boundaries (no extrapolation)."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Bilerp, Constant
+    from openscvx.symbolic.lower import lower_to_jax
+
+    xp = np.array([0.0, 1.0])
+    yp = np.array([0.0, 1.0])
+    fp = np.array([[10.0, 20.0], [30.0, 40.0]])
+
+    # Query outside grid (below)
+    expr = Bilerp(Constant(-1.0), Constant(-1.0), xp, yp, fp)
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+    assert jnp.allclose(result, 10.0)  # Corner value at (0, 0)
+
+    # Query outside grid (above)
+    expr = Bilerp(Constant(2.0), Constant(2.0), xp, yp, fp)
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+    assert jnp.allclose(result, 40.0)  # Corner value at (1, 1)
+
+
+def test_bilerp_midpoint_interpolation():
+    """Test Bilerp gives correct values at cell midpoints."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Bilerp, Constant
+    from openscvx.symbolic.lower import lower_to_jax
+
+    # Linear function f(x, y) = x + y on [0,1] x [0,1]
+    xp = np.array([0.0, 1.0])
+    yp = np.array([0.0, 1.0])
+    fp = np.array([[0.0, 1.0], [1.0, 2.0]])  # f(x,y) = x + y
+
+    # Query at (0.5, 0.5) should give 1.0
+    expr = Bilerp(Constant(0.5), Constant(0.5), xp, yp, fp)
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+    assert jnp.allclose(result, 1.0)
+
+    # Query at (0.25, 0.75) should give 1.0
+    expr = Bilerp(Constant(0.25), Constant(0.75), xp, yp, fp)
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+    assert jnp.allclose(result, 1.0)
+
+
+def test_bilerp_in_expression():
+    """Test Bilerp composed with other operations."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Bilerp, Mul, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    # Simple thrust table
+    alt_grid = np.array([0.0, 20000.0])
+    mach_grid = np.array([0.0, 2.0])
+    thrust_table = np.array([[100.0, 200.0], [50.0, 100.0]])
+
+    altitude = State("alt", (1,))
+    altitude._slice = slice(0, 1)
+    mach = State("mach", (1,))
+    mach._slice = slice(1, 2)
+
+    thrust = Bilerp(altitude[0], mach[0], alt_grid, mach_grid, thrust_table)
+    # Multiply by throttle
+    throttle = State("throttle", (1,))
+    throttle._slice = slice(2, 3)
+    actual_thrust = Mul(thrust, throttle[0])
+
+    fn = lower_to_jax(actual_thrust)
+
+    # At sea level, Mach 0, 50% throttle
+    x = jnp.array([0.0, 0.0, 0.5])
+    result = fn(x, None, None, None)
+    assert jnp.allclose(result, 50.0)  # 100 * 0.5
+
+
+def test_bilerp_jit_compatible():
+    """Test that Bilerp is JIT-compatible."""
+    import jax
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Bilerp, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    xp = np.array([0.0, 1.0])
+    yp = np.array([0.0, 1.0])
+    fp = np.array([[1.0, 2.0], [3.0, 4.0]])
+
+    x_state = State("x", (1,))
+    x_state._slice = slice(0, 1)
+    y_state = State("y", (1,))
+    y_state._slice = slice(1, 2)
+
+    expr = Bilerp(x_state[0], y_state[0], xp, yp, fp)
+
+    fn = lower_to_jax(expr)
+    jit_fn = jax.jit(fn)
+
+    x = jnp.array([0.5, 0.5])
+    result = jit_fn(x, None, None, None)
+    expected = 2.5  # Average of all corners
+    assert jnp.allclose(result, expected)
+
+
+def test_bilerp_differentiable():
+    """Test that Bilerp is differentiable through JAX autodiff."""
+    import jax
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Bilerp, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    # Linear function f(x, y) = 2x + 3y
+    xp = np.array([0.0, 1.0])
+    yp = np.array([0.0, 1.0])
+    fp = np.array([[0.0, 3.0], [2.0, 5.0]])  # f(x,y) = 2x + 3y
+
+    x_state = State("x", (1,))
+    x_state._slice = slice(0, 1)
+    y_state = State("y", (1,))
+    y_state._slice = slice(1, 2)
+
+    expr = Bilerp(x_state[0], y_state[0], xp, yp, fp)
+
+    fn = lower_to_jax(expr)
+
+    # Compute gradient
+    grad_fn = jax.grad(lambda state: fn(state, None, None, None))
+
+    # For f(x,y) = 2x + 3y, gradient should be [2, 3]
+    state = jnp.array([0.5, 0.5])
+    grad = grad_fn(state)
+
+    assert jnp.allclose(grad[0], 2.0, atol=1e-5)
+    assert jnp.allclose(grad[1], 3.0, atol=1e-5)
+
+
+# --- Bilerp: CVXPy Lowering ---
+
+
+def test_cvxpy_bilerp_not_implemented():
+    """Test that Bilerp raises NotImplementedError in CVXPy."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Bilerp, State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 2), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    xp = np.array([0.0, 1.0])
+    yp = np.array([0.0, 1.0])
+    fp = np.array([[1.0, 2.0], [3.0, 4.0]])
+    x = State("x", shape=(2,))
+    expr = Bilerp(x[0], x[1], xp, yp, fp)
+
+    with pytest.raises(NotImplementedError, match="Bilinear interpolation"):
+        lowerer.lower(expr)
