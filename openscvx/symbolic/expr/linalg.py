@@ -243,6 +243,11 @@ class Inv(Expr):
         Matrix inverse is non-convex and only supported in JAX lowering.
         CVXPy lowering will raise NotImplementedError since inv(X) is neither
         convex nor concave for variable matrices.
+
+    !!! warning
+        Solving a matrix inverse inside an optimization loop can be somewhat
+        of an oxymoron and performance may be severly impacted.
+        Consider whether your problem can be reformulated to avoid the inverse.
     """
 
     def __init__(self, operand):
