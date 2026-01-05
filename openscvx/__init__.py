@@ -32,6 +32,7 @@ from openscvx.symbolic.expr import (
     Index,
     Inequality,
     Leaf,
+    Linterp,
     Log,
     LogSumExp,
     MatMul,
@@ -107,6 +108,7 @@ __all__ = [
     "Log",
     "LogSumExp",
     "Max",
+    "Linterp",
     # Constraints
     "Constraint",
     "Equality",

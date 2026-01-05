@@ -121,6 +121,7 @@ from .math import (
     Cos,
     Exp,
     Huber,
+    Linterp,
     Log,
     LogSumExp,
     Max,
@@ -194,6 +195,7 @@ __all__ = [
     "Log",
     "LogSumExp",
     "Max",
+    "Linterp",
     # Linear algebra operations
     "Transpose",
     "Stack",

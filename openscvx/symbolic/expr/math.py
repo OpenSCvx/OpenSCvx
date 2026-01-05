@@ -697,3 +697,95 @@ class LogSumExp(Expr):
     def __repr__(self):
         inner = ", ".join(repr(op) for op in self.operands)
         return f"logsumexp({inner})"
+
+
+class Linterp(Expr):
+    """1D linear interpolation for symbolic expressions.
+
+    Computes the linear interpolant of data points (xp, fp) evaluated at x,
+    equivalent to jax.numpy.interp(x, xp, fp). For values outside the data range,
+    the boundary values are returned (no extrapolation).
+
+    This is useful for incorporating tabulated data (e.g., atmospheric properties,
+    engine thrust curves, aerodynamic coefficients) into trajectory optimization
+    dynamics and constraints.
+
+    Attributes:
+        x: Query point(s) at which to evaluate the interpolant (symbolic expression)
+        xp: 1D array of x-coordinates of data points (must be increasing)
+        fp: 1D array of y-coordinates of data points (same length as xp)
+
+    Example:
+        Interpolate atmospheric density from altitude table::
+
+            import openscvx as ox
+            import numpy as np
+
+            # US 1976 Standard Atmosphere data
+            alt_data = np.array([0, 5000, 10000, 15000, 20000])  # meters
+            rho_data = np.array([1.225, 0.736, 0.414, 0.195, 0.089])  # kg/m^3
+
+            altitude = ox.State("altitude", shape=(1,))
+            rho = ox.Linterp(altitude[0], alt_data, rho_data)
+
+            # rho can now be used in dynamics expressions
+            drag = 0.5 * rho * v**2 * Cd * S
+
+    Note:
+        - xp must be strictly increasing
+        - For query points outside [xp[0], xp[-1]], boundary values are returned
+    """
+
+    def __init__(self, x, xp, fp):
+        """Initialize a 1D linear interpolation node.
+
+        Args:
+            x: Query point(s) at which to evaluate the interpolant.
+                Can be a scalar or array symbolic expression.
+            xp: 1D array of x-coordinates of data points. Must be increasing.
+                Can be a numpy array or Constant expression.
+            fp: 1D array of y-coordinates of data points. Must have same length as xp.
+                Can be a numpy array or Constant expression.
+        """
+        self.x = to_expr(x)
+        self.xp = to_expr(xp)
+        self.fp = to_expr(fp)
+
+    def children(self):
+        return [self.x, self.xp, self.fp]
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize by canonicalizing all operands."""
+        x = self.x.canonicalize()
+        xp = self.xp.canonicalize()
+        fp = self.fp.canonicalize()
+        return Linterp(x, xp, fp)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Output shape matches the query point shape.
+
+        The interpolation is element-wise over x, so the output has
+        the same shape as the query points.
+
+        Returns:
+            tuple: Shape of the query point x
+
+        Raises:
+            ValueError: If xp and fp have different lengths or are not 1D
+        """
+        xp_shape = self.xp.check_shape()
+        fp_shape = self.fp.check_shape()
+
+        if len(xp_shape) != 1:
+            raise ValueError(f"Linterp xp must be 1D, got shape {xp_shape}")
+        if len(fp_shape) != 1:
+            raise ValueError(f"Linterp fp must be 1D, got shape {fp_shape}")
+        if xp_shape != fp_shape:
+            raise ValueError(
+                f"Linterp xp and fp must have same length, got {xp_shape} vs {fp_shape}"
+            )
+
+        return self.x.check_shape()
+
+    def __repr__(self):
+        return f"linterp({self.x!r}, {self.xp!r}, {self.fp!r})"
