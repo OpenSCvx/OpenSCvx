@@ -8,6 +8,7 @@ Key Operations:
     - **Matrix Operations:**
         - `Transpose` - Matrix/tensor transposition (swaps last two dimensions)
         - `Diag` - Construct diagonal matrix from vector
+        - `Inv` - Matrix inverse (square matrices only, JAX lowering only)
     - **Reductions:**
         - `Sum` - Sum all elements of an array (reduces to scalar)
         - `Norm` - Euclidean (L2) norm and other norms of vectors/matrices
@@ -211,6 +212,76 @@ class Sum(Expr):
 
     def __repr__(self):
         return f"sum({self.operand!r})"
+
+
+class Inv(Expr):
+    """Matrix inverse operation for symbolic expressions.
+
+    Computes the inverse of a square matrix. For batched inputs with shape
+    (..., M, M), inverts the last two dimensions following jax.numpy.linalg.inv
+    conventions.
+
+    The canonicalization includes an optimization that eliminates double inverses:
+    Inv(Inv(A)) simplifies to A.
+
+    Attributes:
+        operand: Square matrix expression to invert
+
+    Example:
+        Define matrix inverse expressions::
+
+            M = Variable("M", shape=(3, 3))
+            M_inv = Inv(M)  # Result shape (3, 3)
+
+            # Batched case
+            M_batch = Variable("M_batch", shape=(5, 3, 3))
+            M_batch_inv = Inv(M_batch)  # Result shape (5, 3, 3)
+
+    Note:
+        Matrix inverse is non-convex and only supported in JAX lowering.
+        CVXPy lowering will raise NotImplementedError since inv(X) is neither
+        convex nor concave for variable matrices.
+    """
+
+    def __init__(self, operand):
+        """Initialize a matrix inverse operation.
+
+        Args:
+            operand: Square matrix expression to invert. Must have shape
+                (..., M, M) where the last two dimensions are equal.
+        """
+        self.operand = to_expr(operand)
+
+    def children(self):
+        return [self.operand]
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize the operand with double inverse optimization."""
+        operand = self.operand.canonicalize()
+
+        # Double inverse optimization: Inv(Inv(A)) = A
+        if isinstance(operand, Inv):
+            return operand.operand
+
+        return Inv(operand)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Matrix inverse preserves shape; validates square matrix."""
+        operand_shape = self.operand.check_shape()
+
+        if len(operand_shape) < 2:
+            raise ValueError(f"Inv requires at least a 2D matrix, got shape {operand_shape}")
+
+        if operand_shape[-1] != operand_shape[-2]:
+            raise ValueError(
+                f"Inv requires a square matrix (last two dims must be equal), "
+                f"got shape {operand_shape}"
+            )
+
+        return operand_shape
+
+    def __repr__(self):
+        return f"inv({self.operand!r})"
 
 
 class Norm(Expr):

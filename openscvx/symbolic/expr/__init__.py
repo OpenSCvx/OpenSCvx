@@ -113,7 +113,7 @@ from .lie import (
 )
 
 # Linear algebra operations
-from .linalg import Diag, Norm, Sum, Transpose
+from .linalg import Diag, Inv, Norm, Sum, Transpose
 
 # Mathematical functions
 from .math import (
@@ -206,6 +206,7 @@ __all__ = [
     "Block",
     "Norm",
     "Diag",
+    "Inv",
     # Spatial/3D operations
     "QDCM",
     "SSMP",

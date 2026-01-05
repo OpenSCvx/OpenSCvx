@@ -32,6 +32,7 @@ from openscvx.symbolic.expr import (
     Hstack,
     Index,
     Inequality,
+    Inv,
     Leaf,
     Linterp,
     Log,
@@ -98,6 +99,7 @@ __all__ = [
     "Vstack",
     "Block",
     "Diag",
+    "Inv",
     "Constant",
     # Mathematical functions
     "Sin",
