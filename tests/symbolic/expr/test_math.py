@@ -2357,3 +2357,374 @@ def test_penalty_with_control():
     # Expected: [0, 0, 1] since only u[2]=2.0 violates
     expected = jnp.array([0.0, 0.0, 1.0])
     assert jnp.allclose(result, expected)
+
+
+# =============================================================================
+# Linterp (1D Linear Interpolation)
+# =============================================================================
+
+
+def test_linterp_creation():
+    """Test Linterp node creation and properties."""
+    from openscvx.symbolic.expr import Constant, Linterp
+
+    xp = np.array([0.0, 1.0, 2.0, 3.0])
+    fp = np.array([0.0, 2.0, 1.0, 3.0])
+    x = Variable("x", shape=())
+
+    interp = Linterp(x, xp, fp)
+    assert len(interp.children()) == 3
+    # Check that xp and fp were converted to Constant
+    assert isinstance(interp.xp, Constant)
+    assert isinstance(interp.fp, Constant)
+
+
+def test_linterp_creation_with_expressions():
+    """Test Linterp with symbolic query point."""
+    from openscvx.symbolic.expr import Linterp, State
+
+    xp = np.array([0.0, 1.0, 2.0])
+    fp = np.array([10.0, 20.0, 30.0])
+    state = State("alt", shape=(1,))
+
+    interp = Linterp(state[0], xp, fp)
+    assert len(interp.children()) == 3
+
+
+# --- Linterp: Shape Checking ---
+
+
+def test_linterp_shape_scalar_query():
+    """Test Linterp shape with scalar query point."""
+    from openscvx.symbolic.expr import Linterp
+
+    xp = np.array([0.0, 1.0, 2.0])
+    fp = np.array([1.0, 2.0, 3.0])
+    x = Variable("x", shape=())
+
+    interp = Linterp(x, xp, fp)
+    assert interp.check_shape() == ()
+
+
+def test_linterp_shape_vector_query():
+    """Test Linterp shape with vector query points."""
+    from openscvx.symbolic.expr import Linterp
+
+    xp = np.array([0.0, 1.0, 2.0])
+    fp = np.array([1.0, 2.0, 3.0])
+    x = Variable("x", shape=(5,))
+
+    interp = Linterp(x, xp, fp)
+    assert interp.check_shape() == (5,)
+
+
+def test_linterp_shape_matrix_query():
+    """Test Linterp shape with matrix query points."""
+    from openscvx.symbolic.expr import Linterp
+
+    xp = np.array([0.0, 1.0, 2.0])
+    fp = np.array([1.0, 2.0, 3.0])
+    x = Variable("x", shape=(3, 4))
+
+    interp = Linterp(x, xp, fp)
+    assert interp.check_shape() == (3, 4)
+
+
+def test_linterp_shape_invalid_xp():
+    """Test Linterp raises error for non-1D xp."""
+    from openscvx.symbolic.expr import Linterp
+
+    xp = np.array([[0.0, 1.0], [2.0, 3.0]])  # 2D - invalid
+    fp = np.array([1.0, 2.0])
+    x = Variable("x", shape=())
+
+    interp = Linterp(x, xp, fp)
+    with pytest.raises(ValueError, match="Linterp xp must be 1D"):
+        interp.check_shape()
+
+
+def test_linterp_shape_invalid_fp():
+    """Test Linterp raises error for non-1D fp."""
+    from openscvx.symbolic.expr import Linterp
+
+    xp = np.array([0.0, 1.0, 2.0])
+    fp = np.array([[1.0, 2.0], [3.0, 4.0]])  # 2D - invalid
+    x = Variable("x", shape=())
+
+    interp = Linterp(x, xp, fp)
+    with pytest.raises(ValueError, match="Linterp fp must be 1D"):
+        interp.check_shape()
+
+
+def test_linterp_shape_mismatched_xp_fp():
+    """Test Linterp raises error when xp and fp have different lengths."""
+    from openscvx.symbolic.expr import Linterp
+
+    xp = np.array([0.0, 1.0, 2.0])
+    fp = np.array([1.0, 2.0])  # Different length
+    x = Variable("x", shape=())
+
+    interp = Linterp(x, xp, fp)
+    with pytest.raises(ValueError, match="Linterp xp and fp must have same length"):
+        interp.check_shape()
+
+
+# --- Linterp: Canonicalization ---
+
+
+def test_linterp_canonicalize_preserves_structure():
+    """Test that Linterp canonicalization preserves structure."""
+    from openscvx.symbolic.expr import Linterp
+
+    xp = np.array([0.0, 1.0, 2.0])
+    fp = np.array([1.0, 2.0, 3.0])
+    x = Variable("x", shape=())
+
+    interp = Linterp(x, xp, fp)
+    canonical = interp.canonicalize()
+
+    assert isinstance(canonical, Linterp)
+
+
+def test_linterp_canonicalize_recursively():
+    """Test that Linterp canonicalization recurses into operands."""
+    from openscvx.symbolic.expr import Add, Constant, Linterp
+
+    xp = np.array([0.0, 1.0, 2.0])
+    fp = np.array([1.0, 2.0, 3.0])
+    x = Variable("x", shape=())
+
+    # Linterp with x + 0 should canonicalize to Linterp with x
+    expr = Linterp(Add(x, Constant(0.0)), xp, fp)
+    canonical = expr.canonicalize()
+
+    assert isinstance(canonical, Linterp)
+    # The query should be canonicalized (x + 0 -> x)
+    assert canonical.x == x
+
+
+# --- Linterp: JAX Lowering ---
+
+
+def test_linterp_constant_query():
+    """Test Linterp with constant query values."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Constant, Linterp
+    from openscvx.symbolic.lower import lower_to_jax
+
+    xp = np.array([0.0, 1.0, 2.0, 3.0])
+    fp = np.array([0.0, 2.0, 1.0, 3.0])
+    query = np.array([0.5, 1.5, 2.5])
+
+    expr = Linterp(Constant(query), xp, fp)
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    expected = jnp.interp(query, xp, fp)
+    assert jnp.allclose(result, expected)
+
+
+def test_linterp_state_query():
+    """Test Linterp with state variable as query."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Linterp, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    # Simulate atmospheric density lookup
+    alt_data = np.array([0.0, 5000.0, 10000.0, 15000.0, 20000.0])
+    rho_data = np.array([1.225, 0.736, 0.414, 0.195, 0.089])
+
+    altitude = State("alt", (1,))
+    altitude._slice = slice(0, 1)
+
+    expr = Linterp(altitude[0], alt_data, rho_data)
+
+    fn = lower_to_jax(expr)
+
+    # Test at various altitudes
+    for alt_val in [0.0, 2500.0, 7500.0, 12500.0, 20000.0]:
+        x = jnp.array([alt_val])
+        result = fn(x, None, None, None)
+        expected = jnp.interp(alt_val, alt_data, rho_data)
+        assert jnp.allclose(result, expected)
+
+
+def test_linterp_boundary_behavior():
+    """Test Linterp clamping at boundaries (no extrapolation)."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Constant, Linterp
+    from openscvx.symbolic.lower import lower_to_jax
+
+    xp = np.array([0.0, 1.0, 2.0])
+    fp = np.array([10.0, 20.0, 30.0])
+
+    # Query points outside the range
+    query = np.array([-1.0, 0.0, 1.0, 2.0, 3.0])
+
+    expr = Linterp(Constant(query), xp, fp)
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    # jnp.interp clamps to boundary values
+    expected = jnp.interp(query, xp, fp)
+    assert jnp.allclose(result, expected)
+
+    # Verify boundary clamping
+    assert jnp.allclose(result[0], 10.0)  # Below range -> first value
+    assert jnp.allclose(result[-1], 30.0)  # Above range -> last value
+
+
+def test_linterp_exact_data_points():
+    """Test Linterp returns exact values at data points."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Constant, Linterp
+    from openscvx.symbolic.lower import lower_to_jax
+
+    xp = np.array([0.0, 1.0, 2.0, 3.0])
+    fp = np.array([5.0, 10.0, 7.0, 12.0])
+
+    expr = Linterp(Constant(xp), xp, fp)  # Query at data points
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    assert jnp.allclose(result, fp)
+
+
+def test_linterp_midpoint_interpolation():
+    """Test Linterp gives correct midpoint values."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Constant, Linterp
+    from openscvx.symbolic.lower import lower_to_jax
+
+    xp = np.array([0.0, 2.0, 4.0])
+    fp = np.array([0.0, 4.0, 8.0])  # Linear: f(x) = x
+
+    # Query at midpoints
+    query = np.array([1.0, 3.0])
+
+    expr = Linterp(Constant(query), xp, fp)
+
+    fn = lower_to_jax(expr)
+    result = fn(None, None, None, None)
+
+    # For linear data, midpoints should be exact
+    expected = np.array([2.0, 6.0])
+    assert jnp.allclose(result, expected)
+
+
+def test_linterp_in_expression():
+    """Test Linterp composed with other operations."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Linterp, Mul, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    # Simulate drag calculation: drag = 0.5 * rho * v^2 * Cd * S
+    alt_data = np.array([0.0, 10000.0, 20000.0])
+    rho_data = np.array([1.225, 0.414, 0.089])
+
+    altitude = State("alt", (1,))
+    altitude._slice = slice(0, 1)
+    velocity = State("vel", (1,))
+    velocity._slice = slice(1, 2)
+
+    rho = Linterp(altitude[0], alt_data, rho_data)
+    # Simplified: 0.5 * rho * v^2
+    dynamic_pressure = Mul(0.5, Mul(rho, velocity[0] ** 2))
+
+    fn = lower_to_jax(dynamic_pressure)
+
+    # Test at sea level with 100 m/s velocity
+    x = jnp.array([0.0, 100.0])
+    result = fn(x, None, None, None)
+
+    expected = 0.5 * 1.225 * 100.0**2
+    assert jnp.allclose(result, expected)
+
+
+def test_linterp_jit_compatible():
+    """Test that Linterp is JIT-compatible."""
+    import jax
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Linterp, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    xp = np.array([0.0, 1.0, 2.0])
+    fp = np.array([10.0, 20.0, 30.0])
+
+    state = State("x", (1,))
+    state._slice = slice(0, 1)
+
+    expr = Linterp(state[0], xp, fp)
+
+    fn = lower_to_jax(expr)
+    jit_fn = jax.jit(fn)
+
+    x = jnp.array([0.5])
+    result = jit_fn(x, None, None, None)
+    expected = jnp.interp(0.5, xp, fp)
+    assert jnp.allclose(result, expected)
+
+
+def test_linterp_differentiable():
+    """Test that Linterp is differentiable through JAX autodiff."""
+    import jax
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.expr import Linterp, State
+    from openscvx.symbolic.lower import lower_to_jax
+
+    xp = np.array([0.0, 1.0, 2.0])
+    fp = np.array([0.0, 2.0, 6.0])  # Increasing slope
+
+    state = State("x", (1,))
+    state._slice = slice(0, 1)
+
+    expr = Linterp(state[0], xp, fp)
+
+    fn = lower_to_jax(expr)
+
+    # Compute gradient
+    grad_fn = jax.grad(lambda x: fn(x, None, None, None))
+
+    # Between x=0 and x=1, slope = (2-0)/(1-0) = 2
+    x = jnp.array([0.5])
+    grad = grad_fn(x)
+    assert jnp.allclose(grad, 2.0, atol=1e-5)
+
+    # Between x=1 and x=2, slope = (6-2)/(2-1) = 4
+    x = jnp.array([1.5])
+    grad = grad_fn(x)
+    assert jnp.allclose(grad, 4.0, atol=1e-5)
+
+
+# --- Linterp: CVXPy Lowering ---
+
+
+def test_cvxpy_linterp_not_implemented():
+    """Test that Linterp raises NotImplementedError in CVXPy."""
+    import cvxpy as cp
+
+    from openscvx.symbolic.expr import Linterp, State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    x_cvx = cp.Variable((10, 3), name="x")
+    variable_map = {"x": x_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    xp = np.array([0.0, 1.0, 2.0])
+    fp = np.array([10.0, 20.0, 30.0])
+    x = State("x", shape=(3,))
+    expr = Linterp(x[0], xp, fp)
+
+    with pytest.raises(NotImplementedError, match="Linear interpolation"):
+        lowerer.lower(expr)
