@@ -144,6 +144,9 @@ from .stl import Or
 # Variable
 from .variable import Variable
 
+# Vmap
+from .vmap import Vmap, _Placeholder  # noqa: F401
+
 __all__ = [
     # Core base classes and fundamental operations
     "Expr",
@@ -219,4 +222,6 @@ __all__ = [
     "ctcs",
     # STL operations
     "Or",
+    # Vmap
+    "Vmap",
 ]
