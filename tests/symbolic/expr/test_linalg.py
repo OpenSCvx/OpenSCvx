@@ -1,6 +1,6 @@
 """Tests for linear algebra operation nodes.
 
-This module tests linear algebra operation nodes: Transpose, Diag, Sum, Norm.
+This module tests linear algebra operation nodes: Transpose, Diag, Sum, Norm, Inv.
 
 Tests are organized by node/node-group, with each section containing:
 
@@ -18,6 +18,7 @@ from openscvx.symbolic.expr import (
     Add,
     Constant,
     Diag,
+    Inv,
     Norm,
     Sum,
     Transpose,
@@ -689,3 +690,187 @@ def test_cvxpy_norm_fro():
 
     result = lowerer.lower(expr)
     assert isinstance(result, cp.Expression)
+
+
+# =============================================================================
+# Inv
+# =============================================================================
+
+# --- Inv: Creation & Tree Structure ---
+
+
+def test_inv_creation_and_children():
+    """Test Inv node creation and tree structure."""
+    M = Variable("M", shape=(3, 3))
+    M_inv = Inv(M)
+
+    assert isinstance(M_inv, Inv)
+    assert M_inv.children() == [M]
+    assert repr(M_inv) == "inv(Var('M'))"
+
+
+def test_inv_wraps_constants():
+    """Test Inv with constant matrices."""
+    arr = np.array([[1.0, 2.0], [3.0, 4.0]])
+    inv_expr = Inv(arr)
+
+    assert isinstance(inv_expr.operand, Constant)
+    assert np.array_equal(inv_expr.operand.value, arr)
+
+
+# --- Inv: Shape Checking ---
+
+
+def test_inv_shape_square_matrix():
+    """Test that inverse of square matrix preserves shape."""
+    M = Variable("M", shape=(3, 3))
+    M_inv = Inv(M)
+
+    assert M_inv.check_shape() == (3, 3)
+
+
+def test_inv_shape_batched():
+    """Test that inverse supports batched inputs (..., M, M)."""
+    M_batch = Variable("M_batch", shape=(5, 3, 3))
+    M_batch_inv = Inv(M_batch)
+
+    assert M_batch_inv.check_shape() == (5, 3, 3)
+
+    # Multi-batch dimensions
+    M_multi = Variable("M_multi", shape=(2, 4, 3, 3))
+    M_multi_inv = Inv(M_multi)
+
+    assert M_multi_inv.check_shape() == (2, 4, 3, 3)
+
+
+def test_inv_shape_requires_2d():
+    """Test that Inv raises error for 1D inputs."""
+    import pytest
+
+    v = Variable("v", shape=(3,))
+    inv_expr = Inv(v)
+
+    with pytest.raises(ValueError, match="Inv requires at least a 2D matrix"):
+        inv_expr.check_shape()
+
+
+def test_inv_shape_requires_square():
+    """Test that Inv raises error for non-square matrices."""
+    import pytest
+
+    A = Variable("A", shape=(3, 4))
+    inv_expr = Inv(A)
+
+    with pytest.raises(ValueError, match="Inv requires a square matrix"):
+        inv_expr.check_shape()
+
+
+# --- Inv: Canonicalization ---
+
+
+def test_inv_canonicalize_recurses():
+    """Test that canonicalize recurses into the operand."""
+    M = Variable("M", shape=(3, 3))
+    expr = Inv(M + 0)  # M + 0 should simplify
+
+    canonical = expr.canonicalize()
+
+    # The Add(M, 0) should have been canonicalized
+    assert isinstance(canonical, Inv)
+    # After canonicalization, M + 0 should become M
+    assert canonical.operand == M
+
+
+def test_inv_double_inverse_eliminates():
+    """Test that Inv(Inv(A)) simplifies to A."""
+    M = Variable("M", shape=(3, 3))
+    double_inv = Inv(Inv(M))
+
+    canonical = double_inv.canonicalize()
+
+    # Double inverse should be eliminated
+    assert canonical is M
+
+
+def test_inv_triple_inverse_becomes_single():
+    """Test that Inv(Inv(Inv(A))) simplifies to Inv(A)."""
+    M = Variable("M", shape=(3, 3))
+    triple_inv = Inv(Inv(Inv(M)))
+
+    canonical = triple_inv.canonicalize()
+
+    # Should reduce to single inverse
+    assert isinstance(canonical, Inv)
+    assert canonical.operand is M
+
+
+def test_inv_constant_folding():
+    """Test that Inv of Constant computes inverse at canonicalization time."""
+    arr = np.array([[1.0, 2.0], [3.0, 4.0]])
+    inv_expr = Inv(Constant(arr))
+
+    canonical = inv_expr.canonicalize()
+
+    # Should be folded into a Constant
+    assert isinstance(canonical, Constant)
+
+    # Should be the actual inverse
+    expected = np.linalg.inv(arr)
+    assert np.allclose(canonical.value, expected, atol=1e-12)
+
+
+def test_inv_constant_folding_batched():
+    """Test constant folding with batched matrices."""
+    # Create batch of 2x2 matrices
+    arr = np.array([[[1.0, 2.0], [3.0, 4.0]], [[2.0, 0.0], [0.0, 2.0]]])
+    inv_expr = Inv(Constant(arr))
+
+    canonical = inv_expr.canonicalize()
+
+    assert isinstance(canonical, Constant)
+    expected = np.linalg.inv(arr)
+    assert np.allclose(canonical.value, expected, atol=1e-12)
+
+
+# --- Inv: JAX Lowering ---
+
+
+def test_inv_jax_matrix():
+    """Test JAX lowering of matrix inverse."""
+    import jax.numpy as jnp
+
+    from openscvx.symbolic.lower import lower_to_jax
+
+    # Test with an invertible 2x2 matrix
+    arr = np.array([[1.0, 2.0], [3.0, 4.0]])
+    M = Constant(arr)
+    M_inv = Inv(M)
+    fn = lower_to_jax(M_inv)
+
+    result = fn(None, None, None, None)
+
+    # Should be the inverse
+    expected = np.linalg.inv(arr)
+    assert jnp.allclose(result, expected, atol=1e-12)
+
+
+# --- Inv: CVXPy Lowering ---
+
+
+def test_inv_cvxpy_raises_not_implemented():
+    """Test that CVXPy lowering raises NotImplementedError for Inv."""
+    import cvxpy as cp
+    import pytest
+
+    from openscvx.symbolic.expr import State
+    from openscvx.symbolic.lowerers.cvxpy import CvxpyLowerer
+
+    M_cvx = cp.Variable((3, 3), name="M")
+    variable_map = {"M": M_cvx}
+    lowerer = CvxpyLowerer(variable_map)
+
+    M = State("M", shape=(9,))  # 3x3 flattened
+    expr = Inv(M)
+
+    with pytest.raises(NotImplementedError, match="Matrix inverse.*not DCP-compliant"):
+        lowerer.lower(expr)
