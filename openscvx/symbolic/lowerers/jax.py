@@ -136,6 +136,7 @@ from openscvx.symbolic.expr import (
     Huber,
     Index,
     Inequality,
+    Linterp,
     Log,
     LogSumExp,
     MatMul,
@@ -1451,3 +1452,33 @@ class JaxLowerer:
                 return jax.vmap(inner, in_axes=axis)(data)
 
         return vmapped_fn
+
+    @visitor(Linterp)
+    def _visit_linterp(self, node: Linterp):
+        """Lower 1D linear interpolation to JAX function.
+
+        Uses jnp.interp which performs piecewise linear interpolation.
+        For query points outside the data range, boundary values are returned.
+
+        Args:
+            node: Linterp expression node with xp, fp, and x
+
+        Returns:
+            Function (x, u, node, params) -> interpolated value(s)
+
+        Note:
+            The xp and fp arrays are typically constants (tabulated data),
+            while x is typically a symbolic expression (state or derived value).
+            jnp.interp is differentiable through JAX's autodiff.
+        """
+        f_xp = self.lower(node.xp)
+        f_fp = self.lower(node.fp)
+        f_x = self.lower(node.x)
+
+        def linterp_fn(x, u, node_idx, params):
+            xp_val = f_xp(x, u, node_idx, params)
+            fp_val = f_fp(x, u, node_idx, params)
+            x_val = f_x(x, u, node_idx, params)
+            return jnp.interp(x_val, xp_val, fp_val)
+
+        return linterp_fn
