@@ -173,6 +173,7 @@ from openscvx.symbolic.expr.lie import (
     SO3Exp,
     SO3Log,
 )
+from openscvx.symbolic.expr.linalg import Inv
 from openscvx.symbolic.expr.state import State
 
 _JAX_VISITORS: Dict[Type[Expr], Callable] = {}
@@ -1228,6 +1229,22 @@ class JaxLowerer:
         """Lower diagonal matrix construction to JAX function."""
         f = self.lower(node.operand)
         return lambda x, u, node, params: jnp.diag(f(x, u, node, params))
+
+    @visitor(Inv)
+    def _visit_inv(self, node: Inv):
+        """Lower matrix inverse to JAX function.
+
+        Computes the inverse of a square matrix using jnp.linalg.inv.
+        Supports batched inputs with shape (..., M, M).
+
+        Args:
+            node: Inv expression node
+
+        Returns:
+            Function (x, u, node, params) -> inverse of operand matrix
+        """
+        f = self.lower(node.operand)
+        return lambda x, u, node, params: jnp.linalg.inv(f(x, u, node, params))
 
     @visitor(Or)
     def _visit_or(self, node: Or):

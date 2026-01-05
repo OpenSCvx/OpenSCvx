@@ -172,6 +172,7 @@ from openscvx.symbolic.expr import (
     Vstack,
 )
 from openscvx.symbolic.expr.control import Control
+from openscvx.symbolic.expr.linalg import Inv
 from openscvx.symbolic.expr.state import State
 
 _CVXPY_VISITORS: Dict[Type[Expr], Callable] = {}
@@ -1122,6 +1123,34 @@ class CvxpyLowerer:
         """
         operand = self.lower(node.operand)
         return operand.T
+
+    @visitor(Inv)
+    def _visit_inv(self, node: Inv) -> cp.Expression:
+        """Raise NotImplementedError for matrix inverse.
+
+        Matrix inverse is not DCP-compliant in CVXPy as it is neither convex
+        nor concave for variable matrices.
+
+        Args:
+            node: Inv expression node
+
+        Raises:
+            NotImplementedError: Always raised since matrix inverse is not DCP-compliant
+
+        Note:
+            For optimization problems requiring matrix inverse:
+            - If the matrix is constant/parameter, compute the inverse numerically
+              before passing to CVXPy
+            - Handle matrix inverse in the JAX dynamics/constraint layer instead
+            - Consider reformulating the problem to avoid explicit matrix inverse
+        """
+        raise NotImplementedError(
+            "Matrix inverse (Inv) is not DCP-compliant in CVXPy. "
+            "inv(X) is neither convex nor concave for variable matrices. "
+            "Consider: (1) computing the inverse numerically if the matrix is constant, "
+            "(2) handling this in the JAX layer instead, or "
+            "(3) reformulating the problem to avoid explicit matrix inverse."
+        )
 
     @visitor(Power)
     def _visit_power(self, node: Power) -> cp.Expression:
