@@ -121,6 +121,7 @@ from openscvx.symbolic.expr import (
     Add,
     Adjoint,
     AdjointDual,
+    Bilerp,
     Block,
     Concat,
     Constant,
@@ -1482,3 +1483,68 @@ class JaxLowerer:
             return jnp.interp(x_val, xp_val, fp_val)
 
         return linterp_fn
+
+    @visitor(Bilerp)
+    def _visit_bilerp(self, node: Bilerp):
+        """Lower 2D bilinear interpolation to JAX function.
+
+        Implements bilinear interpolation on a regular grid. For query points
+        outside the grid, boundary values are returned (clamping).
+
+        Args:
+            node: Bilerp expression node with x, y, xp, yp, fp
+
+        Returns:
+            Function (x, u, node, params) -> interpolated scalar value
+
+        Note:
+            The grid arrays (xp, yp, fp) are typically constants (tabulated data),
+            while x and y are symbolic expressions (state or derived values).
+            The implementation is differentiable through JAX's autodiff.
+        """
+        f_x = self.lower(node.x)
+        f_y = self.lower(node.y)
+        f_xp = self.lower(node.xp)
+        f_yp = self.lower(node.yp)
+        f_fp = self.lower(node.fp)
+
+        def bilerp_fn(x, u, node_idx, params):
+            x_val = f_x(x, u, node_idx, params)
+            y_val = f_y(x, u, node_idx, params)
+            xp_val = f_xp(x, u, node_idx, params)
+            yp_val = f_yp(x, u, node_idx, params)
+            fp_val = f_fp(x, u, node_idx, params)
+
+            # Find indices of the grid cell containing (x_val, y_val)
+            # searchsorted returns the index where x_val would be inserted
+            # Subtract 1 to get the lower bound index, clamp to valid range
+            nx = xp_val.shape[0]
+            ny = yp_val.shape[0]
+
+            i = jnp.clip(jnp.searchsorted(xp_val, x_val) - 1, 0, nx - 2)
+            j = jnp.clip(jnp.searchsorted(yp_val, y_val) - 1, 0, ny - 2)
+
+            # Get corner coordinates
+            x0 = xp_val[i]
+            x1 = xp_val[i + 1]
+            y0 = yp_val[j]
+            y1 = yp_val[j + 1]
+
+            # Get corner values: fp[i, j] is value at (xp[i], yp[j])
+            f00 = fp_val[i, j]
+            f10 = fp_val[i + 1, j]
+            f01 = fp_val[i, j + 1]
+            f11 = fp_val[i + 1, j + 1]
+
+            # Compute normalized coordinates in [0, 1]
+            # Clamp x_val and y_val to grid bounds for proper interpolation
+            x_clamped = jnp.clip(x_val, xp_val[0], xp_val[-1])
+            y_clamped = jnp.clip(y_val, yp_val[0], yp_val[-1])
+
+            s = (x_clamped - x0) / (x1 - x0)
+            t = (y_clamped - y0) / (y1 - y0)
+
+            # Bilinear interpolation formula
+            return (1 - s) * (1 - t) * f00 + s * (1 - t) * f10 + (1 - s) * t * f01 + s * t * f11
+
+        return bilerp_fn

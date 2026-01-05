@@ -134,6 +134,7 @@ from openscvx.symbolic.expr import (
     CTCS,
     Abs,
     Add,
+    Bilerp,
     Block,
     Concat,
     Constant,
@@ -1253,9 +1254,22 @@ class CvxpyLowerer:
         Raises:
             NotImplementedError: Always raised since Linterp is not DCP-compliant
         """
-        raise NotImplementedError(
-            "Linear interpolation (Linterp) is not DCP-compliant in CVXPy."
-        )
+        raise NotImplementedError("Linear interpolation (Linterp) is not DCP-compliant in CVXPy.")
+
+    @visitor(Bilerp)
+    def _visit_bilerp(self, node: Bilerp) -> cp.Expression:
+        """Raise NotImplementedError for bilinear interpolation.
+
+        Bilinear interpolation (Bilerp) is not DCP-compliant in CVXPy as it
+        represents a nonlinear function that is neither convex nor concave.
+
+        Args:
+            node: Bilerp expression node
+
+        Raises:
+            NotImplementedError: Always raised since Bilerp is not DCP-compliant
+        """
+        raise NotImplementedError("Bilinear interpolation (Bilerp) is not DCP-compliant in CVXPy.")
 
 
 def lower_to_cvxpy(expr: Expr, variable_map: Dict[str, cp.Expression] = None) -> cp.Expression:
