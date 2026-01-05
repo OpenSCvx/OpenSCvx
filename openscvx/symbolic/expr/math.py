@@ -789,3 +789,113 @@ class Linterp(Expr):
 
     def __repr__(self):
         return f"linterp({self.x!r}, {self.xp!r}, {self.fp!r})"
+
+
+class Bilerp(Expr):
+    """2D bilinear interpolation for symbolic expressions.
+
+    Performs bilinear interpolation on a regular 2D grid. Given grid points
+    (xp, yp) and corresponding values fp, computes the bilinearly interpolated
+    value at query point (x, y). For values outside the grid, boundary values
+    are returned (clamping, no extrapolation).
+
+    This is useful for incorporating 2D tabulated data (e.g., engine thrust
+    as a function of altitude and Mach number, aerodynamic coefficients as
+    a function of angle of attack and sideslip) into trajectory optimization.
+
+    Attributes:
+        x: Query x-coordinate (symbolic expression)
+        y: Query y-coordinate (symbolic expression)
+        xp: 1D array of x grid coordinates (must be increasing), length N
+        yp: 1D array of y grid coordinates (must be increasing), length M
+        fp: 2D array of values with shape (N, M), where fp[i, j] is the
+            value at grid point (xp[i], yp[j])
+
+    Example:
+        Interpolate engine thrust from altitude and Mach number::
+
+            import openscvx as ox
+            import numpy as np
+
+            # Grid coordinates
+            alt_grid = np.array([0, 5000, 10000, 15000, 20000])  # meters
+            mach_grid = np.array([0.0, 0.5, 1.0, 1.5, 2.0])
+
+            # Thrust values: thrust_table[i, j] = thrust at (alt_grid[i], mach_grid[j])
+            thrust_table = np.array([...])  # shape (5, 5)
+
+            altitude = ox.State("altitude", shape=(1,))
+            mach = ox.State("mach", shape=(1,))
+
+            thrust = ox.Bilerp(altitude[0], mach[0], alt_grid, mach_grid, thrust_table)
+
+    Note:
+        - xp and yp must be strictly increasing
+        - fp must have shape (len(xp), len(yp))
+        - For query points outside the grid, boundary values are returned
+        - This node is only supported in JAX lowering (dynamics/cost), not CVXPy
+    """
+
+    def __init__(self, x, y, xp, yp, fp):
+        """Initialize a 2D bilinear interpolation node.
+
+        Args:
+            x: Query x-coordinate. Can be a scalar symbolic expression.
+            y: Query y-coordinate. Can be a scalar symbolic expression.
+            xp: 1D array of x grid coordinates. Must be increasing.
+            yp: 1D array of y grid coordinates. Must be increasing.
+            fp: 2D array of values with shape (len(xp), len(yp)).
+        """
+        self.x = to_expr(x)
+        self.y = to_expr(y)
+        self.xp = to_expr(xp)
+        self.yp = to_expr(yp)
+        self.fp = to_expr(fp)
+
+    def children(self):
+        return [self.x, self.y, self.xp, self.yp, self.fp]
+
+    def canonicalize(self) -> "Expr":
+        """Canonicalize by canonicalizing all operands."""
+        x = self.x.canonicalize()
+        y = self.y.canonicalize()
+        xp = self.xp.canonicalize()
+        yp = self.yp.canonicalize()
+        fp = self.fp.canonicalize()
+        return Bilerp(x, y, xp, yp, fp)
+
+    def check_shape(self) -> Tuple[int, ...]:
+        """Output shape is scalar (single interpolated value).
+
+        Returns:
+            tuple: Empty tuple (scalar output)
+
+        Raises:
+            ValueError: If grid arrays have invalid shapes
+        """
+        xp_shape = self.xp.check_shape()
+        yp_shape = self.yp.check_shape()
+        fp_shape = self.fp.check_shape()
+        x_shape = self.x.check_shape()
+        y_shape = self.y.check_shape()
+
+        if len(xp_shape) != 1:
+            raise ValueError(f"Bilerp xp must be 1D, got shape {xp_shape}")
+        if len(yp_shape) != 1:
+            raise ValueError(f"Bilerp yp must be 1D, got shape {yp_shape}")
+        if len(fp_shape) != 2:
+            raise ValueError(f"Bilerp fp must be 2D, got shape {fp_shape}")
+        if fp_shape != (xp_shape[0], yp_shape[0]):
+            raise ValueError(
+                f"Bilerp fp shape {fp_shape} must match (len(xp), len(yp)) = "
+                f"({xp_shape[0]}, {yp_shape[0]})"
+            )
+        if x_shape != ():
+            raise ValueError(f"Bilerp x must be scalar, got shape {x_shape}")
+        if y_shape != ():
+            raise ValueError(f"Bilerp y must be scalar, got shape {y_shape}")
+
+        return ()
+
+    def __repr__(self):
+        return f"bilerp({self.x!r}, {self.y!r}, {self.xp!r}, {self.yp!r}, {self.fp!r})"

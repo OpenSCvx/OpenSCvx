@@ -15,6 +15,7 @@ from openscvx.symbolic.expr import (
     CTCS,
     Abs,
     Add,
+    Bilerp,
     Block,
     Concat,
     Constant,
@@ -109,6 +110,7 @@ __all__ = [
     "LogSumExp",
     "Max",
     "Linterp",
+    "Bilerp",
     # Constraints
     "Constraint",
     "Equality",
