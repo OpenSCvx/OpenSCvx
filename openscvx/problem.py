@@ -82,6 +82,7 @@ class Problem:
         *,
         dynamics_prop: Optional[dict] = None,
         states_prop: Optional[List[State]] = None,
+        outputs_prop: Optional[dict] = None,
         licq_min=0.0,
         licq_max=1e-4,
         time_dilation_factor_min=0.3,
@@ -109,6 +110,9 @@ class Problem:
                 state dynamics here.
             states_prop (List[State], optional): List of EXTRA State objects for propagation only.
                 Only specify additional states beyond optimization states. Used with dynamics_prop.
+            outputs_prop (dict, optional): Dictionary mapping output names to symbolic expressions
+                for algebraic outputs computed during propagation. These are evaluated (not
+                integrated) at each propagation timestep. Example: {"kinetic_energy": 0.5*m*v**2}.
             licq_min: Minimum LICQ constraint value
             licq_max: Maximum LICQ constraint value
             time_dilation_factor_min: Minimum time dilation factor
@@ -140,6 +144,7 @@ class Problem:
             time_dilation_factor_max=time_dilation_factor_max,
             dynamics_prop_extra=dynamics_prop,
             states_prop_extra=states_prop,
+            outputs_prop=outputs_prop,
             byof=byof,
         )
 
@@ -681,7 +686,11 @@ class Problem:
 
         t_0_post = time.time()
         result = propagate_trajectory_results(
-            self._parameters, self.settings, result, self._propagation_solver
+            self._parameters,
+            self.settings,
+            result,
+            self._propagation_solver,
+            outputs_prop=self._lowered.outputs_prop,
         )
         t_f_post = time.time()
 

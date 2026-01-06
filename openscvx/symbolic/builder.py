@@ -73,6 +73,7 @@ def preprocess_symbolic_problem(
     time_dilation_factor_max: float = 3.0,
     dynamics_prop_extra: dict = None,
     states_prop_extra: List[State] = None,
+    outputs_prop: dict = None,
     byof: Optional[dict] = None,
 ) -> SymbolicProblem:
     """Preprocess and augment symbolic trajectory optimization problem.
@@ -110,6 +111,9 @@ def preprocess_symbolic_problem(
             states (default: None)
         states_prop_extra: Optional list of additional State objects for propagation only
             (default: None)
+        outputs_prop: Optional dictionary mapping output names to symbolic expressions
+            for algebraic outputs computed during propagation. These are evaluated (not
+            integrated) at each propagation timestep. (default: None)
         byof: Optional dict of raw JAX functions for expert users. If byof contains
             a "dynamics" key, it should map state names to raw JAX functions with
             signature f(x, u, node, params) -> xdot_component. States in byof["dynamics"]
@@ -126,6 +130,7 @@ def preprocess_symbolic_problem(
             - dynamics_prop: Propagation dynamics
             - states_prop: Propagation states
             - controls_prop: Propagation controls
+            - outputs_prop: Algebraic outputs (validated and canonicalized)
 
     Raises:
         ValueError: If validation fails at any stage
@@ -318,6 +323,29 @@ def preprocess_symbolic_problem(
             parameters=parameters,
         )
 
+    # ==================== PHASE 6: Process Algebraic Outputs ====================
+
+    # Validate and canonicalize outputs_prop expressions
+    outputs_prop_processed = None
+    if outputs_prop is not None:
+        outputs_prop_processed = {}
+        for name, expr in outputs_prop.items():
+            # Validate shape inference works
+            validate_shapes([expr])
+
+            # Canonicalize the expression
+            expr_canonical = expr.canonicalize()
+
+            # Collect any parameter values from output expressions
+            def collect_param_values(e):
+                if isinstance(e, Parameter):
+                    if e.name not in parameters:
+                        parameters[e.name] = e.value
+
+            traverse(expr_canonical, collect_param_values)
+
+            outputs_prop_processed[name] = expr_canonical
+
     # ==================== Return SymbolicProblem ====================
 
     return SymbolicProblem(
@@ -331,6 +359,7 @@ def preprocess_symbolic_problem(
         dynamics_prop=dynamics_prop,
         states_prop=states_prop,
         controls_prop=controls_prop,
+        outputs_prop=outputs_prop_processed,
     )
 
 

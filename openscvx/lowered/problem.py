@@ -1,7 +1,7 @@
 """LoweredProblem dataclass - container for all lowering outputs."""
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Callable, Dict, Optional
 
 from openscvx.lowered.cvxpy_constraints import LoweredCvxpyConstraints
 from openscvx.lowered.cvxpy_variables import CVXPyVariables
@@ -31,6 +31,9 @@ class LoweredProblem:
         x_prop_unified: Aggregated propagation state interface
         ocp_vars: Typed CVXPy variables and parameters for OCP construction
         cvxpy_params: Dict mapping user parameter names to CVXPy Parameter objects
+        outputs_prop: Dict mapping output names to vmapped JAX functions.
+            These define additional propagation outputs algebraically dependent on
+            other variables (no integration)
 
     Example:
         After lowering a symbolic problem::
@@ -68,3 +71,6 @@ class LoweredProblem:
     # CVXPy objects
     ocp_vars: CVXPyVariables
     cvxpy_params: Dict[str, "cp.Parameter"]
+
+    # Algebraic outputs (vmapped JAX functions for propagation)
+    outputs_prop: Optional[Dict[str, Callable]] = field(default_factory=dict)

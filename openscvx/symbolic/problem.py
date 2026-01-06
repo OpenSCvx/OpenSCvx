@@ -60,6 +60,8 @@ class SymbolicProblem:
             None before preprocessing, populated after.
         controls_prop: Propagation controls (typically same as controls).
             None before preprocessing, populated after.
+        outputs_prop: Algebraic outputs computed during propagation (no integration).
+            None before preprocessing, populated after.
 
     Example:
         Before preprocessing::
@@ -98,6 +100,10 @@ class SymbolicProblem:
     dynamics_prop: Optional["Expr"] = None
     states_prop: Optional[List["State"]] = None
     controls_prop: Optional[List["Control"]] = None
+
+    # Algebraic outputs computed during propagation (no integration)
+    # Maps output names to symbolic expressions
+    outputs_prop: Optional[Dict[str, "Expr"]] = None
 
     @property
     def is_preprocessed(self) -> bool:
