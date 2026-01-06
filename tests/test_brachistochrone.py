@@ -786,6 +786,8 @@ def test_propagation():
         "kinetic_energy": 0.5 * mass * velocity[0] ** 2,
         "potential_energy": mass * g * position[1],  # mgh (using y as height)
         "total_energy": 0.5 * mass * velocity[0] ** 2 + mass * g * position[1],
+        # Test that outputs_prop can depend on states_prop (propagation-only states)
+        "distance_squared": distance[0] ** 2,
     }
 
     # Generate box constraints for optimization states
@@ -931,6 +933,21 @@ def test_propagation():
 
     # Verify potential energy decreases (object moves down)
     assert pe[-1] < pe[0], "Final potential energy should be less than initial"
+
+    # ==================== Verify outputs_prop can use states_prop ====================
+
+    # Verify that distance_squared (which depends on the propagation-only state) was computed
+    assert "distance_squared" in result.trajectory, "distance_squared not found in trajectory"
+    dist_sq = result.trajectory["distance_squared"]
+    assert dist_sq.shape[0] == len(result.t_full), "distance_squared trajectory length mismatch"
+
+    # Verify distance_squared = distance^2 (allowing for numerical precision)
+    distance_traj = result.trajectory["distance"]
+    computed_dist_sq = distance_traj.flatten() ** 2
+    dist_sq_error = np.max(np.abs(dist_sq.flatten() - computed_dist_sq))
+    assert dist_sq_error < 1e-5, (
+        f"distance_squared != distance^2, max error: {dist_sq_error:.2e}"
+    )
 
     # Clean up JAX caches
     jax.clear_caches()
