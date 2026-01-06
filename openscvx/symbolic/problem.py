@@ -60,7 +60,7 @@ class SymbolicProblem:
             None before preprocessing, populated after.
         controls_prop: Propagation controls (typically same as controls).
             None before preprocessing, populated after.
-        outputs_prop: Algebraic outputs computed during propagation (no integration).
+        algebraic_prop: Algebraic outputs computed during propagation (no integration).
             None before preprocessing, populated after.
 
     Example:
@@ -103,7 +103,7 @@ class SymbolicProblem:
 
     # Algebraic outputs computed during propagation (no integration)
     # Maps output names to symbolic expressions
-    outputs_prop: Optional[Dict[str, "Expr"]] = None
+    algebraic_prop: Optional[Dict[str, "Expr"]] = None
 
     @property
     def is_preprocessed(self) -> bool:

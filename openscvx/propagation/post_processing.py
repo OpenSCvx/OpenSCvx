@@ -1,4 +1,5 @@
 import copy
+from typing import Optional
 
 import jax.numpy as jnp
 import numpy as np
@@ -15,7 +16,7 @@ def propagate_trajectory_results(
     settings: Config,
     result: OptimizationResults,
     propagation_solver: callable,
-    outputs_prop: dict = None,
+    algebraic_prop: Optional[dict] = None,
 ) -> OptimizationResults:
     """Propagate the optimal trajectory and compute additional results.
 
@@ -27,7 +28,7 @@ def propagate_trajectory_results(
         settings (Config): Configuration settings.
         result (OptimizationResults): Optimization results object.
         propagation_solver (callable): Function for propagating the system state.
-        outputs_prop (dict, optional): Dictionary mapping output names to vmapped JAX functions.
+        algebraic_prop (dict, optional): Dictionary mapping output names to vmapped JAX functions.
 
     Returns:
         OptimizationResults: Updated results object containing:
@@ -100,8 +101,8 @@ def propagate_trajectory_results(
         trajectory_dict[control.name] = u_full[:, control._slice]
 
     # Compute algebraic outputs (vmapped over time)
-    if outputs_prop:
-        for name, output_fn in outputs_prop.items():
+    if algebraic_prop:
+        for name, output_fn in algebraic_prop.items():
             # output_fn is vmapped: (T, n_x), (T, n_u), node, params -> (T, output_dim)
             # Pass node=0 since algebraic outputs shouldn't depend on node index
             output_values = output_fn(x_full, u_full, 0, params)

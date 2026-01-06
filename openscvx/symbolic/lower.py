@@ -748,14 +748,14 @@ def lower_symbolic_problem(
     )
 
     # Lower algebraic outputs to vmapped JAX functions
-    outputs_prop_lowered = {}
-    if problem.outputs_prop:
-        for name, expr in problem.outputs_prop.items():
+    algebraic_prop_lowered = {}
+    if problem.algebraic_prop:
+        for name, expr in problem.algebraic_prop.items():
             # Lower expression to JAX function: f(x, u, node, params) -> output
             output_fn = lower_to_jax(expr)
             # Vmap over time axis: (T, n_x), (T, n_u) -> (T, output_dim)
             output_fn_vmapped = jax.vmap(output_fn, in_axes=(0, 0, None, None))
-            outputs_prop_lowered[name] = output_fn_vmapped
+            algebraic_prop_lowered[name] = output_fn_vmapped
 
     return LoweredProblem(
         dynamics=dynamics,
@@ -767,5 +767,5 @@ def lower_symbolic_problem(
         x_prop_unified=x_prop_unified,
         ocp_vars=ocp_vars,
         cvxpy_params=cvxpy_params,
-        outputs_prop=outputs_prop_lowered,
+        algebraic_prop=algebraic_prop_lowered,
     )

@@ -711,7 +711,7 @@ def test_propagation():
     extra state (distance) that is only propagated forward and not included
     in the optimization problem. The distance state integrates velocity to
     track the total arc length travelled along the brachistochrone curve.
-    It also uses outputs_prop to compute algebraic outputs (kinetic energy,
+    It also uses algebraic_prop to compute algebraic outputs (kinetic energy,
     potential energy, total energy) that are evaluated at each timestep
     without integration.
     """
@@ -782,11 +782,11 @@ def test_propagation():
     # Define algebraic outputs (computed, not integrated)
     # These are evaluated at each propagation timestep via vmap
     mass = 1.0  # kg
-    outputs_prop = {
+    algebraic_prop = {
         "kinetic_energy": 0.5 * mass * velocity[0] ** 2,
         "potential_energy": mass * g * position[1],  # mgh (using y as height)
         "total_energy": 0.5 * mass * velocity[0] ** 2 + mass * g * position[1],
-        # Test that outputs_prop can depend on states_prop (propagation-only states)
+        # Test that algebraic_prop can depend on states_prop (propagation-only states)
         "distance_squared": distance[0] ** 2,
     }
 
@@ -812,7 +812,7 @@ def test_propagation():
         licq_max=1e-8,
         dynamics_prop=dynamics_prop_extra,  # Only extra states
         states_prop=states_prop_extra,  # Only extra states
-        outputs_prop=outputs_prop,  # Algebraic outputs
+        algebraic_prop=algebraic_prop,  # Algebraic outputs
     )
 
     problem.settings.prp.dt = 0.01
@@ -934,7 +934,7 @@ def test_propagation():
     # Verify potential energy decreases (object moves down)
     assert pe[-1] < pe[0], "Final potential energy should be less than initial"
 
-    # ==================== Verify outputs_prop can use states_prop ====================
+    # ==================== Verify algebraic_prop can use states_prop ====================
 
     # Verify that distance_squared (which depends on the propagation-only state) was computed
     assert "distance_squared" in result.trajectory, "distance_squared not found in trajectory"
@@ -945,9 +945,7 @@ def test_propagation():
     distance_traj = result.trajectory["distance"]
     computed_dist_sq = distance_traj.flatten() ** 2
     dist_sq_error = np.max(np.abs(dist_sq.flatten() - computed_dist_sq))
-    assert dist_sq_error < 1e-5, (
-        f"distance_squared != distance^2, max error: {dist_sq_error:.2e}"
-    )
+    assert dist_sq_error < 1e-5, f"distance_squared != distance^2, max error: {dist_sq_error:.2e}"
 
     # Clean up JAX caches
     jax.clear_caches()

@@ -31,9 +31,8 @@ class LoweredProblem:
         x_prop_unified: Aggregated propagation state interface
         ocp_vars: Typed CVXPy variables and parameters for OCP construction
         cvxpy_params: Dict mapping user parameter names to CVXPy Parameter objects
-        outputs_prop: Dict mapping output names to vmapped JAX functions.
-            These define additional propagation outputs algebraically dependent on
-            other variables (no integration)
+        algebraic_prop: Dict mapping output names to vmapped JAX functions
+            (evaluated, not integrated)
 
     Example:
         After lowering a symbolic problem::
@@ -73,4 +72,4 @@ class LoweredProblem:
     cvxpy_params: Dict[str, "cp.Parameter"]
 
     # Algebraic outputs (vmapped JAX functions for propagation)
-    outputs_prop: Optional[Dict[str, Callable]] = field(default_factory=dict)
+    algebraic_prop: Optional[Dict[str, Callable]] = field(default_factory=dict)
