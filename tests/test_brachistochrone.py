@@ -705,12 +705,15 @@ def test_parameters():
 
 def test_propagation():
     """
-    Test brachistochrone with propagation dynamics to track distance travelled.
+    Test brachistochrone with propagation dynamics and algebraic outputs.
 
     This test demonstrates using dynamics_prop and states_prop to add an
     extra state (distance) that is only propagated forward and not included
     in the optimization problem. The distance state integrates velocity to
     track the total arc length travelled along the brachistochrone curve.
+    It also uses outputs_prop to compute algebraic outputs (kinetic energy,
+    potential energy, total energy) that are evaluated at each timestep
+    without integration.
     """
     import jax.numpy as jnp
 
@@ -776,6 +779,15 @@ def test_propagation():
         "distance": velocity[0],
     }
 
+    # Define algebraic outputs (computed, not integrated)
+    # These are evaluated at each propagation timestep via vmap
+    mass = 1.0  # kg
+    outputs_prop = {
+        "kinetic_energy": 0.5 * mass * velocity[0] ** 2,
+        "potential_energy": mass * g * position[1],  # mgh (using y as height)
+        "total_energy": 0.5 * mass * velocity[0] ** 2 + mass * g * position[1],
+    }
+
     # Generate box constraints for optimization states
     constraint_exprs = []
     for state in states:
@@ -798,6 +810,7 @@ def test_propagation():
         licq_max=1e-8,
         dynamics_prop=dynamics_prop_extra,  # Only extra states
         states_prop=states_prop_extra,  # Only extra states
+        outputs_prop=outputs_prop,  # Algebraic outputs
     )
 
     problem.settings.prp.dt = 0.01
@@ -874,6 +887,50 @@ def test_propagation():
     print(f"  Distance error:        {distance_error_pct:.2f}%")
     print(f"  Straight-line dist:    {straight_line_distance:.4f} m")
     print(f"  Ratio (arc/line):      {analytical_arc_length / straight_line_distance:.4f}")
+
+    # ==================== Verify Algebraic Outputs ====================
+
+    # Verify that algebraic outputs were computed
+    assert "kinetic_energy" in result.trajectory, "kinetic_energy not found in trajectory"
+    assert "potential_energy" in result.trajectory, "potential_energy not found in trajectory"
+    assert "total_energy" in result.trajectory, "total_energy not found in trajectory"
+
+    # Get output trajectories
+    ke = result.trajectory["kinetic_energy"]
+    pe = result.trajectory["potential_energy"]
+    te = result.trajectory["total_energy"]
+
+    # Check shapes match the time trajectory
+    assert ke.shape[0] == len(result.t_full), "kinetic_energy trajectory length mismatch"
+    assert pe.shape[0] == len(result.t_full), "potential_energy trajectory length mismatch"
+    assert te.shape[0] == len(result.t_full), "total_energy trajectory length mismatch"
+
+    # Verify energy conservation (total energy should be approximately constant)
+    # In brachistochrone without friction, mechanical energy is conserved
+    te_values = te.flatten()
+    te_mean = np.mean(te_values)
+    te_std = np.std(te_values)
+    te_variation_pct = 100 * te_std / te_mean
+
+    # Energy should be conserved within 1% (allowing for numerical integration error)
+    assert te_variation_pct < 1.0, (
+        f"Total energy variation {te_variation_pct:.2f}% exceeds 1% threshold "
+        f"(mean: {te_mean:.4f}, std: {te_std:.4f})"
+    )
+
+    # Verify kinetic + potential = total
+    computed_total = ke.flatten() + pe.flatten()
+    energy_sum_error = np.max(np.abs(computed_total - te_values))
+    assert energy_sum_error < 1e-10, f"KE + PE != Total Energy, max error: {energy_sum_error:.2e}"
+
+    # Verify initial kinetic energy is ~0 (starts from rest)
+    assert ke[0] < 1e-6, f"Initial kinetic energy should be ~0, got {ke[0]}"
+
+    # Verify kinetic energy increases (object accelerates down)
+    assert ke[-1] > ke[0], "Final kinetic energy should be greater than initial"
+
+    # Verify potential energy decreases (object moves down)
+    assert pe[-1] < pe[0], "Final potential energy should be less than initial"
 
     # Clean up JAX caches
     jax.clear_caches()
