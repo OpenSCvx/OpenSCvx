@@ -14,13 +14,13 @@ if TYPE_CHECKING:
 
 
 def _hash_byof(byof: Optional["ByofSpec"]) -> bytes:
-    """Hash BYOF functions by their bytecode.
+    """Hash BYOF functions by their bytecode and constants.
 
     Args:
         byof: Optional ByofSpec containing raw JAX functions
 
     Returns:
-        Concatenated bytecode of all functions, or empty bytes if no byof
+        Concatenated bytecode and constants of all functions, or empty bytes if no byof
     """
     if not byof:
         return b""
@@ -28,12 +28,16 @@ def _hash_byof(byof: Optional["ByofSpec"]) -> bytes:
     codes = []
     for f in byof.get("dynamics", {}).values():
         codes.append(f.__code__.co_code)
+        codes.append(repr(f.__code__.co_consts).encode())
     for c in byof.get("nodal_constraints", []):
         codes.append(c["constraint_fn"].__code__.co_code)
+        codes.append(repr(c["constraint_fn"].__code__.co_consts).encode())
     for f in byof.get("cross_nodal_constraints", []):
         codes.append(f.__code__.co_code)
+        codes.append(repr(f.__code__.co_consts).encode())
     for c in byof.get("ctcs_constraints", []):
         codes.append(c["constraint_fn"].__code__.co_code)
+        codes.append(repr(c["constraint_fn"].__code__.co_consts).encode())
 
     return b"".join(codes)
 
