@@ -70,7 +70,6 @@ time.max = np.array([total_time])
 time.min = np.array([0.0])
 time.initial = np.array([0.0])
 time.final = np.array([total_time])
-time.guess = np.linspace(0.0, total_time, n).reshape(-1, 1)
 
 # Define control components
 thrust_force = ox.Control("thrust_force", shape=(3,))  # Thrust forces [fx, fy, fz]

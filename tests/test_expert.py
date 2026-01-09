@@ -651,10 +651,12 @@ def test_problem_validates_byof_during_construction():
     velocity.min = np.array([0.0])
     velocity.max = np.array([10.0])
     velocity.initial = np.array([0.0])
+    velocity.final = [("free", 5.0)]
 
     theta = ox.Control("theta", shape=(1,))
     theta.min = np.array([0.0])
     theta.max = np.array([np.pi / 2])
+    theta.guess = np.zeros((2, 1))
 
     dynamics = {"position": ox.Concat(velocity[0], velocity[0])}
     time = ox.Time(initial=0.0, final=1.0, min=0.0, max=2.0)

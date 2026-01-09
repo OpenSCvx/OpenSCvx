@@ -158,7 +158,6 @@ def test_monolithic():
     x.min = np.array([0.0, 0.0, 0.0])  # Lower bounds
     x.initial = np.array([x0, y0, 0.0])  # [x0, y0, v0]
     x.final = [x1, y1, ("free", 10.0)]  # [x1, y1, v_free]
-    x.guess = np.linspace(x.initial, x.final, n)
 
     # Define control
     u = ox.Control("u", shape=(1,))  # Angle from vertical
@@ -261,14 +260,12 @@ def test_constraint_types(constraint_type):
     position.min = np.array([0.0, 0.0])
     position.initial = np.array([x0, y0])
     position.final = [x1, y1]
-    position.guess = np.linspace(position.initial, position.final, n)
 
     velocity = ox.State("velocity", shape=(1,))  # Scalar speed
     velocity.max = np.array([10.0])
     velocity.min = np.array([0.0])
     velocity.initial = np.array([0.0])
     velocity.final = [("free", 10.0)]
-    velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
 
     # Define control
     theta = ox.Control("theta", shape=(1,))  # Angle from vertical
@@ -407,14 +404,12 @@ def test_cross_nodal(test_case):
     position.min = np.array([0.0, 0.0])
     position.initial = np.array([x0, y0])
     position.final = [x1, y1]
-    position.guess = np.linspace(position.initial, position.final, n)
 
     velocity = ox.State("velocity", shape=(1,))  # Scalar speed
     velocity.max = np.array([10.0])
     velocity.min = np.array([0.0])
     velocity.initial = np.array([0.0])
     velocity.final = [("free", 10.0)]
-    velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
 
     # Define control
     theta = ox.Control("theta", shape=(1,))  # Angle from vertical
@@ -556,14 +551,12 @@ def test_parameters():
     position.min = np.array([0.0, 0.0])
     position.initial = np.array([x0, y0])
     position.final = [x1, y1]
-    position.guess = np.linspace(position.initial, position.final, n)
 
     velocity = ox.State("velocity", shape=(1,))  # Scalar speed
     velocity.max = np.array([10.0])
     velocity.min = np.array([0.0])
     velocity.initial = np.array([0.0])
     velocity.final = [("free", 10.0)]
-    velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
 
     # Define control
     theta = ox.Control("theta", shape=(1,))  # Angle from vertical
@@ -732,14 +725,12 @@ def test_propagation():
     position.min = np.array([0.0, 0.0])
     position.initial = np.array([x0, y0])
     position.final = [x1, y1]
-    position.guess = np.linspace(position.initial, position.final, n)
 
     velocity = ox.State("velocity", shape=(1,))  # Scalar speed
     velocity.max = np.array([10.0])
     velocity.min = np.array([0.0])
     velocity.initial = np.array([0.0])
     velocity.final = [("free", 10.0)]
-    velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
 
     # Define control
     theta = ox.Control("theta", shape=(1,))  # Angle from vertical
@@ -752,6 +743,8 @@ def test_propagation():
     controls = [theta]
 
     # Define propagation-only state for tracking total distance traveled
+    # Note: propagation states need explicit guesses since fill_default_guesses
+    # only runs on main optimization states
     distance = ox.State("distance", shape=(1,))
     distance.initial = np.array([0.0])
     distance.min = np.array([0.0])
@@ -931,14 +924,12 @@ def test_byof(byof_mode):
     position.min = np.array([0.0, 0.0])
     position.initial = np.array([x0, y0])
     position.final = [x1, y1]
-    position.guess = np.linspace(position.initial, position.final, n)
 
     velocity = ox.State("velocity", shape=(1,))
     velocity.max = np.array([10.0])
     velocity.min = np.array([0.0])
     velocity.initial = np.array([0.0])
     velocity.final = [("free", 10.0)]
-    velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
 
     # Define control
     theta = ox.Control("theta", shape=(1,))

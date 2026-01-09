@@ -41,7 +41,6 @@ theta.min = np.array([-2 * jnp.pi])
 theta.max = np.array([2 * jnp.pi])
 theta.initial = np.array([0])
 theta.final = [("free", 0)]
-theta.guess = np.zeros((n, 1))
 
 # Define control components
 speed = ox.Control("speed", shape=(1,))  # Forward speed

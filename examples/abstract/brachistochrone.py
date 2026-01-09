@@ -38,14 +38,12 @@ position.max = np.array([10.0, 10.0])
 position.min = np.array([0.0, 0.0])
 position.initial = np.array([0.0, 10.0])
 position.final = [10.0, 5.0]
-position.guess = np.linspace(position.initial, position.final, n)
 
 velocity = ox.State("velocity", shape=(1,))  # Scalar speed
 velocity.max = np.array([10.0])
 velocity.min = np.array([0.0])
 velocity.initial = np.array([0.0])
 velocity.final = [("free", 10.0)]
-velocity.guess = np.linspace(0.0, 10.0, n).reshape(-1, 1)
 
 # Define control
 theta = ox.Control("theta", shape=(1,))  # Angle from vertical

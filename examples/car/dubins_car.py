@@ -35,14 +35,12 @@ position.min = np.array([-5.0, -5.0])
 position.max = np.array([5.0, 5.0])
 position.initial = np.array([0, -2])
 position.final = np.array([0, 2])
-position.guess = np.linspace(position.initial, position.final, n)
 
 theta = ox.State("theta", shape=(1,))  # Heading angle
 theta.min = np.array([-2 * jnp.pi])
 theta.max = np.array([2 * jnp.pi])
 theta.initial = np.array([0])
 theta.final = [ox.Free(0)]
-theta.guess = np.zeros((n, 1))
 
 # Define control components
 speed = ox.Control("speed", shape=(1,))  # Forward speed
