@@ -897,34 +897,22 @@ def test_validate_boundary_conditions_passes():
     x.initial = np.zeros(3)
     x.final = np.ones(3)
 
-    v = State("velocity", shape=(2,))
-    v.initial = np.zeros(2)
-    v.final = np.array([1.0, 2.0])
-
-    # Should not raise
-    validate_boundary_conditions([x, v])
-    validate_boundary_conditions([])  # Empty list should also pass
+    validate_boundary_conditions([x])
+    validate_boundary_conditions([])
 
 
 def test_validate_boundary_conditions_raises_missing():
-    """Test that validation raises and lists states missing initial or final."""
-    x1 = State("no_initial", shape=(2,))
-    x1.final = np.ones(2)
+    """Test that validation fails fast on first missing attribute."""
+    x = State("position", shape=(2,))
+    # No initial or final set
 
-    x2 = State("no_final", shape=(2,))
-    x2.initial = np.zeros(2)
+    with pytest.raises(ValueError, match="'position' is missing initial"):
+        validate_boundary_conditions([x])
 
-    x3 = State("no_both", shape=(2,))
-
-    with pytest.raises(ValueError) as exc:
-        validate_boundary_conditions([x1, x2, x3])
-
-    msg = str(exc.value)
-    assert "missing initial conditions" in msg
-    assert "no_initial" in msg
-    assert "no_both" in msg
-    assert "missing final conditions" in msg
-    assert "no_final" in msg
+    # With initial but no final
+    x.initial = np.zeros(2)
+    with pytest.raises(ValueError, match="'position' is missing final"):
+        validate_boundary_conditions([x])
 
 
 # =============================================================================
@@ -942,35 +930,22 @@ def test_validate_bounds_passes():
     u.min = np.zeros(2)
     u.max = np.array([100, 100])
 
-    # Should not raise
     validate_bounds([x, u])
-    validate_bounds([])  # Empty list should also pass
+    validate_bounds([])
 
 
 def test_validate_bounds_raises_missing():
-    """Test that validation raises and lists variables missing min or max."""
-    x = State("valid", shape=(2,))
-    x.min = np.zeros(2)
-    x.max = np.ones(2)
+    """Test that validation fails fast on first missing attribute."""
+    u = Control("thrust", shape=(2,))
+    # No min or max set
 
-    u1 = State("no_min", shape=(2,))
-    u1.max = np.ones(2)
+    with pytest.raises(ValueError, match="'thrust' is missing min"):
+        validate_bounds([u])
 
-    u2 = Control("no_max", shape=(2,))
-    u2.min = np.zeros(2)
-
-    u3 = Control("no_both", shape=(2,))
-
-    with pytest.raises(ValueError) as exc:
-        validate_bounds([x, u1, u2, u3])
-
-    msg = str(exc.value)
-    assert "missing min bounds" in msg
-    assert "no_min" in msg
-    assert "no_both" in msg
-    assert "missing max bounds" in msg
-    assert "no_max" in msg
-    assert "valid" not in msg
+    # With min but no max
+    u.min = np.zeros(2)
+    with pytest.raises(ValueError, match="'thrust' is missing max"):
+        validate_bounds([u])
 
 
 # =============================================================================
@@ -987,25 +962,14 @@ def test_validate_guesses_passes():
     u = Control("thrust", shape=(2,))
     u.guess = np.ones((N, 2))
 
-    # Should not raise
     validate_guesses([x, u])
-    validate_guesses([])  # Empty list should also pass
+    validate_guesses([])
 
 
 def test_validate_guesses_raises_missing():
-    """Test that validation raises and lists variables missing guesses."""
-    N = 10
-    x = State("valid", shape=(3,))
-    x.guess = np.zeros((N, 3))
+    """Test that validation fails fast on first missing guess."""
+    u = Control("thrust", shape=(2,))
+    # No guess set
 
-    u1 = Control("no_guess_1", shape=(2,))
-    u2 = Control("no_guess_2", shape=(1,))
-
-    with pytest.raises(ValueError) as exc:
-        validate_guesses([x, u1, u2])
-
-    msg = str(exc.value)
-    assert "Variables missing initial guesses" in msg
-    assert "no_guess_1" in msg
-    assert "no_guess_2" in msg
-    assert "valid" not in msg
+    with pytest.raises(ValueError, match="Control 'thrust' is missing initial guess.*controls require explicit guesses"):
+        validate_guesses([u])

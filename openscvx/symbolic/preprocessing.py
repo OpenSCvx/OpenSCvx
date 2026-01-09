@@ -786,19 +786,17 @@ def validate_boundary_conditions(states: List[State]) -> None:
     Raises:
         ValueError: If any state is missing initial or final conditions
     """
-    missing_initial = [s.name for s in states if s.initial is None]
-    missing_final = [s.name for s in states if s.final is None]
-
-    if missing_initial or missing_final:
-        msgs = []
-        if missing_initial:
-            msgs.append(f"States missing initial conditions: {missing_initial}")
-        if missing_final:
-            msgs.append(f"States missing final conditions: {missing_final}")
-        raise ValueError(
-            ". ".join(msgs) + ". "
-            "Please set the .initial and .final attributes for each state."
-        )
+    for state in states:
+        if state.initial is None:
+            raise ValueError(
+                f"State '{state.name}' is missing initial condition. "
+                f"Please set {state.name}.initial"
+            )
+        if state.final is None:
+            raise ValueError(
+                f"State '{state.name}' is missing final condition. "
+                f"Please set {state.name}.final"
+            )
 
 
 def validate_bounds(variables: List[Variable]) -> None:
@@ -810,19 +808,17 @@ def validate_bounds(variables: List[Variable]) -> None:
     Raises:
         ValueError: If any variable is missing min or max bounds
     """
-    missing_min = [v.name for v in variables if v.min is None]
-    missing_max = [v.name for v in variables if v.max is None]
-
-    if missing_min or missing_max:
-        msgs = []
-        if missing_min:
-            msgs.append(f"Variables missing min bounds: {missing_min}")
-        if missing_max:
-            msgs.append(f"Variables missing max bounds: {missing_max}")
-        raise ValueError(
-            ". ".join(msgs) + ". "
-            "Please set the .min and .max attributes for each variable."
-        )
+    for var in variables:
+        if var.min is None:
+            raise ValueError(
+                f"Variable '{var.name}' is missing min bound. "
+                f"Please set {var.name}.min"
+            )
+        if var.max is None:
+            raise ValueError(
+                f"Variable '{var.name}' is missing max bound. "
+                f"Please set {var.name}.max"
+            )
 
 
 def validate_guesses(variables: List[Variable]) -> None:
@@ -834,10 +830,14 @@ def validate_guesses(variables: List[Variable]) -> None:
     Raises:
         ValueError: If any variable is missing a guess
     """
-    missing_guesses = [v.name for v in variables if v.guess is None]
-    if missing_guesses:
-        raise ValueError(
-            f"Variables missing initial guesses: {missing_guesses}. "
-            f"Please set the .guess attribute for each variable, e.g.:\n"
-            f"    variable.guess = np.zeros((N, variable.shape[0]))"
-        )
+    for var in variables:
+        if var.guess is None:
+            if isinstance(var, Control):
+                raise ValueError(
+                    f"Control '{var.name}' is missing initial guess. "
+                    f"Please set {var.name}.guess (controls require explicit guesses)"
+                )
+            raise ValueError(
+                f"State '{var.name}' is missing initial guess. "
+                f"Please set {var.name}.guess"
+            )
