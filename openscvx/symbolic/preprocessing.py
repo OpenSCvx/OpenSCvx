@@ -777,6 +777,54 @@ def fill_default_guesses(states: List[State], N: int) -> None:
             state.guess = np.linspace(state.initial, state.final, N)
 
 
+def validate_boundary_conditions(states: List[State]) -> None:
+    """Validate that all states have initial and final boundary conditions set.
+
+    Args:
+        states: List of State objects to validate
+
+    Raises:
+        ValueError: If any state is missing initial or final conditions
+    """
+    missing_initial = [s.name for s in states if s.initial is None]
+    missing_final = [s.name for s in states if s.final is None]
+
+    if missing_initial or missing_final:
+        msgs = []
+        if missing_initial:
+            msgs.append(f"States missing initial conditions: {missing_initial}")
+        if missing_final:
+            msgs.append(f"States missing final conditions: {missing_final}")
+        raise ValueError(
+            ". ".join(msgs) + ". "
+            "Please set the .initial and .final attributes for each state."
+        )
+
+
+def validate_bounds(variables: List[Variable]) -> None:
+    """Validate that all variables have min and max bounds set.
+
+    Args:
+        variables: List of Variable objects (State or Control) to validate
+
+    Raises:
+        ValueError: If any variable is missing min or max bounds
+    """
+    missing_min = [v.name for v in variables if v.min is None]
+    missing_max = [v.name for v in variables if v.max is None]
+
+    if missing_min or missing_max:
+        msgs = []
+        if missing_min:
+            msgs.append(f"Variables missing min bounds: {missing_min}")
+        if missing_max:
+            msgs.append(f"Variables missing max bounds: {missing_max}")
+        raise ValueError(
+            ". ".join(msgs) + ". "
+            "Please set the .min and .max attributes for each variable."
+        )
+
+
 def validate_guesses(variables: List[Variable]) -> None:
     """Validate that all variables have initial guesses set.
 
