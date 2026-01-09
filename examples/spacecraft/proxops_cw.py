@@ -54,7 +54,6 @@ position.max = np.array([100.0, 100.0, 100.0])
 position.min = np.array([-100.0, -100.0, -100.0])
 position.initial = np.array([0.0, -100.0, 0.0])  # Start 100m behind target (V-bar position)
 position.final = np.array([0.0, 0.0, 0.0])  # Dock at origin
-position.guess = np.linspace(position.initial, position.final, n_nodes)
 
 # Velocity in CW frame [vx, vy, vz] in m/s
 velocity = ox.State("velocity", shape=(3,))

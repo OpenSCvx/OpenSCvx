@@ -54,6 +54,7 @@ from openscvx.symbolic.expr import (
     Expr,
     NodalConstraint,
     State,
+    Variable,
     traverse,
 )
 
@@ -755,3 +756,84 @@ def convert_dynamics_dict_to_expr(
     dynamics_concat = Concat(*dynamics_exprs)
 
     return dynamics_converted, dynamics_concat
+
+
+def fill_default_guesses(states: List[State], N: int) -> None:
+    """Fill in default linspace guesses for states with guess=None.
+
+    For states with both initial and final conditions set, generates a linear
+    interpolation from initial to final values.
+
+    This function modifies states in-place.
+
+    Args:
+        states: List of State objects to fill guesses for
+        N: Number of discretization nodes
+    """
+    for state in states:
+        if state.guess is None and state.initial is not None and state.final is not None:
+            # state.initial and state.final are already numpy arrays of values
+            # (the setter handles parsing tuples like ("free", value))
+            state.guess = np.linspace(state.initial, state.final, N)
+
+
+def validate_boundary_conditions(states: List[State]) -> None:
+    """Validate that all states have initial and final boundary conditions set.
+
+    Args:
+        states: List of State objects to validate
+
+    Raises:
+        ValueError: If any state is missing initial or final conditions
+    """
+    for state in states:
+        if state.initial is None:
+            raise ValueError(
+                f"State '{state.name}' is missing initial condition. "
+                f"Please set {state.name}.initial"
+            )
+        if state.final is None:
+            raise ValueError(
+                f"State '{state.name}' is missing final condition. Please set {state.name}.final"
+            )
+
+
+def validate_bounds(variables: List[Variable]) -> None:
+    """Validate that all variables have min and max bounds set.
+
+    Args:
+        variables: List of Variable objects (State or Control) to validate
+
+    Raises:
+        ValueError: If any variable is missing min or max bounds
+    """
+    for var in variables:
+        if var.min is None:
+            raise ValueError(
+                f"Variable '{var.name}' is missing min bound. Please set {var.name}.min"
+            )
+        if var.max is None:
+            raise ValueError(
+                f"Variable '{var.name}' is missing max bound. Please set {var.name}.max"
+            )
+
+
+def validate_guesses(variables: List[Variable]) -> None:
+    """Validate that all variables have initial guesses set.
+
+    Args:
+        variables: List of Variable objects (State or Control) to validate
+
+    Raises:
+        ValueError: If any variable is missing a guess
+    """
+    for var in variables:
+        if var.guess is None:
+            if isinstance(var, Control):
+                raise ValueError(
+                    f"Control '{var.name}' is missing initial guess. "
+                    f"Please set {var.name}.guess (controls require explicit guesses)"
+                )
+            raise ValueError(
+                f"State '{var.name}' is missing initial guess. Please set {var.name}.guess"
+            )

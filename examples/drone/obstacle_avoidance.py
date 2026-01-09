@@ -137,12 +137,6 @@ for center, A in zip(obstacle_centers, A_obs):
     obstacle_constraint = ox.ctcs(1.0 <= diff.T @ A_const @ diff)
     constraints.append(obstacle_constraint)
 
-# Set initial guesses
-position.guess = np.linspace(position.initial, position.final, n)
-velocity.guess = np.linspace(velocity.initial, [0, 0, 0], n)
-attitude.guess = np.tile([1.0, 0.0, 0.0, 0.0], (n, 1))
-angular_velocity.guess = np.zeros((n, 3))
-
 
 time = ox.Time(
     initial=0.0,

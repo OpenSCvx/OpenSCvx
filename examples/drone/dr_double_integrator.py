@@ -38,14 +38,12 @@ position.max = np.array([200.0, 100, 50])
 position.min = np.array([-200.0, -100, 15])
 position.initial = np.array([10.0, 0, 20])
 position.final = [10.0, 0, 20]
-position.guess = np.linspace(position.initial, position.final, n)
 
 velocity = ox.State("velocity", shape=(3,))  # 3D velocity [vx, vy, vz]
 velocity.max = np.array([100, 100, 100])
 velocity.min = np.array([-100, -100, -100])
 velocity.initial = np.array([0, 0, 0])
 velocity.final = [("free", 0), ("free", 0), ("free", 0)]
-velocity.guess = np.linspace(velocity.initial, [0, 0, 0], n)
 
 # Define control
 force = ox.Control("force", shape=(3,))  # Control forces [fx, fy, fz]

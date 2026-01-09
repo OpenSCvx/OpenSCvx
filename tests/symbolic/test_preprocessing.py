@@ -6,11 +6,15 @@ from openscvx.symbolic.expr import Add, Concat, Constant, Control, CrossNodeCons
 from openscvx.symbolic.preprocessing import (
     collect_and_assign_slices,
     convert_dynamics_dict_to_expr,
+    fill_default_guesses,
+    validate_boundary_conditions,
+    validate_bounds,
     validate_constraints_at_root,
     validate_cross_node_constraint,
     validate_dynamics_dict,
     validate_dynamics_dict_dimensions,
     validate_dynamics_dimension,
+    validate_guesses,
     validate_variable_names,
 )
 
@@ -801,3 +805,174 @@ def test_cross_node_constraint_both_sides():
     constraint2 = CrossNodeConstraint(velocity <= position.at(5))
     with pytest.raises(ValueError, match="without .at\\(\\).*vel"):
         validate_cross_node_constraint(constraint2, N)
+
+
+# =============================================================================
+# fill_default_guesses Tests
+# =============================================================================
+
+
+def test_fill_default_guesses_state_linspace():
+    """Test that state guesses are filled with linspace from initial to final."""
+    N = 11  # Use 11 so middle index (5) is exactly at midpoint
+    x = State("x", shape=(3,))
+    x.initial = np.array([0.0, 1.0, 2.0])
+    x.final = np.array([10.0, 11.0, 12.0])
+
+    fill_default_guesses([x], N)
+
+    assert x.guess is not None
+    assert x.guess.shape == (N, 3)
+    # Check first and last rows match initial and final
+    np.testing.assert_array_almost_equal(x.guess[0], [0.0, 1.0, 2.0])
+    np.testing.assert_array_almost_equal(x.guess[-1], [10.0, 11.0, 12.0])
+    # Check it's actually a linspace (middle index should be exactly at midpoint)
+    np.testing.assert_array_almost_equal(x.guess[N // 2], [5.0, 6.0, 7.0])
+
+
+def test_fill_default_guesses_preserves_existing():
+    """Test that existing guesses are not overwritten."""
+    N = 10
+    x = State("x", shape=(2,))
+    x.initial = np.array([0.0, 0.0])
+    x.final = np.array([10.0, 10.0])
+    custom_guess = np.ones((N, 2)) * 99.0
+    x.guess = custom_guess
+
+    fill_default_guesses([x], N)
+
+    # Guess should be unchanged
+    np.testing.assert_array_equal(x.guess, custom_guess)
+
+
+def test_fill_default_guesses_with_free_boundary_conditions():
+    """Test that states with free boundary conditions use the guess values."""
+    N = 10
+    x = State("x", shape=(3,))
+    # Mixed: first fixed, second free, third fixed
+    x.initial = [0.0, ("free", 5.0), 2.0]
+    x.final = [10.0, ("free", 15.0), 12.0]
+
+    fill_default_guesses([x], N)
+
+    assert x.guess is not None
+    assert x.guess.shape == (N, 3)
+    # The setter extracts values from tuples, so initial=[0, 5, 2], final=[10, 15, 12]
+    np.testing.assert_array_almost_equal(x.guess[0], [0.0, 5.0, 2.0])
+    np.testing.assert_array_almost_equal(x.guess[-1], [10.0, 15.0, 12.0])
+
+
+def test_fill_default_guesses_multiple_states():
+    """Test filling guesses for multiple states at once."""
+    N = 5
+    x1 = State("x1", shape=(2,))
+    x1.initial = np.array([0.0, 0.0])
+    x1.final = np.array([4.0, 8.0])
+
+    x2 = State("x2", shape=(1,))
+    x2.initial = np.array([10.0])
+    x2.final = np.array([20.0])
+
+    fill_default_guesses([x1, x2], N)
+
+    # Check x1
+    assert x1.guess.shape == (N, 2)
+    np.testing.assert_array_almost_equal(x1.guess[0], [0.0, 0.0])
+    np.testing.assert_array_almost_equal(x1.guess[-1], [4.0, 8.0])
+
+    # Check x2
+    assert x2.guess.shape == (N, 1)
+    np.testing.assert_array_almost_equal(x2.guess[0], [10.0])
+    np.testing.assert_array_almost_equal(x2.guess[-1], [20.0])
+
+
+# =============================================================================
+# validate_boundary_conditions Tests
+# =============================================================================
+
+
+def test_validate_boundary_conditions_passes():
+    """Test that validation passes when all states have initial and final."""
+    x = State("position", shape=(3,))
+    x.initial = np.zeros(3)
+    x.final = np.ones(3)
+
+    validate_boundary_conditions([x])
+    validate_boundary_conditions([])
+
+
+def test_validate_boundary_conditions_raises_missing():
+    """Test that validation fails fast on first missing attribute."""
+    x = State("position", shape=(2,))
+    # No initial or final set
+
+    with pytest.raises(ValueError, match="'position' is missing initial"):
+        validate_boundary_conditions([x])
+
+    # With initial but no final
+    x.initial = np.zeros(2)
+    with pytest.raises(ValueError, match="'position' is missing final"):
+        validate_boundary_conditions([x])
+
+
+# =============================================================================
+# validate_bounds Tests
+# =============================================================================
+
+
+def test_validate_bounds_passes():
+    """Test that validation passes when all variables have min and max."""
+    x = State("position", shape=(3,))
+    x.min = np.array([-10, -10, -10])
+    x.max = np.array([10, 10, 10])
+
+    u = Control("thrust", shape=(2,))
+    u.min = np.zeros(2)
+    u.max = np.array([100, 100])
+
+    validate_bounds([x, u])
+    validate_bounds([])
+
+
+def test_validate_bounds_raises_missing():
+    """Test that validation fails fast on first missing attribute."""
+    u = Control("thrust", shape=(2,))
+    # No min or max set
+
+    with pytest.raises(ValueError, match="'thrust' is missing min"):
+        validate_bounds([u])
+
+    # With min but no max
+    u.min = np.zeros(2)
+    with pytest.raises(ValueError, match="'thrust' is missing max"):
+        validate_bounds([u])
+
+
+# =============================================================================
+# validate_guesses Tests
+# =============================================================================
+
+
+def test_validate_guesses_passes():
+    """Test that validation passes when all variables have guesses."""
+    N = 10
+    x = State("position", shape=(3,))
+    x.guess = np.zeros((N, 3))
+
+    u = Control("thrust", shape=(2,))
+    u.guess = np.ones((N, 2))
+
+    validate_guesses([x, u])
+    validate_guesses([])
+
+
+def test_validate_guesses_raises_missing():
+    """Test that validation fails fast on first missing guess."""
+    u = Control("thrust", shape=(2,))
+    # No guess set
+
+    with pytest.raises(
+        ValueError,
+        match="Control 'thrust' is missing initial guess.*controls require explicit guesses",
+    ):
+        validate_guesses([u])

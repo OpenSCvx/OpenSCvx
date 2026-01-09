@@ -37,28 +37,24 @@ position.max = np.array([200.0, 100, 200])
 position.min = np.array([-200.0, -100, 15])
 position.initial = np.array([10.0, 0, 20])
 position.final = [10.0, 0, 20]
-position.guess = np.linspace(position.initial, position.final, n)
 
 velocity = ox.State("velocity", shape=(3,))  # 3D velocity [vx, vy, vz]
 velocity.max = np.array([100, 100, 100])
 velocity.min = np.array([-100, -100, -100])
 velocity.initial = np.array([0, 0, 0])
 velocity.final = [("free", 0), ("free", 0), ("free", 0)]
-velocity.guess = np.linspace(velocity.initial, [0, 0, 0], n)
 
 attitude = ox.State("attitude", shape=(4,))  # Quaternion [qw, qx, qy, qz]
 attitude.max = np.array([1, 1, 1, 1])
 attitude.min = np.array([-1, -1, -1, -1])
 attitude.initial = [("free", 1.0), ("free", 0), ("free", 0), ("free", 0)]
 attitude.final = [("free", 1), ("free", 0), ("free", 0), ("free", 0)]
-attitude.guess = np.tile([1.0, 0.0, 0.0, 0.0], (n, 1))
 
 angular_velocity = ox.State("angular_velocity", shape=(3,))  # Angular velocity [wx, wy, wz]
 angular_velocity.max = np.array([10, 10, 10])
 angular_velocity.min = np.array([-10, -10, -10])
 angular_velocity.initial = [("free", 0), ("free", 0), ("free", 0)]
 angular_velocity.final = [("free", 0), ("free", 0), ("free", 0)]
-angular_velocity.guess = np.zeros((n, 3))
 
 # Define control components
 thrust_force = ox.Control("thrust_force", shape=(3,))  # Thrust forces [fx, fy, fz]
