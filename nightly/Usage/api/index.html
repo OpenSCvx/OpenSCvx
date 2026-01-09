@@ -7846,7 +7846,7 @@ Must be provided for export compatibility.</p>
 
 
 <h4 id="openscvx.problem.Problem.__init__" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">openscvx</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">Problem</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">dynamics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">constraints</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Constraint</span><span class="p">,</span> <span class="n">CTCS</span><span class="p">]],</span> <span class="n">states</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">State</span><span class="p">],</span> <span class="n">controls</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Control</span><span class="p">],</span> <span class="n">N</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">time</span><span class="p">:</span> <span class="n">Time</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">dynamics_prop</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">states_prop</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">State</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">licq_min</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">licq_max</span><span class="o">=</span><span class="mf">0.0001</span><span class="p">,</span> <span class="n">time_dilation_factor_min</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">time_dilation_factor_max</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span> <span class="n">byof</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ByofSpec</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">openscvx</span><span class="o">.</span><span class="n">problem</span><span class="o">.</span><span class="n">Problem</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">dynamics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">constraints</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Constraint</span><span class="p">,</span> <span class="n">CTCS</span><span class="p">]],</span> <span class="n">states</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">State</span><span class="p">],</span> <span class="n">controls</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Control</span><span class="p">],</span> <span class="n">N</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">time</span><span class="p">:</span> <span class="n">Time</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">dynamics_prop</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">states_prop</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">State</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">algebraic_prop</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">licq_min</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">licq_max</span><span class="o">=</span><span class="mf">0.0001</span><span class="p">,</span> <span class="n">time_dilation_factor_min</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">time_dilation_factor_max</span><span class="o">=</span><span class="mf">3.0</span><span class="p">,</span> <span class="n">byof</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ByofSpec</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span></code>
 
 <a href="#openscvx.problem.Problem.__init__" class="headerlink" title="Permanent link">&para;</a></h4>
 
@@ -7998,6 +7998,23 @@ state dynamics here.</p>
               <div class="doc-md-description">
                 <p>List of EXTRA State objects for propagation only.
 Only specify additional states beyond optimization states. Used with dynamics_prop.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>algebraic_prop</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Dictionary mapping names to symbolic expressions
+for outputs evaluated (not integrated) during propagation.</p>
               </div>
             </td>
             <td>
