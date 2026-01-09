@@ -971,5 +971,8 @@ def test_validate_guesses_raises_missing():
     u = Control("thrust", shape=(2,))
     # No guess set
 
-    with pytest.raises(ValueError, match="Control 'thrust' is missing initial guess.*controls require explicit guesses"):
+    with pytest.raises(
+        ValueError,
+        match="Control 'thrust' is missing initial guess.*controls require explicit guesses",
+    ):
         validate_guesses([u])

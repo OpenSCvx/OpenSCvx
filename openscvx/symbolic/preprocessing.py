@@ -794,8 +794,7 @@ def validate_boundary_conditions(states: List[State]) -> None:
             )
         if state.final is None:
             raise ValueError(
-                f"State '{state.name}' is missing final condition. "
-                f"Please set {state.name}.final"
+                f"State '{state.name}' is missing final condition. Please set {state.name}.final"
             )
 
 
@@ -811,13 +810,11 @@ def validate_bounds(variables: List[Variable]) -> None:
     for var in variables:
         if var.min is None:
             raise ValueError(
-                f"Variable '{var.name}' is missing min bound. "
-                f"Please set {var.name}.min"
+                f"Variable '{var.name}' is missing min bound. Please set {var.name}.min"
             )
         if var.max is None:
             raise ValueError(
-                f"Variable '{var.name}' is missing max bound. "
-                f"Please set {var.name}.max"
+                f"Variable '{var.name}' is missing max bound. Please set {var.name}.max"
             )
 
 
@@ -838,6 +835,5 @@ def validate_guesses(variables: List[Variable]) -> None:
                     f"Please set {var.name}.guess (controls require explicit guesses)"
                 )
             raise ValueError(
-                f"State '{var.name}' is missing initial guess. "
-                f"Please set {var.name}.guess"
+                f"State '{var.name}' is missing initial guess. Please set {var.name}.guess"
             )
