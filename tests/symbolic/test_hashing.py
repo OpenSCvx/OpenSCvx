@@ -1047,3 +1047,42 @@ def test_duplicate_constraints_same_hash():
     # Different number of duplicates should hash differently
     p3 = make_problem(2)
     assert hash_symbolic_problem(p1) != hash_symbolic_problem(p3)
+
+
+# =============================================================================
+# BYOF Hashing Tests
+# =============================================================================
+
+
+def test_byof_hash_none():
+    """None byof should return empty bytes."""
+    from openscvx.utils.caching import _hash_byof
+
+    assert _hash_byof(None) == b""
+
+
+def test_byof_hash_empty():
+    """Empty byof dict should return empty bytes."""
+    from openscvx.utils.caching import _hash_byof
+
+    assert _hash_byof({}) == b""
+
+
+def test_byof_hash_changes_with_function():
+    """Different lambda implementations should produce different hashes."""
+    from openscvx.utils.caching import _hash_byof
+
+    byof1 = {"nodal_constraints": [{"constraint_fn": lambda x, u, n, p: x[0] - 10.0}]}
+    byof2 = {"nodal_constraints": [{"constraint_fn": lambda x, u, n, p: x[0] - 20.0}]}
+
+    assert _hash_byof(byof1) != _hash_byof(byof2)
+
+
+def test_byof_hash_same_function_same_hash():
+    """Identical lambda implementations should produce same hash."""
+    from openscvx.utils.caching import _hash_byof
+
+    byof1 = {"nodal_constraints": [{"constraint_fn": lambda x, u, n, p: x[0] - 10.0}]}
+    byof2 = {"nodal_constraints": [{"constraint_fn": lambda x, u, n, p: x[0] - 10.0}]}
+
+    assert _hash_byof(byof1) == _hash_byof(byof2)

@@ -164,6 +164,9 @@ class Problem:
 
             validate_byof(byof, self.symbolic.states, n_x, n_u, N)
 
+        # Store byof for cache hashing
+        self._byof = byof
+
         # Lower to JAX and CVXPy (byof handling happens inside lower_symbolic_problem)
         self._lowered: LoweredProblem = lower_symbolic_problem(self.symbolic, byof=byof)
 
@@ -458,6 +461,7 @@ class Problem:
             self.symbolic,
             dt=self.settings.prp.dt,
             total_time=self.settings.sim.total_time,
+            byof=self._byof,
         )
 
         # Compile the discretization solver

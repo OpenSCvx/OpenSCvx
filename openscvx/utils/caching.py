@@ -9,7 +9,37 @@ from jax import export
 from openscvx.utils.cache import get_cache_dir
 
 if TYPE_CHECKING:
+    from openscvx.expert.byof import ByofSpec
     from openscvx.symbolic.problem import SymbolicProblem
+
+
+def _hash_byof(byof: Optional["ByofSpec"]) -> bytes:
+    """Hash BYOF functions by their bytecode and constants.
+
+    Args:
+        byof: Optional ByofSpec containing raw JAX functions
+
+    Returns:
+        Concatenated bytecode and constants of all functions, or empty bytes if no byof
+    """
+    if not byof:
+        return b""
+
+    codes = []
+    for f in byof.get("dynamics", {}).values():
+        codes.append(f.__code__.co_code)
+        codes.append(repr(f.__code__.co_consts).encode())
+    for c in byof.get("nodal_constraints", []):
+        codes.append(c["constraint_fn"].__code__.co_code)
+        codes.append(repr(c["constraint_fn"].__code__.co_consts).encode())
+    for f in byof.get("cross_nodal_constraints", []):
+        codes.append(f.__code__.co_code)
+        codes.append(repr(f.__code__.co_consts).encode())
+    for c in byof.get("ctcs_constraints", []):
+        codes.append(c["constraint_fn"].__code__.co_code)
+        codes.append(repr(c["constraint_fn"].__code__.co_consts).encode())
+
+    return b"".join(codes)
 
 
 def get_solver_cache_paths(
@@ -17,6 +47,7 @@ def get_solver_cache_paths(
     dt: float,
     total_time: float,
     cache_dir: Optional[Path] = None,
+    byof: Optional["ByofSpec"] = None,
 ) -> Tuple[Path, Path]:
     """Generate cache file paths using symbolic AST hashing.
 
@@ -30,6 +61,8 @@ def get_solver_cache_paths(
         total_time: Total simulation time
         cache_dir: Directory to store cached solvers. If None, uses the default
             cache directory (see :func:`openscvx.get_cache_dir`).
+        byof: Optional ByofSpec containing raw JAX functions. If provided,
+            function bytecode is included in the hash.
 
     Returns:
         Tuple of (discretization_solver_path, propagation_solver_path)
@@ -44,6 +77,10 @@ def get_solver_cache_paths(
     final_hasher.update(problem_hash.encode())
     final_hasher.update(f"dt:{dt}".encode())
     final_hasher.update(f"total_time:{total_time}".encode())
+
+    # Include BYOF function bytecode in the hash
+    final_hasher.update(_hash_byof(byof))
+
     final_hash = final_hasher.hexdigest()[:32]
 
     solver_dir = cache_dir if cache_dir is not None else get_cache_dir()
