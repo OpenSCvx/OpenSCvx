@@ -53,6 +53,7 @@ from openscvx.symbolic.preprocessing import (
     validate_dynamics_dict,
     validate_dynamics_dict_dimensions,
     validate_dynamics_dimension,
+    validate_guesses,
     validate_shapes,
     validate_time_parameters,
     validate_variable_names,
@@ -182,9 +183,12 @@ def preprocess_symbolic_problem(
             print([s.name for s in problem.states_prop])
     """
 
-    # Fill in default guesses for user-provided states/controls
-    # (augmented states/controls get their guesses set by augmentation code)
-    fill_default_guesses(states, controls, N)
+    # Fill in default guesses for user-provided states
+    # (augmented states get their guesses set by augmentation code)
+    fill_default_guesses(states, N)
+
+    # Validate that all user-provided variables have guesses
+    validate_guesses(states + controls)
 
     # ==================== PHASE 1: Time Handling & Validation ====================
 

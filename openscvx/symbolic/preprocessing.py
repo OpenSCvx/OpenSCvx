@@ -54,6 +54,7 @@ from openscvx.symbolic.expr import (
     Expr,
     NodalConstraint,
     State,
+    Variable,
     traverse,
 )
 
@@ -757,17 +758,16 @@ def convert_dynamics_dict_to_expr(
     return dynamics_converted, dynamics_concat
 
 
-def fill_default_guesses(states: List[State], controls: List[Control], N: int) -> None:
-    """Fill in default linspace guesses for states/controls with guess=None.
+def fill_default_guesses(states: List[State], N: int) -> None:
+    """Fill in default linspace guesses for states with guess=None.
 
-    For states: generates a linear interpolation from initial to final values.
-    For controls: generates a constant array at the midpoint of bounds (or zeros if unbounded).
+    For states with both initial and final conditions set, generates a linear
+    interpolation from initial to final values.
 
-    This function modifies states and controls in-place.
+    This function modifies states in-place.
 
     Args:
         states: List of State objects to fill guesses for
-        controls: List of Control objects to fill guesses for
         N: Number of discretization nodes
     """
     for state in states:
@@ -776,12 +776,20 @@ def fill_default_guesses(states: List[State], controls: List[Control], N: int) -
             # (the setter handles parsing tuples like ("free", value))
             state.guess = np.linspace(state.initial, state.final, N)
 
-    for control in controls:
-        if control.guess is None:
-            if control.min is not None and control.max is not None:
-                # Use midpoint of bounds
-                default_val = (control.min + control.max) / 2
-            else:
-                # Fall back to zeros
-                default_val = np.zeros(control.shape)
-            control.guess = np.tile(default_val, (N, 1))
+
+def validate_guesses(variables: List[Variable]) -> None:
+    """Validate that all variables have initial guesses set.
+
+    Args:
+        variables: List of Variable objects (State or Control) to validate
+
+    Raises:
+        ValueError: If any variable is missing a guess
+    """
+    missing_guesses = [v.name for v in variables if v.guess is None]
+    if missing_guesses:
+        raise ValueError(
+            f"Variables missing initial guesses: {missing_guesses}. "
+            f"Please set the .guess attribute for each variable, e.g.:\n"
+            f"    variable.guess = np.zeros((N, variable.shape[0]))"
+        )
