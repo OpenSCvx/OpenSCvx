@@ -47,6 +47,7 @@ from openscvx.symbolic.expr.state import State
 from openscvx.symbolic.preprocessing import (
     collect_and_assign_slices,
     convert_dynamics_dict_to_expr,
+    fill_default_guesses,
     validate_and_normalize_constraint_nodes,
     validate_constraints_at_root,
     validate_dynamics_dict,
@@ -180,6 +181,10 @@ def preprocess_symbolic_problem(
             # Propagation states include distance for post-solve simulation
             print([s.name for s in problem.states_prop])
     """
+
+    # Fill in default guesses for user-provided states/controls
+    # (augmented states/controls get their guesses set by augmentation code)
+    fill_default_guesses(states, controls, N)
 
     # ==================== PHASE 1: Time Handling & Validation ====================
 

@@ -755,3 +755,33 @@ def convert_dynamics_dict_to_expr(
     dynamics_concat = Concat(*dynamics_exprs)
 
     return dynamics_converted, dynamics_concat
+
+
+def fill_default_guesses(states: List[State], controls: List[Control], N: int) -> None:
+    """Fill in default linspace guesses for states/controls with guess=None.
+
+    For states: generates a linear interpolation from initial to final values.
+    For controls: generates a constant array at the midpoint of bounds (or zeros if unbounded).
+
+    This function modifies states and controls in-place.
+
+    Args:
+        states: List of State objects to fill guesses for
+        controls: List of Control objects to fill guesses for
+        N: Number of discretization nodes
+    """
+    for state in states:
+        if state.guess is None and state.initial is not None and state.final is not None:
+            # state.initial and state.final are already numpy arrays of values
+            # (the setter handles parsing tuples like ("free", value))
+            state.guess = np.linspace(state.initial, state.final, N)
+
+    for control in controls:
+        if control.guess is None:
+            if control.min is not None and control.max is not None:
+                # Use midpoint of bounds
+                default_val = (control.min + control.max) / 2
+            else:
+                # Fall back to zeros
+                default_val = np.zeros(control.shape)
+            control.guess = np.tile(default_val, (N, 1))
