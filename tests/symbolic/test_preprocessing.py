@@ -6,11 +6,13 @@ from openscvx.symbolic.expr import Add, Concat, Constant, Control, CrossNodeCons
 from openscvx.symbolic.preprocessing import (
     collect_and_assign_slices,
     convert_dynamics_dict_to_expr,
+    fill_default_guesses,
     validate_constraints_at_root,
     validate_cross_node_constraint,
     validate_dynamics_dict,
     validate_dynamics_dict_dimensions,
     validate_dynamics_dimension,
+    validate_guesses,
     validate_variable_names,
 )
 
@@ -801,3 +803,165 @@ def test_cross_node_constraint_both_sides():
     constraint2 = CrossNodeConstraint(velocity <= position.at(5))
     with pytest.raises(ValueError, match="without .at\\(\\).*vel"):
         validate_cross_node_constraint(constraint2, N)
+
+
+# =============================================================================
+# fill_default_guesses Tests
+# =============================================================================
+
+
+def test_fill_default_guesses_state_linspace():
+    """Test that state guesses are filled with linspace from initial to final."""
+    N = 11  # Use 11 so middle index (5) is exactly at midpoint
+    x = State("x", shape=(3,))
+    x.initial = np.array([0.0, 1.0, 2.0])
+    x.final = np.array([10.0, 11.0, 12.0])
+
+    fill_default_guesses([x], N)
+
+    assert x.guess is not None
+    assert x.guess.shape == (N, 3)
+    # Check first and last rows match initial and final
+    np.testing.assert_array_almost_equal(x.guess[0], [0.0, 1.0, 2.0])
+    np.testing.assert_array_almost_equal(x.guess[-1], [10.0, 11.0, 12.0])
+    # Check it's actually a linspace (middle index should be exactly at midpoint)
+    np.testing.assert_array_almost_equal(x.guess[N // 2], [5.0, 6.0, 7.0])
+
+
+def test_fill_default_guesses_preserves_existing():
+    """Test that existing guesses are not overwritten."""
+    N = 10
+    x = State("x", shape=(2,))
+    x.initial = np.array([0.0, 0.0])
+    x.final = np.array([10.0, 10.0])
+    custom_guess = np.ones((N, 2)) * 99.0
+    x.guess = custom_guess
+
+    fill_default_guesses([x], N)
+
+    # Guess should be unchanged
+    np.testing.assert_array_equal(x.guess, custom_guess)
+
+
+def test_fill_default_guesses_skips_missing_boundary_conditions():
+    """Test that states without initial or final are skipped."""
+    N = 10
+
+    # State with only initial
+    x1 = State("x1", shape=(2,))
+    x1.initial = np.array([0.0, 0.0])
+    # No final set
+
+    # State with only final
+    x2 = State("x2", shape=(2,))
+    x2.final = np.array([10.0, 10.0])
+    # No initial set
+
+    # State with neither
+    x3 = State("x3", shape=(2,))
+
+    fill_default_guesses([x1, x2, x3], N)
+
+    # All should still be None
+    assert x1.guess is None
+    assert x2.guess is None
+    assert x3.guess is None
+
+
+def test_fill_default_guesses_with_free_boundary_conditions():
+    """Test that states with free boundary conditions use the guess values."""
+    N = 10
+    x = State("x", shape=(3,))
+    # Mixed: first fixed, second free, third fixed
+    x.initial = [0.0, ("free", 5.0), 2.0]
+    x.final = [10.0, ("free", 15.0), 12.0]
+
+    fill_default_guesses([x], N)
+
+    assert x.guess is not None
+    assert x.guess.shape == (N, 3)
+    # The setter extracts values from tuples, so initial=[0, 5, 2], final=[10, 15, 12]
+    np.testing.assert_array_almost_equal(x.guess[0], [0.0, 5.0, 2.0])
+    np.testing.assert_array_almost_equal(x.guess[-1], [10.0, 15.0, 12.0])
+
+
+def test_fill_default_guesses_multiple_states():
+    """Test filling guesses for multiple states at once."""
+    N = 5
+    x1 = State("x1", shape=(2,))
+    x1.initial = np.array([0.0, 0.0])
+    x1.final = np.array([4.0, 8.0])
+
+    x2 = State("x2", shape=(1,))
+    x2.initial = np.array([10.0])
+    x2.final = np.array([20.0])
+
+    fill_default_guesses([x1, x2], N)
+
+    # Check x1
+    assert x1.guess.shape == (N, 2)
+    np.testing.assert_array_almost_equal(x1.guess[0], [0.0, 0.0])
+    np.testing.assert_array_almost_equal(x1.guess[-1], [4.0, 8.0])
+
+    # Check x2
+    assert x2.guess.shape == (N, 1)
+    np.testing.assert_array_almost_equal(x2.guess[0], [10.0])
+    np.testing.assert_array_almost_equal(x2.guess[-1], [20.0])
+
+
+# =============================================================================
+# validate_guesses Tests
+# =============================================================================
+
+
+def test_validate_guesses_passes_with_all_guesses():
+    """Test that validation passes when all variables have guesses."""
+    N = 10
+    x = State("position", shape=(3,))
+    x.guess = np.zeros((N, 3))
+
+    u = Control("thrust", shape=(2,))
+    u.guess = np.ones((N, 2))
+
+    # Should not raise
+    validate_guesses([x, u])
+
+
+def test_validate_guesses_raises_missing_guess():
+    """Test that validation raises when a variable is missing a guess."""
+    u = Control("thrust", shape=(3,))
+    # No guess set
+
+    with pytest.raises(ValueError) as exc:
+        validate_guesses([u])
+
+    msg = str(exc.value)
+    assert "Variables missing initial guesses" in msg
+    assert "thrust" in msg
+
+
+def test_validate_guesses_raises_multiple_missing():
+    """Test that validation lists all variables missing guesses."""
+    N = 10
+    x = State("position", shape=(3,))
+    x.guess = np.zeros((N, 3))  # Has guess
+
+    u1 = Control("torque", shape=(2,))
+    # No guess
+
+    u2 = Control("flaps", shape=(1,))
+    # No guess
+
+    with pytest.raises(ValueError) as exc:
+        validate_guesses([x, u1, u2])
+
+    msg = str(exc.value)
+    assert "torque" in msg
+    assert "flaps" in msg
+    assert "position" not in msg  # position has a guess
+
+
+def test_validate_guesses_empty_list():
+    """Test that validation passes with empty variable list."""
+    # Should not raise
+    validate_guesses([])
