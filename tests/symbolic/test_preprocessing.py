@@ -7,6 +7,8 @@ from openscvx.symbolic.preprocessing import (
     collect_and_assign_slices,
     convert_dynamics_dict_to_expr,
     fill_default_guesses,
+    validate_boundary_conditions,
+    validate_bounds,
     validate_constraints_at_root,
     validate_cross_node_constraint,
     validate_dynamics_dict,
@@ -843,31 +845,6 @@ def test_fill_default_guesses_preserves_existing():
     np.testing.assert_array_equal(x.guess, custom_guess)
 
 
-def test_fill_default_guesses_skips_missing_boundary_conditions():
-    """Test that states without initial or final are skipped."""
-    N = 10
-
-    # State with only initial
-    x1 = State("x1", shape=(2,))
-    x1.initial = np.array([0.0, 0.0])
-    # No final set
-
-    # State with only final
-    x2 = State("x2", shape=(2,))
-    x2.final = np.array([10.0, 10.0])
-    # No initial set
-
-    # State with neither
-    x3 = State("x3", shape=(2,))
-
-    fill_default_guesses([x1, x2, x3], N)
-
-    # All should still be None
-    assert x1.guess is None
-    assert x2.guess is None
-    assert x3.guess is None
-
-
 def test_fill_default_guesses_with_free_boundary_conditions():
     """Test that states with free boundary conditions use the guess values."""
     N = 10
@@ -910,11 +887,98 @@ def test_fill_default_guesses_multiple_states():
 
 
 # =============================================================================
+# validate_boundary_conditions Tests
+# =============================================================================
+
+
+def test_validate_boundary_conditions_passes():
+    """Test that validation passes when all states have initial and final."""
+    x = State("position", shape=(3,))
+    x.initial = np.zeros(3)
+    x.final = np.ones(3)
+
+    v = State("velocity", shape=(2,))
+    v.initial = np.zeros(2)
+    v.final = np.array([1.0, 2.0])
+
+    # Should not raise
+    validate_boundary_conditions([x, v])
+    validate_boundary_conditions([])  # Empty list should also pass
+
+
+def test_validate_boundary_conditions_raises_missing():
+    """Test that validation raises and lists states missing initial or final."""
+    x1 = State("no_initial", shape=(2,))
+    x1.final = np.ones(2)
+
+    x2 = State("no_final", shape=(2,))
+    x2.initial = np.zeros(2)
+
+    x3 = State("no_both", shape=(2,))
+
+    with pytest.raises(ValueError) as exc:
+        validate_boundary_conditions([x1, x2, x3])
+
+    msg = str(exc.value)
+    assert "missing initial conditions" in msg
+    assert "no_initial" in msg
+    assert "no_both" in msg
+    assert "missing final conditions" in msg
+    assert "no_final" in msg
+
+
+# =============================================================================
+# validate_bounds Tests
+# =============================================================================
+
+
+def test_validate_bounds_passes():
+    """Test that validation passes when all variables have min and max."""
+    x = State("position", shape=(3,))
+    x.min = np.array([-10, -10, -10])
+    x.max = np.array([10, 10, 10])
+
+    u = Control("thrust", shape=(2,))
+    u.min = np.zeros(2)
+    u.max = np.array([100, 100])
+
+    # Should not raise
+    validate_bounds([x, u])
+    validate_bounds([])  # Empty list should also pass
+
+
+def test_validate_bounds_raises_missing():
+    """Test that validation raises and lists variables missing min or max."""
+    x = State("valid", shape=(2,))
+    x.min = np.zeros(2)
+    x.max = np.ones(2)
+
+    u1 = State("no_min", shape=(2,))
+    u1.max = np.ones(2)
+
+    u2 = Control("no_max", shape=(2,))
+    u2.min = np.zeros(2)
+
+    u3 = Control("no_both", shape=(2,))
+
+    with pytest.raises(ValueError) as exc:
+        validate_bounds([x, u1, u2, u3])
+
+    msg = str(exc.value)
+    assert "missing min bounds" in msg
+    assert "no_min" in msg
+    assert "no_both" in msg
+    assert "missing max bounds" in msg
+    assert "no_max" in msg
+    assert "valid" not in msg
+
+
+# =============================================================================
 # validate_guesses Tests
 # =============================================================================
 
 
-def test_validate_guesses_passes_with_all_guesses():
+def test_validate_guesses_passes():
     """Test that validation passes when all variables have guesses."""
     N = 10
     x = State("position", shape=(3,))
@@ -925,43 +989,23 @@ def test_validate_guesses_passes_with_all_guesses():
 
     # Should not raise
     validate_guesses([x, u])
+    validate_guesses([])  # Empty list should also pass
 
 
-def test_validate_guesses_raises_missing_guess():
-    """Test that validation raises when a variable is missing a guess."""
-    u = Control("thrust", shape=(3,))
-    # No guess set
-
-    with pytest.raises(ValueError) as exc:
-        validate_guesses([u])
-
-    msg = str(exc.value)
-    assert "Variables missing initial guesses" in msg
-    assert "thrust" in msg
-
-
-def test_validate_guesses_raises_multiple_missing():
-    """Test that validation lists all variables missing guesses."""
+def test_validate_guesses_raises_missing():
+    """Test that validation raises and lists variables missing guesses."""
     N = 10
-    x = State("position", shape=(3,))
-    x.guess = np.zeros((N, 3))  # Has guess
+    x = State("valid", shape=(3,))
+    x.guess = np.zeros((N, 3))
 
-    u1 = Control("torque", shape=(2,))
-    # No guess
-
-    u2 = Control("flaps", shape=(1,))
-    # No guess
+    u1 = Control("no_guess_1", shape=(2,))
+    u2 = Control("no_guess_2", shape=(1,))
 
     with pytest.raises(ValueError) as exc:
         validate_guesses([x, u1, u2])
 
     msg = str(exc.value)
-    assert "torque" in msg
-    assert "flaps" in msg
-    assert "position" not in msg  # position has a guess
-
-
-def test_validate_guesses_empty_list():
-    """Test that validation passes with empty variable list."""
-    # Should not raise
-    validate_guesses([])
+    assert "Variables missing initial guesses" in msg
+    assert "no_guess_1" in msg
+    assert "no_guess_2" in msg
+    assert "valid" not in msg
