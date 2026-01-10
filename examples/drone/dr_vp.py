@@ -187,33 +187,16 @@ dynamics = {
 }
 
 
-# Initialize initial guess (will be modified by gate logic)
-position_bar = np.linspace(position.initial, position.final, n)
-velocity_bar = np.zeros((n, 3))
-attitude_bar = np.tile([1.0, 0.0, 0.0, 0.0], (n, 1))
-angular_velocity_bar = np.zeros((n, 3))
+# Generate initial guess for position trajectory through gates
+position_bar = ox.init.linspace(
+    keyframes=[position.initial] + gate_centers + [position.final],
+    nodes=[0] + list(gate_nodes) + [n - 1],
+)
 
-# Modify position to go through gates
-i = 0
-origins = [position.initial]
-ends = []
-for center in gate_centers:
-    origins.append(center)
-    ends.append(center)
-ends.append(position.final)
-gate_idx = 0
-for _ in range(n_gates + 1):
-    for k in range(n // (n_gates + 1)):
-        position_bar[i] = origins[gate_idx] + (k / (n // (n_gates + 1))) * (
-            ends[gate_idx] - origins[gate_idx]
-        )
-        i += 1
-    gate_idx += 1
-
-# Modify attitude to point sensor at targets
-R_sb = R_sb  # Sensor to body frame
+# Generate attitude guess to point sensor at mean target position
 b = R_sb @ np.array([0, 1, 0])
-mean_target = np.mean(init_poses, axis=0)  # Average target position
+mean_target = np.mean(init_poses, axis=0)
+attitude_bar = np.zeros((n, 4))
 for k in range(n):
     a = mean_target - position_bar[k]
     # Determine the direction cosine matrix that aligns the z-axis of the sensor frame with the
@@ -221,14 +204,11 @@ for k in range(n):
     q_xyz = np.cross(b, a)
     q_w = np.sqrt(la.norm(a) ** 2 + la.norm(b) ** 2) + np.dot(a, b)
     q_no_norm = np.hstack((q_w, q_xyz))
-    q = q_no_norm / la.norm(q_no_norm)
-    attitude_bar[k] = q
+    attitude_bar[k] = q_no_norm / la.norm(q_no_norm)
 
-# Set all guesses
+# Set guesses
 position.guess = position_bar
-velocity.guess = velocity_bar
 attitude.guess = attitude_bar
-angular_velocity.guess = angular_velocity_bar
 
 time = ox.Time(
     initial=0.0,
