@@ -37,6 +37,19 @@ def test_linspace_multiple_keyframes():
     np.testing.assert_array_almost_equal(result[2], [4.0])  # 0 -> 10, at 2/5
 
 
+def test_linspace_adjacent_nodes():
+    """Test linspace with adjacent nodes (spacing of 1)."""
+    result = linspace(
+        keyframes=[[0.0], [10.0], [5.0]],
+        nodes=[0, 1, 2],
+    )
+
+    assert result.shape == (3, 1)
+    np.testing.assert_array_almost_equal(result[0], [0.0])
+    np.testing.assert_array_almost_equal(result[1], [10.0])
+    np.testing.assert_array_almost_equal(result[2], [5.0])
+
+
 def test_linspace_validation():
     """Test linspace input validation."""
     with pytest.raises(ValueError, match="same length"):
@@ -44,6 +57,9 @@ def test_linspace_validation():
 
     with pytest.raises(ValueError, match="strictly increasing"):
         linspace(keyframes=[[0.0], [10.0]], nodes=[5, 5])
+
+    with pytest.raises(ValueError, match="strictly increasing"):
+        linspace(keyframes=[[0.0], [10.0]], nodes=[5, 3])  # decreasing
 
     with pytest.raises(ValueError, match="At least 2 keyframes"):
         linspace(keyframes=[[0.0]], nodes=[0])
