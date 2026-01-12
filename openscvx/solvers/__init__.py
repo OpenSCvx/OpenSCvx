@@ -5,19 +5,23 @@ SCvx algorithms. At each iteration of a successive convexification algorithm,
 the non-convex problem is approximated by a convex subproblem, which is then
 solved using one of these solver backends.
 
-Current Implementations:
-    CVXPy Solver: The default solver backend using CVXPy's modeling language
-        with support for multiple backend solvers (CLARABEL, etc.).
-        Includes optional code generation via cvxpygen for improved performance.
+All solvers inherit from :class:`ConvexSolver`, enabling pluggable solver
+implementations and custom backends:
 
-Note:
-    CVXPyGen setup logic is currently in :class:`Problem`. When the
-    ``ConvexSolver`` base class is implemented, this setup will move here.
+```python
+class ConvexSolver(ABC):
+    @abstractmethod
+    def initialize(self, lowered, settings) -> None:
+        '''Build the convex subproblem structure (called once).'''
+        ...
 
-Planned Architecture (ABC-based):
+    @abstractmethod
+    def solve(self, state, params, settings) -> cp.Problem:
+        '''Update parameters and solve (called each iteration).'''
+        ...
+```
 
-A base class will be introduced to enable pluggable solver implementations.
-This will enable users to implement custom solver backends such as:
+This architecture enables users to implement custom solver backends such as:
 
 - Direct Clarabel solver (Rust-based, GPU-capable)
 - QPAX (JAX-based QP solver for end-to-end differentiability)
@@ -25,27 +29,17 @@ This will enable users to implement custom solver backends such as:
 - Custom embedded solvers for real-time applications
 - Research solvers with specialized structure exploitation
 
-This should also make the solver choice independent of the algorithm choice
-
-Future solvers will implement the ConvexSolver interface:
-
-```python
-# solvers/base.py (planned):
-class ConvexSolver(ABC):
-    @abstractmethod
-    def build_subproblem(self, state: AlgorithmState, lowered: LoweredProblem):
-        '''Build the convex subproblem from current state.'''
-        ...
-
-    @abstractmethod
-    def solve(self) -> OptimizationResults:
-        '''Solve the convex subproblem and return results.'''
-        ...
-```
+Note:
+    CVXPyGen setup logic is currently in :class:`Problem`. When solvers are
+    refactored to use the ``ConvexSolver`` base class, this setup will move here.
 """
 
+from .base import ConvexSolver
 from .cvxpy import optimal_control_problem
 
 __all__ = [
+    # Base class
+    "ConvexSolver",
+    # CVXPy implementation
     "optimal_control_problem",
 ]
