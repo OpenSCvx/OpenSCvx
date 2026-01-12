@@ -128,11 +128,13 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
             cost -= lam_cost * x_nonscaled[-1][i]
 
     if settings.scp.uniform_time_grid:
+        S_u_inv_td = np.linalg.inv(S_u)[
+            settings.sim.time_dilation_slice, settings.sim.time_dilation_slice
+        ]
+        c_u_td = c_u[settings.sim.time_dilation_slice]
         constr += [
-            np.linalg.inv(S_u)[settings.sim.time_dilation_slice, settings.sim.time_dilation_slice] @ 
-            (u_nonscaled[i][settings.sim.time_dilation_slice] - c_u[settings.sim.time_dilation_slice])
-            == np.linalg.inv(S_u)[settings.sim.time_dilation_slice, settings.sim.time_dilation_slice] @ 
-            (u_nonscaled[i - 1][settings.sim.time_dilation_slice] - c_u[settings.sim.time_dilation_slice])
+            S_u_inv_td @ (u_nonscaled[i][settings.sim.time_dilation_slice] - c_u_td)
+            == S_u_inv_td @ (u_nonscaled[i - 1][settings.sim.time_dilation_slice] - c_u_td)
             for i in range(1, settings.scp.n)
         ]
 
