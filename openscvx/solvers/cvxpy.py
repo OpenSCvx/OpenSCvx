@@ -113,9 +113,7 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
     if cvxpy_constraints.constraints:
         constr += cvxpy_constraints.constraints
 
-    for i in range(
-        settings.sim.true_state_slice.start, settings.sim.true_state_slice.stop
-    ):
+    for i in range(settings.sim.true_state_slice.start, settings.sim.true_state_slice.stop):
         if settings.sim.x.initial_type[i] == "Fix":
             constr += [x_nonscaled[0][i] == x_init[i]]  # Initial Boundary Conditions
         if settings.sim.x.final_type[i] == "Fix":
@@ -130,14 +128,11 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
             cost -= lam_cost * x_nonscaled[-1][i]
 
     if settings.scp.uniform_time_grid:
-        S_u_inv_td = inv_S_u[
-            settings.sim.time_dilation_slice, settings.sim.time_dilation_slice
-        ]
+        S_u_inv_td = inv_S_u[settings.sim.time_dilation_slice, settings.sim.time_dilation_slice]
         c_u_td = c_u[settings.sim.time_dilation_slice]
         constr += [
             S_u_inv_td @ (u_nonscaled[i][settings.sim.time_dilation_slice] - c_u_td)
-            == S_u_inv_td
-            @ (u_nonscaled[i - 1][settings.sim.time_dilation_slice] - c_u_td)
+            == S_u_inv_td @ (u_nonscaled[i - 1][settings.sim.time_dilation_slice] - c_u_td)
             for i in range(1, settings.scp.n)
         ]
 
@@ -211,8 +206,7 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
     ):
         start_idx = 1 if nodes[0] == 0 else nodes[0]
         constr += [
-            cp.abs(x_nonscaled[i][idx] - x_nonscaled[i - 1][idx])
-            <= settings.sim.x.max[idx]
+            cp.abs(x_nonscaled[i][idx] - x_nonscaled[i - 1][idx]) <= settings.sim.x.max[idx]
             for i in range(start_idx, nodes[1])
         ]
         constr += [x_nonscaled[0][idx] == 0]
@@ -229,16 +223,12 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
             )
         # Check to see if solver directory exists
         if not os.path.exists("solver"):
-            cpg.generate_code(
-                prob, solver=settings.cvx.solver, code_dir="solver", wrapper=True
-            )
+            cpg.generate_code(prob, solver=settings.cvx.solver, code_dir="solver", wrapper=True)
         else:
             # Prompt the use to indicate if they wish to overwrite the solver
             # directory or use the existing compiled solver
             if settings.cvx.cvxpygen_override:
-                cpg.generate_code(
-                    prob, solver=settings.cvx.solver, code_dir="solver", wrapper=True
-                )
+                cpg.generate_code(prob, solver=settings.cvx.solver, code_dir="solver", wrapper=True)
             else:
                 overwrite = input("Solver directory already exists. Overwrite? (y/n): ")
                 if overwrite.lower() == "y":
