@@ -59,26 +59,22 @@ def print_summary_box(lines, title="Summary"):
     print(f"{' ' * indent}╰{'─' * box_width}╯\n")
 
 
-def print_problem_summary(settings, lowered):
+def print_problem_summary(settings, lowered, solver):
     """
     Print the problem summary box.
 
     Args:
         settings: Configuration settings containing problem information
         lowered: LoweredProblem from lower_symbolic_problem()
+        solver: Initialized ConvexSolver with built problem
     """
     n_nodal_convex = len(lowered.cvxpy_constraints.constraints)
     n_nodal_nonconvex = len(lowered.jax_constraints.nodal)
     n_ctcs = len(lowered.jax_constraints.ctcs)
     n_augmented = settings.sim.n_states - settings.sim.true_state_slice.stop
 
-    # Count CVXPy variables, parameters, and constraints
-    from openscvx.solvers import CVXPySolver
-
+    # Count CVXPy variables, parameters, and constraints from solver's problem
     try:
-        # Build OCP using CVXPySolver
-        solver = CVXPySolver()
-        solver.initialize(lowered, settings)
         prob = solver.problem
 
         # Get the actual problem size information like CVXPy verbose output
@@ -86,7 +82,7 @@ def print_problem_summary(settings, lowered):
         n_cvx_parameters = sum(param.size for param in prob.parameters())
         n_cvx_constraints = sum(constraint.size for constraint in prob.constraints)
     except Exception:
-        # Fallback if problem construction fails
+        # Fallback if problem not available
         n_cvx_variables = 0
         n_cvx_parameters = 0
         n_cvx_constraints = 0

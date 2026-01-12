@@ -396,9 +396,6 @@ class Problem:
         """
         printing.intro()
 
-        # Print problem summary
-        printing.print_problem_summary(self.settings, self._lowered)
-
         # Enable the profiler
         pr = profiling.profiling_start(self.settings.dev.profiling)
 
@@ -457,6 +454,9 @@ class Problem:
 
         # Build convex subproblem (solver was created in __init__, variables in lower)
         self._solver.initialize(self._lowered, self.settings)
+
+        # Print problem summary (after solver is initialized so we can access problem stats)
+        printing.print_problem_summary(self.settings, self._lowered, self._solver)
 
         # Get cache file paths using symbolic AST hashing
         # This is more stable than hashing lowered JAX code
