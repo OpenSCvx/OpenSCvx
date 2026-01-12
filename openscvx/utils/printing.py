@@ -73,19 +73,11 @@ def print_problem_summary(settings, lowered, solver):
     n_ctcs = len(lowered.jax_constraints.ctcs)
     n_augmented = settings.sim.n_states - settings.sim.true_state_slice.stop
 
-    # Count CVXPy variables, parameters, and constraints from solver's problem
-    try:
-        prob = solver.problem
-
-        # Get the actual problem size information like CVXPy verbose output
-        n_cvx_variables = sum(var.size for var in prob.variables())
-        n_cvx_parameters = sum(param.size for param in prob.parameters())
-        n_cvx_constraints = sum(constraint.size for constraint in prob.constraints)
-    except Exception:
-        # Fallback if problem not available
-        n_cvx_variables = 0
-        n_cvx_parameters = 0
-        n_cvx_constraints = 0
+    # Get solver statistics
+    stats = solver.get_stats()
+    n_cvx_variables = stats["n_variables"]
+    n_cvx_parameters = stats["n_parameters"]
+    n_cvx_constraints = stats["n_constraints"]
 
     # Get JAX backend information
     jax_backend = jax.devices()[0].platform.upper()

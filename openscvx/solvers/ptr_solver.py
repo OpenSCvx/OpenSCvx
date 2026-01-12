@@ -100,7 +100,6 @@ class PtrSolver(ConvexSolver):
             x_sol = result.x  # Unscaled state trajectory
 
     Attributes:
-        problem: The CVXPy Problem object (available after initialize())
         ocp_vars: The CVXPy variables and parameters (available after create_variables())
     """
 
@@ -112,15 +111,6 @@ class PtrSolver(ConvexSolver):
         self._ocp_vars: "CVXPyVariables" = None
         self._problem: cp.Problem = None
         self._solve_fn: callable = None
-
-    @property
-    def problem(self) -> cp.Problem:
-        """The CVXPy Problem object.
-
-        Returns:
-            The constructed CVXPy problem, or None if not initialized.
-        """
-        return self._problem
 
     @property
     def ocp_vars(self) -> "CVXPyVariables":
@@ -341,6 +331,43 @@ class PtrSolver(ConvexSolver):
         self._set_param("lam_cost", lam_cost)
         self._set_param("lam_vc", lam_vc)
         self._set_param("lam_vb", lam_vb)
+
+    def update_boundary_conditions(
+        self,
+        x_init: np.ndarray = None,
+        x_term: np.ndarray = None,
+    ) -> None:
+        """Update boundary condition parameters.
+
+        Sets initial and/or terminal state constraints. Only sets parameters
+        that exist in the problem (some problems may not have both).
+
+        Args:
+            x_init: Initial state vector, shape (n_states,). Optional.
+            x_term: Terminal state vector, shape (n_states,). Optional.
+        """
+        if x_init is not None and "x_init" in self._problem.param_dict:
+            self._set_param("x_init", x_init)
+        if x_term is not None and "x_term" in self._problem.param_dict:
+            self._set_param("x_term", x_term)
+
+    def get_stats(self) -> dict:
+        """Get solver statistics for diagnostics and printing.
+
+        Returns:
+            Dict containing:
+                - ``n_variables``: Total number of optimization variables
+                - ``n_parameters``: Total number of parameters
+                - ``n_constraints``: Total number of constraints
+        """
+        if self._problem is None:
+            return {"n_variables": 0, "n_parameters": 0, "n_constraints": 0}
+
+        return {
+            "n_variables": sum(var.size for var in self._problem.variables()),
+            "n_parameters": sum(param.size for param in self._problem.parameters()),
+            "n_constraints": sum(constraint.size for constraint in self._problem.constraints),
+        }
 
     def _set_param(self, name: str, value: np.ndarray) -> None:
         """Set a CVXPy parameter with helpful error messages on failure.

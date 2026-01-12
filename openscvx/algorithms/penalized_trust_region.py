@@ -8,7 +8,6 @@ import time
 import warnings
 from typing import TYPE_CHECKING, List
 
-import cvxpy as cp
 import numpy as np
 import numpy.linalg as la
 
@@ -22,41 +21,6 @@ if TYPE_CHECKING:
     from openscvx.solvers import ConvexSolver
 
 warnings.filterwarnings("ignore")
-
-
-def _set_param(prob: cp.Problem, name: str, value: np.ndarray) -> None:
-    """Set a CVXPY parameter with helpful error messages on failure.
-
-    Args:
-        prob: The CVXPY problem containing the parameter.
-        name: The parameter name in prob.param_dict.
-        value: The value to assign.
-
-    Raises:
-        ValueError: If the value is not real, with diagnostic information.
-    """
-    try:
-        prob.param_dict[name].value = value
-    except ValueError as e:
-        if "must be real" in str(e):
-            arr = np.asarray(value)
-            nan_mask = ~np.isfinite(arr)
-            nan_indices = np.argwhere(nan_mask)
-
-            # Build list of "index -> value" strings
-            index_value_strs = [
-                f"  {tuple(int(i) for i in idx)} -> {arr[tuple(idx)]}" for idx in nan_indices[:20]
-            ]
-            if len(nan_indices) > 20:
-                index_value_strs.append(f"  ... and {len(nan_indices) - 20} more")
-
-            arr_str = np.array2string(arr, threshold=200, edgeitems=3, max_line_width=120)
-            msg = (
-                f"Parameter '{name}' with shape {arr.shape} contains {len(nan_indices)} non-real"
-                " value(s):\n" + "\n".join(index_value_strs) + f"\n\n{name} = {arr_str}"
-            )
-            raise ValueError(msg) from e
-        raise
 
 
 class PenalizedTrustRegion(Algorithm):
@@ -126,14 +90,11 @@ class PenalizedTrustRegion(Algorithm):
         self._jax_constraints = jax_constraints
         self._emitter = emitter
 
-        # Access the underlying problem for parameter initialization
-        ocp = self._solver.problem
-
-        if "x_init" in ocp.param_dict:
-            _set_param(ocp, "x_init", settings.sim.x.initial)
-
-        if "x_term" in ocp.param_dict:
-            _set_param(ocp, "x_term", settings.sim.x.final)
+        # Set boundary conditions
+        self._solver.update_boundary_conditions(
+            x_init=settings.sim.x.initial,
+            x_term=settings.sim.x.final,
+        )
 
         # Create temporary state for initialization solve
         init_state = AlgorithmState.from_settings(settings)

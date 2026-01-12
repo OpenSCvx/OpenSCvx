@@ -182,6 +182,30 @@ class ConvexSolver(ABC):
         ...
 
     @abstractmethod
+    def update_boundary_conditions(self, **kwargs) -> None:
+        """Update boundary condition parameters.
+
+        Called once during algorithm initialization to set initial and terminal
+        state constraints.
+
+        The specific parameters depend on the solver implementation.
+        See concrete solver classes for expected arguments.
+        """
+        ...
+
+    @abstractmethod
+    def get_stats(self) -> dict:
+        """Get solver statistics for diagnostics and printing.
+
+        Returns:
+            Dict containing solver statistics. Expected keys:
+                - ``n_variables``: Total number of optimization variables
+                - ``n_parameters``: Total number of parameters
+                - ``n_constraints``: Total number of constraints
+        """
+        ...
+
+    @abstractmethod
     def solve(self):
         """Solve the convex subproblem and return results.
 
