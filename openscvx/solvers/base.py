@@ -31,12 +31,9 @@ This separation allows the lowering process to:
 """
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, List
+from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
-    import cvxpy as cp
-
-    from openscvx.algorithms import AlgorithmState
     from openscvx.config import Config
     from openscvx.lowered import LoweredProblem
     from openscvx.lowered.jax_constraints import LoweredJaxConstraints
@@ -72,11 +69,9 @@ class ConvexSolver(ABC):
                     # Build problem structure using self._vars
                     self._prob = build_my_problem(self._vars, lowered, settings)
 
-                def solve(self, state, params, settings) -> cp.Problem:
-                    # Update parameters and solve
-                    update_params(self._prob, state, params)
+                def solve(self):
+                    # Parameters already updated by algorithm
                     self._prob.solve()
-                    return self._prob
     """
 
     @abstractmethod
@@ -129,28 +124,16 @@ class ConvexSolver(ABC):
         ...
 
     @abstractmethod
-    def solve(
-        self,
-        state: "AlgorithmState",
-        params: dict,
-        settings: "Config",
-    ) -> Any:
-        """Update parameters and solve the convex subproblem.
+    def solve(self) -> None:
+        """Solve the convex subproblem.
 
-        Called at each SCP iteration. Updates the parameter values from the
-        current linearization point and solves the problem.
+        Called at each SCP iteration after the algorithm has updated parameter
+        values. The algorithm is responsible for setting linearization parameters
+        before calling this method.
 
-        Args:
-            state: Current algorithm state containing linearization point
-                (provides ``x``, ``u`` for linearization via properties)
-            params: Problem parameters dictionary
-            settings: Configuration object with solver settings
-
-        Returns:
-            The solved problem. Currently returns ``cp.Problem`` for CVXPy-based
-            solvers. Future backends may return different types (e.g., solution
-            arrays, result objects). The return type will be refined when the
-            interface is generalized.
+        Note:
+            Results are accessed via backend-specific attributes after solving
+            (e.g., ``solver.problem.var_dict["x"].value`` for CVXPy).
         """
         ...
 

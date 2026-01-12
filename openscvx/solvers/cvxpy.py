@@ -6,7 +6,7 @@ code generation via cvxpygen for improved performance.
 """
 
 import os
-from typing import TYPE_CHECKING, Any, List
+from typing import TYPE_CHECKING, List
 
 import cvxpy as cp
 import numpy as np
@@ -16,7 +16,6 @@ from openscvx.config import Config
 from .base import ConvexSolver
 
 if TYPE_CHECKING:
-    from openscvx.algorithms import AlgorithmState
     from openscvx.lowered import LoweredProblem
     from openscvx.lowered.cvxpy_variables import CVXPyVariables
     from openscvx.lowered.jax_constraints import LoweredJaxConstraints
@@ -57,8 +56,8 @@ class CVXPySolver(ConvexSolver):
             solver.initialize(lowered, settings)
 
             # Each iteration (parameter updates done by algorithm):
-            prob = solver.solve(state, params, settings)
-            x_sol = prob.var_dict["x"].value
+            solver.solve()
+            x_sol = solver.problem.var_dict["x"].value
 
     Attributes:
         problem: The CVXPy Problem object (available after initialize())
@@ -218,34 +217,17 @@ class CVXPySolver(ConvexSolver):
             solver_args = settings.cvx.solver_args
             self._solve_fn = lambda: self._problem.solve(solver=solver, **solver_args)
 
-    def solve(
-        self,
-        state: "AlgorithmState",
-        params: dict,
-        settings: "Config",
-    ) -> cp.Problem:
+    def solve(self) -> None:
         """Solve the convex subproblem.
 
-        Note:
-            Parameter updates (x_bar, u_bar, A_d, B_d, constraint linearizations,
-            etc.) are currently performed by the algorithm before calling this
-            method. This method simply invokes the configured solver.
+        The algorithm is responsible for updating CVXPy parameters (x_bar, u_bar,
+        A_d, B_d, constraint linearizations, etc.) before calling this method.
 
-            A future refactor may move parameter update logic here for better
-            encapsulation, at which point the full ``state`` and ``params``
-            arguments will be used.
-
-        Args:
-            state: Current algorithm state (reserved for future use)
-            params: Problem parameters dictionary (reserved for future use)
-            settings: Configuration object (reserved for future use)
-
-        Returns:
-            The solved CVXPy problem. Access solution via:
-            - ``problem.var_dict["x"].value`` for state trajectory
-            - ``problem.var_dict["u"].value`` for control trajectory
-            - ``problem.value`` for optimal cost
-            - ``problem.status`` for solver status
+        Access results after solving via:
+        - ``solver.problem.var_dict["x"].value`` for state trajectory
+        - ``solver.problem.var_dict["u"].value`` for control trajectory
+        - ``solver.problem.value`` for optimal cost
+        - ``solver.problem.status`` for solver status
 
         Raises:
             RuntimeError: If initialize() has not been called.
@@ -257,7 +239,6 @@ class CVXPySolver(ConvexSolver):
             )
 
         self._solve_fn()
-        return self._problem
 
     def citation(self) -> List[str]:
         """Return BibTeX citations for CVXPy.

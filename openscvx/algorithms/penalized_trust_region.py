@@ -319,7 +319,7 @@ class PenalizedTrustRegion(Algorithm):
         _set_param(ocp, "lam_vb", state.lam_vb)
 
         t0 = time.time()
-        self._solver.solve(state, params, settings)
+        self._solver.solve()
         subprop_time = time.time() - t0
 
         x_new_guess = (
