@@ -19,6 +19,7 @@ from .base import Algorithm, AlgorithmState
 
 if TYPE_CHECKING:
     from openscvx.lowered import LoweredJaxConstraints
+    from openscvx.solvers import ConvexSolver
 
 warnings.filterwarnings("ignore")
 
@@ -92,18 +93,16 @@ class PenalizedTrustRegion(Algorithm):
 
         Call initialize() before step() to set up compiled components.
         """
-        self._ocp: cp.Problem = None
+        self._solver: "ConvexSolver" = None
         self._discretization_solver: callable = None
         self._jax_constraints: "LoweredJaxConstraints" = None
-        self._solve_ocp: callable = None
         self._emitter: callable = None
 
     def initialize(
         self,
-        ocp: cp.Problem,
+        solver: "ConvexSolver",
         discretization_solver: callable,
         jax_constraints: "LoweredJaxConstraints",
-        solve_ocp: callable,
         emitter: callable,
         params: dict,
         settings: Config,
@@ -114,20 +113,21 @@ class PenalizedTrustRegion(Algorithm):
         initialize DPP and JAX jacobians.
 
         Args:
-            ocp: CVXPy optimal control problem
+            solver: Convex subproblem solver (e.g., CVXPySolver)
             discretization_solver: Compiled discretization solver
             jax_constraints: JIT-compiled constraint functions
-            solve_ocp: Callable that solves the OCP
             emitter: Callback for emitting iteration progress
             params: Problem parameters dictionary (for warm-start)
             settings: Configuration object (for warm-start)
         """
         # Store immutable infrastructure
-        self._ocp = ocp
+        self._solver = solver
         self._discretization_solver = discretization_solver
         self._jax_constraints = jax_constraints
-        self._solve_ocp = solve_ocp
         self._emitter = emitter
+
+        # Access the underlying problem for parameter initialization
+        ocp = self._solver.problem
 
         if "x_init" in ocp.param_dict:
             _set_param(ocp, "x_init", settings.sim.x.initial)
@@ -164,7 +164,7 @@ class PenalizedTrustRegion(Algorithm):
         Raises:
             RuntimeError: If initialize() has not been called.
         """
-        if self._ocp is None:
+        if self._solver is None:
             raise RuntimeError(
                 "PenalizedTrustRegion.step() called before initialize(). "
                 "Call initialize() first to set up compiled infrastructure."
@@ -235,7 +235,7 @@ class PenalizedTrustRegion(Algorithm):
     ):
         """Solve a single convex subproblem.
 
-        Uses stored infrastructure (ocp, discretization_solver, jax_constraints)
+        Uses stored infrastructure (solver, discretization_solver, jax_constraints)
         with per-step params and settings.
 
         Args:
@@ -246,8 +246,11 @@ class PenalizedTrustRegion(Algorithm):
         Returns:
             Tuple containing solution data, costs, and timing information.
         """
-        _set_param(self._ocp, "x_bar", state.x)
-        _set_param(self._ocp, "u_bar", state.u)
+        # Get the underlying CVXPy problem from the solver
+        ocp = self._solver.problem
+
+        _set_param(ocp, "x_bar", state.x)
+        _set_param(ocp, "u_bar", state.u)
 
         param_dict = params
 
@@ -256,10 +259,10 @@ class PenalizedTrustRegion(Algorithm):
             state.x, state.u.astype(float), param_dict
         )
 
-        _set_param(self._ocp, "A_d", A_bar.__array__())
-        _set_param(self._ocp, "B_d", B_bar.__array__())
-        _set_param(self._ocp, "C_d", C_bar.__array__())
-        _set_param(self._ocp, "x_prop", x_prop.__array__())
+        _set_param(ocp, "A_d", A_bar.__array__())
+        _set_param(ocp, "B_d", B_bar.__array__())
+        _set_param(ocp, "C_d", C_bar.__array__())
+        _set_param(ocp, "x_prop", x_prop.__array__())
         dis_time = time.time() - t0
 
         # Update nodal constraint linearization parameters
@@ -267,17 +270,17 @@ class PenalizedTrustRegion(Algorithm):
         if self._jax_constraints.nodal:
             for g_id, constraint in enumerate(self._jax_constraints.nodal):
                 _set_param(
-                    self._ocp,
+                    ocp,
                     f"g_{g_id}",
                     np.asarray(constraint.func(state.x, state.u, 0, param_dict)),
                 )
                 _set_param(
-                    self._ocp,
+                    ocp,
                     f"grad_g_x_{g_id}",
                     np.asarray(constraint.grad_g_x(state.x, state.u, 0, param_dict)),
                 )
                 _set_param(
-                    self._ocp,
+                    ocp,
                     f"grad_g_u_{g_id}",
                     np.asarray(constraint.grad_g_u(state.x, state.u, 0, param_dict)),
                 )
@@ -287,17 +290,17 @@ class PenalizedTrustRegion(Algorithm):
             for g_id, constraint in enumerate(self._jax_constraints.cross_node):
                 # Cross-node constraints take (X, U, params) not (x, u, node, params)
                 _set_param(
-                    self._ocp,
+                    ocp,
                     f"g_cross_{g_id}",
                     np.asarray(constraint.func(state.x, state.u, param_dict)),
                 )
                 _set_param(
-                    self._ocp,
+                    ocp,
                     f"grad_g_X_cross_{g_id}",
                     np.asarray(constraint.grad_g_X(state.x, state.u, param_dict)),
                 )
                 _set_param(
-                    self._ocp,
+                    ocp,
                     f"grad_g_U_cross_{g_id}",
                     np.asarray(constraint.grad_g_U(state.x, state.u, param_dict)),
                 )
@@ -310,22 +313,20 @@ class PenalizedTrustRegion(Algorithm):
             state.lam_vc = np.ones((settings.scp.n - 1, settings.sim.n_states)) * state.lam_vc
 
         # Update CVXPy parameters from state
-        _set_param(self._ocp, "w_tr", state.w_tr)
-        _set_param(self._ocp, "lam_cost", state.lam_cost)
-        _set_param(self._ocp, "lam_vc", state.lam_vc)
-        _set_param(self._ocp, "lam_vb", state.lam_vb)
+        _set_param(ocp, "w_tr", state.w_tr)
+        _set_param(ocp, "lam_cost", state.lam_cost)
+        _set_param(ocp, "lam_vc", state.lam_vc)
+        _set_param(ocp, "lam_vb", state.lam_vb)
 
         t0 = time.time()
-        self._solve_ocp()
+        self._solver.solve(state, params, settings)
         subprop_time = time.time() - t0
 
         x_new_guess = (
-            settings.sim.S_x @ self._ocp.var_dict["x"].value.T
-            + np.expand_dims(settings.sim.c_x, axis=1)
+            settings.sim.S_x @ ocp.var_dict["x"].value.T + np.expand_dims(settings.sim.c_x, axis=1)
         ).T
         u_new_guess = (
-            settings.sim.S_u @ self._ocp.var_dict["u"].value.T
-            + np.expand_dims(settings.sim.c_u, axis=1)
+            settings.sim.S_u @ ocp.var_dict["u"].value.T + np.expand_dims(settings.sim.c_u, axis=1)
         ).T
 
         # Calculate costs from boundary conditions using utility function
@@ -355,21 +356,21 @@ class PenalizedTrustRegion(Algorithm):
         # Calculate J_tr_vec using the JAX-compatible block diagonal matrix
         tr_mat = inv_block_diag @ np.hstack((x_new_guess - state.x, u_new_guess - state.u)).T
         J_tr_vec = la.norm(tr_mat, axis=0) ** 2
-        vc_mat = np.abs(self._ocp.var_dict["nu"].value)
+        vc_mat = np.abs(ocp.var_dict["nu"].value)
         J_vc_vec = np.sum(vc_mat, axis=1)
 
         id_ncvx = 0
         J_vb_vec = 0
         if self._jax_constraints.nodal:
             for constraint in self._jax_constraints.nodal:
-                J_vb_vec += np.maximum(0, self._ocp.var_dict["nu_vb_" + str(id_ncvx)].value)
+                J_vb_vec += np.maximum(0, ocp.var_dict["nu_vb_" + str(id_ncvx)].value)
                 id_ncvx += 1
 
         # Add cross-node constraint violations
         id_cross = 0
         if self._jax_constraints.cross_node:
             for constraint in self._jax_constraints.cross_node:
-                J_vb_vec += np.maximum(0, self._ocp.var_dict["nu_vb_cross_" + str(id_cross)].value)
+                J_vb_vec += np.maximum(0, ocp.var_dict["nu_vb_cross_" + str(id_cross)].value)
                 id_cross += 1
 
         # Convex constraints are already handled in the OCP, no processing needed here
@@ -377,11 +378,11 @@ class PenalizedTrustRegion(Algorithm):
             x_new_guess,
             u_new_guess,
             costs,
-            self._ocp.value,
+            ocp.value,
             J_vb_vec,
             J_vc_vec,
             J_tr_vec,
-            self._ocp.status,
+            ocp.status,
             V_multi_shoot,
             subprop_time,
             dis_time,
