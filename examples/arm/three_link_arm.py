@@ -205,10 +205,10 @@ problem = Problem(
 
 # Solver settings
 problem.settings.prp.dt = 0.01
-problem.settings.scp.w_tr = 1e1
-problem.settings.scp.lam_cost = 1e2
+problem.settings.scp.w_tr = 1e0
+problem.settings.scp.lam_cost = 1e0
 problem.settings.scp.lam_vc = 1e1
-problem.settings.scp.lam_vb = 1e2
+problem.settings.scp.lam_vb = 1e1
 
 if __name__ == "__main__":
     print("3-Link Arm Trajectory Optimization with Product of Exponentials FK")

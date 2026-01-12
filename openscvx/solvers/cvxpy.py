@@ -129,8 +129,8 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
 
     if settings.scp.uniform_time_grid:
         constr += [
-            u_nonscaled[i][settings.sim.time_dilation_slice]
-            == u_nonscaled[i - 1][settings.sim.time_dilation_slice]
+            np.linalg.inv(S_u) @ (u_nonscaled[i][settings.sim.time_dilation_slice] - c_u)
+            == np.linalg.inv(S_u) @ (u_nonscaled[i - 1][settings.sim.time_dilation_slice] - c_u)
             for i in range(1, settings.scp.n)
         ]
 
@@ -142,24 +142,24 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
     ]  # Control Error
 
     constr += [
-        x_nonscaled[i]
-        == A_d[i - 1] @ dx_nonscaled[i - 1]
+        np.linalg.inv(S_x) @ (x_nonscaled[i] - c_x)
+        == np.linalg.inv(S_x) @ (A_d[i - 1] @ dx_nonscaled[i - 1]
         + B_d[i - 1] @ du_nonscaled[i - 1]
         + C_d[i - 1] @ du_nonscaled[i]
         + x_prop[i - 1]
-        + nu[i - 1]
+        + nu[i - 1] - c_x)
         for i in range(1, settings.scp.n)
     ]  # Dynamics Constraint
 
-    constr += [u_nonscaled[i] <= settings.sim.u.max for i in range(settings.scp.n)]
+    constr += [np.linalg.inv(S_u) @ (u_nonscaled[i] - c_u) <= np.linalg.inv(S_u) @ (settings.sim.u.max - c_u) for i in range(settings.scp.n)]
     constr += [
-        u_nonscaled[i] >= settings.sim.u.min for i in range(settings.scp.n)
+        np.linalg.inv(S_u) @ (u_nonscaled[i] - c_u) >= np.linalg.inv(S_u) @ (settings.sim.u.min - c_u) for i in range(settings.scp.n)
     ]  # Control Constraints
 
     # TODO: (norrisg) formalize this
-    constr += [x_nonscaled[i][:] <= settings.sim.x.max for i in range(settings.scp.n)]
+    constr += [np.linalg.inv(S_x) @ (x_nonscaled[i][:] - c_x) <= np.linalg.inv(S_x) @ (settings.sim.x.max -c_x) for i in range(settings.scp.n)]
     constr += [
-        x_nonscaled[i][:] >= settings.sim.x.min for i in range(settings.scp.n)
+        np.linalg.inv(S_x) @ (x_nonscaled[i][:] - c_x) >= np.linalg.inv(S_x) @ (settings.sim.x.min - c_x) for i in range(settings.scp.n)
     ]  # State Constraints (Also implemented in CTCS but included for numerical stability)
 
     ########
