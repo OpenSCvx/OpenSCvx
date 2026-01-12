@@ -14,24 +14,20 @@ This separation allows the lowering process to:
 - Lower convex constraints using those variables
 - Call ``initialize()`` with the lowered constraints
 
-.. note:: Interface subject to change
+!!! note
 
-    This interface is under active development. Solvers now own their optimization
-    variables via ``create_variables()``, and ``LoweredProblem`` no longer contains
-    ``ocp_vars``.
+    Solvers own their optimization variables via ``create_variables()``.
+    Convex constraint lowering remains in ``lower.py`` but uses the solver's
+    variables. If non-CVXPy backends are needed in the future, the solver
+    could own the constraint lowering as well (via a ``lower_convex_constraints()``
+    method), while keeping the orchestration in ``lower_symbolic_problem()``:
 
-    TODO(norrisg): Continue refactoring toward backend-agnostic LoweredProblem:
-
-    1. [DONE] Integrate ``create_variables()`` into the lowering flow
-    2. [DONE] Have ``lower_symbolic_problem()`` call ``solver.create_variables()``
-    3. [DONE] Remove ``ocp_vars`` from ``LoweredProblem``
-    4. Remove ``cvxpy_constraints``, ``cvxpy_params`` from ``LoweredProblem``
-       (move constraint lowering into solver)
-    5. Add ``lower_convex_constraints()`` abstract method so each backend
-       can provide its own constraint lowering path (QPAX, Clarabel, etc.)
-
-    The goal is for ``LoweredProblem`` to contain only backend-agnostic data:
-    dynamics (JAX), JAX constraints, unified state/control interfaces.
+    ```python
+    @abstractmethod
+    def lower_convex_constraints(self, constraints: ConstraintSet, parameters: dict) -> None:
+        '''Lower symbolic convex constraints using created variables.'''
+        ...
+    ```
 """
 
 from abc import ABC, abstractmethod
@@ -125,10 +121,9 @@ class ConvexSolver(ABC):
 
         Args:
             lowered: Lowered problem containing:
-                - ``ocp_vars``: CVXPy Variables and Parameters (CVXPy-specific)
-                - ``cvxpy_constraints``: Lowered convex constraints (CVXPy-specific)
-                - ``jax_constraints``: JAX constraint functions (backend-agnostic)
-                - ``x_unified``, ``u_unified``: State/control interfaces (backend-agnostic)
+                - ``cvxpy_constraints``: Lowered convex constraints
+                - ``jax_constraints``: JAX constraint functions
+                - ``x_unified``, ``u_unified``: State/control interfaces
             settings: Configuration object with solver settings
         """
         ...
