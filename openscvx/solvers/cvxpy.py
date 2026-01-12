@@ -113,7 +113,9 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
     if cvxpy_constraints.constraints:
         constr += cvxpy_constraints.constraints
 
-    for i in range(settings.sim.true_state_slice.start, settings.sim.true_state_slice.stop):
+    for i in range(
+        settings.sim.true_state_slice.start, settings.sim.true_state_slice.stop
+    ):
         if settings.sim.x.initial_type[i] == "Fix":
             constr += [x_nonscaled[0][i] == x_init[i]]  # Initial Boundary Conditions
         if settings.sim.x.final_type[i] == "Fix":
@@ -134,7 +136,8 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
         c_u_td = c_u[settings.sim.time_dilation_slice]
         constr += [
             S_u_inv_td @ (u_nonscaled[i][settings.sim.time_dilation_slice] - c_u_td)
-            == S_u_inv_td @ (u_nonscaled[i - 1][settings.sim.time_dilation_slice] - c_u_td)
+            == S_u_inv_td
+            @ (u_nonscaled[i - 1][settings.sim.time_dilation_slice] - c_u_td)
             for i in range(1, settings.scp.n)
         ]
 
@@ -160,25 +163,21 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
     ]  # Dynamics Constraint
 
     constr += [
-        inv_S_u @ (u_nonscaled[i] - c_u)
-        <= inv_S_u @ (settings.sim.u.max - c_u)
+        inv_S_u @ (u_nonscaled[i] - c_u) <= inv_S_u @ (settings.sim.u.max - c_u)
         for i in range(settings.scp.n)
     ]
     constr += [
-        inv_S_u @ (u_nonscaled[i] - c_u)
-        >= inv_S_u @ (settings.sim.u.min - c_u)
+        inv_S_u @ (u_nonscaled[i] - c_u) >= inv_S_u @ (settings.sim.u.min - c_u)
         for i in range(settings.scp.n)
     ]  # Control Constraints
 
     # TODO: (norrisg) formalize this
     constr += [
-        inv_S_x @ (x_nonscaled[i][:] - c_x)
-        <= inv_S_x @ (settings.sim.x.max - c_x)
+        inv_S_x @ (x_nonscaled[i][:] - c_x) <= inv_S_x @ (settings.sim.x.max - c_x)
         for i in range(settings.scp.n)
     ]
     constr += [
-        inv_S_x @ (x_nonscaled[i][:] - c_x)
-        >= inv_S_x @ (settings.sim.x.min - c_x)
+        inv_S_x @ (x_nonscaled[i][:] - c_x) >= inv_S_x @ (settings.sim.x.min - c_x)
         for i in range(settings.scp.n)
     ]  # State Constraints (Also implemented in CTCS but included for numerical stability)
 
@@ -212,7 +211,8 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
     ):
         start_idx = 1 if nodes[0] == 0 else nodes[0]
         constr += [
-            cp.abs(x_nonscaled[i][idx] - x_nonscaled[i - 1][idx]) <= settings.sim.x.max[idx]
+            cp.abs(x_nonscaled[i][idx] - x_nonscaled[i - 1][idx])
+            <= settings.sim.x.max[idx]
             for i in range(start_idx, nodes[1])
         ]
         constr += [x_nonscaled[0][idx] == 0]
@@ -229,17 +229,24 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
             )
         # Check to see if solver directory exists
         if not os.path.exists("solver"):
-            cpg.generate_code(prob, solver=settings.cvx.solver, code_dir="solver", wrapper=True)
+            cpg.generate_code(
+                prob, solver=settings.cvx.solver, code_dir="solver", wrapper=True
+            )
         else:
             # Prompt the use to indicate if they wish to overwrite the solver
             # directory or use the existing compiled solver
             if settings.cvx.cvxpygen_override:
-                cpg.generate_code(prob, solver=settings.cvx.solver, code_dir="solver", wrapper=True)
+                cpg.generate_code(
+                    prob, solver=settings.cvx.solver, code_dir="solver", wrapper=True
+                )
             else:
                 overwrite = input("Solver directory already exists. Overwrite? (y/n): ")
                 if overwrite.lower() == "y":
                     cpg.generate_code(
-                        prob, solver=settings.cvx.solver, code_dir="solver", wrapper=True
+                        prob,
+                        solver=settings.cvx.solver,
+                        code_dir="solver",
+                        wrapper=True,
                     )
                 else:
                     pass
