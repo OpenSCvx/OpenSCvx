@@ -770,11 +770,16 @@ def fill_default_guesses(states: List[State], N: int) -> None:
         states: List of State objects to fill guesses for
         N: Number of discretization nodes
     """
+    from openscvx.init import linspace
+
     for state in states:
         if state.guess is None and state.initial is not None and state.final is not None:
             # state.initial and state.final are already numpy arrays of values
             # (the setter handles parsing tuples like ("free", value))
-            state.guess = np.linspace(state.initial, state.final, N)
+            state.guess = linspace(
+                keyframes=[state.initial, state.final],
+                nodes=[0, N - 1],
+            )
 
 
 def validate_boundary_conditions(states: List[State]) -> None:

@@ -5,6 +5,7 @@ os.environ["EQX_ON_ERROR"] = "nan"
 
 # Cache management
 # Core symbolic expressions - flat namespace for most common functions
+import openscvx.init as init
 import openscvx.symbolic.expr.lie as lie
 import openscvx.symbolic.expr.linalg as linalg
 import openscvx.symbolic.expr.spatial as spatial
@@ -123,6 +124,7 @@ __all__ = [
     # Data parallelism
     "Vmap",
     # Submodules
+    "init",
     "stl",
     "spatial",
     "linalg",

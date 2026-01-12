@@ -115,25 +115,11 @@ dynamics = {
 }
 
 
-position_bar = np.linspace(position.initial, position.final, n)
-
-i = 0
-origins = [position.initial]
-ends = []
-for center in gate_centers:
-    origins.append(center)
-    ends.append(center)
-ends.append(position.final)
-gate_idx = 0
-for _ in range(n_gates + 1):
-    for k in range(n // (n_gates + 1)):
-        position_bar[i] = origins[gate_idx] + (k / (n // (n_gates + 1))) * (
-            ends[gate_idx] - origins[gate_idx]
-        )
-        i += 1
-    gate_idx += 1
-
-position.guess = position_bar
+# Generate initial guess for position trajectory through gates
+position.guess = ox.init.linspace(
+    keyframes=[position.initial] + gate_centers + [position.final],
+    nodes=[0] + list(gate_nodes) + [n - 1],
+)
 
 t = ox.Time(
     initial=0.0,
