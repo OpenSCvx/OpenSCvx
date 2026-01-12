@@ -55,10 +55,8 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
     grad_g_X_cross = ocp_vars.grad_g_X_cross
     grad_g_U_cross = ocp_vars.grad_g_U_cross
     nu_vb_cross = ocp_vars.nu_vb_cross
-    S_x = ocp_vars.S_x
     inv_S_x = ocp_vars.inv_S_x
     c_x = ocp_vars.c_x
-    S_u = ocp_vars.S_u
     inv_S_u = ocp_vars.inv_S_u
     c_u = ocp_vars.c_u
     x_nonscaled = ocp_vars.x_nonscaled
