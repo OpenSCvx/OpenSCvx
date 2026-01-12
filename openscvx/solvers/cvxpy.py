@@ -129,8 +129,10 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
 
     if settings.scp.uniform_time_grid:
         constr += [
-            np.linalg.inv(S_u) @ (u_nonscaled[i][settings.sim.time_dilation_slice] - c_u)
-            == np.linalg.inv(S_u) @ (u_nonscaled[i - 1][settings.sim.time_dilation_slice] - c_u)
+            np.linalg.inv(S_u)[settings.sim.time_dilation_slice, settings.sim.time_dilation_slice] @ 
+            (u_nonscaled[i][settings.sim.time_dilation_slice] - c_u[settings.sim.time_dilation_slice])
+            == np.linalg.inv(S_u)[settings.sim.time_dilation_slice, settings.sim.time_dilation_slice] @ 
+            (u_nonscaled[i - 1][settings.sim.time_dilation_slice] - c_u[settings.sim.time_dilation_slice])
             for i in range(1, settings.scp.n)
         ]
 
