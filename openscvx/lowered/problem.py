@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Dict, Optional
 
 from openscvx.lowered.cvxpy_constraints import LoweredCvxpyConstraints
-from openscvx.lowered.cvxpy_variables import CVXPyVariables
 from openscvx.lowered.dynamics import Dynamics
 from openscvx.lowered.jax_constraints import LoweredJaxConstraints
 from openscvx.lowered.unified import UnifiedControl, UnifiedState
@@ -21,6 +20,10 @@ class LoweredProblem:
     to executable JAX and CVXPy code. It provides a clean, typed interface
     for accessing the various components needed for optimization.
 
+    Note:
+        CVXPy optimization variables (``ocp_vars``) are owned by the solver,
+        not stored here. Access them via ``solver.ocp_vars``.
+
     Attributes:
         dynamics: Optimization dynamics with fields f, A, B (JAX functions)
         dynamics_prop: Propagation dynamics with fields f, A, B
@@ -29,7 +32,6 @@ class LoweredProblem:
         x_unified: Aggregated optimization state interface
         u_unified: Aggregated optimization control interface
         x_prop_unified: Aggregated propagation state interface
-        ocp_vars: Typed CVXPy variables and parameters for OCP construction
         cvxpy_params: Dict mapping user parameter names to CVXPy Parameter objects
         algebraic_prop: Dict mapping output names to vmapped JAX functions
             (evaluated, not integrated)
@@ -37,21 +39,15 @@ class LoweredProblem:
     Example:
         After lowering a symbolic problem::
 
-            lowered = lower_symbolic_problem(
-                dynamics_aug=dynamics,
-                states_aug=states,
-                controls_aug=controls,
-                constraints=constraint_set,
-                parameters=params,
-                N=50,
-            )
+            solver = CVXPySolver()
+            lowered = lower_symbolic_problem(problem, solver, settings)
 
             # Access components
             dx_dt = lowered.dynamics.f(x, u, node, params)
             jacobian_A = lowered.dynamics.A(x, u, node, params)
 
-            # Use CVXPy objects
-            ocp = OptimalControlProblem(settings, lowered)
+            # Solver owns CVXPy variables
+            ocp_vars = solver.ocp_vars
     """
 
     # JAX dynamics
@@ -67,8 +63,7 @@ class LoweredProblem:
     u_unified: UnifiedControl
     x_prop_unified: UnifiedState
 
-    # CVXPy objects
-    ocp_vars: CVXPyVariables
+    # CVXPy constraint parameters (user-defined parameters lowered to CVXPy)
     cvxpy_params: Dict[str, "cp.Parameter"]
 
     # Algebraic outputs (vmapped JAX functions for propagation)

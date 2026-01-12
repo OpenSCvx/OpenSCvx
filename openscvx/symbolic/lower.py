@@ -74,6 +74,7 @@ from openscvx.symbolic.expr import Expr, NodeReference
 
 if TYPE_CHECKING:
     from openscvx.lowered.unified import UnifiedState
+    from openscvx.solvers import ConvexSolver
     from openscvx.symbolic.problem import SymbolicProblem
 
 __all__ = [
@@ -553,91 +554,6 @@ def _lower_jax_constraints(
     )
 
 
-def _lower_cvxpy(
-    constraints: ConstraintSet,
-    parameters: dict,
-    N: int,
-    x_unified: UnifiedState,
-    u_unified: UnifiedControl,
-    jax_constraints: LoweredJaxConstraints,
-) -> Tuple[CVXPyVariables, LoweredCvxpyConstraints, dict]:
-    """Create CVXPy variables and lower convex constraints.
-
-    Creates all CVXPy variables/parameters needed for the OCP and lowers
-    convex constraints to CVXPy constraint objects.
-
-    Args:
-        constraints: ConstraintSet containing convex constraints
-        parameters: Dict of parameter values for constraint lowering
-        N: Number of discretization nodes
-        jax_constraints: Lowered JAX constraints (for sizing CVXPy variables)
-        x_unified: Unified state interface (for dimensions and scaling)
-        u_unified: Unified control interface (for dimensions and scaling)
-
-    Returns:
-        Tuple of:
-        - CVXPyVariables dataclass with all OCP variables
-        - LoweredCvxpyConstraints with CVXPy constraint objects
-        - Dict mapping parameter names to CVXPy Parameter objects
-    """
-    from openscvx.config import get_affine_scaling_matrices
-
-    n_states = len(x_unified.max)
-    n_controls = len(u_unified.max)
-
-    # Compute scaling matrices from unified object bounds
-    if x_unified.scaling_min is not None:
-        lower_x = np.array(x_unified.scaling_min, dtype=float)
-    else:
-        lower_x = np.array(x_unified.min, dtype=float)
-
-    if x_unified.scaling_max is not None:
-        upper_x = np.array(x_unified.scaling_max, dtype=float)
-    else:
-        upper_x = np.array(x_unified.max, dtype=float)
-
-    S_x, c_x = get_affine_scaling_matrices(n_states, lower_x, upper_x)
-
-    if u_unified.scaling_min is not None:
-        lower_u = np.array(u_unified.scaling_min, dtype=float)
-    else:
-        lower_u = np.array(u_unified.min, dtype=float)
-
-    if u_unified.scaling_max is not None:
-        upper_u = np.array(u_unified.scaling_max, dtype=float)
-    else:
-        upper_u = np.array(u_unified.max, dtype=float)
-
-    S_u, c_u = get_affine_scaling_matrices(n_controls, lower_u, upper_u)
-
-    # Create all CVXPy variables for the OCP
-    ocp_vars = create_cvxpy_variables(
-        N=N,
-        n_states=n_states,
-        n_controls=n_controls,
-        S_x=S_x,
-        c_x=c_x,
-        S_u=S_u,
-        c_u=c_u,
-        n_nodal_constraints=len(jax_constraints.nodal),
-        n_cross_node_constraints=len(jax_constraints.cross_node),
-    )
-
-    # Lower convex constraints to CVXPy
-    lowered_cvxpy_constraint_list, cvxpy_params = lower_cvxpy_constraints(
-        constraints,
-        ocp_vars.x_nonscaled,
-        ocp_vars.u_nonscaled,
-        parameters,
-    )
-
-    cvxpy_constraints = LoweredCvxpyConstraints(
-        constraints=lowered_cvxpy_constraint_list,
-    )
-
-    return ocp_vars, cvxpy_constraints, cvxpy_params
-
-
 def _contains_node_reference(expr: Expr) -> bool:
     """Check if an expression contains any NodeReference nodes.
 
@@ -673,7 +589,9 @@ def _contains_node_reference(expr: Expr) -> bool:
 
 
 def lower_symbolic_problem(
-    problem: "SymbolicProblem", byof: Optional[dict] = None
+    problem: "SymbolicProblem",
+    solver: "ConvexSolver",
+    byof: Optional[dict] = None,
 ) -> LoweredProblem:
     """Lower symbolic problem specification to executable JAX and CVXPy code.
 
@@ -688,6 +606,9 @@ def lower_symbolic_problem(
     Args:
         problem: Preprocessed SymbolicProblem from preprocess_symbolic_problem().
             Must have is_preprocessed == True.
+        solver: ConvexSolver instance to create backend-specific variables.
+            The solver's ``create_variables()`` method will be called to create
+            optimization variables before constraint lowering.
         byof: Optional dict of raw JAX functions for expert users. Supported keys:
             - "nodal_constraints": List of f(x, u, node, params) -> residual
             - "cross_nodal_constraints": List of f(X, U, params) -> residual
@@ -699,14 +620,15 @@ def lower_symbolic_problem(
     Example:
         After preprocessing::
 
+            solver = CVXPySolver()
             problem = preprocess_symbolic_problem(...)
-            lowered = lower_symbolic_problem(problem)
+            lowered = lower_symbolic_problem(problem, solver)
 
             # Access dynamics
             dx = lowered.dynamics.f(x_val, u_val, node=0, params={...})
 
-            # Use CVXPy objects for OCP
-            ocp = OptimalControlProblem(settings, lowered)
+            # Solver now owns the CVXPy variables
+            ocp_vars = solver.ocp_vars
 
     Raises:
         AssertionError: If problem.is_preprocessed is False
@@ -742,9 +664,23 @@ def lower_symbolic_problem(
             problem.N,
         )
 
-    # Create CVXPy variables and lower convex constraints
-    ocp_vars, cvxpy_constraints, cvxpy_params = _lower_cvxpy(
-        problem.constraints, problem.parameters, problem.N, x_unified, u_unified, jax_constraints
+    # Solver creates its own backend-specific variables
+    solver.create_variables(
+        N=problem.N,
+        x_unified=x_unified,
+        u_unified=u_unified,
+        jax_constraints=jax_constraints,
+    )
+
+    # Lower convex constraints using solver's variables
+    lowered_cvxpy_constraint_list, cvxpy_params = lower_cvxpy_constraints(
+        problem.constraints,
+        solver.ocp_vars.x_nonscaled,
+        solver.ocp_vars.u_nonscaled,
+        problem.parameters,
+    )
+    cvxpy_constraints = LoweredCvxpyConstraints(
+        constraints=lowered_cvxpy_constraint_list,
     )
 
     # Lower algebraic outputs to vmapped JAX functions
@@ -765,7 +701,6 @@ def lower_symbolic_problem(
         x_unified=x_unified,
         u_unified=u_unified,
         x_prop_unified=x_prop_unified,
-        ocp_vars=ocp_vars,
         cvxpy_params=cvxpy_params,
         algebraic_prop=algebraic_prop_lowered,
     )

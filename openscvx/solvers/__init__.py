@@ -11,6 +11,11 @@ implementations and custom backends:
 ```python
 class ConvexSolver(ABC):
     @abstractmethod
+    def create_variables(self, N, x_unified, u_unified, jax_constraints) -> None:
+        '''Create backend-specific optimization variables (called once).'''
+        ...
+
+    @abstractmethod
     def initialize(self, lowered, settings) -> None:
         '''Build the convex subproblem structure (called once).'''
         ...
@@ -30,14 +35,10 @@ This architecture enables users to implement custom solver backends such as:
 - Research solvers with specialized structure exploitation
 
 Note:
-    The current implementation is CVXPy-centric. :class:`LoweredProblem` contains
-    CVXPy-specific objects (``ocp_vars``, ``cvxpy_constraints``). See the
-    architecture note in :mod:`openscvx.solvers.base` for planned refactoring
-    to support backend-agnostic problem lowering.
-
-Note:
-    CVXPyGen setup logic is currently in :class:`Problem`. When solvers are
-    refactored to use the ``ConvexSolver`` base class, this setup will move here.
+    Solvers own their optimization variables (e.g., ``CVXPySolver.ocp_vars``).
+    The lowering process calls ``solver.create_variables()`` before constraint
+    lowering, then ``solver.initialize()`` after. See :mod:`openscvx.solvers.base`
+    for the interface details.
 """
 
 from .base import ConvexSolver

@@ -167,8 +167,13 @@ class Problem:
         # Store byof for cache hashing
         self._byof = byof
 
+        # Create solver before lowering (solver owns its variables)
+        self._solver: CVXPySolver = CVXPySolver()
+
         # Lower to JAX and CVXPy (byof handling happens inside lower_symbolic_problem)
-        self._lowered: LoweredProblem = lower_symbolic_problem(self.symbolic, byof=byof)
+        self._lowered: LoweredProblem = lower_symbolic_problem(
+            self.symbolic, self._solver, byof=byof
+        )
 
         # Store parameters in two forms:
         self._parameters = self.symbolic.parameters  # Plain dict for JAX functions
@@ -198,7 +203,6 @@ class Problem:
 
         # OCP construction happens in initialize() so users can modify
         # settings (like uniform_time_grid) between __init__ and initialize()
-        self._solver: CVXPySolver = None
         self._discretization_solver: callable = None
 
         # Set up emitter & thread only if printing is enabled
@@ -451,8 +455,7 @@ class Problem:
             self._compiled_dynamics_prop.f, self.settings
         )
 
-        # Build convex subproblem solver
-        self._solver = CVXPySolver()
+        # Build convex subproblem (solver was created in __init__, variables in lower)
         self._solver.initialize(self._lowered, self.settings)
 
         # Get cache file paths using symbolic AST hashing

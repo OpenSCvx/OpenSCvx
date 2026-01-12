@@ -3,29 +3,35 @@
 This module defines the abstract interface that all convex solver implementations
 must follow for use within successive convexification algorithms.
 
-Architecture Note:
-    The current implementation is CVXPy-centric. :class:`LoweredProblem` contains
-    ``ocp_vars`` (:class:`CVXPyVariables`) and ``cvxpy_constraints``, which are
-    CVXPy-specific. This couples the lowering layer to CVXPy.
+The solver lifecycle follows three phases:
 
-    To support alternative backends (QPAX, Clarabel, COCO, etc.), a future refactor
-    should:
+1. **create_variables**: Create backend-specific optimization variables
+2. **initialize**: Build the complete optimization problem structure
+3. **solve**: Update parameters and solve (called each SCP iteration)
 
-    1. Move ``CVXPyVariables`` creation from ``lower_symbolic_problem()`` into
-       ``CVXPySolver.initialize()``, so each solver owns its problem representation.
+This separation allows the lowering process to:
+- Call ``create_variables()`` to get backend-specific variables
+- Lower convex constraints using those variables
+- Call ``initialize()`` with the lowered constraints
 
-    2. Keep ``LoweredProblem`` backend-agnostic, containing only:
-       - Dynamics (JAX functions)
-       - JAX constraints (for linearization)
-       - Unified state/control interfaces
-       - Problem dimensions and constraint metadata
+.. note:: Interface subject to change
 
-    3. Add alternative constraint lowering paths (symbolic -> target format) or
-       have solvers convert from a common intermediate representation.
+    This interface is under active development. Solvers now own their optimization
+    variables via ``create_variables()``, and ``LoweredProblem`` no longer contains
+    ``ocp_vars``.
 
-    For now, non-CVXPy solvers would need to either:
-    - Extract data from ``CVXPyVariables`` and convert to their format
-    - Work at a lower level, bypassing symbolic constraints entirely
+    TODO(norrisg): Continue refactoring toward backend-agnostic LoweredProblem:
+
+    1. [DONE] Integrate ``create_variables()`` into the lowering flow
+    2. [DONE] Have ``lower_symbolic_problem()`` call ``solver.create_variables()``
+    3. [DONE] Remove ``ocp_vars`` from ``LoweredProblem``
+    4. Remove ``cvxpy_constraints``, ``cvxpy_params`` from ``LoweredProblem``
+       (move constraint lowering into solver)
+    5. Add ``lower_convex_constraints()`` abstract method so each backend
+       can provide its own constraint lowering path (QPAX, Clarabel, etc.)
+
+    The goal is for ``LoweredProblem`` to contain only backend-agnostic data:
+    dynamics (JAX), JAX constraints, unified state/control interfaces.
 """
 
 from abc import ABC, abstractmethod
@@ -37,6 +43,8 @@ if TYPE_CHECKING:
     from openscvx.algorithms import AlgorithmState
     from openscvx.config import Config
     from openscvx.lowered import LoweredProblem
+    from openscvx.lowered.jax_constraints import LoweredJaxConstraints
+    from openscvx.lowered.unified import UnifiedControl, UnifiedState
 
 
 class ConvexSolver(ABC):
@@ -46,24 +54,27 @@ class ConvexSolver(ABC):
     subproblems generated at each iteration of a successive convexification
     algorithm.
 
-    The two core methods mirror the SCP workflow:
+    The solver lifecycle has three phases:
 
-    - initialize: Build the problem structure once (with Parameters)
-    - solve: Update parameter values and solve each iteration
+    - create_variables: Create backend-specific variables (called once)
+    - initialize: Build the problem structure using lowered constraints (called once)
+    - solve: Update parameter values and solve (called each SCP iteration)
 
-    Note:
-        The current interface is CVXPy-centric. ``LoweredProblem`` provides
-        ``ocp_vars`` (CVXPy Variables/Parameters) and ``solve()`` returns a
-        ``cp.Problem``. Future backends may require interface changes - see
-        the module-level architecture note for planned refactoring.
+    This separation allows the lowering process to create variables first,
+    then lower convex constraints using those variables, before building
+    the complete problem.
 
     Example:
         Implementing a custom solver::
 
             class MySolver(ConvexSolver):
+                def create_variables(self, N, x_unified, u_unified, jax_constraints):
+                    # Create backend-specific variables
+                    self._vars = create_my_variables(N, x_unified, ...)
+
                 def initialize(self, lowered, settings):
-                    # Build problem structure using lowered.ocp_vars
-                    self._prob = build_my_problem(lowered, settings)
+                    # Build problem structure using self._vars
+                    self._prob = build_my_problem(self._vars, lowered, settings)
 
                 def solve(self, state, params, settings) -> cp.Problem:
                     # Update parameters and solve
@@ -71,6 +82,31 @@ class ConvexSolver(ABC):
                     self._prob.solve()
                     return self._prob
     """
+
+    @abstractmethod
+    def create_variables(
+        self,
+        N: int,
+        x_unified: "UnifiedState",
+        u_unified: "UnifiedControl",
+        jax_constraints: "LoweredJaxConstraints",
+    ) -> None:
+        """Create backend-specific optimization variables.
+
+        This method creates the optimization variables (decision variables and
+        parameters) for this solver's backend. Called once during problem setup,
+        before constraint lowering.
+
+        The solver should store its variables on ``self`` for use in subsequent
+        ``initialize()`` and ``solve()`` calls.
+
+        Args:
+            N: Number of discretization nodes
+            x_unified: Unified state interface with dimensions and scaling bounds
+            u_unified: Unified control interface with dimensions and scaling bounds
+            jax_constraints: Lowered JAX constraints (for sizing linearization params)
+        """
+        ...
 
     @abstractmethod
     def initialize(

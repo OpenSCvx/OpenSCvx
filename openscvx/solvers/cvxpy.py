@@ -18,6 +18,9 @@ from .base import ConvexSolver
 if TYPE_CHECKING:
     from openscvx.algorithms import AlgorithmState
     from openscvx.lowered import LoweredProblem
+    from openscvx.lowered.cvxpy_variables import CVXPyVariables
+    from openscvx.lowered.jax_constraints import LoweredJaxConstraints
+    from openscvx.lowered.unified import UnifiedControl, UnifiedState
 
 # Optional cvxpygen import
 try:
@@ -64,8 +67,9 @@ class CVXPySolver(ConvexSolver):
     def __init__(self):
         """Initialize CVXPySolver with unset problem.
 
-        Call initialize() to build the problem structure.
+        Call create_variables() then initialize() to build the problem structure.
         """
+        self._ocp_vars: "CVXPyVariables" = None
         self._problem: cp.Problem = None
         self._solve_fn: callable = None
 
@@ -77,6 +81,78 @@ class CVXPySolver(ConvexSolver):
             The constructed CVXPy problem, or None if not initialized.
         """
         return self._problem
+
+    @property
+    def ocp_vars(self) -> "CVXPyVariables":
+        """The CVXPy variables and parameters.
+
+        Returns:
+            The CVXPyVariables dataclass, or None if create_variables() not called.
+        """
+        return self._ocp_vars
+
+    def create_variables(
+        self,
+        N: int,
+        x_unified: "UnifiedState",
+        u_unified: "UnifiedControl",
+        jax_constraints: "LoweredJaxConstraints",
+    ) -> None:
+        """Create CVXPy optimization variables.
+
+        Creates all CVXPy Variable and Parameter objects needed for the optimal
+        control problem. This includes state/control variables, dynamics parameters,
+        constraint linearization parameters, and scaling matrices.
+
+        Args:
+            N: Number of discretization nodes
+            x_unified: Unified state interface with dimensions and scaling bounds
+            u_unified: Unified control interface with dimensions and scaling bounds
+            jax_constraints: Lowered JAX constraints (for sizing linearization params)
+        """
+        from openscvx.config import get_affine_scaling_matrices
+        from openscvx.symbolic.lower import create_cvxpy_variables
+
+        n_states = len(x_unified.max)
+        n_controls = len(u_unified.max)
+
+        # Compute scaling matrices from unified object bounds
+        if x_unified.scaling_min is not None:
+            lower_x = np.array(x_unified.scaling_min, dtype=float)
+        else:
+            lower_x = np.array(x_unified.min, dtype=float)
+
+        if x_unified.scaling_max is not None:
+            upper_x = np.array(x_unified.scaling_max, dtype=float)
+        else:
+            upper_x = np.array(x_unified.max, dtype=float)
+
+        S_x, c_x = get_affine_scaling_matrices(n_states, lower_x, upper_x)
+
+        if u_unified.scaling_min is not None:
+            lower_u = np.array(u_unified.scaling_min, dtype=float)
+        else:
+            lower_u = np.array(u_unified.min, dtype=float)
+
+        if u_unified.scaling_max is not None:
+            upper_u = np.array(u_unified.scaling_max, dtype=float)
+        else:
+            upper_u = np.array(u_unified.max, dtype=float)
+
+        S_u, c_u = get_affine_scaling_matrices(n_controls, lower_u, upper_u)
+
+        # Create all CVXPy variables for the OCP
+        self._ocp_vars = create_cvxpy_variables(
+            N=N,
+            n_states=n_states,
+            n_controls=n_controls,
+            S_x=S_x,
+            c_x=c_x,
+            S_u=S_u,
+            c_u=c_u,
+            n_nodal_constraints=len(jax_constraints.nodal),
+            n_cross_node_constraints=len(jax_constraints.cross_node),
+        )
 
     def initialize(
         self,
@@ -92,14 +168,24 @@ class CVXPySolver(ConvexSolver):
         If cvxpygen is enabled in settings, generates compiled solver code
         for improved performance.
 
+        Note:
+            ``create_variables()`` must be called before this method.
+
         Args:
             lowered: Lowered problem containing:
-                - ``ocp_vars``: CVXPy Variables and Parameters
                 - ``cvxpy_constraints``: Lowered convex constraints
                 - ``jax_constraints``: JAX constraint functions (for structure)
             settings: Configuration object with solver settings
+
+        Raises:
+            RuntimeError: If create_variables() has not been called.
         """
-        self._problem = _build_optimal_control_problem(settings, lowered)
+        if self._ocp_vars is None:
+            raise RuntimeError(
+                "CVXPySolver.initialize() called before create_variables(). "
+                "Call create_variables() first to create optimization variables."
+            )
+        self._problem = _build_optimal_control_problem(settings, lowered, self._ocp_vars)
         self._setup_solve_function(settings)
 
     def _setup_solve_function(self, settings: "Config") -> None:
@@ -202,7 +288,11 @@ class CVXPySolver(ConvexSolver):
         ]
 
 
-def _build_optimal_control_problem(settings: Config, lowered: "LoweredProblem") -> cp.Problem:
+def _build_optimal_control_problem(
+    settings: Config,
+    lowered: "LoweredProblem",
+    ocp_vars: "CVXPyVariables",
+) -> cp.Problem:
     """Build the complete optimal control problem with all constraints.
 
     This is the internal implementation that constructs the CVXPy problem
@@ -210,13 +300,12 @@ def _build_optimal_control_problem(settings: Config, lowered: "LoweredProblem") 
 
     Args:
         settings: Configuration settings for the optimization problem
-        lowered: LoweredProblem containing ocp_vars and lowered constraints
+        lowered: LoweredProblem containing lowered constraints
+        ocp_vars: CVXPy variables and parameters (owned by solver)
 
     Returns:
         The constructed CVXPy Problem object.
     """
-    # Extract typed CVXPy variables from LoweredProblem
-    ocp_vars = lowered.ocp_vars
 
     # Extract variables from the dataclass for easier access
     w_tr = ocp_vars.w_tr
