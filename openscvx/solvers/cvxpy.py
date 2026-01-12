@@ -151,15 +151,27 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
         for i in range(1, settings.scp.n)
     ]  # Dynamics Constraint
 
-    constr += [np.linalg.inv(S_u) @ (u_nonscaled[i] - c_u) <= np.linalg.inv(S_u) @ (settings.sim.u.max - c_u) for i in range(settings.scp.n)]
     constr += [
-        np.linalg.inv(S_u) @ (u_nonscaled[i] - c_u) >= np.linalg.inv(S_u) @ (settings.sim.u.min - c_u) for i in range(settings.scp.n)
+        np.linalg.inv(S_u) @ (u_nonscaled[i] - c_u)
+        <= np.linalg.inv(S_u) @ (settings.sim.u.max - c_u)
+        for i in range(settings.scp.n)
+    ]
+    constr += [
+        np.linalg.inv(S_u) @ (u_nonscaled[i] - c_u)
+        >= np.linalg.inv(S_u) @ (settings.sim.u.min - c_u)
+        for i in range(settings.scp.n)
     ]  # Control Constraints
 
     # TODO: (norrisg) formalize this
-    constr += [np.linalg.inv(S_x) @ (x_nonscaled[i][:] - c_x) <= np.linalg.inv(S_x) @ (settings.sim.x.max -c_x) for i in range(settings.scp.n)]
     constr += [
-        np.linalg.inv(S_x) @ (x_nonscaled[i][:] - c_x) >= np.linalg.inv(S_x) @ (settings.sim.x.min - c_x) for i in range(settings.scp.n)
+        np.linalg.inv(S_x) @ (x_nonscaled[i][:] - c_x)
+        <= np.linalg.inv(S_x) @ (settings.sim.x.max - c_x)
+        for i in range(settings.scp.n)
+    ]
+    constr += [
+        np.linalg.inv(S_x) @ (x_nonscaled[i][:] - c_x)
+        >= np.linalg.inv(S_x) @ (settings.sim.x.min - c_x)
+        for i in range(settings.scp.n)
     ]  # State Constraints (Also implemented in CTCS but included for numerical stability)
 
     ########

@@ -107,7 +107,24 @@ def test_jit_dVdt_compiles(settings):
     # bind out the Python callables & settings
     def wrapped(tau_, V_):
         return dVdt(
-            tau_, V_, u_cur, u_next, state_dot, A, B, n_x, n_u, N, settings.dis.dis_type, {}, settings.sim.S_x, settings.sim.c_x, settings.sim.S_u, settings.sim.c_u, settings.sim.inv_S_x, settings.sim.inv_S_u
+            tau_,
+            V_,
+            u_cur,
+            u_next,
+            state_dot,
+            A,
+            B,
+            n_x,
+            n_u,
+            N,
+            settings.dis.dis_type,
+            {},
+            settings.sim.S_x,
+            settings.sim.c_x,
+            settings.sim.S_u,
+            settings.sim.c_u,
+            settings.sim.inv_S_x,
+            settings.sim.inv_S_u,
         )
 
     # now JIT only over (tau_, V_)
