@@ -16,7 +16,7 @@ class ConvexSolver(ABC):
         ...
 
     @abstractmethod
-    def solve(self, state, params, settings) -> cp.Problem:
+    def solve(self, state, params, settings) -> Any:
         '''Update parameters and solve (called each iteration).'''
         ...
 ```
@@ -30,16 +30,22 @@ This architecture enables users to implement custom solver backends such as:
 - Research solvers with specialized structure exploitation
 
 Note:
+    The current implementation is CVXPy-centric. :class:`LoweredProblem` contains
+    CVXPy-specific objects (``ocp_vars``, ``cvxpy_constraints``). See the
+    architecture note in :mod:`openscvx.solvers.base` for planned refactoring
+    to support backend-agnostic problem lowering.
+
+Note:
     CVXPyGen setup logic is currently in :class:`Problem`. When solvers are
     refactored to use the ``ConvexSolver`` base class, this setup will move here.
 """
 
 from .base import ConvexSolver
-from .cvxpy import optimal_control_problem
+from .cvxpy import CVXPySolver
 
 __all__ = [
     # Base class
     "ConvexSolver",
     # CVXPy implementation
-    "optimal_control_problem",
+    "CVXPySolver",
 ]
