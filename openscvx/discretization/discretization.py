@@ -179,12 +179,12 @@ def calculate_discretization(
         n_u=n_u,
         N=N,
         dis_type=settings.dis.dis_type,
-        S_x = settings.sim.S_x,
-        c_x = settings.sim.c_x,
-        S_u = settings.sim.S_u,
-        c_u = settings.sim.c_u,
-        inv_S_x = settings.sim.inv_S_x,
-        inv_S_u = settings.sim.inv_S_u,
+        S_x=settings.sim.S_x,
+        c_x=settings.sim.c_x,
+        S_u=settings.sim.S_u,
+        c_u=settings.sim.c_u,
+        inv_S_x=settings.sim.inv_S_x,
+        inv_S_u=settings.sim.inv_S_u,
         params=params,  # Pass params as single dict
     )
 

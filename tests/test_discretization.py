@@ -79,7 +79,6 @@ def test_discretization_shapes(settings, dynamics):
     # dummy x,u
     x = jnp.ones((settings.scp.n, settings.sim.n_states))
     u = jnp.ones((settings.scp.n, settings.sim.n_controls + 1))  # +1 slack
-    
 
     A_bar, B_bar, C_bar, x_prop, Vmulti = solver(x, u, {})
 

@@ -143,11 +143,15 @@ def optimal_control_problem(settings: Config, lowered: "LoweredProblem"):
 
     constr += [
         np.linalg.inv(S_x) @ (x_nonscaled[i] - c_x)
-        == np.linalg.inv(S_x) @ (A_d[i - 1] @ dx_nonscaled[i - 1]
-        + B_d[i - 1] @ du_nonscaled[i - 1]
-        + C_d[i - 1] @ du_nonscaled[i]
-        + x_prop[i - 1]
-        + nu[i - 1] - c_x)
+        == np.linalg.inv(S_x)
+        @ (
+            A_d[i - 1] @ dx_nonscaled[i - 1]
+            + B_d[i - 1] @ du_nonscaled[i - 1]
+            + C_d[i - 1] @ du_nonscaled[i]
+            + x_prop[i - 1]
+            + nu[i - 1]
+            - c_x
+        )
         for i in range(1, settings.scp.n)
     ]  # Dynamics Constraint
 
