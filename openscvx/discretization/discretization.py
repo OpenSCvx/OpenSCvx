@@ -49,6 +49,8 @@ def dVdt(
         jnp.ndarray: Time derivative of augmented state vector.
     """
 
+    # TODO Implement scaling of V vector
+
     # Define the nodes
     nodes = jnp.arange(0, N - 1)
 
@@ -109,6 +111,8 @@ def dVdt(
     )
     # fmt: on
 
+    # TODO Implement scaling of V vector
+
     return dVdt.reshape(-1)
 
 
@@ -167,6 +171,8 @@ def calculate_discretization(
     V0 = V0.at[:, :n_x].set(x[:-1].astype(float))
     V0 = V0.at[:, n_x : n_x + n_x * n_x].set(jnp.eye(n_x).reshape(1, -1).repeat(N - 1, axis=0))
     V0 = V0.reshape(-1)
+
+    # TODO Implement scaling of V vector
 
     # Choose integrator
     integrator_args = dict(
