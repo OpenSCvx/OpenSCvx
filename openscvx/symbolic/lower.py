@@ -73,7 +73,6 @@ from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import Expr, NodeReference
 
 if TYPE_CHECKING:
-    from openscvx.lowered.unified import UnifiedState
     from openscvx.solvers import ConvexSolver
     from openscvx.symbolic.problem import SymbolicProblem
 
@@ -84,7 +83,6 @@ __all__ = [
     "create_cvxpy_variables",
     "lower_symbolic_problem",
 ]
-from openscvx.lowered.unified import UnifiedControl, UnifiedState
 from openscvx.symbolic.unified import unify_controls, unify_states
 
 

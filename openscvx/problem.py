@@ -15,11 +15,10 @@ Example:
 
 import copy
 import os
-import pickle
 import queue
 import threading
 import time
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import List, Optional, Union
 
 import jax
 
@@ -65,9 +64,6 @@ from openscvx.utils.caching import (
     load_or_compile_propagation_solver,
     prime_propagation_solver,
 )
-
-if TYPE_CHECKING:
-    import cvxpy as cp
 
 
 class Problem:
