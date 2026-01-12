@@ -717,6 +717,14 @@ class Problem:
             citations = "\n".join(algo_citations)
             sections.append(f"{header}\n\n{citations}")
 
+        # Solver citations
+        solver_citations = self._solver.citation()
+        if solver_citations:
+            solver_name = type(self._solver).__name__
+            header = f"% Convex Solver: {solver_name}"
+            citations = "\n".join(solver_citations)
+            sections.append(f"{header}\n\n{citations}")
+
         # Future: add citations from discretization, constraint formulations, etc.
 
         sections.append(r"% --- END AUTO-GENERATED CITATIONS")
