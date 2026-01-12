@@ -73,11 +73,20 @@ class PtrSolver(ConvexSolver):
     CVXPy Parameters for values that change each iteration. The ``solve()``
     method then solves and returns a structured ``PtrSolveResult``.
 
-    Note:
-        Parameter updates (linearization matrices, constraint gradients, etc.)
-        are currently performed by the algorithm before calling ``solve()``.
-        A future refactor may move this logic into the solver for better
-        encapsulation.
+    !!! note "Future Backend Support"
+
+        When adding a new backend (QPAX, COCO, etc.), this class should be
+        refactored:
+
+        1. Rename ``PtrSolver`` to ``CVXPyPtrSolver``
+        2. Extract ``PtrSolver`` as an abstract base class defining the PTR
+           interface (``update_dynamics_linearization``, ``update_constraint_linearizations``,
+           ``update_penalties``, ``solve`` returning ``PtrSolveResult``)
+        3. Have ``CVXPyPtrSolver`` and the new backend (e.g., ``QPAXPtrSolver``)
+           inherit from the abstract ``PtrSolver``
+
+        This keeps the algorithm backend-agnostic while allowing multiple
+        solver implementations for the PTR formulation.
 
     Example:
         Using PtrSolver with the SCP framework::
@@ -249,11 +258,130 @@ class PtrSolver(ConvexSolver):
             solver_args = settings.cvx.solver_args
             self._solve_fn = lambda: self._problem.solve(solver=solver, **solver_args)
 
+    def update_dynamics_linearization(
+        self,
+        x_bar: np.ndarray,
+        u_bar: np.ndarray,
+        A_d: np.ndarray,
+        B_d: np.ndarray,
+        C_d: np.ndarray,
+        x_prop: np.ndarray,
+    ) -> None:
+        """Update dynamics linearization point and matrices.
+
+        Sets the current linearization point (previous iterate) and the
+        discretized dynamics matrices for the convex subproblem.
+
+        Args:
+            x_bar: Previous state trajectory, shape (N, n_states)
+            u_bar: Previous control trajectory, shape (N, n_controls)
+            A_d: Discretized state Jacobian, shape (N-1, n_states, n_states)
+            B_d: Discretized control Jacobian (current node), shape (N-1, n_states, n_controls)
+            C_d: Discretized control Jacobian (next node), shape (N-1, n_states, n_controls)
+            x_prop: Propagated state from dynamics, shape (N-1, n_states)
+        """
+        self._set_param("x_bar", x_bar)
+        self._set_param("u_bar", u_bar)
+        self._set_param("A_d", A_d)
+        self._set_param("B_d", B_d)
+        self._set_param("C_d", C_d)
+        self._set_param("x_prop", x_prop)
+
+    def update_constraint_linearizations(
+        self,
+        nodal: List[dict] = None,
+        cross_node: List[dict] = None,
+    ) -> None:
+        """Update linearized constraint values and gradients.
+
+        Sets constraint function values and gradients at the current
+        linearization point for both nodal and cross-node constraints.
+
+        Args:
+            nodal: List of dicts for nodal constraints, each containing:
+                - ``g``: Constraint value at linearization point
+                - ``grad_g_x``: Gradient w.r.t. state
+                - ``grad_g_u``: Gradient w.r.t. control
+            cross_node: List of dicts for cross-node constraints, each containing:
+                - ``g``: Constraint value at linearization point
+                - ``grad_g_X``: Gradient w.r.t. full state trajectory
+                - ``grad_g_U``: Gradient w.r.t. full control trajectory
+        """
+        if nodal:
+            for g_id, constraint_data in enumerate(nodal):
+                self._set_param(f"g_{g_id}", constraint_data["g"])
+                self._set_param(f"grad_g_x_{g_id}", constraint_data["grad_g_x"])
+                self._set_param(f"grad_g_u_{g_id}", constraint_data["grad_g_u"])
+
+        if cross_node:
+            for g_id, constraint_data in enumerate(cross_node):
+                self._set_param(f"g_cross_{g_id}", constraint_data["g"])
+                self._set_param(f"grad_g_X_cross_{g_id}", constraint_data["grad_g_X"])
+                self._set_param(f"grad_g_U_cross_{g_id}", constraint_data["grad_g_U"])
+
+    def update_penalties(
+        self,
+        w_tr: float,
+        lam_cost: float,
+        lam_vc: np.ndarray,
+        lam_vb: float,
+    ) -> None:
+        """Update SCP penalty weights.
+
+        Sets the penalty weights that balance competing objectives in the
+        PTR convex subproblem.
+
+        Args:
+            w_tr: Trust region weight (penalizes deviation from linearization point)
+            lam_cost: Cost function weight
+            lam_vc: Virtual control penalty weights, shape (N-1, n_states)
+            lam_vb: Virtual buffer penalty weight (for constraint violations)
+        """
+        self._set_param("w_tr", w_tr)
+        self._set_param("lam_cost", lam_cost)
+        self._set_param("lam_vc", lam_vc)
+        self._set_param("lam_vb", lam_vb)
+
+    def _set_param(self, name: str, value: np.ndarray) -> None:
+        """Set a CVXPy parameter with helpful error messages on failure.
+
+        Args:
+            name: The parameter name in problem.param_dict
+            value: The value to assign
+
+        Raises:
+            ValueError: If the value is not real, with diagnostic information.
+        """
+        try:
+            self._problem.param_dict[name].value = value
+        except ValueError as e:
+            if "must be real" in str(e):
+                arr = np.asarray(value)
+                nan_mask = ~np.isfinite(arr)
+                nan_indices = np.argwhere(nan_mask)
+
+                index_value_strs = [
+                    f"  {tuple(int(i) for i in idx)} -> {arr[tuple(idx)]}"
+                    for idx in nan_indices[:20]
+                ]
+                if len(nan_indices) > 20:
+                    index_value_strs.append(f"  ... and {len(nan_indices) - 20} more")
+
+                arr_str = np.array2string(arr, threshold=200, edgeitems=3, max_line_width=120)
+                msg = (
+                    f"Parameter '{name}' with shape {arr.shape} contains "
+                    f"{len(nan_indices)} non-real value(s):\n"
+                    + "\n".join(index_value_strs)
+                    + f"\n\n{name} = {arr_str}"
+                )
+                raise ValueError(msg) from e
+            raise
+
     def solve(self) -> PtrSolveResult:
         """Solve the convex subproblem and return structured results.
 
-        The algorithm is responsible for updating CVXPy parameters (x_bar, u_bar,
-        A_d, B_d, constraint linearizations, etc.) before calling this method.
+        Call ``update_dynamics_linearization()``, ``update_constraint_linearizations()``,
+        and ``update_penalties()`` before calling this method.
 
         Returns:
             PtrSolveResult containing unscaled trajectories, slack variables,

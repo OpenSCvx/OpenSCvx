@@ -3,11 +3,19 @@
 This module defines the abstract interface that all convex solver implementations
 must follow for use within successive convexification algorithms.
 
-The solver lifecycle follows three phases:
+The solver lifecycle follows these phases:
+
+**Setup (called once):**
 
 1. **create_variables**: Create backend-specific optimization variables
 2. **initialize**: Build the complete optimization problem structure
-3. **solve**: Update parameters and solve (called each SCP iteration)
+
+**Per-iteration (called each SCP iteration):**
+
+3. **update_dynamics_linearization**: Set dynamics linearization point and matrices
+4. **update_constraint_linearizations**: Set constraint values and gradients
+5. **update_penalties**: Set penalty weights
+6. **solve**: Solve and return results
 
 This separation allows the lowering process to:
 - Call ``create_variables()`` to get backend-specific variables
@@ -47,31 +55,45 @@ class ConvexSolver(ABC):
     subproblems generated at each iteration of a successive convexification
     algorithm.
 
-    The solver lifecycle has three phases:
+    The solver lifecycle has two phases:
 
-    - create_variables: Create backend-specific variables (called once)
-    - initialize: Build the problem structure using lowered constraints (called once)
-    - solve: Update parameter values and solve (called each SCP iteration)
+    **Setup (called once):**
 
-    This separation allows the lowering process to create variables first,
-    then lower convex constraints using those variables, before building
-    the complete problem.
+    - create_variables: Create backend-specific variables
+    - initialize: Build the problem structure using lowered constraints
+
+    **Per-iteration (called each SCP iteration):**
+
+    - update_dynamics_linearization: Set linearization point and dynamics matrices
+    - update_constraint_linearizations: Set constraint values and gradients
+    - update_penalties: Set penalty weights
+    - solve: Solve and return results
 
     Example:
         Implementing a custom solver::
 
             class MySolver(ConvexSolver):
                 def create_variables(self, N, x_unified, u_unified, jax_constraints):
-                    # Create backend-specific variables
                     self._vars = create_my_variables(N, x_unified, ...)
 
                 def initialize(self, lowered, settings):
-                    # Build problem structure using self._vars
                     self._prob = build_my_problem(self._vars, lowered, settings)
 
+                def update_dynamics_linearization(self, **kwargs):
+                    # Set x_bar, u_bar, A_d, B_d, etc.
+                    ...
+
+                def update_constraint_linearizations(self, **kwargs):
+                    # Set constraint function values and gradients
+                    ...
+
+                def update_penalties(self, **kwargs):
+                    # Set w_tr, lam_cost, lam_vc, lam_vb
+                    ...
+
                 def solve(self):
-                    # Parameters already updated by algorithm
                     self._prob.solve()
+                    return MyResult(...)
     """
 
     @abstractmethod
@@ -124,16 +146,50 @@ class ConvexSolver(ABC):
         ...
 
     @abstractmethod
-    def solve(self) -> None:
-        """Solve the convex subproblem.
+    def update_dynamics_linearization(self, **kwargs) -> None:
+        """Update dynamics linearization point and matrices.
 
-        Called at each SCP iteration after the algorithm has updated parameter
-        values. The algorithm is responsible for setting linearization parameters
-        before calling this method.
+        Called at each SCP iteration before ``solve()`` to set the current
+        linearization point and discretized dynamics matrices.
 
-        Note:
-            Results are accessed via backend-specific attributes after solving
-            (e.g., ``solver.problem.var_dict["x"].value`` for CVXPy).
+        The specific parameters depend on the solver implementation.
+        See concrete solver classes for expected arguments.
+        """
+        ...
+
+    @abstractmethod
+    def update_constraint_linearizations(self, **kwargs) -> None:
+        """Update linearized constraint values and gradients.
+
+        Called at each SCP iteration before ``solve()`` to set constraint
+        function values and gradients at the current linearization point.
+
+        The specific parameters depend on the solver implementation.
+        See concrete solver classes for expected arguments.
+        """
+        ...
+
+    @abstractmethod
+    def update_penalties(self, **kwargs) -> None:
+        """Update SCP penalty weights.
+
+        Called at each SCP iteration before ``solve()`` to set the current
+        penalty weights for trust region, virtual control, and virtual buffer.
+
+        The specific parameters depend on the solver implementation.
+        See concrete solver classes for expected arguments.
+        """
+        ...
+
+    @abstractmethod
+    def solve(self):
+        """Solve the convex subproblem and return results.
+
+        Called at each SCP iteration after updating linearization and penalties.
+        Returns a solver-specific result object containing the solution.
+
+        Returns:
+            Solver-specific result object (e.g., ``PtrSolveResult`` for PTR).
         """
         ...
 

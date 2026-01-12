@@ -246,78 +246,72 @@ class PenalizedTrustRegion(Algorithm):
         Returns:
             Tuple containing solution data, costs, and timing information.
         """
-        # Get the underlying CVXPy problem from the solver
-        ocp = self._solver.problem
-
-        _set_param(ocp, "x_bar", state.x)
-        _set_param(ocp, "u_bar", state.u)
-
         param_dict = params
 
+        # Compute discretization
         t0 = time.time()
         A_bar, B_bar, C_bar, x_prop, V_multi_shoot = self._discretization_solver.call(
             state.x, state.u.astype(float), param_dict
         )
-
-        _set_param(ocp, "A_d", A_bar.__array__())
-        _set_param(ocp, "B_d", B_bar.__array__())
-        _set_param(ocp, "C_d", C_bar.__array__())
-        _set_param(ocp, "x_prop", x_prop.__array__())
         dis_time = time.time() - t0
 
-        # Update nodal constraint linearization parameters
+        # Update solver with dynamics linearization
+        self._solver.update_dynamics_linearization(
+            x_bar=state.x,
+            u_bar=state.u,
+            A_d=A_bar.__array__(),
+            B_d=B_bar.__array__(),
+            C_d=C_bar.__array__(),
+            x_prop=x_prop.__array__(),
+        )
+
+        # Build constraint linearization data
         # TODO: (norrisg) investigate why we are passing `0` for the node here
+        nodal_linearizations = []
         if self._jax_constraints.nodal:
-            for g_id, constraint in enumerate(self._jax_constraints.nodal):
-                _set_param(
-                    ocp,
-                    f"g_{g_id}",
-                    np.asarray(constraint.func(state.x, state.u, 0, param_dict)),
-                )
-                _set_param(
-                    ocp,
-                    f"grad_g_x_{g_id}",
-                    np.asarray(constraint.grad_g_x(state.x, state.u, 0, param_dict)),
-                )
-                _set_param(
-                    ocp,
-                    f"grad_g_u_{g_id}",
-                    np.asarray(constraint.grad_g_u(state.x, state.u, 0, param_dict)),
+            for constraint in self._jax_constraints.nodal:
+                nodal_linearizations.append(
+                    {
+                        "g": np.asarray(constraint.func(state.x, state.u, 0, param_dict)),
+                        "grad_g_x": np.asarray(
+                            constraint.grad_g_x(state.x, state.u, 0, param_dict)
+                        ),
+                        "grad_g_u": np.asarray(
+                            constraint.grad_g_u(state.x, state.u, 0, param_dict)
+                        ),
+                    }
                 )
 
-        # Update cross-node constraint linearization parameters
+        cross_node_linearizations = []
         if self._jax_constraints.cross_node:
-            for g_id, constraint in enumerate(self._jax_constraints.cross_node):
-                # Cross-node constraints take (X, U, params) not (x, u, node, params)
-                _set_param(
-                    ocp,
-                    f"g_cross_{g_id}",
-                    np.asarray(constraint.func(state.x, state.u, param_dict)),
-                )
-                _set_param(
-                    ocp,
-                    f"grad_g_X_cross_{g_id}",
-                    np.asarray(constraint.grad_g_X(state.x, state.u, param_dict)),
-                )
-                _set_param(
-                    ocp,
-                    f"grad_g_U_cross_{g_id}",
-                    np.asarray(constraint.grad_g_U(state.x, state.u, param_dict)),
+            for constraint in self._jax_constraints.cross_node:
+                cross_node_linearizations.append(
+                    {
+                        "g": np.asarray(constraint.func(state.x, state.u, param_dict)),
+                        "grad_g_X": np.asarray(constraint.grad_g_X(state.x, state.u, param_dict)),
+                        "grad_g_U": np.asarray(constraint.grad_g_U(state.x, state.u, param_dict)),
+                    }
                 )
 
-        # Convex constraints are already lowered and handled in the OCP, no action needed here
+        # Update solver with constraint linearizations
+        self._solver.update_constraint_linearizations(
+            nodal=nodal_linearizations if nodal_linearizations else None,
+            cross_node=cross_node_linearizations if cross_node_linearizations else None,
+        )
 
         # Initialize lam_vc as matrix if it's still a scalar in state
         if isinstance(state.lam_vc, (int, float)):
-            # Convert scalar to matrix: (N-1, n_states)
             state.lam_vc = np.ones((settings.scp.n - 1, settings.sim.n_states)) * state.lam_vc
 
-        # Update CVXPy parameters from state
-        _set_param(ocp, "w_tr", state.w_tr)
-        _set_param(ocp, "lam_cost", state.lam_cost)
-        _set_param(ocp, "lam_vc", state.lam_vc)
-        _set_param(ocp, "lam_vb", state.lam_vb)
+        # Update solver with penalty weights
+        self._solver.update_penalties(
+            w_tr=state.w_tr,
+            lam_cost=state.lam_cost,
+            lam_vc=state.lam_vc,
+            lam_vb=state.lam_vb,
+        )
 
+        # Solve the convex subproblem
         t0 = time.time()
         result = self._solver.solve()
         subprop_time = time.time() - t0
