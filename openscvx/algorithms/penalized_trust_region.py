@@ -319,15 +319,12 @@ class PenalizedTrustRegion(Algorithm):
         _set_param(ocp, "lam_vb", state.lam_vb)
 
         t0 = time.time()
-        self._solver.solve()
+        result = self._solver.solve()
         subprop_time = time.time() - t0
 
-        x_new_guess = (
-            settings.sim.S_x @ ocp.var_dict["x"].value.T + np.expand_dims(settings.sim.c_x, axis=1)
-        ).T
-        u_new_guess = (
-            settings.sim.S_u @ ocp.var_dict["u"].value.T + np.expand_dims(settings.sim.c_u, axis=1)
-        ).T
+        # Extract unscaled trajectories from result
+        x_new_guess = result.x
+        u_new_guess = result.u
 
         # Calculate costs from boundary conditions using utility function
         # Note: The original code only considered final_type, but the utility handles both
@@ -356,33 +353,28 @@ class PenalizedTrustRegion(Algorithm):
         # Calculate J_tr_vec using the JAX-compatible block diagonal matrix
         tr_mat = inv_block_diag @ np.hstack((x_new_guess - state.x, u_new_guess - state.u)).T
         J_tr_vec = la.norm(tr_mat, axis=0) ** 2
-        vc_mat = np.abs(ocp.var_dict["nu"].value)
+        vc_mat = np.abs(result.nu)
         J_vc_vec = np.sum(vc_mat, axis=1)
 
-        id_ncvx = 0
+        # Sum nodal constraint violations
         J_vb_vec = 0
-        if self._jax_constraints.nodal:
-            for constraint in self._jax_constraints.nodal:
-                J_vb_vec += np.maximum(0, ocp.var_dict["nu_vb_" + str(id_ncvx)].value)
-                id_ncvx += 1
+        for nu_vb_arr in result.nu_vb:
+            J_vb_vec += np.maximum(0, nu_vb_arr)
 
         # Add cross-node constraint violations
-        id_cross = 0
-        if self._jax_constraints.cross_node:
-            for constraint in self._jax_constraints.cross_node:
-                J_vb_vec += np.maximum(0, ocp.var_dict["nu_vb_cross_" + str(id_cross)].value)
-                id_cross += 1
+        for nu_vb_cross_val in result.nu_vb_cross:
+            J_vb_vec += np.maximum(0, nu_vb_cross_val)
 
         # Convex constraints are already handled in the OCP, no processing needed here
         return (
             x_new_guess,
             u_new_guess,
             costs,
-            ocp.value,
+            result.cost,
             J_vb_vec,
             J_vc_vec,
             J_tr_vec,
-            ocp.status,
+            result.status,
             V_multi_shoot,
             subprop_time,
             dis_time,

@@ -42,11 +42,12 @@ Note:
 """
 
 from .base import ConvexSolver
-from .cvxpy import CVXPySolver
+from .ptr_solver import PtrSolver, PtrSolveResult
 
 __all__ = [
     # Base class
     "ConvexSolver",
-    # CVXPy implementation
-    "CVXPySolver",
+    # PTR solver
+    "PtrSolver",
+    "PtrSolveResult",
 ]

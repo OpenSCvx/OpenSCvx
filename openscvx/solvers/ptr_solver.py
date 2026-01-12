@@ -1,4 +1,4 @@
-"""CVXPy-based convex subproblem solver.
+"""CVXPy-based convex subproblem solver for the penalized trust-region (PTR) SCP algorithm.
 
 This module provides the default solver backend using CVXPy's modeling language
 with support for multiple backend solvers (CLARABEL, etc.). Includes optional
@@ -6,6 +6,7 @@ code generation via cvxpygen for improved performance.
 """
 
 import os
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, List
 
 import cvxpy as cp
@@ -14,6 +15,35 @@ import numpy as np
 from openscvx.config import Config
 
 from .base import ConvexSolver
+
+
+@dataclass
+class PtrSolveResult:
+    """Result from solving a PTR convex subproblem.
+
+    Contains the solution trajectories and slack variables from a single
+    SCP iteration. All trajectories are unscaled (physical units).
+
+    Attributes:
+        x: State trajectory, shape (N, n_states). Unscaled.
+        u: Control trajectory, shape (N, n_controls). Unscaled.
+        nu: Virtual control slack for dynamics defects, shape (N-1, n_states).
+        nu_vb: Nonconvex nodal constraint violation slacks. List of arrays,
+            one per nodal constraint.
+        nu_vb_cross: Cross-node constraint violation slacks. List of scalars,
+            one per cross-node constraint.
+        cost: Optimal objective value.
+        status: Solver status string (e.g., "optimal", "infeasible").
+    """
+
+    x: np.ndarray
+    u: np.ndarray
+    nu: np.ndarray
+    nu_vb: List[np.ndarray]
+    nu_vb_cross: List[float]
+    cost: float
+    status: str
+
 
 if TYPE_CHECKING:
     from openscvx.lowered import LoweredProblem
@@ -31,8 +61,8 @@ except ImportError:
     cpg = None
 
 
-class CVXPySolver(ConvexSolver):
-    """CVXPy-based convex subproblem solver.
+class PtrSolver(ConvexSolver):
+    """CVXPy-based convex subproblem solver for the PTR algorithm.
 
     This solver uses CVXPy's modeling language to construct and solve the convex
     subproblems generated at each SCP iteration. It supports multiple backend
@@ -41,7 +71,7 @@ class CVXPySolver(ConvexSolver):
 
     The solver builds the problem structure once during ``initialize()``, using
     CVXPy Parameters for values that change each iteration. The ``solve()``
-    method then updates these parameters and solves the problem.
+    method then solves and returns a structured ``PtrSolveResult``.
 
     Note:
         Parameter updates (linearization matrices, constraint gradients, etc.)
@@ -50,21 +80,23 @@ class CVXPySolver(ConvexSolver):
         encapsulation.
 
     Example:
-        Using CVXPySolver with the SCP framework::
+        Using PtrSolver with the SCP framework::
 
-            solver = CVXPySolver()
+            solver = PtrSolver()
+            solver.create_variables(N, x_unified, u_unified, jax_constraints)
             solver.initialize(lowered, settings)
 
             # Each iteration (parameter updates done by algorithm):
-            solver.solve()
-            x_sol = solver.problem.var_dict["x"].value
+            result = solver.solve()
+            x_sol = result.x  # Unscaled state trajectory
 
     Attributes:
         problem: The CVXPy Problem object (available after initialize())
+        ocp_vars: The CVXPy variables and parameters (available after create_variables())
     """
 
     def __init__(self):
-        """Initialize CVXPySolver with unset problem.
+        """Initialize PtrSolver with unset problem.
 
         Call create_variables() then initialize() to build the problem structure.
         """
@@ -181,7 +213,7 @@ class CVXPySolver(ConvexSolver):
         """
         if self._ocp_vars is None:
             raise RuntimeError(
-                "CVXPySolver.initialize() called before create_variables(). "
+                "PtrSolver.initialize() called before create_variables(). "
                 "Call create_variables() first to create optimization variables."
             )
         self._problem = _build_optimal_control_problem(settings, lowered, self._ocp_vars)
@@ -217,28 +249,57 @@ class CVXPySolver(ConvexSolver):
             solver_args = settings.cvx.solver_args
             self._solve_fn = lambda: self._problem.solve(solver=solver, **solver_args)
 
-    def solve(self) -> None:
-        """Solve the convex subproblem.
+    def solve(self) -> PtrSolveResult:
+        """Solve the convex subproblem and return structured results.
 
         The algorithm is responsible for updating CVXPy parameters (x_bar, u_bar,
         A_d, B_d, constraint linearizations, etc.) before calling this method.
 
-        Access results after solving via:
-        - ``solver.problem.var_dict["x"].value`` for state trajectory
-        - ``solver.problem.var_dict["u"].value`` for control trajectory
-        - ``solver.problem.value`` for optimal cost
-        - ``solver.problem.status`` for solver status
+        Returns:
+            PtrSolveResult containing unscaled trajectories, slack variables,
+            cost, and solver status.
 
         Raises:
             RuntimeError: If initialize() has not been called.
         """
         if self._problem is None:
             raise RuntimeError(
-                "CVXPySolver.solve() called before initialize(). "
+                "PtrSolver.solve() called before initialize(). "
                 "Call initialize() first to build the problem structure."
             )
 
         self._solve_fn()
+
+        # Get scaling matrices
+        S_x = self._ocp_vars.S_x
+        c_x = self._ocp_vars.c_x
+        S_u = self._ocp_vars.S_u
+        c_u = self._ocp_vars.c_u
+
+        # Unscale state and control trajectories
+        x_scaled = self._problem.var_dict["x"].value  # (N, n_states)
+        u_scaled = self._problem.var_dict["u"].value  # (N, n_controls)
+        x = (S_x @ x_scaled.T + np.expand_dims(c_x, axis=1)).T
+        u = (S_u @ u_scaled.T + np.expand_dims(c_u, axis=1)).T
+
+        # Get virtual control slack
+        nu = self._problem.var_dict["nu"].value
+
+        # Get nodal constraint violation slacks
+        nu_vb = [var.value for var in self._ocp_vars.nu_vb]
+
+        # Get cross-node constraint violation slacks
+        nu_vb_cross = [var.value for var in self._ocp_vars.nu_vb_cross]
+
+        return PtrSolveResult(
+            x=x,
+            u=u,
+            nu=nu,
+            nu_vb=nu_vb,
+            nu_vb_cross=nu_vb_cross,
+            cost=self._problem.value,
+            status=self._problem.status,
+        )
 
     def citation(self) -> List[str]:
         """Return BibTeX citations for CVXPy.
@@ -277,7 +338,7 @@ def _build_optimal_control_problem(
     """Build the complete optimal control problem with all constraints.
 
     This is the internal implementation that constructs the CVXPy problem
-    structure. It is called by CVXPySolver.initialize().
+    structure. It is called by PtrSolver.initialize().
 
     Args:
         settings: Configuration settings for the optimization problem
