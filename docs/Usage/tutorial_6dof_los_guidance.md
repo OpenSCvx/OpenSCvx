@@ -4,7 +4,7 @@
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open in Colab">
 </a>
 
-Awesome! Now that we have a basic understanding of how to use OpenSCvx, let's solve a more complex problem. In this example we will be solving a 6DoF line-of-sight guidance problem. This example comes from a RA-L paper of mine which you can find [here](https://haynec.github.io/papers/los/). The problem is more complex than the previous example, but demonstrates the power of OpenSCvx's symbolic expression layer.
+Awesome! Now that we have a basic understanding of how to use OpenSCvx, let's solve a more complex problem. In this example we will be solving a 6DoF line-of-sight guidance problem. This example comes from a RA-L paper of mine which you can find [here](https://openscvx.github.io/papers/los/). The problem is more complex than the previous example, but demonstrates the power of OpenSCvx's symbolic expression layer.
 
 In this problem, it is still a minimum time problem, but now there are 10 gates in which the drone must pass through in a predefined sequence while maintaining a line-of-sight to several key points throughout the entire trajectory. The problem can be expressed as follows:
 

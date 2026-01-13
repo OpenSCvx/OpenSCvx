@@ -66,12 +66,12 @@ def create_server(
         TitlebarButton(
             text="Getting Started",
             icon="Description",
-            href="https://haynec.github.io/OpenSCvx/latest/getting-started/",
+            href="https://openscvx.github.io/OpenSCvx/latest/getting-started/",
         ),
         TitlebarButton(
             text="Docs",
             icon="Description",
-            href="https://haynec.github.io/OpenSCvx/",
+            href="https://openscvx.github.io/OpenSCvx/",
         ),
         TitlebarButton(
             text="GitHub",
