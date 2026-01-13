@@ -61,7 +61,7 @@ For local development, you can clone the repository and install it in editable m
 
 ```sh
 # Clone the repo
-git clone https://github.com/haynec/OpenSCvx.git
+git clone https://github.com/OpenSCvx/OpenSCvx.git
 cd OpenSCvx
 
 # Install in editable mode with all optional dependencies
@@ -104,7 +104,7 @@ For setting up a local development environment, we recommend using Conda to mana
 
 1.  Clone the repository:
     ```sh
-    git clone https://github.com/haynec/OpenSCvx.git
+    git clone https://github.com/OpenSCvx/OpenSCvx.git
     cd OpenSCvx
     ```
 2.  Create and activate a conda environment with Python:
@@ -124,7 +124,7 @@ For setting up a local development environment, we recommend using Conda to mana
 1.  Prerequisites: Install [uv](https://docs.astral.sh/uv/getting-started/installation/)
 2.  Clone the repository:
     ```sh
-    git clone https://github.com/haynec/OpenSCvx.git
+    git clone https://github.com/OpenSCvx/OpenSCvx.git
     cd OpenSCvx
     ```
 3.  Create and activate a virtual environment:
@@ -143,7 +143,7 @@ For setting up a local development environment, we recommend using Conda to mana
 
 1.  Clone the repository:
     ```sh
-    git clone https://github.com/haynec/OpenSCvx.git
+    git clone https://github.com/OpenSCvx/OpenSCvx.git
     cd OpenSCvx
     ```
 2.  Create and activate a virtual environment:
