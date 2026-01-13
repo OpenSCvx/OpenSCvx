@@ -76,7 +76,7 @@ def create_server(
         TitlebarButton(
             text="GitHub",
             icon="GitHub",
-            href="https://github.com/haynec/OpenSCvx",
+            href="https://github.com/OpenSCvx/OpenSCvx",
         ),
     )
 
@@ -88,7 +88,7 @@ def create_server(
         image_url_light=logo_url,
         image_url_dark=logo_url,  # Use same logo for both themes
         image_alt="OpenSCvx",
-        href="https://github.com/haynec/OpenSCvx",
+        href="https://github.com/OpenSCvx/OpenSCvx",
     )
 
     titlebar_config = TitlebarConfig(buttons=buttons, image=image)
