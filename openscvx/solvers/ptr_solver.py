@@ -530,9 +530,9 @@ def _build_optimal_control_problem(
     grad_g_X_cross = ocp_vars.grad_g_X_cross
     grad_g_U_cross = ocp_vars.grad_g_U_cross
     nu_vb_cross = ocp_vars.nu_vb_cross
-    S_x = ocp_vars.S_x
+    inv_S_x = ocp_vars.inv_S_x
     c_x = ocp_vars.c_x
-    S_u = ocp_vars.S_u
+    inv_S_u = ocp_vars.inv_S_u
     c_u = ocp_vars.c_u
     x_nonscaled = ocp_vars.x_nonscaled
     u_nonscaled = ocp_vars.u_nonscaled
@@ -603,38 +603,52 @@ def _build_optimal_control_problem(
             cost -= lam_cost * x_nonscaled[-1][i]
 
     if settings.scp.uniform_time_grid:
+        S_u_inv_td = inv_S_u[settings.sim.time_dilation_slice, settings.sim.time_dilation_slice]
+        c_u_td = c_u[settings.sim.time_dilation_slice]
         constr += [
-            u_nonscaled[i][settings.sim.time_dilation_slice]
-            == u_nonscaled[i - 1][settings.sim.time_dilation_slice]
+            S_u_inv_td @ (u_nonscaled[i][settings.sim.time_dilation_slice] - c_u_td)
+            == S_u_inv_td @ (u_nonscaled[i - 1][settings.sim.time_dilation_slice] - c_u_td)
             for i in range(1, settings.scp.n)
         ]
 
     constr += [
-        (x[i] - np.linalg.inv(S_x) @ (x_bar[i] - c_x) - dx[i]) == 0 for i in range(settings.scp.n)
+        (x[i] - inv_S_x @ (x_bar[i] - c_x) - dx[i]) == 0 for i in range(settings.scp.n)
     ]  # State Error
     constr += [
-        (u[i] - np.linalg.inv(S_u) @ (u_bar[i] - c_u) - du[i]) == 0 for i in range(settings.scp.n)
+        (u[i] - inv_S_u @ (u_bar[i] - c_u) - du[i]) == 0 for i in range(settings.scp.n)
     ]  # Control Error
 
     constr += [
-        x_nonscaled[i]
-        == A_d[i - 1] @ dx_nonscaled[i - 1]
-        + B_d[i - 1] @ du_nonscaled[i - 1]
-        + C_d[i - 1] @ du_nonscaled[i]
-        + x_prop[i - 1]
-        + nu[i - 1]
+        inv_S_x @ (x_nonscaled[i] - c_x)
+        == inv_S_x
+        @ (
+            A_d[i - 1] @ dx_nonscaled[i - 1]
+            + B_d[i - 1] @ du_nonscaled[i - 1]
+            + C_d[i - 1] @ du_nonscaled[i]
+            + x_prop[i - 1]
+            + nu[i - 1]
+            - c_x
+        )
         for i in range(1, settings.scp.n)
     ]  # Dynamics Constraint
 
-    constr += [u_nonscaled[i] <= settings.sim.u.max for i in range(settings.scp.n)]
     constr += [
-        u_nonscaled[i] >= settings.sim.u.min for i in range(settings.scp.n)
+        inv_S_u @ (u_nonscaled[i] - c_u) <= inv_S_u @ (settings.sim.u.max - c_u)
+        for i in range(settings.scp.n)
+    ]
+    constr += [
+        inv_S_u @ (u_nonscaled[i] - c_u) >= inv_S_u @ (settings.sim.u.min - c_u)
+        for i in range(settings.scp.n)
     ]  # Control Constraints
 
     # TODO: (norrisg) formalize this
-    constr += [x_nonscaled[i][:] <= settings.sim.x.max for i in range(settings.scp.n)]
     constr += [
-        x_nonscaled[i][:] >= settings.sim.x.min for i in range(settings.scp.n)
+        inv_S_x @ (x_nonscaled[i][:] - c_x) <= inv_S_x @ (settings.sim.x.max - c_x)
+        for i in range(settings.scp.n)
+    ]
+    constr += [
+        inv_S_x @ (x_nonscaled[i][:] - c_x) >= inv_S_x @ (settings.sim.x.min - c_x)
+        for i in range(settings.scp.n)
     ]  # State Constraints (Also implemented in CTCS but included for numerical stability)
 
     ########
@@ -676,8 +690,6 @@ def _build_optimal_control_problem(
     # PROBLEM
     #########
     prob = cp.Problem(cp.Minimize(cost), constr)
-
-    # Handle cvxpygen code generation
     if settings.cvx.cvxpygen:
         if not CVXPYGEN_AVAILABLE:
             raise ImportError(
@@ -688,7 +700,7 @@ def _build_optimal_control_problem(
         if not os.path.exists("solver"):
             cpg.generate_code(prob, solver=settings.cvx.solver, code_dir="solver", wrapper=True)
         else:
-            # Prompt the user to indicate if they wish to overwrite the solver
+            # Prompt the use to indicate if they wish to overwrite the solver
             # directory or use the existing compiled solver
             if settings.cvx.cvxpygen_override:
                 cpg.generate_code(prob, solver=settings.cvx.solver, code_dir="solver", wrapper=True)
@@ -696,7 +708,11 @@ def _build_optimal_control_problem(
                 overwrite = input("Solver directory already exists. Overwrite? (y/n): ")
                 if overwrite.lower() == "y":
                     cpg.generate_code(
-                        prob, solver=settings.cvx.solver, code_dir="solver", wrapper=True
+                        prob,
+                        solver=settings.cvx.solver,
+                        code_dir="solver",
+                        wrapper=True,
                     )
-
+                else:
+                    pass
     return prob

@@ -18,6 +18,12 @@ def dVdt(
     n_u: int,
     N: int,
     dis_type: str,
+    S_x: np.ndarray,
+    c_x: np.ndarray,
+    S_u: np.ndarray,
+    c_u: np.ndarray,
+    inv_S_x: np.ndarray,
+    inv_S_u: np.ndarray,
     params: dict,
 ) -> jnp.ndarray:
     """Compute the time derivative of the augmented state vector.
@@ -42,6 +48,9 @@ def dVdt(
     Returns:
         jnp.ndarray: Time derivative of augmented state vector.
     """
+
+    # TODO Implement scaling of V vector
+
     # Define the nodes
     nodes = jnp.arange(0, N - 1)
 
@@ -102,6 +111,8 @@ def dVdt(
     )
     # fmt: on
 
+    # TODO Implement scaling of V vector
+
     return dVdt.reshape(-1)
 
 
@@ -159,6 +170,9 @@ def calculate_discretization(
     V0 = jnp.zeros((N - 1, i4))
     V0 = V0.at[:, :n_x].set(x[:-1].astype(float))
     V0 = V0.at[:, n_x : n_x + n_x * n_x].set(jnp.eye(n_x).reshape(1, -1).repeat(N - 1, axis=0))
+    V0 = V0.reshape(-1)
+
+    # TODO Implement scaling of V vector
 
     # Choose integrator
     integrator_args = dict(
@@ -171,6 +185,12 @@ def calculate_discretization(
         n_u=n_u,
         N=N,
         dis_type=settings.dis.dis_type,
+        S_x=settings.sim.S_x,
+        c_x=settings.sim.c_x,
+        S_u=settings.sim.S_u,
+        c_u=settings.sim.c_u,
+        inv_S_x=settings.sim.inv_S_x,
+        inv_S_u=settings.sim.inv_S_u,
         params=params,  # Pass params as single dict
     )
 
@@ -183,7 +203,7 @@ def calculate_discretization(
         sol = solve_ivp_rk45(
             dVdt_wrapped,
             1.0 / (N - 1),
-            V0.reshape(-1),
+            V0,
             args=(),
             is_not_compiled=settings.dev.debug,
         )
@@ -191,7 +211,7 @@ def calculate_discretization(
         sol = solve_ivp_diffrax(
             dVdt_wrapped,
             1.0 / (N - 1),
-            V0.reshape(-1),
+            V0,
             solver_name=settings.dis.solver,
             rtol=settings.dis.rtol,
             atol=settings.dis.atol,
