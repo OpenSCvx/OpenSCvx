@@ -10,8 +10,8 @@ implementations and custom SCvx variants:
 ```python
 class Algorithm(ABC):
     @abstractmethod
-    def initialize(self, ocp, discretization_solver, jax_constraints,
-                   solve_ocp, emitter, params, settings) -> None:
+    def initialize(self, solver, discretization_solver, jax_constraints,
+                   emitter, params, settings) -> None:
         '''Store compiled infrastructure and warm-start solvers.'''
         ...
 
@@ -21,7 +21,7 @@ class Algorithm(ABC):
         ...
 ```
 
-Immutable components (ocp, discretization_solver, jax_constraints, etc.) are stored
+Immutable components (solver, discretization_solver, jax_constraints, etc.) are stored
 during ``initialize()``. Mutable configuration (params, settings) is passed per-step
 to support runtime parameter updates and tolerance tuning.
 

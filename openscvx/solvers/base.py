@@ -3,39 +3,30 @@
 This module defines the abstract interface that all convex solver implementations
 must follow for use within successive convexification algorithms.
 
-The solver lifecycle follows these phases:
-
-**Setup (called once):**
-
-1. **create_variables**: Create backend-specific optimization variables
-2. **initialize**: Build the complete optimization problem structure
-
-**Per-iteration (called each SCP iteration):**
-
-3. **update_dynamics_linearization**: Set dynamics linearization point and matrices
-4. **update_constraint_linearizations**: Set constraint values and gradients
-5. **update_penalties**: Set penalty weights
-6. **solve**: Solve and return results
-
-This separation allows the lowering process to:
-- Call ``create_variables()`` to get backend-specific variables
-- Lower convex constraints using those variables
-- Call ``initialize()`` with the lowered constraints
-
 !!! note
 
     Solvers own their optimization variables via ``create_variables()``.
     Convex constraint lowering remains in ``lower.py`` but uses the solver's
-    variables. If non-CVXPy backends are needed in the future, the solver
-    could own the constraint lowering as well (via a ``lower_convex_constraints()``
-    method), while keeping the orchestration in ``lower_symbolic_problem()``:
+    variables.
 
-    ```python
-    @abstractmethod
-    def lower_convex_constraints(self, constraints: ConstraintSet, parameters: dict) -> None:
-        '''Lower symbolic convex constraints using created variables.'''
-        ...
-    ```
+    When adding non-CVXPy backends, there are two approaches:
+
+    1. **Solver owns the lowerer**: The solver implements a
+       ``lower_convex_constraints()`` method containing the lowering logic.
+
+    2. **Solver determines the lowerer**: The solver references which lowerer
+       to use, but the lowering logic stays in ``lower.py``. Example:
+
+       ```python
+       # In solver
+       @property
+       def lowerer(self):
+           from openscvx.symbolic.lower import lower_cvxpy_constraints
+           return lower_cvxpy_constraints
+
+       # In lower_symbolic_problem()
+       lowered_constraints = solver.lowerer(constraints, solver.variables, parameters)
+       ```
 """
 
 from abc import ABC, abstractmethod
