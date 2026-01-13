@@ -152,7 +152,7 @@ git clone https://github.com/OpenSCvx/OpenSCvx.git
 or ssh
 
 ```sh
-git clone git@github.com:haynec/OpenSCvx.git
+git clone git@github.com:OpenSCvx/OpenSCvx.git
 ```
 
 Dependencies can then be installed using Conda or Pip
