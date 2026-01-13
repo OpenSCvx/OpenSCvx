@@ -2,11 +2,11 @@
 
 <img src="figures/openscvx_logo.svg" width="1200"/>
 <p align="center">
-    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/lint.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/lint.yml/badge.svg"/></a>
-    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/tests-unit.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/tests-unit.yml/badge.svg"/></a>
-    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/tests-integration.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/tests-integration.yml/badge.svg"/></a>
-    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/nightly.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/nightly.yml/badge.svg"/></a>
-    <a href="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml"><img src="https://github.com/haynec/OpenSCvx/actions/workflows/release.yml/badge.svg?event=release"/></a>
+    <a href="https://github.com/OpenSCvx/OpenSCvx/actions/workflows/lint.yml"><img src="https://github.com/OpenSCvx/OpenSCvx/actions/workflows/lint.yml/badge.svg"/></a>
+    <a href="https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-unit.yml"><img src="https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-unit.yml/badge.svg"/></a>
+    <a href="https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-integration.yml"><img src="https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-integration.yml/badge.svg"/></a>
+    <a href="https://github.com/OpenSCvx/OpenSCvx/actions/workflows/nightly.yml"><img src="https://github.com/OpenSCvx/OpenSCvx/actions/workflows/nightly.yml/badge.svg"/></a>
+    <a href="https://github.com/OpenSCvx/OpenSCvx/actions/workflows/release.yml"><img src="https://github.com/OpenSCvx/OpenSCvx/actions/workflows/release.yml/badge.svg?event=release"/></a>
 </p>
 <p align="center">
     <a href="https://arxiv.org/abs/2410.22596"><img src="http://img.shields.io/badge/arXiv-2410.22596-B31B1B.svg"/></a>
@@ -76,7 +76,7 @@ Alternatively, for local development with the latest source:
 
 ```sh
 # Clone the repo
-git clone https://github.com/haynec/OpenSCvx.git
+git clone https://github.com/OpenSCvx/OpenSCvx.git
 cd OpenSCvx
 
 # Install in editable/development mode
@@ -146,7 +146,7 @@ CVXPYGen features include:
 This git repository can be installed using https
 
 ```sh
-git clone https://github.com/haynec/OpenSCvx.git
+git clone https://github.com/OpenSCvx/OpenSCvx.git
 ```
 
 or ssh
