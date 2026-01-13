@@ -52,7 +52,7 @@ Contributors can either:
 
 To set up a fork for development:
 
-1. Fork the repository on GitHub by clicking the "Fork" button on the [OpenSCvx repository page](https://github.com/haynec/OpenSCvx)
+1. Fork the repository on GitHub by clicking the "Fork" button on the [OpenSCvx repository page](https://github.com/OpenSCvx/OpenSCvx)
 
 2. Clone your fork locally:
    ```bash
