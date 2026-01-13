@@ -6,7 +6,7 @@ site_description: >-
   Warning this repo is currently in beta testing! Documentation for OpenSCvx, a JAX-based Python library for solving nonconvex trajectory optimization problems
 # Repository
 repo_name: haynec/OpenSCvx
-repo_url: https://github.com/haynec/OpenSCvx
+repo_url: https://github.com/OpenSCvx/OpenSCvx
 
 # Copyright
 copyright: Copyright &copy; 2025 Chris Hayner
