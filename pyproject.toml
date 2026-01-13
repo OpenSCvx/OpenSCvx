@@ -31,7 +31,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://haynec.github.io/openscvx/"
+Homepage = "https://openscvx.github.io/openscvx/"
 
 [project.optional-dependencies]
 gui = [
