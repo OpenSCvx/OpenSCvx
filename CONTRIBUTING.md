@@ -84,6 +84,7 @@ To set up a fork for development:
 #### Branch Naming Conventions
 
 We use [release-drafter](https://github.com/release-drafter/release-drafter) to automatically generate release notes based on pull request labels. These labels are auto-assigned based on your branch name prefix.
+To ensure release-drafter can successfully sort pull requests we run a [branch-name-check](.github/workflows/branch-name.yml) workflow to ensure compatibility.
 
 **Required branch prefixes:**
 
@@ -102,7 +103,7 @@ We use [release-drafter](https://github.com/release-drafter/release-drafter) to 
 - `chore/update-dependencies` - Maintenance tasks
 - `docs/api-examples` - Documentation updates
 
-See the [workflow](.github/workflows/release-drafter.yml) and [configuration](.github/release-drafter.yml) for details.
+See the release-drafter [workflow](.github/workflows/release-drafter.yml) and [configuration](.github/release-drafter.yml) for details.
 
 ### Development Guidelines
 
