@@ -357,7 +357,7 @@ class ScpConfig:
 
         This class defines the parameters used to configure the SCP solver. You
         will very likely need to modify the weights for your problem. Please
-        refer to my guide [here](https://haynec.github.io/openscvx/
+        refer to my guide [here](https://openscvx.github.io/openscvx/
         hyperparameter_tuning) for more information.
 
         Attributes:

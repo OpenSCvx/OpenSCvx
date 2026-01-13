@@ -66,17 +66,17 @@ def create_server(
         TitlebarButton(
             text="Getting Started",
             icon="Description",
-            href="https://haynec.github.io/OpenSCvx/latest/getting-started/",
+            href="https://openscvx.github.io/OpenSCvx/latest/getting-started/",
         ),
         TitlebarButton(
             text="Docs",
             icon="Description",
-            href="https://haynec.github.io/OpenSCvx/",
+            href="https://openscvx.github.io/OpenSCvx/",
         ),
         TitlebarButton(
             text="GitHub",
             icon="GitHub",
-            href="https://github.com/haynec/OpenSCvx",
+            href="https://github.com/OpenSCvx/OpenSCvx",
         ),
     )
 
@@ -88,7 +88,7 @@ def create_server(
         image_url_light=logo_url,
         image_url_dark=logo_url,  # Use same logo for both themes
         image_alt="OpenSCvx",
-        href="https://github.com/haynec/OpenSCvx",
+        href="https://github.com/OpenSCvx/OpenSCvx",
     )
 
     titlebar_config = TitlebarConfig(buttons=buttons, image=image)

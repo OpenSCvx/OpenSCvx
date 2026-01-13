@@ -52,7 +52,7 @@ Contributors can either:
 
 To set up a fork for development:
 
-1. Fork the repository on GitHub by clicking the "Fork" button on the [OpenSCvx repository page](https://github.com/haynec/OpenSCvx)
+1. Fork the repository on GitHub by clicking the "Fork" button on the [OpenSCvx repository page](https://github.com/OpenSCvx/OpenSCvx)
 
 2. Clone your fork locally:
    ```bash
@@ -181,7 +181,7 @@ The extensive test suite helps ensure that new features and refactors don't brea
 
 #### Documentation
 
-We use [MkDocs](https://www.mkdocs.org/) with [Material](https://squidfunk.github.io/mkdocs-material/) theme for documentation, hosted at [haynec.github.io/OpenSCvx](https://haynec.github.io/OpenSCvx/).
+We use [MkDocs](https://www.mkdocs.org/) with [Material](https://squidfunk.github.io/mkdocs-material/) theme for documentation, hosted at [openscvx.github.io/OpenSCvx](https://openscvx.github.io/OpenSCvx/).
 
 API reference is auto-generated from docstrings using [mkdocstrings](https://mkdocstrings.github.io/). Please use [Google-style docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings) for all public functions and classes:
 
