@@ -15,11 +15,10 @@ Example:
 
 import copy
 import os
-import pickle
 import queue
 import threading
 import time
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import List, Optional, Union
 
 import jax
 
@@ -49,7 +48,7 @@ from openscvx.lowered.jax_constraints import (
     LoweredNodalConstraint,
 )
 from openscvx.propagation import get_propagation_solver, propagate_trajectory_results
-from openscvx.solvers import optimal_control_problem
+from openscvx.solvers import PTRSolver
 from openscvx.symbolic.builder import preprocess_symbolic_problem
 from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import CTCS, Constraint
@@ -65,9 +64,6 @@ from openscvx.utils.caching import (
     load_or_compile_propagation_solver,
     prime_propagation_solver,
 )
-
-if TYPE_CHECKING:
-    import cvxpy as cp
 
 
 class Problem:
@@ -167,8 +163,13 @@ class Problem:
         # Store byof for cache hashing
         self._byof = byof
 
+        # Create solver before lowering (solver owns its variables)
+        self._solver: PTRSolver = PTRSolver()
+
         # Lower to JAX and CVXPy (byof handling happens inside lower_symbolic_problem)
-        self._lowered: LoweredProblem = lower_symbolic_problem(self.symbolic, byof=byof)
+        self._lowered: LoweredProblem = lower_symbolic_problem(
+            self.symbolic, self._solver, byof=byof
+        )
 
         # Store parameters in two forms:
         self._parameters = self.symbolic.parameters  # Plain dict for JAX functions
@@ -198,9 +199,7 @@ class Problem:
 
         # OCP construction happens in initialize() so users can modify
         # settings (like uniform_time_grid) between __init__ and initialize()
-        self._optimal_control_problem: cp.Problem = None
         self._discretization_solver: callable = None
-        self._solve_ocp: callable = None  # Solver callable (built during initialize)
 
         # Set up emitter & thread only if printing is enabled
         if self.settings.dev.printing:
@@ -393,9 +392,6 @@ class Problem:
         """
         printing.intro()
 
-        # Print problem summary
-        printing.print_problem_summary(self.settings, self._lowered)
-
         # Enable the profiler
         pr = profiling.profiling_start(self.settings.dev.profiling)
 
@@ -452,8 +448,11 @@ class Problem:
             self._compiled_dynamics_prop.f, self.settings
         )
 
-        # Build optimal control problem using LoweredProblem
-        self._optimal_control_problem = optimal_control_problem(self.settings, self._lowered)
+        # Build convex subproblem (solver was created in __init__, variables in lower)
+        self._solver.initialize(self._lowered, self.settings)
+
+        # Print problem summary (after solver is initialized so we can access problem stats)
+        printing.print_problem_summary(self.settings, self._lowered, self._solver)
 
         # Get cache file paths using symbolic AST hashing
         # This is more stable than hashing lowered JAX code
@@ -492,37 +491,12 @@ class Problem:
             save_compiled=self.settings.sim.save_compiled,
         )
 
-        # Build solver callable (handle CVXPyGen if enabled)
-        if self.settings.cvx.cvxpygen:
-            try:
-                from solver.cpg_solver import cpg_solve
-
-                with open("solver/problem.pickle", "rb") as f:
-                    pickle.load(f)
-                self._optimal_control_problem.register_solve("CPG", cpg_solve)
-                solver_args = self.settings.cvx.solver_args
-                self._solve_ocp = lambda: self._optimal_control_problem.solve(
-                    method="CPG", **solver_args
-                )
-            except ImportError:
-                raise ImportError(
-                    "cvxpygen solver not found. Make sure cvxpygen is installed and code "
-                    "generation has been run. Install with: pip install openscvx[cvxpygen]"
-                )
-        else:
-            solver = self.settings.cvx.solver
-            solver_args = self.settings.cvx.solver_args
-            self._solve_ocp = lambda: self._optimal_control_problem.solve(
-                solver=solver, **solver_args
-            )
-
         # Initialize the SCP algorithm
         print("Initializing the SCvx Subproblem Solver...")
         self._algorithm.initialize(
-            self._optimal_control_problem,
+            self._solver,
             self._discretization_solver,
             self._compiled_constraints,
-            self._solve_ocp,
             self.emitter_function,
             self._parameters,  # For warm-start only
             self.settings,  # For warm-start only
@@ -629,7 +603,7 @@ class Problem:
         required = [
             self._compiled_dynamics,
             self._compiled_constraints,
-            self._optimal_control_problem,
+            self._solver,
             self._discretization_solver,
             self._state,
         ]
@@ -737,6 +711,14 @@ class Problem:
             algo_name = type(self._algorithm).__name__
             header = f"% Algorithm: {algo_name}"
             citations = "\n".join(algo_citations)
+            sections.append(f"{header}\n\n{citations}")
+
+        # Solver citations
+        solver_citations = self._solver.citation()
+        if solver_citations:
+            solver_name = type(self._solver).__name__
+            header = f"% Convex Solver: {solver_name}"
+            citations = "\n".join(solver_citations)
             sections.append(f"{header}\n\n{citations}")
 
         # Future: add citations from discretization, constraint formulations, etc.

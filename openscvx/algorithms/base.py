@@ -12,10 +12,9 @@ from typing import TYPE_CHECKING, List, Union
 import numpy as np
 
 if TYPE_CHECKING:
-    import cvxpy as cp
-
     from openscvx.config import Config
     from openscvx.lowered.jax_constraints import LoweredJaxConstraints
+    from openscvx.solvers import ConvexSolver
 
 
 @dataclass
@@ -262,14 +261,13 @@ class Algorithm(ABC):
         Implementing a custom algorithm::
 
             class MyAlgorithm(Algorithm):
-                def initialize(self, ocp, discretization_solver,
-                               jax_constraints, solve_ocp, emitter,
+                def initialize(self, solver, discretization_solver,
+                               jax_constraints, emitter,
                                params, settings):
                     # Store compiled infrastructure
-                    self._ocp = ocp
+                    self._solver = solver
                     self._discretization_solver = discretization_solver
                     self._jax_constraints = jax_constraints
-                    self._solve_ocp = solve_ocp
                     self._emitter = emitter
                     # Warm-start with initial params/settings...
 
@@ -281,10 +279,9 @@ class Algorithm(ABC):
     @abstractmethod
     def initialize(
         self,
-        ocp: "cp.Problem",
+        solver: "ConvexSolver",
         discretization_solver: callable,
         jax_constraints: "LoweredJaxConstraints",
-        solve_ocp: callable,
         emitter: callable,
         params: dict,
         settings: "Config",
@@ -296,10 +293,9 @@ class Algorithm(ABC):
         settings are passed for warm-start but may change between steps.
 
         Args:
-            ocp: The CVXPy optimal control problem
+            solver: Convex subproblem solver (e.g., CVXPySolver)
             discretization_solver: Compiled discretization solver function
             jax_constraints: JIT-compiled JAX constraint functions
-            solve_ocp: Callable that solves the OCP (captures solver config)
             emitter: Callback for emitting iteration progress data
             params: Problem parameters dictionary (for warm-start only)
             settings: Configuration object (for warm-start only)
