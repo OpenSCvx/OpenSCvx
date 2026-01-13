@@ -345,7 +345,11 @@
          <lastmod>2026-01-13</lastmod>
     </url>
     <url>
-         <loc>https://openscvx.github.io/OpenSCvx/nightly/reference/solvers/cvxpy/</loc>
+         <loc>https://openscvx.github.io/OpenSCvx/nightly/reference/solvers/base/</loc>
+         <lastmod>2026-01-13</lastmod>
+    </url>
+    <url>
+         <loc>https://openscvx.github.io/OpenSCvx/nightly/reference/solvers/ptr_solver/</loc>
          <lastmod>2026-01-13</lastmod>
     </url>
     <url>
