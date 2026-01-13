@@ -38,20 +38,23 @@ position.max = np.array([3000, 3000, 3000])
 position.min = np.array([-3000, -3000, 0])
 position.initial = np.array([2000, 0, 1500])
 position.final = np.array([0, 0, 0])
+position.guess = np.linspace(position.initial, position.final, n)
 
 velocity = ox.State("velocity", shape=(3,))  # 3D velocity [vx, vy, vz]
 velocity.max = np.array([v_max, v_max, v_max])
 velocity.min = np.array([-v_max, -v_max, -v_max])
 velocity.initial = np.array([80, 30, -75])
 velocity.final = np.array([0, 0, 0])
+velocity.guess = np.linspace(velocity.initial, velocity.final, n)
 
 mass = ox.State("mass", shape=(1,))  # Vehicle mass
 mass.max = np.array([1905])
 mass.min = np.array([1505])
 mass.initial = np.array([1905])
-mass.final = [("maximize", 1690)]
-mass.scaling_min = np.array([1690])
+mass.final = [("maximize", 1700)]
+mass.scaling_min = np.array([1700])
 # mass.scaling_max = np.array([1700])
+mass.guess = np.linspace(mass.initial, 1690, n).reshape(-1, 1)
 
 # Define control
 thrust = ox.Control("thrust", shape=(3,))  # Thrust force vector [Tx, Ty, Tz]
@@ -153,8 +156,8 @@ problem.settings.dis.dis_type = "ZOH"
 
 problem.settings.dis.solver = "Dopri8"
 
-problem.settings.cvx.solver = "CLARABEL"
-problem.settings.cvx.solver_args = {"enforce_dpp": True}
+# problem.settings.cvx.solver = "QOCO"
+# problem.settings.cvx.solver_args = {"enforce_dpp": True}
 
 
 plotting_dict = {
