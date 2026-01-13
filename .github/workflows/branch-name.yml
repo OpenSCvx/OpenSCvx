@@ -1,0 +1,18 @@
+name: 🏷️ Branch Name Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check-branch-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch name prefix
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          if [[ ! "$BRANCH" =~ ^[Ff]eature\/|^[Ff]ix\/|^[Rr]efactor\/|^[Cc]hore\/|^[Dd]ocumentation\/|^[Dd]ocs?\/ ]]; then
+            echo "❌ Branch name '$BRANCH' must start with: feature/, fix/, refactor/, chore/, documentation/, docs/, or doc/"
+            exit 1
+          fi
+          echo "✅ Branch name '$BRANCH' is valid"
