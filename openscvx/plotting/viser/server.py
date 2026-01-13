@@ -82,7 +82,7 @@ def create_server(
 
     # Add OpenSCvx logo to titlebar (loaded from GitHub)
     logo_url = (
-        "https://raw.githubusercontent.com/haynec/OpenSCvx/main/figures/openscvx_logo_square.png"
+        "https://raw.githubusercontent.com/OpenSCvx/OpenSCvx/main/figures/openscvx_logo_square.png"
     )
     image = TitlebarImage(
         image_url_light=logo_url,
