@@ -18,7 +18,7 @@ from .base import ConvexSolver
 
 
 @dataclass
-class PtrSolveResult:
+class PTRSolveResult:
     """Result from solving a PTR convex subproblem.
 
     Contains the solution trajectories and slack variables from a single
@@ -61,7 +61,7 @@ except ImportError:
     cpg = None
 
 
-class PtrSolver(ConvexSolver):
+class PTRSolver(ConvexSolver):
     """CVXPy-based convex subproblem solver for the PTR algorithm.
 
     This solver uses CVXPy's modeling language to construct and solve the convex
@@ -71,27 +71,27 @@ class PtrSolver(ConvexSolver):
 
     The solver builds the problem structure once during ``initialize()``, using
     CVXPy Parameters for values that change each iteration. The ``solve()``
-    method then solves and returns a structured ``PtrSolveResult``.
+    method then solves and returns a structured ``PTRSolveResult``.
 
     !!! note "Future Backend Support"
 
         When adding a new backend (QPAX, COCO, etc.), this class should be
         refactored:
 
-        1. Rename ``PtrSolver`` to ``CVXPyPtrSolver``
-        2. Extract ``PtrSolver`` as an abstract base class defining the PTR
+        1. Rename ``PTRSolver`` to ``CVXPyPTRSolver``
+        2. Extract ``PTRSolver`` as an abstract base class defining the PTR
            interface (``update_dynamics_linearization``, ``update_constraint_linearizations``,
-           ``update_penalties``, ``solve`` returning ``PtrSolveResult``)
-        3. Have ``CVXPyPtrSolver`` and the new backend (e.g., ``QPAXPtrSolver``)
-           inherit from the abstract ``PtrSolver``
+           ``update_penalties``, ``solve`` returning ``PTRSolveResult``)
+        3. Have ``CVXPyPTRSolver`` and the new backend (e.g., ``QPAXPTRSolver``)
+           inherit from the abstract ``PTRSolver``
 
         This keeps the algorithm backend-agnostic while allowing multiple
         solver implementations for the PTR formulation.
 
     Example:
-        Using PtrSolver with the SCP framework::
+        Using PTRSolver with the SCP framework::
 
-            solver = PtrSolver()
+            solver = PTRSolver()
             solver.create_variables(N, x_unified, u_unified, jax_constraints)
             solver.initialize(lowered, settings)
 
@@ -104,7 +104,7 @@ class PtrSolver(ConvexSolver):
     """
 
     def __init__(self):
-        """Initialize PtrSolver with unset problem.
+        """Initialize PTRSolver with unset problem.
 
         Call create_variables() then initialize() to build the problem structure.
         """
@@ -212,7 +212,7 @@ class PtrSolver(ConvexSolver):
         """
         if self._ocp_vars is None:
             raise RuntimeError(
-                "PtrSolver.initialize() called before create_variables(). "
+                "PTRSolver.initialize() called before create_variables(). "
                 "Call create_variables() first to create optimization variables."
             )
         self._problem = _build_optimal_control_problem(settings, lowered, self._ocp_vars)
@@ -404,14 +404,14 @@ class PtrSolver(ConvexSolver):
                 raise ValueError(msg) from e
             raise
 
-    def solve(self) -> PtrSolveResult:
+    def solve(self) -> PTRSolveResult:
         """Solve the convex subproblem and return structured results.
 
         Call ``update_dynamics_linearization()``, ``update_constraint_linearizations()``,
         and ``update_penalties()`` before calling this method.
 
         Returns:
-            PtrSolveResult containing unscaled trajectories, slack variables,
+            PTRSolveResult containing unscaled trajectories, slack variables,
             cost, and solver status.
 
         Raises:
@@ -419,7 +419,7 @@ class PtrSolver(ConvexSolver):
         """
         if self._problem is None:
             raise RuntimeError(
-                "PtrSolver.solve() called before initialize(). "
+                "PTRSolver.solve() called before initialize(). "
                 "Call initialize() first to build the problem structure."
             )
 
@@ -446,7 +446,7 @@ class PtrSolver(ConvexSolver):
         # Get cross-node constraint violation slacks
         nu_vb_cross = [var.value for var in self._ocp_vars.nu_vb_cross]
 
-        return PtrSolveResult(
+        return PTRSolveResult(
             x=x,
             u=u,
             nu=nu,
@@ -493,7 +493,7 @@ def _build_optimal_control_problem(
     """Build the complete optimal control problem with all constraints.
 
     This is the internal implementation that constructs the CVXPy problem
-    structure. It is called by PtrSolver.initialize().
+    structure. It is called by PTRSolver.initialize().
 
     Args:
         settings: Configuration settings for the optimization problem

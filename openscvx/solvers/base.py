@@ -204,7 +204,7 @@ class ConvexSolver(ABC):
         Returns a solver-specific result object containing the solution.
 
         Returns:
-            Solver-specific result object (e.g., ``PtrSolveResult`` for PTR).
+            Solver-specific result object (e.g., ``PTRSolveResult`` for PTR).
         """
         ...
 

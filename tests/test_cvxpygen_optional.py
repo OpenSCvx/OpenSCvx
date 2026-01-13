@@ -23,7 +23,7 @@ def test_cvxpygen_optional_import():
     # This should not raise an ImportError
     try:
         from openscvx.algorithms import PenalizedTrustRegion  # noqa: F401
-        from openscvx.solvers import PtrSolver  # noqa: F401
+        from openscvx.solvers import PTRSolver  # noqa: F401
 
         assert True
     except ImportError as e:

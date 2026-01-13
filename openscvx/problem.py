@@ -48,7 +48,7 @@ from openscvx.lowered.jax_constraints import (
     LoweredNodalConstraint,
 )
 from openscvx.propagation import get_propagation_solver, propagate_trajectory_results
-from openscvx.solvers import PtrSolver
+from openscvx.solvers import PTRSolver
 from openscvx.symbolic.builder import preprocess_symbolic_problem
 from openscvx.symbolic.constraint_set import ConstraintSet
 from openscvx.symbolic.expr import CTCS, Constraint
@@ -164,7 +164,7 @@ class Problem:
         self._byof = byof
 
         # Create solver before lowering (solver owns its variables)
-        self._solver: PtrSolver = PtrSolver()
+        self._solver: PTRSolver = PTRSolver()
 
         # Lower to JAX and CVXPy (byof handling happens inside lower_symbolic_problem)
         self._lowered: LoweredProblem = lower_symbolic_problem(

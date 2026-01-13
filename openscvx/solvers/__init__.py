@@ -42,12 +42,12 @@ Note:
 """
 
 from .base import ConvexSolver
-from .ptr_solver import PtrSolver, PtrSolveResult
+from .ptr_solver import PTRSolver, PTRSolveResult
 
 __all__ = [
     # Base class
     "ConvexSolver",
     # PTR solver
-    "PtrSolver",
-    "PtrSolveResult",
+    "PTRSolver",
+    "PTRSolveResult",
 ]
