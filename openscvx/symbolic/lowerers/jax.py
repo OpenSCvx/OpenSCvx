@@ -1585,10 +1585,24 @@ class JaxLowerer:
             pred_val = pred_fn(x, u, node_arg, params)
             # Extract scalar value (predicate must be scalar)
             pred_scalar = jnp.atleast_1d(pred_val)[0]
+            
+            # Convert predicate to boolean
+            # If predicate is a constraint residual (from Inequality/Equality):
+            # - For Inequality (lhs <= rhs): residual = lhs - rhs
+            #   - Satisfied (True): residual <= 0 (negative or zero)
+            #   - Violated (False): residual > 0 (positive)
+            # - For Equality (lhs == rhs): residual = lhs - rhs
+            #   - Satisfied (True): residual == 0
+            #   - Violated (False): residual != 0
+            # jax.lax.cond treats non-zero as True, zero as False, which is backwards
+            # for constraint residuals. We need to check if residual <= 0 for inequalities.
+            # For now, we'll convert to boolean by checking if pred_scalar <= 0
+            # This works for constraint residuals where <= 0 means True
+            pred_bool = pred_scalar <= 0
 
             # Use jax.lax.cond for conditional evaluation
             return cond(
-                pred_scalar,
+                pred_bool,
                 lambda _: true_fn(x, u, node_arg, params),
                 lambda _: false_fn(x, u, node_arg, params),
                 operand=None,
