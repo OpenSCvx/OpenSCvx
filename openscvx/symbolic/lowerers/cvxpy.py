@@ -137,6 +137,7 @@ from openscvx.symbolic.expr import (
     Bilerp,
     Block,
     Concat,
+    Cond,
     Constant,
     Cos,
     CrossNodeConstraint,
@@ -810,6 +811,32 @@ class CvxpyLowerer:
             "Trigonometric functions like Tan are not DCP-compliant in CVXPy. "
             "Consider using piecewise-linear approximations or handle these constraints "
             "in the dynamics (JAX) layer instead."
+        )
+
+    @visitor(Cond)
+    def _visit_cond(self, node: Cond) -> cp.Expression:
+        """Raise NotImplementedError for conditional expression.
+
+        Conditional logic (Cond) is not DCP-compliant in CVXPy as it introduces
+        non-convex branching behavior. Conditional expressions are only supported
+        in JAX lowering for dynamics and non-convex constraints.
+
+        Args:
+            node: Cond expression node
+
+        Raises:
+            NotImplementedError: Always raised since conditional logic is not DCP-compliant
+
+        Note:
+            For conditional constraints:
+            - Use piecewise-linear approximations, or
+            - Handle in the JAX dynamics/constraint layer instead of CVXPy
+        """
+        raise NotImplementedError(
+            "Conditional expressions (Cond) are not DCP-compliant in CVXPy. "
+            "Conditional logic is only supported in JAX lowering. Consider using "
+            "piecewise-linear approximations or handle these constraints in the "
+            "dynamics (JAX) layer instead."
         )
 
     @visitor(Exp)

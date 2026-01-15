@@ -19,6 +19,7 @@ from openscvx.symbolic.expr import (
     Bilerp,
     Block,
     Concat,
+    Cond,
     Constant,
     Constraint,
     Control,
@@ -114,6 +115,8 @@ __all__ = [
     "Max",
     "Linterp",
     "Bilerp",
+    # Logical/control flow operations
+    "Cond",
     # Constraints
     "Constraint",
     "Equality",

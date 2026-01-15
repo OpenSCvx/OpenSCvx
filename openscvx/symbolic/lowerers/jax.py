@@ -124,6 +124,7 @@ from openscvx.symbolic.expr import (
     Bilerp,
     Block,
     Concat,
+    Cond,
     Constant,
     Constraint,
     Cos,
@@ -1544,3 +1545,53 @@ class JaxLowerer:
             return jax.scipy.ndimage.map_coordinates(fp_val, coords, order=1, mode="nearest")[0]
 
         return bilerp_fn
+
+    @visitor(Cond)
+    def _visit_cond(self, node: Cond):
+        """Lower conditional expression to JAX function using jax.lax.cond.
+
+        Implements JAX-traceable conditional logic by wrapping jax.lax.cond. The
+        predicate is evaluated first, and then either the true or false branch
+        is evaluated based on the predicate value.
+
+        Args:
+            node: Cond expression node with predicate, true_branch, and false_branch
+
+        Returns:
+            Function (x, u, node, params) -> result from selected branch
+
+        Note:
+            Uses jax.lax.cond for JAX-traceable conditional evaluation. The predicate
+            must evaluate to a scalar boolean. Both branches are lowered and the
+            appropriate one is selected at runtime based on the predicate value.
+
+        Example:
+            Conditional dynamics based on state::
+
+                x = ox.State("x", shape=(3,))
+                expr = ox.Cond(
+                    ox.Norm(x) > 1.0,  # predicate
+                    x / ox.Norm(x),    # true branch
+                    x                   # false branch
+                )
+        """
+        # Lower all three expressions recursively
+        pred_fn = self.lower(node.pred)
+        true_fn = self.lower(node.true_branch)
+        false_fn = self.lower(node.false_branch)
+
+        def cond_fn(x, u, node_arg, params):
+            # Evaluate predicate
+            pred_val = pred_fn(x, u, node_arg, params)
+            # Extract scalar value (predicate must be scalar)
+            pred_scalar = jnp.atleast_1d(pred_val)[0]
+
+            # Use jax.lax.cond for conditional evaluation
+            return cond(
+                pred_scalar,
+                lambda _: true_fn(x, u, node_arg, params),
+                lambda _: false_fn(x, u, node_arg, params),
+                operand=None,
+            )
+
+        return cond_fn

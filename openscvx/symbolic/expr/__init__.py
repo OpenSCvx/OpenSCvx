@@ -134,6 +134,9 @@ from .math import (
     Tan,
 )
 
+# Logical/control flow operations
+from .logical import Cond
+
 # Spatial/3D operations
 from .spatial import QDCM, SSM, SSMP
 
@@ -198,6 +201,8 @@ __all__ = [
     "Max",
     "Linterp",
     "Bilerp",
+    # Logical/control flow operations
+    "Cond",
     # Linear algebra operations
     "Transpose",
     "Stack",
