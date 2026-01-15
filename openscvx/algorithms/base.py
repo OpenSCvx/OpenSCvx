@@ -45,6 +45,12 @@ class AlgorithmState:
         X: List of state trajectory iterates
         U: List of control trajectory iterates
         V_history: List of discretization history
+        VC_history: List of virtual control history
+        TR_history: List of trust region history
+        A_bar_history: List of state transition matrices
+        B_bar_history: List of control influence matrices
+        C_bar_history: List of control influence matrices for next node
+        x_prop_history: List of propagated states
     """
 
     k: int
@@ -58,11 +64,20 @@ class AlgorithmState:
     n_x: int
     n_u: int
     N: int
+    J_nonlin_history: float
+    acceptance_ratio_history: float
     X: List[np.ndarray] = field(default_factory=list)
     U: List[np.ndarray] = field(default_factory=list)
     V_history: List[np.ndarray] = field(default_factory=list)
     VC_history: List[np.ndarray] = field(default_factory=list)
     TR_history: List[np.ndarray] = field(default_factory=list)
+    A_bar_history: List[np.ndarray] = field(default_factory=list)
+    B_bar_history: List[np.ndarray] = field(default_factory=list)
+    C_bar_history: List[np.ndarray] = field(default_factory=list)
+    x_prop_history: List[np.ndarray] = field(default_factory=list)
+    lam_vc_history: List[float] = field(default_factory=list)
+    lam_cost_history: List[float] = field(default_factory=list)
+    w_tr_history: List[float] = field(default_factory=list)
 
     @property
     def x(self) -> np.ndarray:
@@ -226,11 +241,20 @@ class AlgorithmState:
             n_x=settings.sim.n_states,
             n_u=settings.sim.n_controls,
             N=settings.scp.n,
+            J_nonlin_history=[],
+            acceptance_ratio_history=[],
             X=[settings.sim.x.guess.copy()],
             U=[settings.sim.u.guess.copy()],
             V_history=[],
+            A_bar_history=[],
+            B_bar_history=[],
+            C_bar_history=[],
+            x_prop_history=[],
             VC_history=[],
             TR_history=[],
+            lam_vc_history=[settings.scp.lam_vc],
+            lam_cost_history=[settings.scp.lam_cost],
+            w_tr_history=[settings.scp.w_tr],
         )
 
 
