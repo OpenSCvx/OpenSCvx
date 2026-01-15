@@ -74,7 +74,7 @@ constraints.append(ox.ctcs(obs_radius <= ox.linalg.Norm(position - obs_center)))
 
 # Add the conditional velocity constraint
 distance_to_obstacle = ox.linalg.Norm(position - obs_center)
-constraints.append(ox.ctcs(speed <= ox.Cond(distance_to_obstacle <= safety_threshold, 5.0, 10.0)))
+constraints.append(ox.ctcs(speed <= ox.Cond(distance_to_obstacle <= safety_threshold, 5.0, 10.0), idx=1, penalty="smooth_relu"))
 
 
 # Define normal dynamics (no conditional logic here)
@@ -102,7 +102,7 @@ problem = Problem(
     time=time,
     constraints=constraints,
     N=n,
-    # licq_max=1e-4,
+    licq_max=1e-6,
 )
 
 # Set solver parameters
