@@ -100,6 +100,15 @@ class PenalizedTrustRegion(Algorithm):
         init_state = AlgorithmState.from_settings(settings)
 
         # Solve a dumb problem to initialize DPP and JAX jacobians
+        A_bar, B_bar, C_bar, x_prop, V_multi_shoot = self._discretization_solver.call(
+            init_state.x, init_state.u.astype(float), params
+        )
+
+        init_state.A_bar_history.append(A_bar.__array__())
+        init_state.B_bar_history.append(B_bar.__array__())
+        init_state.C_bar_history.append(C_bar.__array__())
+        init_state.x_prop_history.append(x_prop.__array__())
+        init_state.V_history.append(V_multi_shoot.__array__())
         _ = self._subproblem(params, init_state, settings)
 
     def step(
@@ -130,6 +139,20 @@ class PenalizedTrustRegion(Algorithm):
                 "PenalizedTrustRegion.step() called before initialize(). "
                 "Call initialize() first to set up compiled infrastructure."
             )
+        
+        # Compute discretization before subproblem only for the first iteration
+        if state.k == 1:
+            t0 = time.time()
+            A_bar, B_bar, C_bar, x_prop, V_multi_shoot = self._discretization_solver.call(
+                state.x, state.u.astype(float), params
+            )
+            dis_time = time.time() - t0
+
+            state.A_bar_history.append(A_bar.__array__())
+            state.B_bar_history.append(B_bar.__array__())
+            state.C_bar_history.append(C_bar.__array__())
+            state.x_prop_history.append(x_prop.__array__())
+            state.V_history.append(V_multi_shoot.__array__())
 
         # Run the subproblem
         (
@@ -141,18 +164,29 @@ class PenalizedTrustRegion(Algorithm):
             J_vc_vec,
             J_tr_vec,
             prob_stat,
-            V_multi_shoot,
             subprop_time,
-            dis_time,
             vc_mat,
             tr_mat,
         ) = self._subproblem(params, state, settings)
 
-        # Update state in place by appending to history
-        # The x_guess/u_guess properties will automatically return the latest entry
-        state.V_history.append(V_multi_shoot)
         state.X.append(x_sol)
         state.U.append(u_sol)
+
+        t0 = time.time()
+        A_bar, B_bar, C_bar, x_prop, V_multi_shoot = self._discretization_solver.call(
+            state.x, state.u.astype(float), params
+        )
+        dis_time = time.time() - t0
+
+        state.A_bar_history.append(A_bar.__array__())
+        state.B_bar_history.append(B_bar.__array__())
+        state.C_bar_history.append(C_bar.__array__())
+        state.x_prop_history.append(x_prop.__array__())
+        state.V_history.append(V_multi_shoot.__array__())
+
+
+        # Update state in place by appending to history
+        # The x_guess/u_guess properties will automatically return the latest entry
         state.VC_history.append(vc_mat)
         state.TR_history.append(tr_mat)
 
@@ -161,7 +195,7 @@ class PenalizedTrustRegion(Algorithm):
         state.J_vc = np.sum(np.array(J_vc_vec))
 
         # Update weights in state
-        update_scp_weights(state, settings, state.k)
+        update_scp_weights(state, settings, params)
 
         # Emit data
         self._emitter(
@@ -208,22 +242,15 @@ class PenalizedTrustRegion(Algorithm):
             Tuple containing solution data, costs, and timing information.
         """
         param_dict = params
-
-        # Compute discretization
-        t0 = time.time()
-        A_bar, B_bar, C_bar, x_prop, V_multi_shoot = self._discretization_solver.call(
-            state.x, state.u.astype(float), param_dict
-        )
-        dis_time = time.time() - t0
-
+        
         # Update solver with dynamics linearization
         self._solver.update_dynamics_linearization(
             x_bar=state.x,
             u_bar=state.u,
-            A_d=A_bar.__array__(),
-            B_d=B_bar.__array__(),
-            C_d=C_bar.__array__(),
-            x_prop=x_prop.__array__(),
+            A_d=state.A_bar_history[-1],
+            B_d=state.B_bar_history[-1],
+            C_d=state.C_bar_history[-1],
+            x_prop=state.x_prop_history[-1],
         )
 
         # Build constraint linearization data
@@ -259,10 +286,6 @@ class PenalizedTrustRegion(Algorithm):
             nodal=nodal_linearizations if nodal_linearizations else None,
             cross_node=cross_node_linearizations if cross_node_linearizations else None,
         )
-
-        # Initialize lam_vc as matrix if it's still a scalar in state
-        if isinstance(state.lam_vc, (int, float)):
-            state.lam_vc = np.ones((settings.scp.n - 1, settings.sim.n_states)) * state.lam_vc
 
         # Update solver with penalty weights
         self._solver.update_penalties(
@@ -330,9 +353,7 @@ class PenalizedTrustRegion(Algorithm):
             J_vc_vec,
             J_tr_vec,
             result.status,
-            V_multi_shoot,
             subprop_time,
-            dis_time,
             vc_mat,
             abs(tr_mat),
         )
