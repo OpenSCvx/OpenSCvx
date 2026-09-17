@@ -93,5 +93,6 @@ def test_citation_dedupes_shared_node_entries(problem):
 
 def test_citation_includes_autotuner_references(problem):
     text = problem.citation()
-    assert "oguri2023scvxstar" in text
+    assert "luo2025modeling" in text
+    assert "oguri2023scvxstar" not in text
     assert "mao2016scvx" in text

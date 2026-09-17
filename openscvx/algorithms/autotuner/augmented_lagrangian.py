@@ -259,18 +259,18 @@ class AugmentedLagrangian(AcceptanceRatioAutotuner):
     def citation(self) -> List[str]:
         """Return BibTeX citations for the augmented-Lagrangian multiplier updates.
 
-        Extends the inherited SCvx acceptance-ratio references with SCvx*,
-        whose augmented-Lagrangian weight updates this autotuner implements.
+        Extends the inherited SCvx acceptance-ratio references with Luo's
+        dissertation, whose penalty-weight updates this autotuner implements.
         """
         return super().citation() + [
-            r"""@inproceedings{oguri2023scvxstar,
-  title={Successive Convexification with Feasibility Guarantee via Augmented
-    Lagrangian for Non-Convex Optimal Control Problems},
-  author={Oguri, Kenshiro},
-  booktitle={2023 62nd IEEE Conference on Decision and Control (CDC)},
-  pages={3296--3302},
-  year={2023},
-  publisher={IEEE}
+            r"""@phdthesis{luo2025modeling,
+  title={Modeling and Algorithms for Nonconvex Trajectory Generation Problems:
+    From Constraint Reformulations and First-Order Proximal Methods to
+    Structure-Exploiting Convex Solvers},
+  author={Luo, Dayou},
+  school={University of Washington},
+  year={2025},
+  url={https://hdl.handle.net/1773/53364}
 }"""
         ]
 

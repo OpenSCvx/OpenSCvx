@@ -22,11 +22,11 @@ def test_acceptance_ratio_cites_scvx():
     assert any("mao2019scvx" in e for e in entries)
 
 
-def test_augmented_lagrangian_extends_scvx_with_scvx_star():
+def test_augmented_lagrangian_extends_scvx_with_luo_dissertation():
     entries = AugmentedLagrangian().citation()
-    # Inherits the SCvx acceptance-ratio references and adds SCvx*.
+    # Inherits the SCvx acceptance-ratio references and adds Luo's dissertation.
     assert any("mao2016scvx" in e for e in entries)
-    assert any("oguri2023scvxstar" in e for e in entries)
+    assert any("luo2025modeling" in e for e in entries)
 
 
 def test_adaptive_proximal_weight_inherits_scvx_citations():
