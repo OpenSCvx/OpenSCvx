@@ -6,7 +6,7 @@ SCP loop records history outside this module.
 """
 
 import warnings
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, List, Literal
 
 import jax.numpy as jnp
 from pydantic import BaseModel, ConfigDict
@@ -255,6 +255,24 @@ class AugmentedLagrangian(AcceptanceRatioAutotuner):
         # Intentional: shares the virtual-control cap ``lam_vc_max`` — see
         # :py:meth:`_update_virtual_buffer_nodal_weights`.
         return jnp.minimum(state.hyper.lam_vc_max, lam_vb_new)
+
+    def citation(self) -> List[str]:
+        """Return BibTeX citations for the augmented-Lagrangian multiplier updates.
+
+        Extends the inherited SCvx acceptance-ratio references with Luo's
+        dissertation, whose penalty-weight updates this autotuner implements.
+        """
+        return super().citation() + [
+            r"""@phdthesis{luo2025modeling,
+  title={Modeling and Algorithms for Nonconvex Trajectory Generation Problems:
+    From Constraint Reformulations and First-Order Proximal Methods to
+    Structure-Exploiting Convex Solvers},
+  author={Luo, Dayou},
+  school={University of Washington},
+  year={2025},
+  url={https://hdl.handle.net/1773/53364}
+}"""
+        ]
 
 
 # =============================================================================
