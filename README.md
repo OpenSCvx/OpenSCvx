@@ -228,27 +228,29 @@ This work was supported by a NASA Space Technology Graduate Research Opportunity
 Please cite the following works if you use the repository,
 
 ```tex
-@ARTICLE{hayner2025los,
-        author={Hayner, Christopher R. and Carson III, John M. and Açıkmeşe, Behçet and Leung, Karen},
-        journal={IEEE Robotics and Automation Letters}, 
-        title={Continuous-Time Line-of-Sight Constrained Trajectory Planning for 6-Degree of Freedom Systems}, 
-        year={2025},
-        volume={},
-        number={},
-        pages={1-8},
-        keywords={Robot sensing systems;Vectors;Vehicle dynamics;Line-of-sight propagation;Trajectory planning;Trajectory optimization;Quadrotors;Nonlinear dynamical systems;Heuristic algorithms;Convergence;Constrained Motion Planning;Optimization and Optimal Control;Aerial Systems: Perception and Autonomy},
-        doi={10.1109/LRA.2025.3545299}}
+@misc{hayner2026openscvxopensourcemodularextensible,
+      title={OpenSCvx: An Open-Source Modular and Extensible Nonlinear Trajectory Planning Package}, 
+      author={Christopher R. Hayner and Griffin J. Norris and Fabio Spada and Samet Uzun and Avi Mittal and Behcet Acıkmese and Karen Leung},
+      year={2026},
+      eprint={2608.21631},
+      archivePrefix={arXiv},
+      primaryClass={cs.RO},
+      url={https://arxiv.org/abs/2608.21631}, 
+}
 ```
 
 ```tex
-@misc{elango2024ctscvx,
-      title={Successive Convexification for Trajectory Optimization with Continuous-Time Constraint Satisfaction}, 
-      author={Purnanand Elango and Dayou Luo and Abhinav G. Kamath and Samet Uzun and Taewan Kim and Behçet Açıkmeşe},
-      year={2024},
-      eprint={2404.16826},
-      archivePrefix={arXiv},
-      primaryClass={math.OC},
-      url={https://arxiv.org/abs/2404.16826}, 
+@article{elango2025ctcs,
+title = {Continuous-time successive convexification for constrained trajectory optimization},
+journal = {Automatica},
+volume = {180},
+pages = {112464},
+year = {2025},
+issn = {0005-1098},
+doi = {https://doi.org/10.1016/j.automatica.2025.112464},
+url = {https://www.sciencedirect.com/science/article/pii/S0005109825003589},
+author = {Purnanand Elango and Dayou Luo and Abhinav G. Kamath and Samet Uzun and Taewan Kim and Behçet Açıkmeşe},
+keywords = {Trajectory optimization, Optimal control, Continuous-time constraint satisfaction, Sequential convex programming},
 }
 ```
 
@@ -265,3 +267,5 @@ Please cite the following works if you use the repository,
   month = mar,
 }
 ```
+
+Additionally please run `problem.citation()` to generate the appropriate bibtex citations for the corresponding components used within your problem.
