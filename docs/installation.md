@@ -54,7 +54,7 @@ Extras are installed with the `openscvx[extra1,extra2]` syntax shown above.
 |-------|---------|
 | `cvxpygen` | Generated C solvers via `cvxpygen` + `qocogen`. |
 | `qpax` | The `qpax` differentiable QP backend. |
-| `moreau` | The licensed `moreau` conic solver. |
+| `moreau` | The `moreau` conic solver backend. |
 | `stl` | Signal Temporal Logic constraints via `stljax`. |
 | `lie` | Lie-group operators via `jaxlie`. |
 | `mjx` | MuJoCo MJX dynamics (`mujoco`, `mujoco-mjx`). |
