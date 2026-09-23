@@ -158,5 +158,5 @@ markers = [
     "qpax: requires qpax (openscvx[qpax])",
     "cvxpygen: requires cvxpygen + qocogen (openscvx[cvxpygen])",
     "lie: requires jaxlie (openscvx[lie])",
-    "moreau: requires a licensed moreau install (openscvx[moreau])",
+    "moreau: requires moreau (openscvx[moreau])",
 ]

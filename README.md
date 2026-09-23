@@ -213,7 +213,7 @@ OpenSCvx integrates with several optional third-party packages. Each installs as
 | [jaxlie](https://github.com/brentyi/jaxlie) | `lie` | SO(3)/SE(3) Lie-group operations and IK initialization | [![jaxlie](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-lie.yml/badge.svg?branch=main)](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-lie.yml) |
 | [qpax](https://github.com/qpax-solver/qpax) | `qpax` | JAX-native QP solver backend | [![qpax](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-qpax.yml/badge.svg?branch=main)](https://github.com/OpenSCvx/OpenSCvx/issues/550) |
 | [CVXPYGen](https://github.com/cvxgrp/cvxpygen) | `cvxpygen` | Generated C solver code for the convex subproblem | [![cvxpygen](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-cvxpygen.yml/badge.svg?branch=main)](https://github.com/OpenSCvx/OpenSCvx/issues/551) |
-| [moreau](https://pypi.org/project/moreau/) | `moreau` | Licensed QP solver backend | ![moreau](https://img.shields.io/badge/moreau-license%20required-lightgrey) |
+| [moreau](https://pypi.org/project/moreau/) | `moreau` | Open Source SOCP solver backend | [![moreau](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-moreau.yml/badge.svg?branch=main)](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-moreau.yml) |
 | [stljax](https://github.com/UW-CTRL/stljax) | `stl` | Signal Temporal Logic robustness bridge | ![stljax](https://img.shields.io/badge/stljax-no%20tests%20yet-lightgrey) |
 | [frax](https://github.com/danielpmorton/frax) | `frax` | Robot dynamics for the manipulator examples | [![frax](https://img.shields.io/badge/frax-weekly%20examples%20sweep-blue)](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-examples.yml) |
 
@@ -228,7 +228,7 @@ This work was supported by a NASA Space Technology Graduate Research Opportunity
 Please cite the following works if you use the repository,
 
 ```tex
-@misc{hayner2026openscvxopensourcemodularextensible,
+@misc{hayner2026openscvx,
       title={OpenSCvx: An Open-Source Modular and Extensible Nonlinear Trajectory Planning Package}, 
       author={Christopher R. Hayner and Griffin J. Norris and Fabio Spada and Samet Uzun and Avi Mittal and Behcet Acıkmese and Karen Leung},
       year={2026},
@@ -268,4 +268,4 @@ keywords = {Trajectory optimization, Optimal control, Continuous-time constraint
 }
 ```
 
-Additionally please run `problem.citation()` to generate the appropriate bibtex citations for the corresponding components used within your problem.
+Additionally please run `problem.citation()` after `problem.intitialize()` to generate the appropriate bibtex citations for the corresponding components used within your problem.
