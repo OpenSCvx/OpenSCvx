@@ -41,7 +41,7 @@ jobs:
         # qpax omitted until its solves are stable on Linux runners (#550).
         # moreau omitted: examples that need it carry the moreau marker and skip
         # here. Solver-level moreau tests run in tests-moreau.yml.
-        uv pip install --system -e ".[test,mjx,lie,frax,stl]"
+        uv pip install --system -e ".[test,plotting,mjx,lie,frax,stl]"
 
     - name: Run examples sweep
       run: |

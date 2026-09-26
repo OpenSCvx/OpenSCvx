@@ -9,13 +9,21 @@ Tests the plotting functions:
 - viser scene primitives: per-node naming and colormap helpers
 """
 
+# Imports follow importorskip so the module skips when the plotting extra is absent.
+# ruff: noqa: E402
+
 from unittest.mock import Mock
+
+import pytest
+
+pytest.importorskip("matplotlib")
+pytest.importorskip("plotly")
+pytest.importorskip("viser")
 
 import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
-import pytest
 
 from openscvx.algorithms import OptimizationResults
 from openscvx.plotting.plotting import (

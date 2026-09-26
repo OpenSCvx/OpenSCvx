@@ -38,7 +38,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        uv pip install --system -e ".[test]"
+        uv pip install --system -e ".[test,plotting]"
 
     - name: Run unit tests
       run: |
@@ -82,7 +82,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        uv pip install --system -e ".[test]"
+        uv pip install --system -e ".[test,plotting]"
 
     - name: Run e2e tests
       run: |

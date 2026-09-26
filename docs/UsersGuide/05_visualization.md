@@ -22,7 +22,11 @@ This tutorial covers:
 
 ## 2D Plots with Plotly
 
-The `openscvx.plotting` module provides high-level functions for common visualization tasks. These work with any problem and require no additional setup.
+The `openscvx.plotting` module provides high-level functions for common visualization tasks. These work with any problem once the plotting extra is installed:
+
+```sh
+pip install "openscvx[plotting]"
+```
 
 ### Time Series: States and Controls
 

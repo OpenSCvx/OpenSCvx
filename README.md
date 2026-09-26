@@ -109,9 +109,10 @@ uv pip install openscvx
 > [!TIP]
 > **Optional dependencies**
 >
-> For CVXPYGen code generation:
+> Plotting (Plotly, Matplotlib, and Viser) and CVXPYGen code generation:
 > ```bash
-> pip install openscvx[cvxpygen]
+> pip install "openscvx[plotting]"
+> pip install "openscvx[cvxpygen]"
 > ```
 
 > [!TIP]
@@ -174,7 +175,7 @@ Check out the OpenSCvx documentation:
 We also have a selection of problems in the `examples/` folder as well as on the [Examples page](https://openscvx.github.io/OpenSCvx/latest/Examples/abstract/brachistochrone/) of the documentation. The example trajectory optimization problems are grouped by application and represent some of the problem types that can be solved by OpenSCvx.
 
 > [!Note]
-> To run the examples, you'll need to clone this repository and install OpenSCvx in editable mode (`pip install -e .`). See the [Installing From Source](#installing-from-source) section above for detailed installation instructions.
+> To run the examples, you'll need to clone this repository and install OpenSCvx in editable mode with the plotting extra (`pip install -e ".[plotting]"`). See the [Installing From Source](#installing-from-source) section above for detailed installation instructions.
 
 To run a problem simply run any of the examples directly, for example:
 
