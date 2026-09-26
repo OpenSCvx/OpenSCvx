@@ -13,9 +13,8 @@ Two layers of verification:
   paths solve identical conic programs and should agree to PDIP tolerance.
 
 These tests carry the ``moreau`` marker because Moreau is an optional
-dependency with a license requirement; the marker keeps the suite green on
-machines without a license while still exercising on CI / dev hosts that
-have one.
+dependency. The marker keeps the main suite green when it is not installed;
+``tests-moreau.yml`` installs the extra and runs only these tests.
 """
 
 import numpy as np

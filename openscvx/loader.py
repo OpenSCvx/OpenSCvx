@@ -89,7 +89,7 @@ def load_yaml(path: Union[str, Path]) -> dict:
     Returns:
         Dict of keyword arguments suitable for ``Problem(**result)``.
     """
-    import yaml  # optional dependency
+    import yaml
 
     with open(path) as f:
         data = yaml.safe_load(f)

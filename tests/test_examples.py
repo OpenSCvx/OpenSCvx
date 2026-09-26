@@ -30,9 +30,13 @@ EXCLUDED_EXAMPLES = {
     "arm/7_dof_arm_collision.py",
     "drone/logo.py",
     "drone/openscvx_logo.py",
+    "drone/boresight_trace_mpcc.py",
     "double_integrator/obstacle_avoidance_vmap.py",
     "mjx/triple_cartpole_game.py",
+    "car/racing/race_car_multi_agent_mpcc_ice.py",
+    "car/racing/race_car_multi_agent_mpcc.py",
     "rocket/ascent_launch_vehicle.py",
+    "rocket/senss/*.py",
 }
 
 # Examples that require an optional dependency; their params carry the matching
@@ -47,6 +51,15 @@ _MJX_EXAMPLES = frozenset(
     }
 )
 _QPAX_EXAMPLES = frozenset({"abstract/brachistochrone_batched.py"})
+_MOREAU_EXAMPLES = frozenset(
+    {
+        "car/racing/race_car_multi_agent.py",
+        "car/racing/race_car_multi_agent_mpcc.py",
+        "car/racing/race_car_multi_agent_mpcc_ice.py",
+        "drone/drone_racing_batched_gates.py",
+        "rocket/6DoF_pdg_batched_ic.py",
+    }
+)
 
 # Timing bounds for specific examples (in seconds)
 # Format: "relative/path/to/example.py": {"init": max_init, "solve": max_solve, "post": max_post}
@@ -104,6 +117,8 @@ def discover_example_paths() -> list:
             marks.append(pytest.mark.mjx)
         if rel.as_posix() in _QPAX_EXAMPLES:
             marks.append(pytest.mark.qpax)
+        if rel.as_posix() in _MOREAU_EXAMPLES:
+            marks.append(pytest.mark.moreau)
         params.append(
             pytest.param(py_file, id=str(rel.with_suffix("")).replace("/", "_"), marks=marks)
         )
