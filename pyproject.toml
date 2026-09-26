@@ -23,6 +23,7 @@ dependencies = [
     "jax",
     "termcolor",
     "diffrax",
+    "flatbuffers",  # jax.export serialization of compiled solvers
     "pyyaml",
     "pydantic>=2.0",
 ]
