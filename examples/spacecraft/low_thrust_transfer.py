@@ -1,22 +1,11 @@
 """Low-Thrust Orbit Transfer using Modified Equinoctial Elements.
 
-Faithful reproduction of the **GPOPS-II User's Guide, Section 5.2** benchmark
-(Patterson & Rao, GPOPS-II User's Guide v2.3, 2016), itself taken from
-Betts, *Practical Methods for Optimal Control Using Nonlinear Programming*,
-SIAM, 2009.
-
 The spacecraft starts in a **circular low-Earth orbit** (i = 28.5 deg) and must
 reach a **highly elliptic, inclined orbit** (e = 0.7355, i = 63.4 deg) while
 maximizing final mass. State is in Modified Equinoctial Elements (MEE) and the
 control is the thrust direction in radial-transverse-normal (RTN) coordinates
 together with a throttle. The dynamics include the J2/J3/J4 Earth-oblateness
 perturbations.
-
-The GPOPS-II constants and boundary values are given in English units
-(ft, lbf, lbm); here they are converted to **metric km-kg-s** with explicit
-factors so the physics matches the reference verbatim. In SI the English
-``g0·T/w`` thrust-acceleration factor becomes the standard ``F/m``, and the mass
-flow becomes ``F/Ve`` with ``Ve = Isp·g0``.
 
 States  x = (p, f, g, h, k, L, m):
   p [km]   — semi-latus rectum
@@ -29,7 +18,7 @@ Controls:
   u = (u_r, u_t, u_h) — thrust unit-direction (RTN);  path constraint ‖u‖ = 1
   tau                  — throttle parameter, tau ∈ [-50, 0]; thrust ∝ (1 + 0.01 tau)
 
-Dynamics (Eqs. 13-30 of the reference):
+Dynamics:
   ẋ = A(x) Δ + b,     ṁ = -F (1 + 0.01 tau) / Ve
 with Δ = Δ_g + Δ_T, where Δ_g is the J2-J4 oblateness acceleration projected
 into the RTN frame and Δ_T = F (1 + 0.01 tau) / m · u is the thrust force.
@@ -43,11 +32,7 @@ Terminal (event) constraints (Eq. 17):
   f·h + g·k            = 0
   g·h - k·f            ≤ 0
 
-The active transcription below keeps the benchmark geometry but replaces the
-bilinear final-perigee orientation constraints with their affine equivalent,
-using the fixed terminal magnitudes: f = (e_f/χ_f) k and g = -(e_f/χ_f) h.
-
-Initial guess (Section 5.3): propagate the dynamics from the initial condition
+Initial guess: propagate the dynamics from the initial condition
 with a fixed throttle tau = -25 and the control aligned with the inertial
 velocity, u = Qᵣᵀ v / ‖v‖, then sample onto the discretization nodes.
 
@@ -73,13 +58,13 @@ import openscvx as ox
 from openscvx import Problem
 from openscvx.plotting import plot_controls, plot_scp_iterations, plot_states
 
-# ── Unit conversion factors (GPOPS-II English → metric) ──────────────────────
+# ── Unit conversion factors ──────────────────────
 FT = 0.0003048  # km per ft
 LBF = 4.4482216152605  # N per lbf
 LBM = 0.45359237  # kg per lbm
 G0 = 9.80665  # m/s², standard gravity
 
-# ── Physical constants in km-kg-s, from GPOPS-II Eq. (30) ─────────────────────
+# ── Physical constants in km-kg-s ─────────────────────
 mu_phys = 1.407645794e16 * FT**3  # km³/s², Earth gravitational parameter
 Re_phys = 20925662.73 * FT  # km, Earth equatorial radius
 F_thrust = 4.446618e-3 * LBF  # N, thrust magnitude
@@ -117,7 +102,7 @@ c_thrust = (F_thrust / 1000.0) / (MU * AU)
 #   (physical F/Ve in kg/s, expressed per mass unit and per time unit)
 c_mdot = (F_thrust / (Isp * G0)) * TU / MU
 
-# ── Boundary conditions (non-dimensional), GPOPS-II Eq. (17) ─────────────────
+# ── Boundary conditions ─────────────────
 # Initial: circular LEO, i = 28.5 deg.
 p0_val = p0_phys / LU
 f0_val = 0.0
@@ -138,11 +123,11 @@ tf_guess = 90000.0 / TU  # Section 5.3
 tf_min = 50000.0 / TU
 tf_max = 100000.0 / TU
 
-# Largest allowed true longitude (Lmax = 9·2π, GPOPS-II bounds).
+# Largest allowed true longitude.
 L_max = 9.0 * 2.0 * np.pi
 
 
-# ── Reference dynamics in numpy (used only to build the initial guess) ─────────
+# ── Reference dynamics in numpy  ─────────
 # This mirrors the symbolic dynamics below exactly; keeping the two in one file
 # makes the propagated guess dynamically consistent with the optimized model.
 def _grav_rtn_and_vel(p, f, g, h, k, L):
@@ -326,53 +311,49 @@ def _dot(a, b):
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 
 
-def _norm3(a):
-    return ox.Sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2])
-
-
 q = 1.0 + f * ox.Cos(L) + g * ox.Sin(L)
 r = p / q
 alpha2 = h * h - k * k
 s2 = 1.0 + h * h + k * k
 cL, sL = ox.Cos(L), ox.Sin(L)
 
-# Inertial position (ECI), Eq. (20) helpers.
+# Inertial position (ECI)
 rX = (r / s2) * (cL + alpha2 * cL + 2 * h * k * sL)
 rY = (r / s2) * (sL - alpha2 * sL + 2 * h * k * cL)
 rZ = (2 * r / s2) * (h * sL - k * cL)
 rVec = (rX, rY, rZ)
-rMag = _norm3(rVec)
+rMag = ox.linalg.Norm(ox.Stack(rVec))
 rXZMag = ox.Sqrt(rX * rX + rZ * rZ)
 
-# Inertial velocity (ECI).
+# Inertial velocity (ECI)
 smp = ox.Sqrt(mu / p)
 vX = -(1.0 / s2) * smp * (sL + alpha2 * sL - 2 * h * k * cL + g - 2 * f * h * k + alpha2 * g)
 vY = -(1.0 / s2) * smp * (-cL + alpha2 * cL + 2 * h * k * sL - f + 2 * g * h * k + alpha2 * f)
 vZ = (2.0 / s2) * smp * (h * cL + k * sL + f * h + g * k)
 vVec = (vX, vY, vZ)
 
-# RTN basis vectors i_r, i_θ, i_h, Eq. (24).
+# RTN basis vectors i_r, i_θ, i_h
 rCrossv = _cross(rVec, vVec)
-rCrossvMag = _norm3(rCrossv)
+rCrossvMag = ox.linalg.Norm(ox.Stack(rCrossv))
 rCrossvCrossr = _cross(rCrossv, rVec)
 ir = tuple(c / rMag for c in rVec)
 it = tuple(c / (rCrossvMag * rMag) for c in rCrossvCrossr)
 ih = tuple(c / rCrossvMag for c in rCrossv)
 
-# Local North direction i_n, Eq. (26), with e_n = (0, 0, 1).
+# Local North direction i_n
 enir = ir[2]
 enen = (-enir * ir[0], -enir * ir[1], 1.0 - enir * ir[2])
-enenMag = _norm3(enen)
+enenMag = ox.linalg.Norm(ox.Stack(enen))
 inn = tuple(c / enenMag for c in enen)
 
-# Geocentric latitude and Legendre polynomials, Eqs. (27)-(28).
+# Geocentric latitude and Legendre polynomials
 sinphi = rZ / rXZMag
 cosphi = ox.Sqrt(1.0 - sinphi * sinphi)
 P2 = (3 * sinphi * sinphi - 2) / 2
 P3 = (5 * sinphi**3 - 3 * sinphi) / 2
 P4 = (35 * sinphi**4 - 30 * sinphi * sinphi + 3) / 8
 dP2 = 3 * sinphi
-dP3 = (15 * sinphi - 3) / 2  # verbatim from GPOPS-II source
+dP3 = (15 * sinphi - 3) / 2
 dP4 = (140 * sinphi**3 - 60 * sinphi) / 8
 
 sumn = (Re / r) ** 2 * dP2 * J2 + (Re / r) ** 3 * dP3 * J3 + (Re / r) ** 4 * dP4 * J4
@@ -380,7 +361,7 @@ sumr = 3 * (Re / r) ** 2 * P2 * J2 + 4 * (Re / r) ** 3 * P3 * J3 + 5 * (Re / r) 
 deltagn = -(mu * cosphi / (r * r)) * sumn
 deltagr = -(mu / (r * r)) * sumr
 
-# Oblateness acceleration in ECI then projected into RTN, Eqs. (22)-(25).
+# Oblateness acceleration in ECI then projected into RTN
 dgv = (
     deltagn * inn[0] - deltagr * ir[0],
     deltagn * inn[1] - deltagr * ir[1],
@@ -390,7 +371,7 @@ Deltag1 = _dot(ir, dgv)
 Deltag2 = _dot(it, dgv)
 Deltag3 = _dot(ih, dgv)
 
-# Thrust acceleration in RTN, Eq. (29) (SI form: F/m, no g0 factor).
+# Thrust acceleration in RTN
 thr = c_thrust * (1.0 + 0.01 * tau_s) / m
 DeltaT1, DeltaT2, DeltaT3 = thr * ur, thr * ut, thr * uh
 
@@ -398,7 +379,7 @@ D1 = Deltag1 + DeltaT1
 D2 = Deltag2 + DeltaT2
 D3 = Deltag3 + DeltaT3
 
-# Equations of motion, Eqs. (13)-(14)/(18)-(19).
+# Equations of motion
 p_dot = (2 * p / q) * smp * D2
 f_dot = smp * sL * D1 + smp * ((q + 1) * cL + f) / q * D2 - smp * g / q * (h * sL - k * cL) * D3
 g_dot = -smp * cL * D1 + smp * ((q + 1) * sL + g) / q * D2 + smp * f / q * (h * sL - k * cL) * D3
@@ -418,17 +399,14 @@ dynamics = {
 }
 
 # ── Constraints ───────────────────────────────────────────────────────────────
-# OpenSCvx only accepts *affine* equality constraints. Nonlinear equalities are
-# written as matched inequalities (≤ and ≥), while affine equalities are kept hard.
 constraints = []
 
-
-# Path constraint: thrust direction has unit norm, ‖u‖ = 1 (Eq. 15). ‖u‖ ≤ 1 is
-# convex (enforced continuously); ‖u‖ ≥ 1 is non-convex (nodal, virtual buffer).
-unorm = _norm3((ur, ut, uh))
+# Path constraint: thrust direction has unit norm, ‖u‖ = 1. ‖u‖ ≤ 1 is
+# convex; ‖u‖ ≥ 1 is non-convex.
+unorm = ox.linalg.Norm(u)
 constraints.append(ox.ctcs(unorm <= 1.0))
 
-# Terminal (event) constraints at the final node, Eq. (17).
+# Terminal (event) constraints at the final node.
 fN, gN, hN, kN = f_el[0], g_el[0], h_el[0], k_el[0]
 nodal_eqs = [
     (fN**2 + gN**2, ecc_f**2),  # final eccentricity
@@ -439,7 +417,7 @@ for expr, val in nodal_eqs:
     constraints.append(ox.NodalConstraint(expr == val, nodes=[N - 1]))
 constraints.append(ox.NodalConstraint(gN * hN - kN * fN <= 0.0, nodes=[N - 1]))
 
-# ── Time (free final time) ────────────────────────────────────────────────────
+# ── Time ────────────────────────────────────────────────────
 time = ox.Time(
     initial=0.0,
     final=ox.Free(tf_guess),
@@ -474,7 +452,7 @@ problem = Problem(
 
 
 def mee_to_cartesian(p_a, f_a, g_a, h_a, k_a, L_a):
-    """MEE → ECI position [LU] using the GPOPS-II Eq. (20) convention.
+    """MEE → ECI position [LU]
 
     Inputs are non-dimensional (``p`` in LU); multiply the result by ``LU`` for km.
     """
@@ -490,7 +468,7 @@ def mee_to_cartesian(p_a, f_a, g_a, h_a, k_a, L_a):
 
 
 def plot_final_orbit(results):
-    """3-D ECI plot overlaying the initial guess and the converged transfer (km)."""
+    """3-D ECI plot overlaying the initial guess and the converged transfer (km)"""
     import plotly.graph_objects as go
 
     tr = results.trajectory
