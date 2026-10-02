@@ -207,7 +207,7 @@ def _eom_guess(t, x):
 
 
 def build_initial_guess():
-    """Propagate the reference control law and sample onto N uniform-time nodes."""
+    """Propagate the reference control law; retain the full path for plotting."""
     x0 = [p0_val, f0_val, g0_val, h0_val, k0_val, L0_val, m0_val]
     sol = solve_ivp(
         _eom_guess,
@@ -228,10 +228,10 @@ def build_initial_guess():
         vmag = np.linalg.norm(vVec)
         u_g[i] = [ir @ vVec / vmag, it @ vVec / vmag, ih @ vVec / vmag]
     tau_g = np.full((N, 1), -25.0)
-    return t_nodes, Xg.T, u_g, tau_g
+    return t_nodes, Xg.T, u_g, tau_g, sol.y.T
 
 
-t_nodes, Xg, u_guess, tau_guess = build_initial_guess()
+t_nodes, Xg, u_guess, tau_guess, Xg_integrated = build_initial_guess()
 
 # State bounds (non-dimensional); also used to clip the open-loop guess.
 state_bounds = {
@@ -468,16 +468,24 @@ def mee_to_cartesian(p_a, f_a, g_a, h_a, k_a, L_a):
 
 
 def plot_final_orbit(results):
-    """3-D ECI plot overlaying the initial guess and the converged transfer (km)"""
+    """3-D ECI plot of the integrated guess and propagated solution (km)."""
     import plotly.graph_objects as go
 
+    # post_process() supplies the nonlinear trajectory between optimization nodes.
     tr = results.trajectory
     p, f, g, h, k, L = (np.asarray(tr[s]).flatten() for s in ("p", "f", "g", "h", "k", "L"))
     x, y, z = mee_to_cartesian(p, f, g, h, k, L)
     x, y, z = x * LU, y * LU, z * LU  # canonical (LU) -> km
 
-    # Initial guess (module-level Xg, columns p,f,g,h,k,L,mass), also in km.
-    xg, yg, zg = mee_to_cartesian(Xg[:, 0], Xg[:, 1], Xg[:, 2], Xg[:, 3], Xg[:, 4], Xg[:, 5])
+    # Plot the full solve_ivp propagation, not just its N sampled guess nodes.
+    xg, yg, zg = mee_to_cartesian(
+        Xg_integrated[:, 0],
+        Xg_integrated[:, 1],
+        Xg_integrated[:, 2],
+        Xg_integrated[:, 3],
+        Xg_integrated[:, 4],
+        Xg_integrated[:, 5],
+    )
     xg, yg, zg = xg * LU, yg * LU, zg * LU
 
     # Earth sphere
@@ -489,7 +497,7 @@ def plot_final_orbit(results):
 
     fig = go.Figure()
     fig.add_trace(
-        go.Surface(x=xe, y=ye, z=ze, colorscale="Blues", showscale=False, opacity=0.5, name="Earth")
+        go.Surface(x=xe, y=ye, z=ze, colorscale="Blues", showscale=False, opacity=0.7, name="Earth")
     )
     fig.add_trace(
         go.Scatter3d(
@@ -498,7 +506,7 @@ def plot_final_orbit(results):
             z=zg,
             mode="lines",
             line=dict(color="lightgray", width=2, dash="dash"),
-            name="Initial guess",
+            name="Initial guess (integrated)",
         )
     )
     fig.add_trace(
@@ -532,9 +540,12 @@ def plot_final_orbit(results):
         )
     )
     fig.update_layout(
-        title="Low-Thrust Transfer — ECI Position [km]",
         scene=dict(
-            xaxis_title="x [km]", yaxis_title="y [km]", zaxis_title="z [km]", aspectmode="data"
+            xaxis_title="x [km]",
+            yaxis_title="y [km]",
+            zaxis_title="z [km]",
+            aspectmode="data",
+            camera=dict(eye=dict(x=1.3, y=1.3, z=0.9)),
         ),
     )
     return fig
