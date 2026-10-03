@@ -12561,23 +12561,23 @@
 <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
 <p>OpenSCvx is published on PyPI as <a href="https://pypi.org/project/openscvx/"><code>openscvx</code></a>
 and requires <strong>Python 3.11 or newer</strong>. Its core depends on JAX and CVXPY; the
-optional extras below pull in additional solvers, dynamics backends, and modeling
-features only when you need them.</p>
+optional extras below pull in plotting, additional solvers, dynamics backends,
+and modeling features only when you need them.</p>
 <h2 id="how-to-install-openscvx">How to install OpenSCvx<a class="headerlink" href="#how-to-install-openscvx" title="Permanent link">&para;</a></h2>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="how-to-install-openscvx-uv" name="__tabbed_1" type="radio" /><input id="how-to-install-openscvx-pip" name="__tabbed_1" type="radio" /><input id="how-to-install-openscvx-from-source-editable" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="how-to-install-openscvx-uv">uv</label><label for="how-to-install-openscvx-pip">pip</label><label for="how-to-install-openscvx-from-source-editable">From source (editable)</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>openscvx
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Optional: cvxpygen, stljax, jaxlie, mujoco-mjx extras</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"openscvx[cvxpygen,stl,lie,mjx]"</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Optional: plotting, cvxpygen, stljax, jaxlie, mujoco-mjx extras</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"openscvx[plotting,cvxpygen,stl,lie,mjx]"</span>
 </span></code></pre></div>
 </div>
 <div class="tabbed-block">
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>openscvx
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Optional: cvxpygen, stljax, jaxlie, mujoco-mjx extras</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"openscvx[cvxpygen,stl,lie,mjx]"</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># Optional: plotting, cvxpygen, stljax, jaxlie, mujoco-mjx extras</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"openscvx[plotting,cvxpygen,stl,lie,mjx]"</span>
 </span></code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -12585,14 +12585,15 @@ features only when you need them.</p>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">cd</span><span class="w"> </span>OpenSCvx
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># Optional: cvxpygen, stljax, jaxlie, mujoco-mjx extras</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[cvxpygen,stl,lie,mjx]"</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># Optional: plotting, cvxpygen, stljax, jaxlie, mujoco-mjx extras</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">".[plotting,cvxpygen,stl,lie,mjx]"</span>
 </span></code></pre></div>
 </div>
 </div>
 </div>
-<p>Install from source if you want to run the <a href="../examples/">examples</a>, modify the
-library, or track the development branch.</p>
+<p>Install from source if you want to modify the library or track the development
+branch. Running the <a href="../examples/">examples</a> needs the <code>plotting</code> extra as well,
+because those scripts import Plotly and Viser at startup.</p>
 <h2 id="optional-extras">Optional extras<a class="headerlink" href="#optional-extras" title="Permanent link">&para;</a></h2>
 <p>Extras are installed with the <code>openscvx[extra1,extra2]</code> syntax shown above.</p>
 <table>
@@ -12604,6 +12605,10 @@ library, or track the development branch.</p>
 </thead>
 <tbody>
 <tr>
+<td><code>plotting</code></td>
+<td>2D plots and 3D scenes (<code>matplotlib</code>, <code>plotly</code>, <code>viser</code>).</td>
+</tr>
+<tr>
 <td><code>cvxpygen</code></td>
 <td>Generated C solvers via <code>cvxpygen</code> + <code>qocogen</code>.</td>
 </tr>
@@ -12613,7 +12618,7 @@ library, or track the development branch.</p>
 </tr>
 <tr>
 <td><code>moreau</code></td>
-<td>The licensed <code>moreau</code> conic solver.</td>
+<td>The <code>moreau</code> conic solver backend.</td>
 </tr>
 <tr>
 <td><code>stl</code></td>
@@ -12661,7 +12666,7 @@ library, or track the development branch.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="July 15, 2026 06:18:13 UTC">July 15, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 3, 2026 16:48:30 UTC">October 3, 2026</span>
   </span>
 
     
