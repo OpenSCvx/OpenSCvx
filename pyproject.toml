@@ -21,13 +21,9 @@ dependencies = [
     "qoco",
     "numpy",
     "jax",
-    "plotly",
     "termcolor",
     "diffrax",
-    "absl-py",
-    "flatbuffers",
-    "viser",
-    "matplotlib",
+    "flatbuffers",  # jax.export serialization of compiled solvers
     "pyyaml",
     "pydantic>=2.0",
 ]
@@ -61,6 +57,11 @@ mjx = [
 ]
 frax = [
     "frax>=0.0.4",
+]
+plotting = [
+    "matplotlib",
+    "plotly",
+    "viser",
 ]
 test = [
     "pytest",
@@ -126,7 +127,7 @@ per-file-ignores = { "examples/**/*.py" = ["E402"] }
 # Import sorting configuration (CVXPY-style)
 [tool.ruff.lint.isort]
 known-first-party = ["opencsvx"]
-known-third-party = ["numpy", "jax", "cvxpy", "plotly", "termcolor", "diffrax", "absl", "flatbuffers"]
+known-third-party = ["numpy", "jax", "cvxpy", "plotly", "matplotlib", "viser", "termcolor", "diffrax"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 
 # Quote configuration (CVXPY-style)
@@ -158,5 +159,5 @@ markers = [
     "qpax: requires qpax (openscvx[qpax])",
     "cvxpygen: requires cvxpygen + qocogen (openscvx[cvxpygen])",
     "lie: requires jaxlie (openscvx[lie])",
-    "moreau: requires a licensed moreau install (openscvx[moreau])",
+    "moreau: requires moreau (openscvx[moreau])",
 ]

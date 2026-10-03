@@ -109,9 +109,10 @@ uv pip install openscvx
 > [!TIP]
 > **Optional dependencies**
 >
-> For CVXPYGen code generation:
+> Plotting (Plotly, Matplotlib, and Viser) and CVXPYGen code generation:
 > ```bash
-> pip install openscvx[cvxpygen]
+> pip install "openscvx[plotting]"
+> pip install "openscvx[cvxpygen]"
 > ```
 
 > [!TIP]
@@ -174,7 +175,7 @@ Check out the OpenSCvx documentation:
 We also have a selection of problems in the `examples/` folder as well as on the [Examples page](https://openscvx.github.io/OpenSCvx/latest/Examples/abstract/brachistochrone/) of the documentation. The example trajectory optimization problems are grouped by application and represent some of the problem types that can be solved by OpenSCvx.
 
 > [!Note]
-> To run the examples, you'll need to clone this repository and install OpenSCvx in editable mode (`pip install -e .`). See the [Installing From Source](#installing-from-source) section above for detailed installation instructions.
+> To run the examples, you'll need to clone this repository and install OpenSCvx in editable mode with the plotting extra (`pip install -e ".[plotting]"`). See the [Installing From Source](#installing-from-source) section above for detailed installation instructions.
 
 To run a problem simply run any of the examples directly, for example:
 
@@ -213,7 +214,7 @@ OpenSCvx integrates with several optional third-party packages. Each installs as
 | [jaxlie](https://github.com/brentyi/jaxlie) | `lie` | SO(3)/SE(3) Lie-group operations and IK initialization | [![jaxlie](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-lie.yml/badge.svg?branch=main)](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-lie.yml) |
 | [qpax](https://github.com/qpax-solver/qpax) | `qpax` | JAX-native QP solver backend | [![qpax](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-qpax.yml/badge.svg?branch=main)](https://github.com/OpenSCvx/OpenSCvx/issues/550) |
 | [CVXPYGen](https://github.com/cvxgrp/cvxpygen) | `cvxpygen` | Generated C solver code for the convex subproblem | [![cvxpygen](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-cvxpygen.yml/badge.svg?branch=main)](https://github.com/OpenSCvx/OpenSCvx/issues/551) |
-| [moreau](https://pypi.org/project/moreau/) | `moreau` | Licensed QP solver backend | ![moreau](https://img.shields.io/badge/moreau-license%20required-lightgrey) |
+| [moreau](https://pypi.org/project/moreau/) | `moreau` | Open Source SOCP solver backend | [![moreau](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-moreau.yml/badge.svg?branch=main)](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-moreau.yml) |
 | [stljax](https://github.com/UW-CTRL/stljax) | `stl` | Signal Temporal Logic robustness bridge | ![stljax](https://img.shields.io/badge/stljax-no%20tests%20yet-lightgrey) |
 | [frax](https://github.com/danielpmorton/frax) | `frax` | Robot dynamics for the manipulator examples | [![frax](https://img.shields.io/badge/frax-weekly%20examples%20sweep-blue)](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-examples.yml) |
 
@@ -228,7 +229,7 @@ This work was supported by a NASA Space Technology Graduate Research Opportunity
 Please cite the following works if you use the repository,
 
 ```tex
-@misc{hayner2026openscvxopensourcemodularextensible,
+@misc{hayner2026openscvx,
       title={OpenSCvx: An Open-Source Modular and Extensible Nonlinear Trajectory Planning Package}, 
       author={Christopher R. Hayner and Griffin J. Norris and Fabio Spada and Samet Uzun and Avi Mittal and Behcet Acıkmese and Karen Leung},
       year={2026},
@@ -268,4 +269,4 @@ keywords = {Trajectory optimization, Optimal control, Continuous-time constraint
 }
 ```
 
-Additionally please run `problem.citation()` to generate the appropriate bibtex citations for the corresponding components used within your problem.
+Additionally please run `problem.citation()` after `problem.intitialize()` to generate the appropriate bibtex citations for the corresponding components used within your problem.

@@ -1,0 +1,20 @@
+name: moreau
+
+# Badge workflow: health of the moreau integration on main.
+# The weekly cron catches breakage from upstream releases between commits.
+# Kept off the main tests.yml extras job so a moreau release cannot fail
+# the mjx/lie checks.
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly on Monday, offset from the Sunday examples sweep
+  workflow_dispatch:
+
+jobs:
+  moreau:
+    uses: ./.github/workflows/_extra.yml
+    with:
+      extra: moreau

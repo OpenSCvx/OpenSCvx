@@ -65,7 +65,7 @@ jobs:
         uv pip install --system mike
 
     - name: Install package
-      run: uv pip install --system -e .
+      run: uv pip install --system -e ".[plotting]"
 
     - name: Build documentation (check only)
       if: ${{ !inputs.version }}

@@ -30,9 +30,10 @@ Backends:
         JAX-differentiable SCP loop in follow-up work.
     :class:`openscvx.solvers.moreau_ptr_solver.MoreauPTRSolver`
         Sparse conic program assembled as CSR JAX arrays and solved with
-        ``moreau.jax.Solver`` (NumPy path, warm-started between SCP
-        iterations) or the functional ``moreau.jax.solver(...)`` factory
-        (JAX-pure path, no warm-start). Uses SOC epigraphs for the L1 / pos
+        ``moreau.jax.Solver``. The NumPy path warm-starts between SCP
+        iterations. The JAX-pure path calls that solver's jitted kernel,
+        which returns ``(solution, info)`` and does not warm-start. Uses SOC
+        epigraphs for the L1 / pos
         PTR penalties instead of QPAX-style slack expansion.
 """
 

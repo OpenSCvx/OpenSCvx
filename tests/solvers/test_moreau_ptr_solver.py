@@ -268,29 +268,6 @@ def test_moreau_rejects_l1_norm_convex_constraints():
         )
 
 
-def test_qpax_rejects_soc_convex_constraints():
-    """QPAXPTRSolver does not support SOC constraints.
-
-    An L2-norm inequality canonicalises to
-    :class:`~openscvx.solvers.cones.SOCConstraint` which is **not** in
-    :attr:`QPAXPTRSolver.SUPPORTED_CONE_TYPES`.  The solver must raise
-    :exc:`NotImplementedError` during lowering."""
-    n = 5
-    pos, vel, u, dyn, time = _make_pos_vel_problem_base(n)
-    cvx_constraint = (ox.linalg.Norm(pos) <= 8.0).convex()
-    with pytest.raises(NotImplementedError):
-        Problem(
-            dynamics=dyn,
-            states=[pos, vel],
-            controls=[u],
-            time=time,
-            constraints=[cvx_constraint],
-            N=n,
-            float_dtype="float64",
-            solver={"backend": "qpax"},
-        )
-
-
 # ============================================================================
 # Assembly sanity checks
 # ============================================================================

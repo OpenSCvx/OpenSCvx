@@ -77,13 +77,11 @@ try:
     import jax.numpy as jnp
     import moreau
     from moreau.jax import Solver as _MoreauJaxSolver
-    from moreau.jax import solver as _moreau_jax_solver_fn  # functional factory
 
     _MOREAU_AVAILABLE = True
 except ImportError:  # pragma: no cover — exercised by the install-error test
     moreau = None  # type: ignore[assignment]
     _MoreauJaxSolver = None  # type: ignore[assignment,misc]
-    _moreau_jax_solver_fn = None  # type: ignore[assignment]
     jax = None  # type: ignore[assignment]
     jnp = None  # type: ignore[assignment]
     _MOREAU_AVAILABLE = False
@@ -269,12 +267,14 @@ class MoreauPTRSolver(PTRSolver):
     iterations on successful solves, and natively handles user
     :class:`~openscvx.solvers.cones.SOCConstraint` convex constraints.
 
-    The JAX-pure entry point :meth:`iteration_callback` builds Moreau's
-    functional factory ``moreau.jax.solver(...)`` once at
-    :meth:`initialize` and calls it as
-    ``(P_data, A_data, q, b) -> (JaxSolution, JaxSolveInfo)`` so the backend
-    composes with ``jax.jit`` and ``jax.vmap``. The functional API does not
-    expose a warm-start hook, so every call is a cold start: both
+    The JAX-pure entry point :meth:`iteration_callback` calls the jitted
+    kernel on the :class:`moreau.jax.Solver` built in :meth:`initialize`,
+    as ``(P_data, A_data, q, b) -> (JaxSolution, JaxSolveInfo)``, so the
+    backend composes with ``jax.jit`` and ``jax.vmap``. Moreau 0.4 removed
+    the public ``moreau.jax.solver`` factory. ``Solver.solve`` returns only
+    the solution and stores status on ``solver.info``, which is not batched
+    under ``vmap``. The kernel has no warm-start argument, so every call is
+    a cold start: both
     :meth:`~openscvx.problem.Problem.solve` and
     :meth:`~openscvx.problem.Problem.solve_jax` drive
     ``iteration_callback`` for the SCP body, so neither thread Moreau's
@@ -597,22 +597,6 @@ class MoreauPTRSolver(PTRSolver):
         moreau_settings = _build_moreau_settings(self.solver_args)
 
         self._moreau = _MoreauJaxSolver(
-            n=L.n_z,
-            m=self._n_con,
-            P_row_offsets=jnp.array(P_indptr),
-            P_col_indices=jnp.array(P_indices),
-            A_row_offsets=jnp.array(A_indptr),
-            A_col_indices=jnp.array(A_indices),
-            cones=cones,
-            settings=moreau_settings,
-        )
-
-        # Functional-API solve function for ``iteration_callback``. Returns
-        # ``(JaxSolution, JaxSolveInfo)`` as registered pytrees and does NOT
-        # accept warm-start — see the 2026-05-17 Decision Log entry in
-        # ``plans/solver-iteration-callbacks.md``. The OO ``self._moreau``
-        # path stays in use for the NumPy ``solve()`` route (which warm-starts).
-        self._moreau_solve_fn = _moreau_jax_solver_fn(
             n=L.n_z,
             m=self._n_con,
             P_row_offsets=jnp.array(P_indptr),
@@ -1386,16 +1370,19 @@ class MoreauPTRSolver(PTRSolver):
     def iteration_callback(self):
         """JAX-pure ``(state, SubproblemData) -> SubproblemSolution``.
 
-        Composes :meth:`_assemble_conic_jax` + Moreau's functional
-        ``solve_fn`` + :meth:`_build_solution_jax` into a single
-        ``@jax.jit``-decorated closure built once at :meth:`initialize`.
+        Composes :meth:`_assemble_conic_jax` + Moreau's jitted kernel
+        + :meth:`_build_solution_jax` into a single ``@jax.jit``-decorated
+        closure.
 
-        Moreau's functional API (``moreau.jax.solver()``) is the JIT/vmap-friendly
-        path but does **not** accept a warm-start (see the 2026-05-17 Decision
-        Log entry in ``plans/solver-iteration-callbacks.md``). Every call is a
-        cold start; ``state`` is accepted only for cross-backend signature
-        uniformity. Both :meth:`~openscvx.problem.Problem.solve` and
-        :meth:`~openscvx.problem.Problem.solve_jax` route through this
+        The kernel (``moreau.jax.Solver._solve_raw``) returns
+        ``(JaxSolution, JaxSolveInfo)`` and does **not** accept a warm-start
+        (see the 2026-05-17 Decision Log entry in
+        ``plans/solver-iteration-callbacks.md``). Moreau 0.4 removed the
+        public ``moreau.jax.solver`` factory; ``Solver.solve`` drops status
+        onto ``solver.info``, which does not batch under ``vmap``. Every call
+        is a cold start; ``state`` is accepted only for cross-backend
+        signature uniformity. Both :meth:`~openscvx.problem.Problem.solve`
+        and :meth:`~openscvx.problem.Problem.solve_jax` route through this
         callback for the SCP body, so the warm-start carry isn't threaded
         on either path — threading it would require an
         :class:`AlgorithmState.moreau_carry` field (future extension in
@@ -1403,7 +1390,7 @@ class MoreauPTRSolver(PTRSolver):
 
         The returned callable takes ``(state, data)``: ``state`` is the
         :class:`AlgorithmState` pytree, accepted for cross-backend signature
-        uniformity but unused (Moreau's functional API takes no warm-start);
+        uniformity but unused (the kernel takes no warm-start);
         ``data`` is the :class:`SubproblemData` pytree carrying the
         per-iteration linearization arrays, penalty weights, and boundary
         conditions.
@@ -1414,11 +1401,14 @@ class MoreauPTRSolver(PTRSolver):
                 "have been called first."
             )
 
-        solve_fn = self._moreau_solve_fn
+        # Public ``Solver.solve`` returns only the solution. The jitted kernel
+        # it calls still returns ``(JaxSolution, JaxSolveInfo)``, which is
+        # what ``vmap`` can carry as a pytree.
+        solve_fn = self._moreau._solve_raw
         csr_to_coo_perm = jnp.asarray(self._csr_to_coo_perm)
 
         def step(state, data: SubproblemData) -> SubproblemSolution:
-            del state  # Moreau's functional API takes no warm-start.
+            del state  # The jitted kernel takes no warm-start.
             P_data, coo_vals, q, b = self._assemble_conic_jax(data)
             A_data = coo_vals[csr_to_coo_perm]
             sol, info = solve_fn(P_data, A_data, q, b)

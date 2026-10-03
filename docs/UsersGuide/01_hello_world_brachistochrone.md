@@ -316,7 +316,7 @@ theta_traj = results.trajectory["theta"]
 
 ### Visualizing the Results
 
-OpenSCvx provides built-in plotting utilities for quick visualization of your results. The simplest way to see your solution is with `plot_states()` and `plot_controls()`:
+OpenSCvx provides plotting utilities for quick visualization of your results. Install them with `pip install "openscvx[plotting]"`. The simplest way to see your solution is with `plot_states()` and `plot_controls()`:
 
 ```python
 from openscvx.plotting import plot_states, plot_controls

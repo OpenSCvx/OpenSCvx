@@ -16,10 +16,11 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 Then install the package in editable mode with development dependencies:
 
 ```bash
-pip install -e ".[test]"
+pip install -e ".[test,plotting]"
 ```
 
 For additional features, you can install optional dependencies:
+- `pip install -e ".[plotting]"` - Plotly, Matplotlib, and Viser visualization
 - `pip install -e ".[cvxpygen]"` - Code generation support
 - `pip install -e ".[stl]"` - STL (Signal Temporal Logic) constraints
 
@@ -32,7 +33,7 @@ git clone git@github.com:OpenSCvx/OpenSCvx.git
 cd OpenSCvx
 uv venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install -e ".[test]"
+uv pip install -e ".[test,plotting]"
 ```
 
 To contribute changes, you'll need to create a branch or fork. See [Forking and Merging](#forking-and-merging) below for details on our workflow and [Branch Naming Conventions](#branch-naming-conventions) for required naming patterns.

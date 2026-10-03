@@ -6,7 +6,8 @@ frame-perfectly aligned with the viser recording and can be composited with
 ffmpeg afterwards.
 
 Uses matplotlib's Agg canvas rather than plotly + kaleido so there's no
-headless-Chrome dependency — matplotlib is already a project dep. Raw RGB
+headless-Chrome dependency. Matplotlib comes with the plotting extra
+(``pip install 'openscvx[plotting]'``). Raw RGB
 frames are piped straight into ``ffmpeg -f rawvideo`` (same pattern as
 ``_render.py``), so there's no intermediate PNGs and no Python-side decode.
 """

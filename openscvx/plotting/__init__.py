@@ -1,5 +1,9 @@
 """Trajectory visualization and plotting utilities.
 
+Requires the plotting extra::
+
+    pip install 'openscvx[plotting]'
+
 This module provides reusable building blocks for visualizing trajectory
 optimization results. It is intentionally minimal - we provide common utilities
 that can be composed together, not a complete solution that tries to do
@@ -41,27 +45,10 @@ For problem-specific visualization examples (drones, rockets, etc.), see
 ``examples/plotting_viser.py``.
 """
 
-try:
-    from . import viser
-except ModuleNotFoundError as e:
-    # Make viser an optional dependency so 2D plotting works without it.
-    # Accessing openscvx.plotting.viser will raise a helpful error message.
-    class _MissingOptionalDependency:
-        def __init__(self, *, package: str, exc: Exception):
-            self._package = package
-            self._exc = exc
-
-        def __getattr__(self, name: str):
-            raise ModuleNotFoundError(
-                f"Optional dependency '{self._package}' is required for 3D visualization.\n"
-                f"Install it with: pip install {self._package}\n"
-                f"Original error: {self._exc}"
-            ) from self._exc
-
-        def __repr__(self) -> str:  # pragma: no cover
-            return f"<missing optional dependency '{self._package}'>"
-
-    viser = _MissingOptionalDependency(package="viser", exc=e)  # type: ignore[assignment]
+from . import (
+    _deps,  # noqa: F401  # raises if the plotting extra is missing
+    viser,
+)
 from .plotting import (
     plot_control_component,
     plot_controls,
