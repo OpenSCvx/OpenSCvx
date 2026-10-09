@@ -8,7 +8,7 @@ import viser
 from scipy.interpolate import CubicSpline, PchipInterpolator
 
 from examples.drone._terrain import heightfield_mesh
-from examples.drone.logo_utils.quadrotor_mesh import make_quadrotor_mesh
+from examples.drone.logo_utils._quadrotor_mesh import make_quadrotor_mesh
 from openscvx.algorithms import OptimizationResults
 from openscvx.plotting.viser import compute_velocity_colors, create_server
 from openscvx.plotting.viser.animated import add_animated_trail, add_animation_controls

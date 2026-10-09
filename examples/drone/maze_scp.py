@@ -52,7 +52,7 @@ from examples._maze_viz import (
     uniform_segment_colors,
 )
 from examples.animations._camera import chase_pose, look_at_wxyz
-from examples.drone.logo_utils.quadrotor_mesh import make_quadrotor_mesh
+from examples.drone.logo_utils._quadrotor_mesh import make_quadrotor_mesh
 from openscvx import Problem
 from openscvx.plotting.viser import compute_velocity_colors
 from openscvx.plotting.viser.animated import (

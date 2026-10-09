@@ -31,10 +31,10 @@ EXCLUDED_EXAMPLES = {
     "drone/logo.py",
     "drone/openscvx_logo.py",
     "drone/boresight_trace_mpcc.py",
+    "drone/boresight_trace_mpcc.py",
     "double_integrator/obstacle_avoidance_vmap.py",
     "mjx/triple_cartpole_game.py",
     "car/racing/race_car_multi_agent_mpcc_ice.py",
-    "car/racing/race_car_multi_agent_mpcc.py",
     "rocket/ascent_launch_vehicle.py",
     "rocket/senss/*.py",
 }
