@@ -35,7 +35,7 @@ grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 sys.path.append(grandparent_dir)
 
 import openscvx as ox
-from examples.drone.logo_utils.svg_path_utils import extract_svg_arc_length_path
+from examples.drone.logo_utils._svg_path_utils import extract_svg_arc_length_path
 from openscvx import Problem
 
 ###############################################################################
@@ -517,7 +517,7 @@ if __name__ == "__main__":
     deviation_figure(progress_dense, trace_err).show()
 
     # --- Visualization ---
-    from examples.drone.logo_utils.quadrotor_mesh import make_quadrotor_mesh
+    from examples.drone.logo_utils._quadrotor_mesh import make_quadrotor_mesh
     from openscvx.plotting.viser import add_animation_controls, create_server
 
     server = create_server(positions)

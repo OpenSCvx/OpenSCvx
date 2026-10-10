@@ -30,7 +30,7 @@ except ImportError:
     print("svgpathtools not found. Please install it with: pip install svgpathtools")
     sys.exit(1)
 
-from examples.drone.logo_utils.svg_path_utils import get_svg_path_function
+from examples.drone.logo_utils._svg_path_utils import get_svg_path_function
 
 # -----------------------------------------------------------------------------
 # SVG path utilities
