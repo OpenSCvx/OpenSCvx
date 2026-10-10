@@ -2,8 +2,8 @@ name: moreau
 
 # Badge workflow: health of the moreau integration on main.
 # The weekly cron catches breakage from upstream releases between commits.
-# Kept off the main tests.yml extras job so a moreau release cannot fail
-# the mjx/lie checks.
+# The PR extras job and the examples sweep also install moreau; this workflow
+# is the dedicated badge and the weekly upstream check.
 
 on:
   push:
