@@ -1,5 +1,5 @@
 """
-4-phase Delta II-style ascent from KSC (28.5° lat) to GTO, based on the benchmark from Betts,
+4-phase Delta III-style ascent from KSC (28.5° lat) to GTO, based on the benchmark from Betts,
 *Practical Methods for Optimal Control and Estimation Using Nonlinear Programming*,
 SIAM Press, 2009.
 
@@ -345,7 +345,6 @@ r_0 = np.array(
     ]
 )
 v_0 = r_0 @ auxiliary_data["angular_rate_earth_matrix"].T
-v_0 = v_0 + (5.0 / scales["speed"]) * (r_0 / np.linalg.norm(r_0))
 
 bt_srb = 75.2 / scales["time"]
 bt_first = 261.0 / scales["time"]
@@ -504,7 +503,7 @@ controls = [u, delta_m]
 r_norm = ox.linalg.Norm(r)
 mass_scalar = m[0]
 v_rel = v - r @ auxiliary_data["angular_rate_earth_matrix"].T
-speed_rel = ox.linalg.Norm(v_rel)
+speed_rel = ox.Sqrt(ox.Sum(v_rel * v_rel) + 1e-8)
 altitude = r_norm - auxiliary_data["earth_radius"]
 rho = auxiliary_data["sealevel_density"] * ox.Exp(
     -altitude / auxiliary_data["density_scale_height"]
