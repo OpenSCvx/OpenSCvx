@@ -365,7 +365,9 @@ def test_calculate_cost_from_state_scalar_lam_cost_matches_default(settings):
     cost_default = calculate_cost_from_state(x, settings)
     cost_scalar = calculate_cost_from_state(x, settings, lam_cost=1.0)
 
-    assert cost_scalar == pytest.approx(cost_default, rel=1e-6)
+    # Both results are 0-d JAX arrays. Compare them as Python floats so the
+    # check does not depend on pytest.approx reading ``.flat``.
+    assert float(cost_scalar) == pytest.approx(float(cost_default), rel=1e-6)
 
 
 # --- Tests for calculate_nonlinear_penalty ----------------------------------
