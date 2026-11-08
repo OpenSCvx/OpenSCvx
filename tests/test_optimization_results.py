@@ -84,8 +84,9 @@ def test_save_load_roundtrip_minimal(tmp_path):
 
     assert len(loaded.discretization_history) == len(original.discretization_history)
 
-    # Float lists
-    assert loaded.lam_prox_history == pytest.approx(original.lam_prox_history)
+    # Scalar arrays stored in an array-list. pytest.approx rejects a list of
+    # ndarrays, so compare the numeric values directly.
+    np.testing.assert_allclose(loaded.lam_prox_history, original.lam_prox_history)
     assert loaded.actual_reduction_history == pytest.approx(original.actual_reduction_history)
     assert loaded.pred_reduction_history == pytest.approx(original.pred_reduction_history)
     assert loaded.acceptance_ratio_history == pytest.approx(original.acceptance_ratio_history)
