@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../../assets/favicon.png">
-      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.8.1">
     
     
       
@@ -34,10 +34,10 @@
     
     
   
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -12498,65 +12498,65 @@ preserved but emptied.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>openscvx/utils/cache.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-76"> 76</a></span>
-<span class="normal"><a href="#__codelineno-0-77"> 77</a></span>
-<span class="normal"><a href="#__codelineno-0-78"> 78</a></span>
-<span class="normal"><a href="#__codelineno-0-79"> 79</a></span>
-<span class="normal"><a href="#__codelineno-0-80"> 80</a></span>
-<span class="normal"><a href="#__codelineno-0-81"> 81</a></span>
-<span class="normal"><a href="#__codelineno-0-82"> 82</a></span>
-<span class="normal"><a href="#__codelineno-0-83"> 83</a></span>
-<span class="normal"><a href="#__codelineno-0-84"> 84</a></span>
-<span class="normal"><a href="#__codelineno-0-85"> 85</a></span>
-<span class="normal"><a href="#__codelineno-0-86"> 86</a></span>
-<span class="normal"><a href="#__codelineno-0-87"> 87</a></span>
-<span class="normal"><a href="#__codelineno-0-88"> 88</a></span>
-<span class="normal"><a href="#__codelineno-0-89"> 89</a></span>
-<span class="normal"><a href="#__codelineno-0-90"> 90</a></span>
-<span class="normal"><a href="#__codelineno-0-91"> 91</a></span>
-<span class="normal"><a href="#__codelineno-0-92"> 92</a></span>
-<span class="normal"><a href="#__codelineno-0-93"> 93</a></span>
-<span class="normal"><a href="#__codelineno-0-94"> 94</a></span>
-<span class="normal"><a href="#__codelineno-0-95"> 95</a></span>
-<span class="normal"><a href="#__codelineno-0-96"> 96</a></span>
-<span class="normal"><a href="#__codelineno-0-97"> 97</a></span>
-<span class="normal"><a href="#__codelineno-0-98"> 98</a></span>
-<span class="normal"><a href="#__codelineno-0-99"> 99</a></span>
-<span class="normal"><a href="#__codelineno-0-100">100</a></span>
-<span class="normal"><a href="#__codelineno-0-101">101</a></span>
-<span class="normal"><a href="#__codelineno-0-102">102</a></span>
-<span class="normal"><a href="#__codelineno-0-103">103</a></span>
-<span class="normal"><a href="#__codelineno-0-104">104</a></span>
-<span class="normal"><a href="#__codelineno-0-105">105</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-76"><a id="__codelineno-0-76" name="__codelineno-0-76"></a><span class="k">def</span><span class="w"> </span><span class="nf">clear_cache</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-</span><span id="__span-0-77"><a id="__codelineno-0-77" name="__codelineno-0-77"></a><span class="w">    </span><span class="sd">"""Clear all cached compiled solvers.</span>
-</span><span id="__span-0-78"><a id="__codelineno-0-78" name="__codelineno-0-78"></a>
-</span><span id="__span-0-79"><a id="__codelineno-0-79" name="__codelineno-0-79"></a><span class="sd">    Removes all files in the cache directory. The directory itself is</span>
-</span><span id="__span-0-80"><a id="__codelineno-0-80" name="__codelineno-0-80"></a><span class="sd">    preserved but emptied.</span>
-</span><span id="__span-0-81"><a id="__codelineno-0-81" name="__codelineno-0-81"></a>
-</span><span id="__span-0-82"><a id="__codelineno-0-82" name="__codelineno-0-82"></a><span class="sd">    Returns:</span>
-</span><span id="__span-0-83"><a id="__codelineno-0-83" name="__codelineno-0-83"></a><span class="sd">        Number of files deleted</span>
-</span><span id="__span-0-84"><a id="__codelineno-0-84" name="__codelineno-0-84"></a>
-</span><span id="__span-0-85"><a id="__codelineno-0-85" name="__codelineno-0-85"></a><span class="sd">    Example:</span>
-</span><span id="__span-0-86"><a id="__codelineno-0-86" name="__codelineno-0-86"></a><span class="sd">        Clear the cache::</span>
-</span><span id="__span-0-87"><a id="__codelineno-0-87" name="__codelineno-0-87"></a>
-</span><span id="__span-0-88"><a id="__codelineno-0-88" name="__codelineno-0-88"></a><span class="sd">            import openscvx as ox</span>
-</span><span id="__span-0-89"><a id="__codelineno-0-89" name="__codelineno-0-89"></a><span class="sd">            deleted = ox.clear_cache()</span>
-</span><span id="__span-0-90"><a id="__codelineno-0-90" name="__codelineno-0-90"></a><span class="sd">            print(f"Deleted {deleted} cached files")</span>
-</span><span id="__span-0-91"><a id="__codelineno-0-91" name="__codelineno-0-91"></a><span class="sd">    """</span>
-</span><span id="__span-0-92"><a id="__codelineno-0-92" name="__codelineno-0-92"></a>    <span class="n">cache_dir</span> <span class="o">=</span> <span class="n">get_cache_dir</span><span class="p">()</span>
-</span><span id="__span-0-93"><a id="__codelineno-0-93" name="__codelineno-0-93"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">cache_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-</span><span id="__span-0-94"><a id="__codelineno-0-94" name="__codelineno-0-94"></a>        <span class="k">return</span> <span class="mi">0</span>
-</span><span id="__span-0-95"><a id="__codelineno-0-95" name="__codelineno-0-95"></a>
-</span><span id="__span-0-96"><a id="__codelineno-0-96" name="__codelineno-0-96"></a>    <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
-</span><span id="__span-0-97"><a id="__codelineno-0-97" name="__codelineno-0-97"></a>    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">cache_dir</span><span class="o">.</span><span class="n">iterdir</span><span class="p">():</span>
-</span><span id="__span-0-98"><a id="__codelineno-0-98" name="__codelineno-0-98"></a>        <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
-</span><span id="__span-0-99"><a id="__codelineno-0-99" name="__codelineno-0-99"></a>            <span class="n">item</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
-</span><span id="__span-0-100"><a id="__codelineno-0-100" name="__codelineno-0-100"></a>            <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
-</span><span id="__span-0-101"><a id="__codelineno-0-101" name="__codelineno-0-101"></a>        <span class="k">elif</span> <span class="n">item</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
-</span><span id="__span-0-102"><a id="__codelineno-0-102" name="__codelineno-0-102"></a>            <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
-</span><span id="__span-0-103"><a id="__codelineno-0-103" name="__codelineno-0-103"></a>            <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
-</span><span id="__span-0-104"><a id="__codelineno-0-104" name="__codelineno-0-104"></a>
-</span><span id="__span-0-105"><a id="__codelineno-0-105" name="__codelineno-0-105"></a>    <span class="k">return</span> <span class="n">count</span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-76"> 76</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-77"> 77</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-78"> 78</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-79"> 79</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-80"> 80</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-81"> 81</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-82"> 82</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-83"> 83</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-84"> 84</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-85"> 85</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-86"> 86</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-87"> 87</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-88"> 88</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-89"> 89</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-90"> 90</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-91"> 91</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-92"> 92</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-93"> 93</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-94"> 94</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-95"> 95</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-96"> 96</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-97"> 97</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-98"> 98</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-99"> 99</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-100">100</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-101">101</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-102">102</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-103">103</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-104">104</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.clear_cache--source--__codelineno-0-105">105</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="openscvx.utils.cache.clear_cache--source--__span-0-76"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-76" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-76"></a><span class="k">def</span><span class="w"> </span><span class="nf">clear_cache</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-77"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-77" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-77"></a><span class="w">    </span><span class="sd">"""Clear all cached compiled solvers.</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-78"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-78" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-78"></a>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-79"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-79" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-79"></a><span class="sd">    Removes all files in the cache directory. The directory itself is</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-80"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-80" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-80"></a><span class="sd">    preserved but emptied.</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-81"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-81" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-81"></a>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-82"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-82" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-82"></a><span class="sd">    Returns:</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-83"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-83" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-83"></a><span class="sd">        Number of files deleted</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-84"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-84" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-84"></a>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-85"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-85" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-85"></a><span class="sd">    Example:</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-86"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-86" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-86"></a><span class="sd">        Clear the cache::</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-87"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-87" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-87"></a>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-88"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-88" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-88"></a><span class="sd">            import openscvx as ox</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-89"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-89" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-89"></a><span class="sd">            deleted = ox.clear_cache()</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-90"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-90" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-90"></a><span class="sd">            print(f"Deleted {deleted} cached files")</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-91"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-91" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-91"></a><span class="sd">    """</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-92"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-92" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-92"></a>    <span class="n">cache_dir</span> <span class="o">=</span> <span class="n">get_cache_dir</span><span class="p">()</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-93"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-93" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-93"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">cache_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-94"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-94" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-94"></a>        <span class="k">return</span> <span class="mi">0</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-95"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-95" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-95"></a>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-96"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-96" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-96"></a>    <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-97"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-97" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-97"></a>    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">cache_dir</span><span class="o">.</span><span class="n">iterdir</span><span class="p">():</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-98"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-98" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-98"></a>        <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-99"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-99" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-99"></a>            <span class="n">item</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-100"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-100" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-100"></a>            <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-101"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-101" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-101"></a>        <span class="k">elif</span> <span class="n">item</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-102"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-102" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-102"></a>            <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-103"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-103" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-103"></a>            <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-104"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-104" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-104"></a>
+</span><span id="openscvx.utils.cache.clear_cache--source--__span-0-105"><a id="openscvx.utils.cache.clear_cache--source--__codelineno-0-105" name="openscvx.utils.cache.clear_cache--source--__codelineno-0-105"></a>    <span class="k">return</span> <span class="n">count</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -12608,79 +12608,79 @@ preserved but emptied.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>openscvx/utils/cache.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-37">37</a></span>
-<span class="normal"><a href="#__codelineno-0-38">38</a></span>
-<span class="normal"><a href="#__codelineno-0-39">39</a></span>
-<span class="normal"><a href="#__codelineno-0-40">40</a></span>
-<span class="normal"><a href="#__codelineno-0-41">41</a></span>
-<span class="normal"><a href="#__codelineno-0-42">42</a></span>
-<span class="normal"><a href="#__codelineno-0-43">43</a></span>
-<span class="normal"><a href="#__codelineno-0-44">44</a></span>
-<span class="normal"><a href="#__codelineno-0-45">45</a></span>
-<span class="normal"><a href="#__codelineno-0-46">46</a></span>
-<span class="normal"><a href="#__codelineno-0-47">47</a></span>
-<span class="normal"><a href="#__codelineno-0-48">48</a></span>
-<span class="normal"><a href="#__codelineno-0-49">49</a></span>
-<span class="normal"><a href="#__codelineno-0-50">50</a></span>
-<span class="normal"><a href="#__codelineno-0-51">51</a></span>
-<span class="normal"><a href="#__codelineno-0-52">52</a></span>
-<span class="normal"><a href="#__codelineno-0-53">53</a></span>
-<span class="normal"><a href="#__codelineno-0-54">54</a></span>
-<span class="normal"><a href="#__codelineno-0-55">55</a></span>
-<span class="normal"><a href="#__codelineno-0-56">56</a></span>
-<span class="normal"><a href="#__codelineno-0-57">57</a></span>
-<span class="normal"><a href="#__codelineno-0-58">58</a></span>
-<span class="normal"><a href="#__codelineno-0-59">59</a></span>
-<span class="normal"><a href="#__codelineno-0-60">60</a></span>
-<span class="normal"><a href="#__codelineno-0-61">61</a></span>
-<span class="normal"><a href="#__codelineno-0-62">62</a></span>
-<span class="normal"><a href="#__codelineno-0-63">63</a></span>
-<span class="normal"><a href="#__codelineno-0-64">64</a></span>
-<span class="normal"><a href="#__codelineno-0-65">65</a></span>
-<span class="normal"><a href="#__codelineno-0-66">66</a></span>
-<span class="normal"><a href="#__codelineno-0-67">67</a></span>
-<span class="normal"><a href="#__codelineno-0-68">68</a></span>
-<span class="normal"><a href="#__codelineno-0-69">69</a></span>
-<span class="normal"><a href="#__codelineno-0-70">70</a></span>
-<span class="normal"><a href="#__codelineno-0-71">71</a></span>
-<span class="normal"><a href="#__codelineno-0-72">72</a></span>
-<span class="normal"><a href="#__codelineno-0-73">73</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_cache_dir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
-</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38"></a><span class="w">    </span><span class="sd">"""Get the cache directory for compiled solvers.</span>
-</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39"></a>
-</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40"></a><span class="sd">    The cache location is determined in the following order:</span>
-</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="sd">    1. ``OPENSCVX_CACHE_DIR`` environment variable (if set)</span>
-</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42"></a><span class="sd">    2. Platform-specific default:</span>
-</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43"></a><span class="sd">       - Linux: ``~/.cache/openscvx/``</span>
-</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44"></a><span class="sd">       - macOS: ``~/Library/Caches/openscvx/``</span>
-</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45"></a><span class="sd">       - Windows: ``%LOCALAPPDATA%/openscvx/Cache/``</span>
-</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46"></a>
-</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47"></a><span class="sd">    Returns:</span>
-</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48"></a><span class="sd">        Path to the cache directory (may not exist yet)</span>
-</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49"></a><span class="sd">    """</span>
-</span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50"></a>    <span class="c1"># Check environment variable override</span>
-</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51"></a>    <span class="n">env_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"OPENSCVX_CACHE_DIR"</span><span class="p">)</span>
-</span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52"></a>    <span class="k">if</span> <span class="n">env_dir</span><span class="p">:</span>
-</span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53"></a>        <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="n">env_dir</span><span class="p">)</span>
-</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54"></a>
-</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55"></a>    <span class="c1"># Platform-specific defaults</span>
-</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56"></a>    <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">"darwin"</span><span class="p">:</span>
-</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57"></a>        <span class="c1"># macOS: ~/Library/Caches/openscvx/</span>
-</span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58"></a>        <span class="k">return</span> <span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">()</span> <span class="o">/</span> <span class="s2">"Library"</span> <span class="o">/</span> <span class="s2">"Caches"</span> <span class="o">/</span> <span class="s2">"openscvx"</span>
-</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59"></a>    <span class="k">elif</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">"win32"</span><span class="p">:</span>
-</span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60"></a>        <span class="c1"># Windows: %LOCALAPPDATA%/openscvx/Cache/</span>
-</span><span id="__span-0-61"><a id="__codelineno-0-61" name="__codelineno-0-61"></a>        <span class="n">local_app_data</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"LOCALAPPDATA"</span><span class="p">)</span>
-</span><span id="__span-0-62"><a id="__codelineno-0-62" name="__codelineno-0-62"></a>        <span class="k">if</span> <span class="n">local_app_data</span><span class="p">:</span>
-</span><span id="__span-0-63"><a id="__codelineno-0-63" name="__codelineno-0-63"></a>            <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="n">local_app_data</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"openscvx"</span> <span class="o">/</span> <span class="s2">"Cache"</span>
-</span><span id="__span-0-64"><a id="__codelineno-0-64" name="__codelineno-0-64"></a>        <span class="k">else</span><span class="p">:</span>
-</span><span id="__span-0-65"><a id="__codelineno-0-65" name="__codelineno-0-65"></a>            <span class="c1"># Fallback if LOCALAPPDATA not set</span>
-</span><span id="__span-0-66"><a id="__codelineno-0-66" name="__codelineno-0-66"></a>            <span class="k">return</span> <span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">()</span> <span class="o">/</span> <span class="s2">"AppData"</span> <span class="o">/</span> <span class="s2">"Local"</span> <span class="o">/</span> <span class="s2">"openscvx"</span> <span class="o">/</span> <span class="s2">"Cache"</span>
-</span><span id="__span-0-67"><a id="__codelineno-0-67" name="__codelineno-0-67"></a>    <span class="k">else</span><span class="p">:</span>
-</span><span id="__span-0-68"><a id="__codelineno-0-68" name="__codelineno-0-68"></a>        <span class="c1"># Linux and others: follow XDG Base Directory Specification</span>
-</span><span id="__span-0-69"><a id="__codelineno-0-69" name="__codelineno-0-69"></a>        <span class="n">xdg_cache</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"XDG_CACHE_HOME"</span><span class="p">)</span>
-</span><span id="__span-0-70"><a id="__codelineno-0-70" name="__codelineno-0-70"></a>        <span class="k">if</span> <span class="n">xdg_cache</span><span class="p">:</span>
-</span><span id="__span-0-71"><a id="__codelineno-0-71" name="__codelineno-0-71"></a>            <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="n">xdg_cache</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"openscvx"</span>
-</span><span id="__span-0-72"><a id="__codelineno-0-72" name="__codelineno-0-72"></a>        <span class="k">else</span><span class="p">:</span>
-</span><span id="__span-0-73"><a id="__codelineno-0-73" name="__codelineno-0-73"></a>            <span class="k">return</span> <span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">()</span> <span class="o">/</span> <span class="s2">".cache"</span> <span class="o">/</span> <span class="s2">"openscvx"</span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-37">37</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-38">38</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-39">39</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-40">40</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-41">41</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-42">42</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-43">43</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-44">44</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-45">45</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-46">46</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-47">47</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-48">48</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-49">49</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-50">50</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-51">51</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-52">52</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-53">53</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-54">54</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-55">55</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-56">56</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-57">57</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-58">58</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-59">59</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-60">60</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-61">61</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-62">62</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-63">63</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-64">64</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-65">65</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-66">66</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-67">67</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-68">68</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-69">69</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-70">70</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-71">71</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-72">72</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_dir--source--__codelineno-0-73">73</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-37"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-37" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-37"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_cache_dir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-38"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-38" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-38"></a><span class="w">    </span><span class="sd">"""Get the cache directory for compiled solvers.</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-39"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-39" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-39"></a>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-40"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-40" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-40"></a><span class="sd">    The cache location is determined in the following order:</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-41"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-41" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-41"></a><span class="sd">    1. ``OPENSCVX_CACHE_DIR`` environment variable (if set)</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-42"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-42" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-42"></a><span class="sd">    2. Platform-specific default:</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-43"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-43" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-43"></a><span class="sd">       - Linux: ``~/.cache/openscvx/``</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-44"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-44" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-44"></a><span class="sd">       - macOS: ``~/Library/Caches/openscvx/``</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-45"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-45" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-45"></a><span class="sd">       - Windows: ``%LOCALAPPDATA%/openscvx/Cache/``</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-46"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-46" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-46"></a>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-47"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-47" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-47"></a><span class="sd">    Returns:</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-48"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-48" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-48"></a><span class="sd">        Path to the cache directory (may not exist yet)</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-49"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-49" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-49"></a><span class="sd">    """</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-50"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-50" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-50"></a>    <span class="c1"># Check environment variable override</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-51"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-51" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-51"></a>    <span class="n">env_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"OPENSCVX_CACHE_DIR"</span><span class="p">)</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-52"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-52" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-52"></a>    <span class="k">if</span> <span class="n">env_dir</span><span class="p">:</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-53"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-53" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-53"></a>        <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="n">env_dir</span><span class="p">)</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-54"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-54" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-54"></a>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-55"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-55" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-55"></a>    <span class="c1"># Platform-specific defaults</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-56"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-56" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-56"></a>    <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">"darwin"</span><span class="p">:</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-57"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-57" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-57"></a>        <span class="c1"># macOS: ~/Library/Caches/openscvx/</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-58"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-58" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-58"></a>        <span class="k">return</span> <span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">()</span> <span class="o">/</span> <span class="s2">"Library"</span> <span class="o">/</span> <span class="s2">"Caches"</span> <span class="o">/</span> <span class="s2">"openscvx"</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-59"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-59" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-59"></a>    <span class="k">elif</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">"win32"</span><span class="p">:</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-60"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-60" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-60"></a>        <span class="c1"># Windows: %LOCALAPPDATA%/openscvx/Cache/</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-61"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-61" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-61"></a>        <span class="n">local_app_data</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"LOCALAPPDATA"</span><span class="p">)</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-62"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-62" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-62"></a>        <span class="k">if</span> <span class="n">local_app_data</span><span class="p">:</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-63"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-63" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-63"></a>            <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="n">local_app_data</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"openscvx"</span> <span class="o">/</span> <span class="s2">"Cache"</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-64"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-64" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-64"></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-65"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-65" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-65"></a>            <span class="c1"># Fallback if LOCALAPPDATA not set</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-66"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-66" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-66"></a>            <span class="k">return</span> <span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">()</span> <span class="o">/</span> <span class="s2">"AppData"</span> <span class="o">/</span> <span class="s2">"Local"</span> <span class="o">/</span> <span class="s2">"openscvx"</span> <span class="o">/</span> <span class="s2">"Cache"</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-67"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-67" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-67"></a>    <span class="k">else</span><span class="p">:</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-68"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-68" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-68"></a>        <span class="c1"># Linux and others: follow XDG Base Directory Specification</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-69"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-69" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-69"></a>        <span class="n">xdg_cache</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"XDG_CACHE_HOME"</span><span class="p">)</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-70"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-70" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-70"></a>        <span class="k">if</span> <span class="n">xdg_cache</span><span class="p">:</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-71"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-71" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-71"></a>            <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="n">xdg_cache</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"openscvx"</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-72"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-72" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-72"></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="openscvx.utils.cache.get_cache_dir--source--__span-0-73"><a id="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-73" name="openscvx.utils.cache.get_cache_dir--source--__codelineno-0-73"></a>            <span class="k">return</span> <span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">()</span> <span class="o">/</span> <span class="s2">".cache"</span> <span class="o">/</span> <span class="s2">"openscvx"</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -12745,53 +12745,53 @@ preserved but emptied.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>openscvx/utils/cache.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-108">108</a></span>
-<span class="normal"><a href="#__codelineno-0-109">109</a></span>
-<span class="normal"><a href="#__codelineno-0-110">110</a></span>
-<span class="normal"><a href="#__codelineno-0-111">111</a></span>
-<span class="normal"><a href="#__codelineno-0-112">112</a></span>
-<span class="normal"><a href="#__codelineno-0-113">113</a></span>
-<span class="normal"><a href="#__codelineno-0-114">114</a></span>
-<span class="normal"><a href="#__codelineno-0-115">115</a></span>
-<span class="normal"><a href="#__codelineno-0-116">116</a></span>
-<span class="normal"><a href="#__codelineno-0-117">117</a></span>
-<span class="normal"><a href="#__codelineno-0-118">118</a></span>
-<span class="normal"><a href="#__codelineno-0-119">119</a></span>
-<span class="normal"><a href="#__codelineno-0-120">120</a></span>
-<span class="normal"><a href="#__codelineno-0-121">121</a></span>
-<span class="normal"><a href="#__codelineno-0-122">122</a></span>
-<span class="normal"><a href="#__codelineno-0-123">123</a></span>
-<span class="normal"><a href="#__codelineno-0-124">124</a></span>
-<span class="normal"><a href="#__codelineno-0-125">125</a></span>
-<span class="normal"><a href="#__codelineno-0-126">126</a></span>
-<span class="normal"><a href="#__codelineno-0-127">127</a></span>
-<span class="normal"><a href="#__codelineno-0-128">128</a></span>
-<span class="normal"><a href="#__codelineno-0-129">129</a></span>
-<span class="normal"><a href="#__codelineno-0-130">130</a></span>
-<span class="normal"><a href="#__codelineno-0-131">131</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-108"><a id="__codelineno-0-108" name="__codelineno-0-108"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_cache_size</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-</span><span id="__span-0-109"><a id="__codelineno-0-109" name="__codelineno-0-109"></a><span class="w">    </span><span class="sd">"""Get the total size of the cache in bytes.</span>
-</span><span id="__span-0-110"><a id="__codelineno-0-110" name="__codelineno-0-110"></a>
-</span><span id="__span-0-111"><a id="__codelineno-0-111" name="__codelineno-0-111"></a><span class="sd">    Returns:</span>
-</span><span id="__span-0-112"><a id="__codelineno-0-112" name="__codelineno-0-112"></a><span class="sd">        Total size of all files in the cache directory in bytes.</span>
-</span><span id="__span-0-113"><a id="__codelineno-0-113" name="__codelineno-0-113"></a><span class="sd">        Returns 0 if the cache directory doesn't exist.</span>
-</span><span id="__span-0-114"><a id="__codelineno-0-114" name="__codelineno-0-114"></a>
-</span><span id="__span-0-115"><a id="__codelineno-0-115" name="__codelineno-0-115"></a><span class="sd">    Example:</span>
-</span><span id="__span-0-116"><a id="__codelineno-0-116" name="__codelineno-0-116"></a><span class="sd">        Check cache size in megabytes::</span>
-</span><span id="__span-0-117"><a id="__codelineno-0-117" name="__codelineno-0-117"></a>
-</span><span id="__span-0-118"><a id="__codelineno-0-118" name="__codelineno-0-118"></a><span class="sd">            import openscvx as ox</span>
-</span><span id="__span-0-119"><a id="__codelineno-0-119" name="__codelineno-0-119"></a><span class="sd">            size_mb = ox.get_cache_size() / (1024 * 1024)</span>
-</span><span id="__span-0-120"><a id="__codelineno-0-120" name="__codelineno-0-120"></a><span class="sd">            print(f"Cache size: {size_mb:.1f} MB")</span>
-</span><span id="__span-0-121"><a id="__codelineno-0-121" name="__codelineno-0-121"></a><span class="sd">    """</span>
-</span><span id="__span-0-122"><a id="__codelineno-0-122" name="__codelineno-0-122"></a>    <span class="n">cache_dir</span> <span class="o">=</span> <span class="n">get_cache_dir</span><span class="p">()</span>
-</span><span id="__span-0-123"><a id="__codelineno-0-123" name="__codelineno-0-123"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">cache_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-</span><span id="__span-0-124"><a id="__codelineno-0-124" name="__codelineno-0-124"></a>        <span class="k">return</span> <span class="mi">0</span>
-</span><span id="__span-0-125"><a id="__codelineno-0-125" name="__codelineno-0-125"></a>
-</span><span id="__span-0-126"><a id="__codelineno-0-126" name="__codelineno-0-126"></a>    <span class="n">total</span> <span class="o">=</span> <span class="mi">0</span>
-</span><span id="__span-0-127"><a id="__codelineno-0-127" name="__codelineno-0-127"></a>    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">cache_dir</span><span class="o">.</span><span class="n">rglob</span><span class="p">(</span><span class="s2">"*"</span><span class="p">):</span>
-</span><span id="__span-0-128"><a id="__codelineno-0-128" name="__codelineno-0-128"></a>        <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
-</span><span id="__span-0-129"><a id="__codelineno-0-129" name="__codelineno-0-129"></a>            <span class="n">total</span> <span class="o">+=</span> <span class="n">item</span><span class="o">.</span><span class="n">stat</span><span class="p">()</span><span class="o">.</span><span class="n">st_size</span>
-</span><span id="__span-0-130"><a id="__codelineno-0-130" name="__codelineno-0-130"></a>
-</span><span id="__span-0-131"><a id="__codelineno-0-131" name="__codelineno-0-131"></a>    <span class="k">return</span> <span class="n">total</span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-108">108</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-109">109</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-110">110</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-111">111</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-112">112</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-113">113</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-114">114</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-115">115</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-116">116</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-117">117</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-118">118</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-119">119</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-120">120</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-121">121</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-122">122</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-123">123</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-124">124</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-125">125</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-126">126</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-127">127</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-128">128</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-129">129</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-130">130</a></span>
+<span class="normal"><a href="#openscvx.utils.cache.get_cache_size--source--__codelineno-0-131">131</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="openscvx.utils.cache.get_cache_size--source--__span-0-108"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-108" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-108"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_cache_size</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-109"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-109" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-109"></a><span class="w">    </span><span class="sd">"""Get the total size of the cache in bytes.</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-110"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-110" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-110"></a>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-111"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-111" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-111"></a><span class="sd">    Returns:</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-112"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-112" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-112"></a><span class="sd">        Total size of all files in the cache directory in bytes.</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-113"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-113" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-113"></a><span class="sd">        Returns 0 if the cache directory doesn't exist.</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-114"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-114" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-114"></a>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-115"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-115" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-115"></a><span class="sd">    Example:</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-116"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-116" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-116"></a><span class="sd">        Check cache size in megabytes::</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-117"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-117" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-117"></a>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-118"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-118" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-118"></a><span class="sd">            import openscvx as ox</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-119"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-119" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-119"></a><span class="sd">            size_mb = ox.get_cache_size() / (1024 * 1024)</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-120"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-120" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-120"></a><span class="sd">            print(f"Cache size: {size_mb:.1f} MB")</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-121"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-121" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-121"></a><span class="sd">    """</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-122"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-122" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-122"></a>    <span class="n">cache_dir</span> <span class="o">=</span> <span class="n">get_cache_dir</span><span class="p">()</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-123"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-123" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-123"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">cache_dir</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-124"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-124" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-124"></a>        <span class="k">return</span> <span class="mi">0</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-125"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-125" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-125"></a>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-126"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-126" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-126"></a>    <span class="n">total</span> <span class="o">=</span> <span class="mi">0</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-127"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-127" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-127"></a>    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">cache_dir</span><span class="o">.</span><span class="n">rglob</span><span class="p">(</span><span class="s2">"*"</span><span class="p">):</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-128"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-128" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-128"></a>        <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-129"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-129" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-129"></a>            <span class="n">total</span> <span class="o">+=</span> <span class="n">item</span><span class="o">.</span><span class="n">stat</span><span class="p">()</span><span class="o">.</span><span class="n">st_size</span>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-130"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-130" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-130"></a>
+</span><span id="openscvx.utils.cache.get_cache_size--source--__span-0-131"><a id="openscvx.utils.cache.get_cache_size--source--__codelineno-0-131" name="openscvx.utils.cache.get_cache_size--source--__codelineno-0-131"></a>    <span class="k">return</span> <span class="n">total</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -12827,7 +12827,7 @@ preserved but emptied.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 10, 2026 05:01:59 UTC">October 10, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 8, 2026 05:06:12 UTC">November 8, 2026</span>
   </span>
 
     
@@ -12837,7 +12837,7 @@ preserved but emptied.</p>
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 10, 2026 05:01:59 UTC">October 10, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 8, 2026 05:06:12 UTC">November 8, 2026</span>
   </span>
 
     
@@ -12954,10 +12954,10 @@ preserved but emptied.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.code.select", "content.footnote.tooltips", "content.tooltips", "header.autohide", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.sections", "navigation.tabs", "navigation.top", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.code.select", "content.footnote.tooltips", "content.tooltips", "header.autohide", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.sections", "navigation.tabs", "navigation.top", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
         <script src="../../../javascripts/mathjax.js"></script>
       

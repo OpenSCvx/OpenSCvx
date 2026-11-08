@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../../assets/favicon.png">
-      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.8.1">
     
     
       
@@ -34,10 +34,10 @@
     
     
   
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -12496,89 +12496,89 @@ fields are no longer set during lowering or used internally.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>openscvx/lowered/dynamics.py</code></summary>
-                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-8"> 8</a></span>
-<span class="normal"><a href="#__codelineno-0-9"> 9</a></span>
-<span class="normal"><a href="#__codelineno-0-10">10</a></span>
-<span class="normal"><a href="#__codelineno-0-11">11</a></span>
-<span class="normal"><a href="#__codelineno-0-12">12</a></span>
-<span class="normal"><a href="#__codelineno-0-13">13</a></span>
-<span class="normal"><a href="#__codelineno-0-14">14</a></span>
-<span class="normal"><a href="#__codelineno-0-15">15</a></span>
-<span class="normal"><a href="#__codelineno-0-16">16</a></span>
-<span class="normal"><a href="#__codelineno-0-17">17</a></span>
-<span class="normal"><a href="#__codelineno-0-18">18</a></span>
-<span class="normal"><a href="#__codelineno-0-19">19</a></span>
-<span class="normal"><a href="#__codelineno-0-20">20</a></span>
-<span class="normal"><a href="#__codelineno-0-21">21</a></span>
-<span class="normal"><a href="#__codelineno-0-22">22</a></span>
-<span class="normal"><a href="#__codelineno-0-23">23</a></span>
-<span class="normal"><a href="#__codelineno-0-24">24</a></span>
-<span class="normal"><a href="#__codelineno-0-25">25</a></span>
-<span class="normal"><a href="#__codelineno-0-26">26</a></span>
-<span class="normal"><a href="#__codelineno-0-27">27</a></span>
-<span class="normal"><a href="#__codelineno-0-28">28</a></span>
-<span class="normal"><a href="#__codelineno-0-29">29</a></span>
-<span class="normal"><a href="#__codelineno-0-30">30</a></span>
-<span class="normal"><a href="#__codelineno-0-31">31</a></span>
-<span class="normal"><a href="#__codelineno-0-32">32</a></span>
-<span class="normal"><a href="#__codelineno-0-33">33</a></span>
-<span class="normal"><a href="#__codelineno-0-34">34</a></span>
-<span class="normal"><a href="#__codelineno-0-35">35</a></span>
-<span class="normal"><a href="#__codelineno-0-36">36</a></span>
-<span class="normal"><a href="#__codelineno-0-37">37</a></span>
-<span class="normal"><a href="#__codelineno-0-38">38</a></span>
-<span class="normal"><a href="#__codelineno-0-39">39</a></span>
-<span class="normal"><a href="#__codelineno-0-40">40</a></span>
-<span class="normal"><a href="#__codelineno-0-41">41</a></span>
-<span class="normal"><a href="#__codelineno-0-42">42</a></span>
-<span class="normal"><a href="#__codelineno-0-43">43</a></span>
-<span class="normal"><a href="#__codelineno-0-44">44</a></span>
-<span class="normal"><a href="#__codelineno-0-45">45</a></span>
-<span class="normal"><a href="#__codelineno-0-46">46</a></span>
-<span class="normal"><a href="#__codelineno-0-47">47</a></span>
-<span class="normal"><a href="#__codelineno-0-48">48</a></span>
-<span class="normal"><a href="#__codelineno-0-49">49</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8"></a><span class="nd">@dataclass</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9"></a><span class="k">class</span><span class="w"> </span><span class="nc">Dynamics</span><span class="p">:</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10"></a><span class="w">    </span><span class="sd">"""Dataclass to hold a system dynamics function and its Jacobians.</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11"></a>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12"></a><span class="sd">    This dataclass is used internally by openscvx to store the compiled dynamics</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13"></a><span class="sd">    function and its gradients after symbolic expressions are lowered to JAX.</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14"></a><span class="sd">    Users typically don't instantiate this class directly.</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15"></a>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16"></a><span class="sd">    Attributes:</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17"></a><span class="sd">        f (Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18"></a><span class="sd">            Function defining the continuous time nonlinear system dynamics</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19"></a><span class="sd">            as x_dot = f(x, u, ...params).</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20"></a><span class="sd">            - x: 1D array (state at a single node), shape (n_x,)</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21"></a><span class="sd">            - u: 1D array (control at a single node), shape (n_u,)</span>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22"></a><span class="sd">            - Additional parameters: passed as keyword arguments with names</span>
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23"></a><span class="sd">              matching the parameter name plus an underscore (e.g., g_ for</span>
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24"></a><span class="sd">              Parameter('g')).</span>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25"></a><span class="sd">            If you use vectorized integration or batch evaluation, x and u</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26"></a><span class="sd">            may be 2D arrays (N, n_x) and (N, n_u).</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27"></a><span class="sd">        A (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):</span>
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28"></a><span class="sd">            Jacobian of ``f`` w.r.t. ``x``.</span>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29"></a><span class="sd">        B (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):</span>
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30"></a><span class="sd">            Jacobian of ``f`` w.r.t. ``u``.</span>
-</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31"></a><span class="sd">        A_c_sparsity (Optional[np.ndarray]): Boolean ``(n_x, n_x)`` array</span>
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32"></a><span class="sd">            giving the structural sparsity of the continuous-time state</span>
-</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33"></a><span class="sd">            Jacobian ``df/dx``.  Computed from the symbolic AST.</span>
-</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34"></a><span class="sd">        B_c_sparsity (Optional[np.ndarray]): Boolean ``(n_x, n_u)`` array</span>
-</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35"></a><span class="sd">            giving the structural sparsity of the continuous-time control</span>
-</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36"></a><span class="sd">            Jacobian ``df/du``.  Computed from the symbolic AST.</span>
-</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37"></a>
-</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38"></a><span class="sd">    !!! note</span>
-</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39"></a><span class="sd">        The ``A`` and ``B`` fields are kept for convenience but may be</span>
-</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40"></a><span class="sd">        deprecated in the future. Jacobian computation is now handled by</span>
-</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="sd">        the :class:`~openscvx.discretization.base.Discretizer`, so these</span>
-</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42"></a><span class="sd">        fields are no longer set during lowering or used internally.</span>
-</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43"></a><span class="sd">    """</span>
-</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44"></a>
-</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45"></a>    <span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
-</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46"></a>    <span class="n">A</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47"></a>    <span class="n">B</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48"></a>    <span class="n">A_c_sparsity</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49"></a>    <span class="n">B_c_sparsity</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-8"> 8</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-9"> 9</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-10">10</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-11">11</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-12">12</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-13">13</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-14">14</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-15">15</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-16">16</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-17">17</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-18">18</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-19">19</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-20">20</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-21">21</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-22">22</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-23">23</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-24">24</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-25">25</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-26">26</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-27">27</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-28">28</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-29">29</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-30">30</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-31">31</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-32">32</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-33">33</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-34">34</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-35">35</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-36">36</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-37">37</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-38">38</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-39">39</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-40">40</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-41">41</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-42">42</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-43">43</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-44">44</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-45">45</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-46">46</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-47">47</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-48">48</a></span>
+<span class="normal"><a href="#openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-49">49</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-8"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-8" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-8"></a><span class="nd">@dataclass</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-9"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-9" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-9"></a><span class="k">class</span><span class="w"> </span><span class="nc">Dynamics</span><span class="p">:</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-10"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-10" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-10"></a><span class="w">    </span><span class="sd">"""Dataclass to hold a system dynamics function and its Jacobians.</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-11"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-11" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-11"></a>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-12"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-12" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-12"></a><span class="sd">    This dataclass is used internally by openscvx to store the compiled dynamics</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-13"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-13" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-13"></a><span class="sd">    function and its gradients after symbolic expressions are lowered to JAX.</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-14"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-14" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-14"></a><span class="sd">    Users typically don't instantiate this class directly.</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-15"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-15" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-15"></a>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-16"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-16" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-16"></a><span class="sd">    Attributes:</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-17"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-17" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-17"></a><span class="sd">        f (Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]):</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-18"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-18" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-18"></a><span class="sd">            Function defining the continuous time nonlinear system dynamics</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-19"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-19" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-19"></a><span class="sd">            as x_dot = f(x, u, ...params).</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-20"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-20" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-20"></a><span class="sd">            - x: 1D array (state at a single node), shape (n_x,)</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-21"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-21" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-21"></a><span class="sd">            - u: 1D array (control at a single node), shape (n_u,)</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-22"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-22" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-22"></a><span class="sd">            - Additional parameters: passed as keyword arguments with names</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-23"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-23" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-23"></a><span class="sd">              matching the parameter name plus an underscore (e.g., g_ for</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-24"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-24" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-24"></a><span class="sd">              Parameter('g')).</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-25"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-25" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-25"></a><span class="sd">            If you use vectorized integration or batch evaluation, x and u</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-26"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-26" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-26"></a><span class="sd">            may be 2D arrays (N, n_x) and (N, n_u).</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-27"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-27" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-27"></a><span class="sd">        A (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-28"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-28" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-28"></a><span class="sd">            Jacobian of ``f`` w.r.t. ``x``.</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-29"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-29" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-29"></a><span class="sd">        B (Optional[Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray]]):</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-30"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-30" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-30"></a><span class="sd">            Jacobian of ``f`` w.r.t. ``u``.</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-31"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-31" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-31"></a><span class="sd">        A_c_sparsity (Optional[np.ndarray]): Boolean ``(n_x, n_x)`` array</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-32"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-32" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-32"></a><span class="sd">            giving the structural sparsity of the continuous-time state</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-33"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-33" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-33"></a><span class="sd">            Jacobian ``df/dx``.  Computed from the symbolic AST.</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-34"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-34" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-34"></a><span class="sd">        B_c_sparsity (Optional[np.ndarray]): Boolean ``(n_x, n_u)`` array</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-35"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-35" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-35"></a><span class="sd">            giving the structural sparsity of the continuous-time control</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-36"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-36" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-36"></a><span class="sd">            Jacobian ``df/du``.  Computed from the symbolic AST.</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-37"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-37" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-37"></a>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-38"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-38" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-38"></a><span class="sd">    !!! note</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-39"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-39" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-39"></a><span class="sd">        The ``A`` and ``B`` fields are kept for convenience but may be</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-40"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-40" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-40"></a><span class="sd">        deprecated in the future. Jacobian computation is now handled by</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-41"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-41" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-41"></a><span class="sd">        the :class:`~openscvx.discretization.base.Discretizer`, so these</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-42"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-42" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-42"></a><span class="sd">        fields are no longer set during lowering or used internally.</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-43"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-43" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-43"></a><span class="sd">    """</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-44"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-44" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-44"></a>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-45"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-45" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-45"></a>    <span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-46"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-46" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-46"></a>    <span class="n">A</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-47"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-47" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-47"></a>    <span class="n">B</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="n">jnp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-48"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-48" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-48"></a>    <span class="n">A_c_sparsity</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span><span id="openscvx.lowered.dynamics.Dynamics--source--__span-0-49"><a id="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-49" name="openscvx.lowered.dynamics.Dynamics--source--__codelineno-0-49"></a>    <span class="n">B_c_sparsity</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 
@@ -12633,7 +12633,7 @@ fields are no longer set during lowering or used internally.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 10, 2026 05:01:52 UTC">October 10, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 8, 2026 05:06:00 UTC">November 8, 2026</span>
   </span>
 
     
@@ -12643,7 +12643,7 @@ fields are no longer set during lowering or used internally.</p>
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 10, 2026 05:01:52 UTC">October 10, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 8, 2026 05:06:00 UTC">November 8, 2026</span>
   </span>
 
     
@@ -12760,10 +12760,10 @@ fields are no longer set during lowering or used internally.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.code.select", "content.footnote.tooltips", "content.tooltips", "header.autohide", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.sections", "navigation.tabs", "navigation.top", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.code.select", "content.footnote.tooltips", "content.tooltips", "header.autohide", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.sections", "navigation.tabs", "navigation.top", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
         <script src="../../../javascripts/mathjax.js"></script>
       

@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../../../assets/favicon.png">
-      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.8.1">
     
     
       
@@ -34,10 +34,10 @@
     
     
   
-      <link rel="stylesheet" href="../../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -12395,31 +12395,31 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>openscvx/plotting/viser/coordinates.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-8"> 8</a></span>
-<span class="normal"><a href="#__codelineno-0-9"> 9</a></span>
-<span class="normal"><a href="#__codelineno-0-10">10</a></span>
-<span class="normal"><a href="#__codelineno-0-11">11</a></span>
-<span class="normal"><a href="#__codelineno-0-12">12</a></span>
-<span class="normal"><a href="#__codelineno-0-13">13</a></span>
-<span class="normal"><a href="#__codelineno-0-14">14</a></span>
-<span class="normal"><a href="#__codelineno-0-15">15</a></span>
-<span class="normal"><a href="#__codelineno-0-16">16</a></span>
-<span class="normal"><a href="#__codelineno-0-17">17</a></span>
-<span class="normal"><a href="#__codelineno-0-18">18</a></span>
-<span class="normal"><a href="#__codelineno-0-19">19</a></span>
-<span class="normal"><a href="#__codelineno-0-20">20</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8"></a><span class="k">def</span><span class="w"> </span><span class="nf">model_vec_to_viser_xyz</span><span class="p">(</span><span class="n">v</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9"></a><span class="w">    </span><span class="sd">"""Map model-frame 3-vectors to Viser (x, y, z): (z, y, x) component order → (x, y, z).</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10"></a>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11"></a><span class="sd">    Linear involution: same mapping converts Viser coordinates back to model.</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12"></a><span class="sd">    """</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13"></a>    <span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14"></a>    <span class="k">if</span> <span class="n">a</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15"></a>        <span class="k">return</span> <span class="n">a</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16"></a>    <span class="k">if</span> <span class="n">a</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17"></a>        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">a</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">a</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18"></a>    <span class="k">if</span> <span class="n">a</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&gt;=</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19"></a>        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">a</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">a</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">a</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]],</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20"></a>    <span class="k">return</span> <span class="n">a</span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-8"> 8</a></span>
+<span class="normal"><a href="#openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-9"> 9</a></span>
+<span class="normal"><a href="#openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-10">10</a></span>
+<span class="normal"><a href="#openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-11">11</a></span>
+<span class="normal"><a href="#openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-12">12</a></span>
+<span class="normal"><a href="#openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-13">13</a></span>
+<span class="normal"><a href="#openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-14">14</a></span>
+<span class="normal"><a href="#openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-15">15</a></span>
+<span class="normal"><a href="#openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-16">16</a></span>
+<span class="normal"><a href="#openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-17">17</a></span>
+<span class="normal"><a href="#openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-18">18</a></span>
+<span class="normal"><a href="#openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-19">19</a></span>
+<span class="normal"><a href="#openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-20">20</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__span-0-8"><a id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-8" name="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-8"></a><span class="k">def</span><span class="w"> </span><span class="nf">model_vec_to_viser_xyz</span><span class="p">(</span><span class="n">v</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+</span><span id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__span-0-9"><a id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-9" name="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-9"></a><span class="w">    </span><span class="sd">"""Map model-frame 3-vectors to Viser (x, y, z): (z, y, x) component order → (x, y, z).</span>
+</span><span id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__span-0-10"><a id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-10" name="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-10"></a>
+</span><span id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__span-0-11"><a id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-11" name="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-11"></a><span class="sd">    Linear involution: same mapping converts Viser coordinates back to model.</span>
+</span><span id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__span-0-12"><a id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-12" name="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-12"></a><span class="sd">    """</span>
+</span><span id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__span-0-13"><a id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-13" name="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-13"></a>    <span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+</span><span id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__span-0-14"><a id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-14" name="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-14"></a>    <span class="k">if</span> <span class="n">a</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+</span><span id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__span-0-15"><a id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-15" name="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-15"></a>        <span class="k">return</span> <span class="n">a</span>
+</span><span id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__span-0-16"><a id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-16" name="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-16"></a>    <span class="k">if</span> <span class="n">a</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+</span><span id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__span-0-17"><a id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-17" name="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-17"></a>        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">a</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">a</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+</span><span id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__span-0-18"><a id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-18" name="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-18"></a>    <span class="k">if</span> <span class="n">a</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&gt;=</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+</span><span id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__span-0-19"><a id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-19" name="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-19"></a>        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">a</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="n">a</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="n">a</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]],</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+</span><span id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__span-0-20"><a id="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-20" name="openscvx.plotting.viser.coordinates.model_vec_to_viser_xyz--source--__codelineno-0-20"></a>    <span class="k">return</span> <span class="n">a</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -12455,7 +12455,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 10, 2026 05:01:53 UTC">October 10, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 8, 2026 05:06:02 UTC">November 8, 2026</span>
   </span>
 
     
@@ -12465,7 +12465,7 @@
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 10, 2026 05:01:53 UTC">October 10, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 8, 2026 05:06:02 UTC">November 8, 2026</span>
   </span>
 
     
@@ -12582,10 +12582,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.code.select", "content.footnote.tooltips", "content.tooltips", "header.autohide", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.sections", "navigation.tabs", "navigation.top", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.code.select", "content.footnote.tooltips", "content.tooltips", "header.autohide", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.sections", "navigation.tabs", "navigation.top", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
         <script src="../../../../javascripts/mathjax.js"></script>
       

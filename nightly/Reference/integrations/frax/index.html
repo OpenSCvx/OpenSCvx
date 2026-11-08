@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../../assets/favicon.png">
-      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.7.7">
+      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.8.1">
     
     
       
@@ -34,10 +34,10 @@
     
     
   
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.57a0d79d.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.fb2fffe2.min.css">
       
       
 
@@ -12559,199 +12559,199 @@ mapped to <code>±inf</code> on all of the above.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>openscvx/integrations/frax.py</code></summary>
-                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-213">213</a></span>
-<span class="normal"><a href="#__codelineno-0-214">214</a></span>
-<span class="normal"><a href="#__codelineno-0-215">215</a></span>
-<span class="normal"><a href="#__codelineno-0-216">216</a></span>
-<span class="normal"><a href="#__codelineno-0-217">217</a></span>
-<span class="normal"><a href="#__codelineno-0-218">218</a></span>
-<span class="normal"><a href="#__codelineno-0-219">219</a></span>
-<span class="normal"><a href="#__codelineno-0-220">220</a></span>
-<span class="normal"><a href="#__codelineno-0-221">221</a></span>
-<span class="normal"><a href="#__codelineno-0-222">222</a></span>
-<span class="normal"><a href="#__codelineno-0-223">223</a></span>
-<span class="normal"><a href="#__codelineno-0-224">224</a></span>
-<span class="normal"><a href="#__codelineno-0-225">225</a></span>
-<span class="normal"><a href="#__codelineno-0-226">226</a></span>
-<span class="normal"><a href="#__codelineno-0-227">227</a></span>
-<span class="normal"><a href="#__codelineno-0-228">228</a></span>
-<span class="normal"><a href="#__codelineno-0-229">229</a></span>
-<span class="normal"><a href="#__codelineno-0-230">230</a></span>
-<span class="normal"><a href="#__codelineno-0-231">231</a></span>
-<span class="normal"><a href="#__codelineno-0-232">232</a></span>
-<span class="normal"><a href="#__codelineno-0-233">233</a></span>
-<span class="normal"><a href="#__codelineno-0-234">234</a></span>
-<span class="normal"><a href="#__codelineno-0-235">235</a></span>
-<span class="normal"><a href="#__codelineno-0-236">236</a></span>
-<span class="normal"><a href="#__codelineno-0-237">237</a></span>
-<span class="normal"><a href="#__codelineno-0-238">238</a></span>
-<span class="normal"><a href="#__codelineno-0-239">239</a></span>
-<span class="normal"><a href="#__codelineno-0-240">240</a></span>
-<span class="normal"><a href="#__codelineno-0-241">241</a></span>
-<span class="normal"><a href="#__codelineno-0-242">242</a></span>
-<span class="normal"><a href="#__codelineno-0-243">243</a></span>
-<span class="normal"><a href="#__codelineno-0-244">244</a></span>
-<span class="normal"><a href="#__codelineno-0-245">245</a></span>
-<span class="normal"><a href="#__codelineno-0-246">246</a></span>
-<span class="normal"><a href="#__codelineno-0-247">247</a></span>
-<span class="normal"><a href="#__codelineno-0-248">248</a></span>
-<span class="normal"><a href="#__codelineno-0-249">249</a></span>
-<span class="normal"><a href="#__codelineno-0-250">250</a></span>
-<span class="normal"><a href="#__codelineno-0-251">251</a></span>
-<span class="normal"><a href="#__codelineno-0-252">252</a></span>
-<span class="normal"><a href="#__codelineno-0-253">253</a></span>
-<span class="normal"><a href="#__codelineno-0-254">254</a></span>
-<span class="normal"><a href="#__codelineno-0-255">255</a></span>
-<span class="normal"><a href="#__codelineno-0-256">256</a></span>
-<span class="normal"><a href="#__codelineno-0-257">257</a></span>
-<span class="normal"><a href="#__codelineno-0-258">258</a></span>
-<span class="normal"><a href="#__codelineno-0-259">259</a></span>
-<span class="normal"><a href="#__codelineno-0-260">260</a></span>
-<span class="normal"><a href="#__codelineno-0-261">261</a></span>
-<span class="normal"><a href="#__codelineno-0-262">262</a></span>
-<span class="normal"><a href="#__codelineno-0-263">263</a></span>
-<span class="normal"><a href="#__codelineno-0-264">264</a></span>
-<span class="normal"><a href="#__codelineno-0-265">265</a></span>
-<span class="normal"><a href="#__codelineno-0-266">266</a></span>
-<span class="normal"><a href="#__codelineno-0-267">267</a></span>
-<span class="normal"><a href="#__codelineno-0-268">268</a></span>
-<span class="normal"><a href="#__codelineno-0-269">269</a></span>
-<span class="normal"><a href="#__codelineno-0-270">270</a></span>
-<span class="normal"><a href="#__codelineno-0-271">271</a></span>
-<span class="normal"><a href="#__codelineno-0-272">272</a></span>
-<span class="normal"><a href="#__codelineno-0-273">273</a></span>
-<span class="normal"><a href="#__codelineno-0-274">274</a></span>
-<span class="normal"><a href="#__codelineno-0-275">275</a></span>
-<span class="normal"><a href="#__codelineno-0-276">276</a></span>
-<span class="normal"><a href="#__codelineno-0-277">277</a></span>
-<span class="normal"><a href="#__codelineno-0-278">278</a></span>
-<span class="normal"><a href="#__codelineno-0-279">279</a></span>
-<span class="normal"><a href="#__codelineno-0-280">280</a></span>
-<span class="normal"><a href="#__codelineno-0-281">281</a></span>
-<span class="normal"><a href="#__codelineno-0-282">282</a></span>
-<span class="normal"><a href="#__codelineno-0-283">283</a></span>
-<span class="normal"><a href="#__codelineno-0-284">284</a></span>
-<span class="normal"><a href="#__codelineno-0-285">285</a></span>
-<span class="normal"><a href="#__codelineno-0-286">286</a></span>
-<span class="normal"><a href="#__codelineno-0-287">287</a></span>
-<span class="normal"><a href="#__codelineno-0-288">288</a></span>
-<span class="normal"><a href="#__codelineno-0-289">289</a></span>
-<span class="normal"><a href="#__codelineno-0-290">290</a></span>
-<span class="normal"><a href="#__codelineno-0-291">291</a></span>
-<span class="normal"><a href="#__codelineno-0-292">292</a></span>
-<span class="normal"><a href="#__codelineno-0-293">293</a></span>
-<span class="normal"><a href="#__codelineno-0-294">294</a></span>
-<span class="normal"><a href="#__codelineno-0-295">295</a></span>
-<span class="normal"><a href="#__codelineno-0-296">296</a></span>
-<span class="normal"><a href="#__codelineno-0-297">297</a></span>
-<span class="normal"><a href="#__codelineno-0-298">298</a></span>
-<span class="normal"><a href="#__codelineno-0-299">299</a></span>
-<span class="normal"><a href="#__codelineno-0-300">300</a></span>
-<span class="normal"><a href="#__codelineno-0-301">301</a></span>
-<span class="normal"><a href="#__codelineno-0-302">302</a></span>
-<span class="normal"><a href="#__codelineno-0-303">303</a></span>
-<span class="normal"><a href="#__codelineno-0-304">304</a></span>
-<span class="normal"><a href="#__codelineno-0-305">305</a></span>
-<span class="normal"><a href="#__codelineno-0-306">306</a></span>
-<span class="normal"><a href="#__codelineno-0-307">307</a></span>
-<span class="normal"><a href="#__codelineno-0-308">308</a></span>
-<span class="normal"><a href="#__codelineno-0-309">309</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-213"><a id="__codelineno-0-213" name="__codelineno-0-213"></a><span class="k">class</span><span class="w"> </span><span class="nc">FraxDynamics</span><span class="p">(</span><span class="n">DynamicsAdapter</span><span class="p">):</span>
-</span><span id="__span-0-214"><a id="__codelineno-0-214" name="__codelineno-0-214"></a><span class="w">    </span><span class="sd">"""First-class frax dynamics adapter for `Problem`.</span>
-</span><span id="__span-0-215"><a id="__codelineno-0-215" name="__codelineno-0-215"></a>
-</span><span id="__span-0-216"><a id="__codelineno-0-216" name="__codelineno-0-216"></a><span class="sd">    Wraps a ``frax.Robot`` so it can be passed directly to the ``dynamics=``</span>
-</span><span id="__span-0-217"><a id="__codelineno-0-217" name="__codelineno-0-217"></a><span class="sd">    argument of `Problem`. The adapter constructs default ``q`` / ``qd`` State</span>
-</span><span id="__span-0-218"><a id="__codelineno-0-218" name="__codelineno-0-218"></a><span class="sd">    objects and a ``tau`` Control matching the robot's joint count, exposes</span>
-</span><span id="__span-0-219"><a id="__codelineno-0-219" name="__codelineno-0-219"></a><span class="sd">    them via ``.states`` / ``.controls``, and routes the frax forward dynamics</span>
-</span><span id="__span-0-220"><a id="__codelineno-0-220" name="__codelineno-0-220"></a><span class="sd">    through the BYOF channel internally — without requiring the user to know</span>
-</span><span id="__span-0-221"><a id="__codelineno-0-221" name="__codelineno-0-221"></a><span class="sd">    about BYOF.</span>
-</span><span id="__span-0-222"><a id="__codelineno-0-222" name="__codelineno-0-222"></a>
-</span><span id="__span-0-223"><a id="__codelineno-0-223" name="__codelineno-0-223"></a><span class="sd">    Joint limits and torque bounds are read from the robot's URDF and</span>
-</span><span id="__span-0-224"><a id="__codelineno-0-224" name="__codelineno-0-224"></a><span class="sd">    auto-populated on the State/Control objects. Override any of them after</span>
-</span><span id="__span-0-225"><a id="__codelineno-0-225" name="__codelineno-0-225"></a><span class="sd">    construction if you want tighter problem-specific bounds::</span>
-</span><span id="__span-0-226"><a id="__codelineno-0-226" name="__codelineno-0-226"></a>
-</span><span id="__span-0-227"><a id="__codelineno-0-227" name="__codelineno-0-227"></a><span class="sd">        dyn = ox.FraxDynamics(load_panda())</span>
-</span><span id="__span-0-228"><a id="__codelineno-0-228" name="__codelineno-0-228"></a><span class="sd">        q, qd = dyn.states</span>
-</span><span id="__span-0-229"><a id="__codelineno-0-229" name="__codelineno-0-229"></a><span class="sd">        q.initial = np.array([0.0, -0.7854, 0.0, -2.3562, 0.0, 1.5708, 0.7854])</span>
-</span><span id="__span-0-230"><a id="__codelineno-0-230" name="__codelineno-0-230"></a><span class="sd">        # tighten velocity limits for a slow approach</span>
-</span><span id="__span-0-231"><a id="__codelineno-0-231" name="__codelineno-0-231"></a><span class="sd">        qd.max = np.full(7, 1.0)</span>
-</span><span id="__span-0-232"><a id="__codelineno-0-232" name="__codelineno-0-232"></a>
-</span><span id="__span-0-233"><a id="__codelineno-0-233" name="__codelineno-0-233"></a><span class="sd">    Example:</span>
-</span><span id="__span-0-234"><a id="__codelineno-0-234" name="__codelineno-0-234"></a><span class="sd">        Franka Panda::</span>
-</span><span id="__span-0-235"><a id="__codelineno-0-235" name="__codelineno-0-235"></a>
-</span><span id="__span-0-236"><a id="__codelineno-0-236" name="__codelineno-0-236"></a><span class="sd">            from frax.robots.franka_panda import load_panda</span>
-</span><span id="__span-0-237"><a id="__codelineno-0-237" name="__codelineno-0-237"></a><span class="sd">            import openscvx as ox</span>
-</span><span id="__span-0-238"><a id="__codelineno-0-238" name="__codelineno-0-238"></a>
-</span><span id="__span-0-239"><a id="__codelineno-0-239" name="__codelineno-0-239"></a><span class="sd">            dyn = ox.FraxDynamics(load_panda())</span>
-</span><span id="__span-0-240"><a id="__codelineno-0-240" name="__codelineno-0-240"></a><span class="sd">            problem = ox.Problem(</span>
-</span><span id="__span-0-241"><a id="__codelineno-0-241" name="__codelineno-0-241"></a><span class="sd">                dynamics=dyn,</span>
-</span><span id="__span-0-242"><a id="__codelineno-0-242" name="__codelineno-0-242"></a><span class="sd">                states=dyn.states,</span>
-</span><span id="__span-0-243"><a id="__codelineno-0-243" name="__codelineno-0-243"></a><span class="sd">                controls=dyn.controls,</span>
-</span><span id="__span-0-244"><a id="__codelineno-0-244" name="__codelineno-0-244"></a><span class="sd">                constraints=[...],</span>
-</span><span id="__span-0-245"><a id="__codelineno-0-245" name="__codelineno-0-245"></a><span class="sd">                N=50,</span>
-</span><span id="__span-0-246"><a id="__codelineno-0-246" name="__codelineno-0-246"></a><span class="sd">                time=ox.Time(...),</span>
-</span><span id="__span-0-247"><a id="__codelineno-0-247" name="__codelineno-0-247"></a><span class="sd">            )</span>
-</span><span id="__span-0-248"><a id="__codelineno-0-248" name="__codelineno-0-248"></a>
-</span><span id="__span-0-249"><a id="__codelineno-0-249" name="__codelineno-0-249"></a><span class="sd">    Floating-base robots (``robot.includes_floating_dof = True``) are</span>
-</span><span id="__span-0-250"><a id="__codelineno-0-250" name="__codelineno-0-250"></a><span class="sd">    supported. The ``tau`` Control covers only the ``num_actuated_joints``</span>
-</span><span id="__span-0-251"><a id="__codelineno-0-251" name="__codelineno-0-251"></a><span class="sd">    actuated DOFs; the adapter inserts the required zero-torque entries for the</span>
-</span><span id="__span-0-252"><a id="__codelineno-0-252" name="__codelineno-0-252"></a><span class="sd">    unactuated floating-base DOFs internally.</span>
-</span><span id="__span-0-253"><a id="__codelineno-0-253" name="__codelineno-0-253"></a>
-</span><span id="__span-0-254"><a id="__codelineno-0-254" name="__codelineno-0-254"></a><span class="sd">    Custom State/Control names are *not* supported — drop to the lower-level</span>
-</span><span id="__span-0-255"><a id="__codelineno-0-255" name="__codelineno-0-255"></a><span class="sd">    `frax_dynamics` helper for that.</span>
-</span><span id="__span-0-256"><a id="__codelineno-0-256" name="__codelineno-0-256"></a>
-</span><span id="__span-0-257"><a id="__codelineno-0-257" name="__codelineno-0-257"></a><span class="sd">    Auto-populated bounds:</span>
-</span><span id="__span-0-258"><a id="__codelineno-0-258" name="__codelineno-0-258"></a><span class="sd">        * ``q.min`` / ``q.max``: from the URDF ``&lt;limit lower/upper&gt;``.</span>
-</span><span id="__span-0-259"><a id="__codelineno-0-259" name="__codelineno-0-259"></a><span class="sd">        * ``qd.min`` / ``qd.max``: from the URDF ``&lt;limit velocity&gt;``</span>
-</span><span id="__span-0-260"><a id="__codelineno-0-260" name="__codelineno-0-260"></a><span class="sd">          (mirrored as ``±max_vel``).</span>
-</span><span id="__span-0-261"><a id="__codelineno-0-261" name="__codelineno-0-261"></a><span class="sd">        * ``tau.min`` / ``tau.max``: from the URDF ``&lt;limit effort&gt;`` for the</span>
-</span><span id="__span-0-262"><a id="__codelineno-0-262" name="__codelineno-0-262"></a><span class="sd">          actuated joints.</span>
-</span><span id="__span-0-263"><a id="__codelineno-0-263" name="__codelineno-0-263"></a>
-</span><span id="__span-0-264"><a id="__codelineno-0-264" name="__codelineno-0-264"></a><span class="sd">        frax's ``±1e6`` "no limit" sentinel (used for floating-base DOFs) is</span>
-</span><span id="__span-0-265"><a id="__codelineno-0-265" name="__codelineno-0-265"></a><span class="sd">        mapped to ``±inf`` on all of the above.</span>
-</span><span id="__span-0-266"><a id="__codelineno-0-266" name="__codelineno-0-266"></a><span class="sd">    """</span>
-</span><span id="__span-0-267"><a id="__codelineno-0-267" name="__codelineno-0-267"></a>
-</span><span id="__span-0-268"><a id="__codelineno-0-268" name="__codelineno-0-268"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-269"><a id="__codelineno-0-269" name="__codelineno-0-269"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">openscvx.symbolic.expr.control</span><span class="w"> </span><span class="kn">import</span> <span class="n">Control</span>
-</span><span id="__span-0-270"><a id="__codelineno-0-270" name="__codelineno-0-270"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">openscvx.symbolic.expr.state</span><span class="w"> </span><span class="kn">import</span> <span class="n">State</span>
-</span><span id="__span-0-271"><a id="__codelineno-0-271" name="__codelineno-0-271"></a>
-</span><span id="__span-0-272"><a id="__codelineno-0-272" name="__codelineno-0-272"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_robot</span> <span class="o">=</span> <span class="n">robot</span>
-</span><span id="__span-0-273"><a id="__codelineno-0-273" name="__codelineno-0-273"></a>        <span class="n">nj</span> <span class="o">=</span> <span class="n">robot</span><span class="o">.</span><span class="n">num_joints</span>
-</span><span id="__span-0-274"><a id="__codelineno-0-274" name="__codelineno-0-274"></a>        <span class="n">na</span> <span class="o">=</span> <span class="n">robot</span><span class="o">.</span><span class="n">num_actuated_joints</span>
-</span><span id="__span-0-275"><a id="__codelineno-0-275" name="__codelineno-0-275"></a>
-</span><span id="__span-0-276"><a id="__codelineno-0-276" name="__codelineno-0-276"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_q</span> <span class="o">=</span> <span class="n">State</span><span class="p">(</span><span class="s2">"q"</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">nj</span><span class="p">,))</span>
-</span><span id="__span-0-277"><a id="__codelineno-0-277" name="__codelineno-0-277"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_qd</span> <span class="o">=</span> <span class="n">State</span><span class="p">(</span><span class="s2">"qd"</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">nj</span><span class="p">,))</span>
-</span><span id="__span-0-278"><a id="__codelineno-0-278" name="__codelineno-0-278"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_tau</span> <span class="o">=</span> <span class="n">Control</span><span class="p">(</span><span class="s2">"tau"</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">na</span><span class="p">,))</span>
-</span><span id="__span-0-279"><a id="__codelineno-0-279" name="__codelineno-0-279"></a>
-</span><span id="__span-0-280"><a id="__codelineno-0-280" name="__codelineno-0-280"></a>        <span class="n">q_min</span><span class="p">,</span> <span class="n">q_max</span><span class="p">,</span> <span class="n">qd_min</span><span class="p">,</span> <span class="n">qd_max</span><span class="p">,</span> <span class="n">tau_min</span><span class="p">,</span> <span class="n">tau_max</span> <span class="o">=</span> <span class="n">_bounds_from_robot</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
-</span><span id="__span-0-281"><a id="__codelineno-0-281" name="__codelineno-0-281"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_q</span><span class="o">.</span><span class="n">min</span> <span class="o">=</span> <span class="n">q_min</span>
-</span><span id="__span-0-282"><a id="__codelineno-0-282" name="__codelineno-0-282"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_q</span><span class="o">.</span><span class="n">max</span> <span class="o">=</span> <span class="n">q_max</span>
-</span><span id="__span-0-283"><a id="__codelineno-0-283" name="__codelineno-0-283"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_qd</span><span class="o">.</span><span class="n">min</span> <span class="o">=</span> <span class="n">qd_min</span>
-</span><span id="__span-0-284"><a id="__codelineno-0-284" name="__codelineno-0-284"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_qd</span><span class="o">.</span><span class="n">max</span> <span class="o">=</span> <span class="n">qd_max</span>
-</span><span id="__span-0-285"><a id="__codelineno-0-285" name="__codelineno-0-285"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_tau</span><span class="o">.</span><span class="n">min</span> <span class="o">=</span> <span class="n">tau_min</span>
-</span><span id="__span-0-286"><a id="__codelineno-0-286" name="__codelineno-0-286"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_tau</span><span class="o">.</span><span class="n">max</span> <span class="o">=</span> <span class="n">tau_max</span>
-</span><span id="__span-0-287"><a id="__codelineno-0-287" name="__codelineno-0-287"></a>
-</span><span id="__span-0-288"><a id="__codelineno-0-288" name="__codelineno-0-288"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">states</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">State</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_q</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_qd</span><span class="p">]</span>
-</span><span id="__span-0-289"><a id="__codelineno-0-289" name="__codelineno-0-289"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">controls</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Control</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_tau</span><span class="p">]</span>
-</span><span id="__span-0-290"><a id="__codelineno-0-290" name="__codelineno-0-290"></a>
-</span><span id="__span-0-291"><a id="__codelineno-0-291" name="__codelineno-0-291"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">expand</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">dict</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]:</span>
-</span><span id="__span-0-292"><a id="__codelineno-0-292" name="__codelineno-0-292"></a><span class="w">        </span><span class="sd">"""Return ``(dynamics_dict, byof_dict)`` for this frax robot.</span>
-</span><span id="__span-0-293"><a id="__codelineno-0-293" name="__codelineno-0-293"></a>
-</span><span id="__span-0-294"><a id="__codelineno-0-294" name="__codelineno-0-294"></a><span class="sd">        frax always has ``nq == nv`` (no quaternion floating-base split), so</span>
-</span><span id="__span-0-295"><a id="__codelineno-0-295" name="__codelineno-0-295"></a><span class="sd">        ``dynamics_dict`` is always ``{"q": qd}`` and the full joint</span>
-</span><span id="__span-0-296"><a id="__codelineno-0-296" name="__codelineno-0-296"></a><span class="sd">        acceleration goes through BYOF.</span>
-</span><span id="__span-0-297"><a id="__codelineno-0-297" name="__codelineno-0-297"></a><span class="sd">        """</span>
-</span><span id="__span-0-298"><a id="__codelineno-0-298" name="__codelineno-0-298"></a>        <span class="n">dynamics_dict</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"q"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_qd</span><span class="p">}</span>
-</span><span id="__span-0-299"><a id="__codelineno-0-299" name="__codelineno-0-299"></a>        <span class="n">byof_dict</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="__span-0-300"><a id="__codelineno-0-300" name="__codelineno-0-300"></a>            <span class="s2">"dynamics"</span><span class="p">:</span> <span class="p">{</span>
-</span><span id="__span-0-301"><a id="__codelineno-0-301" name="__codelineno-0-301"></a>                <span class="s2">"qd"</span><span class="p">:</span> <span class="n">frax_dynamics</span><span class="p">(</span>
-</span><span id="__span-0-302"><a id="__codelineno-0-302" name="__codelineno-0-302"></a>                    <span class="bp">self</span><span class="o">.</span><span class="n">_robot</span><span class="p">,</span>
-</span><span id="__span-0-303"><a id="__codelineno-0-303" name="__codelineno-0-303"></a>                    <span class="n">q</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_q</span><span class="p">,</span>
-</span><span id="__span-0-304"><a id="__codelineno-0-304" name="__codelineno-0-304"></a>                    <span class="n">qd</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_qd</span><span class="p">,</span>
-</span><span id="__span-0-305"><a id="__codelineno-0-305" name="__codelineno-0-305"></a>                    <span class="n">tau</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_tau</span><span class="p">,</span>
-</span><span id="__span-0-306"><a id="__codelineno-0-306" name="__codelineno-0-306"></a>                <span class="p">)</span>
-</span><span id="__span-0-307"><a id="__codelineno-0-307" name="__codelineno-0-307"></a>            <span class="p">}</span>
-</span><span id="__span-0-308"><a id="__codelineno-0-308" name="__codelineno-0-308"></a>        <span class="p">}</span>
-</span><span id="__span-0-309"><a id="__codelineno-0-309" name="__codelineno-0-309"></a>        <span class="k">return</span> <span class="n">dynamics_dict</span><span class="p">,</span> <span class="n">byof_dict</span>
+                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-213">213</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-214">214</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-215">215</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-216">216</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-217">217</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-218">218</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-219">219</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-220">220</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-221">221</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-222">222</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-223">223</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-224">224</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-225">225</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-226">226</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-227">227</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-228">228</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-229">229</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-230">230</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-231">231</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-232">232</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-233">233</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-234">234</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-235">235</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-236">236</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-237">237</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-238">238</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-239">239</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-240">240</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-241">241</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-242">242</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-243">243</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-244">244</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-245">245</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-246">246</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-247">247</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-248">248</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-249">249</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-250">250</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-251">251</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-252">252</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-253">253</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-254">254</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-255">255</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-256">256</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-257">257</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-258">258</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-259">259</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-260">260</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-261">261</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-262">262</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-263">263</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-264">264</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-265">265</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-266">266</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-267">267</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-268">268</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-269">269</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-270">270</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-271">271</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-272">272</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-273">273</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-274">274</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-275">275</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-276">276</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-277">277</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-278">278</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-279">279</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-280">280</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-281">281</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-282">282</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-283">283</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-284">284</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-285">285</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-286">286</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-287">287</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-288">288</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-289">289</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-290">290</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-291">291</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-292">292</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-293">293</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-294">294</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-295">295</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-296">296</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-297">297</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-298">298</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-299">299</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-300">300</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-301">301</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-302">302</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-303">303</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-304">304</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-305">305</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-306">306</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-307">307</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-308">308</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-309">309</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-213"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-213" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-213"></a><span class="k">class</span><span class="w"> </span><span class="nc">FraxDynamics</span><span class="p">(</span><span class="n">DynamicsAdapter</span><span class="p">):</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-214"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-214" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-214"></a><span class="w">    </span><span class="sd">"""First-class frax dynamics adapter for `Problem`.</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-215"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-215" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-215"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-216"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-216" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-216"></a><span class="sd">    Wraps a ``frax.Robot`` so it can be passed directly to the ``dynamics=``</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-217"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-217" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-217"></a><span class="sd">    argument of `Problem`. The adapter constructs default ``q`` / ``qd`` State</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-218"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-218" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-218"></a><span class="sd">    objects and a ``tau`` Control matching the robot's joint count, exposes</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-219"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-219" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-219"></a><span class="sd">    them via ``.states`` / ``.controls``, and routes the frax forward dynamics</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-220"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-220" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-220"></a><span class="sd">    through the BYOF channel internally — without requiring the user to know</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-221"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-221" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-221"></a><span class="sd">    about BYOF.</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-222"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-222" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-222"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-223"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-223" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-223"></a><span class="sd">    Joint limits and torque bounds are read from the robot's URDF and</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-224"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-224" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-224"></a><span class="sd">    auto-populated on the State/Control objects. Override any of them after</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-225"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-225" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-225"></a><span class="sd">    construction if you want tighter problem-specific bounds::</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-226"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-226" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-226"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-227"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-227" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-227"></a><span class="sd">        dyn = ox.FraxDynamics(load_panda())</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-228"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-228" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-228"></a><span class="sd">        q, qd = dyn.states</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-229"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-229" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-229"></a><span class="sd">        q.initial = np.array([0.0, -0.7854, 0.0, -2.3562, 0.0, 1.5708, 0.7854])</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-230"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-230" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-230"></a><span class="sd">        # tighten velocity limits for a slow approach</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-231"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-231" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-231"></a><span class="sd">        qd.max = np.full(7, 1.0)</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-232"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-232" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-232"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-233"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-233" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-233"></a><span class="sd">    Example:</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-234"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-234" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-234"></a><span class="sd">        Franka Panda::</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-235"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-235" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-235"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-236"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-236" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-236"></a><span class="sd">            from frax.robots.franka_panda import load_panda</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-237"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-237" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-237"></a><span class="sd">            import openscvx as ox</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-238"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-238" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-238"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-239"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-239" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-239"></a><span class="sd">            dyn = ox.FraxDynamics(load_panda())</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-240"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-240" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-240"></a><span class="sd">            problem = ox.Problem(</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-241"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-241" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-241"></a><span class="sd">                dynamics=dyn,</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-242"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-242" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-242"></a><span class="sd">                states=dyn.states,</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-243"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-243" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-243"></a><span class="sd">                controls=dyn.controls,</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-244"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-244" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-244"></a><span class="sd">                constraints=[...],</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-245"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-245" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-245"></a><span class="sd">                N=50,</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-246"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-246" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-246"></a><span class="sd">                time=ox.Time(...),</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-247"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-247" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-247"></a><span class="sd">            )</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-248"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-248" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-248"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-249"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-249" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-249"></a><span class="sd">    Floating-base robots (``robot.includes_floating_dof = True``) are</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-250"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-250" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-250"></a><span class="sd">    supported. The ``tau`` Control covers only the ``num_actuated_joints``</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-251"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-251" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-251"></a><span class="sd">    actuated DOFs; the adapter inserts the required zero-torque entries for the</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-252"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-252" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-252"></a><span class="sd">    unactuated floating-base DOFs internally.</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-253"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-253" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-253"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-254"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-254" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-254"></a><span class="sd">    Custom State/Control names are *not* supported — drop to the lower-level</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-255"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-255" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-255"></a><span class="sd">    `frax_dynamics` helper for that.</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-256"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-256" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-256"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-257"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-257" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-257"></a><span class="sd">    Auto-populated bounds:</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-258"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-258" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-258"></a><span class="sd">        * ``q.min`` / ``q.max``: from the URDF ``&lt;limit lower/upper&gt;``.</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-259"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-259" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-259"></a><span class="sd">        * ``qd.min`` / ``qd.max``: from the URDF ``&lt;limit velocity&gt;``</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-260"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-260" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-260"></a><span class="sd">          (mirrored as ``±max_vel``).</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-261"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-261" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-261"></a><span class="sd">        * ``tau.min`` / ``tau.max``: from the URDF ``&lt;limit effort&gt;`` for the</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-262"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-262" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-262"></a><span class="sd">          actuated joints.</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-263"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-263" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-263"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-264"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-264" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-264"></a><span class="sd">        frax's ``±1e6`` "no limit" sentinel (used for floating-base DOFs) is</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-265"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-265" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-265"></a><span class="sd">        mapped to ``±inf`` on all of the above.</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-266"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-266" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-266"></a><span class="sd">    """</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-267"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-267" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-267"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-268"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-268" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-268"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">robot</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-269"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-269" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-269"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">openscvx.symbolic.expr.control</span><span class="w"> </span><span class="kn">import</span> <span class="n">Control</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-270"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-270" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-270"></a>        <span class="kn">from</span><span class="w"> </span><span class="nn">openscvx.symbolic.expr.state</span><span class="w"> </span><span class="kn">import</span> <span class="n">State</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-271"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-271" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-271"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-272"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-272" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-272"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_robot</span> <span class="o">=</span> <span class="n">robot</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-273"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-273" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-273"></a>        <span class="n">nj</span> <span class="o">=</span> <span class="n">robot</span><span class="o">.</span><span class="n">num_joints</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-274"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-274" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-274"></a>        <span class="n">na</span> <span class="o">=</span> <span class="n">robot</span><span class="o">.</span><span class="n">num_actuated_joints</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-275"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-275" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-275"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-276"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-276" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-276"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_q</span> <span class="o">=</span> <span class="n">State</span><span class="p">(</span><span class="s2">"q"</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">nj</span><span class="p">,))</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-277"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-277" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-277"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_qd</span> <span class="o">=</span> <span class="n">State</span><span class="p">(</span><span class="s2">"qd"</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">nj</span><span class="p">,))</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-278"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-278" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-278"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_tau</span> <span class="o">=</span> <span class="n">Control</span><span class="p">(</span><span class="s2">"tau"</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">na</span><span class="p">,))</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-279"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-279" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-279"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-280"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-280" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-280"></a>        <span class="n">q_min</span><span class="p">,</span> <span class="n">q_max</span><span class="p">,</span> <span class="n">qd_min</span><span class="p">,</span> <span class="n">qd_max</span><span class="p">,</span> <span class="n">tau_min</span><span class="p">,</span> <span class="n">tau_max</span> <span class="o">=</span> <span class="n">_bounds_from_robot</span><span class="p">(</span><span class="n">robot</span><span class="p">)</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-281"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-281" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-281"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_q</span><span class="o">.</span><span class="n">min</span> <span class="o">=</span> <span class="n">q_min</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-282"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-282" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-282"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_q</span><span class="o">.</span><span class="n">max</span> <span class="o">=</span> <span class="n">q_max</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-283"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-283" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-283"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_qd</span><span class="o">.</span><span class="n">min</span> <span class="o">=</span> <span class="n">qd_min</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-284"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-284" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-284"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_qd</span><span class="o">.</span><span class="n">max</span> <span class="o">=</span> <span class="n">qd_max</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-285"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-285" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-285"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_tau</span><span class="o">.</span><span class="n">min</span> <span class="o">=</span> <span class="n">tau_min</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-286"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-286" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-286"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_tau</span><span class="o">.</span><span class="n">max</span> <span class="o">=</span> <span class="n">tau_max</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-287"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-287" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-287"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-288"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-288" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-288"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">states</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">State</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_q</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_qd</span><span class="p">]</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-289"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-289" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-289"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">controls</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Control</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_tau</span><span class="p">]</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-290"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-290" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-290"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-291"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-291" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-291"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">expand</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">dict</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]:</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-292"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-292" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-292"></a><span class="w">        </span><span class="sd">"""Return ``(dynamics_dict, byof_dict)`` for this frax robot.</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-293"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-293" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-293"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-294"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-294" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-294"></a><span class="sd">        frax always has ``nq == nv`` (no quaternion floating-base split), so</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-295"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-295" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-295"></a><span class="sd">        ``dynamics_dict`` is always ``{"q": qd}`` and the full joint</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-296"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-296" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-296"></a><span class="sd">        acceleration goes through BYOF.</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-297"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-297" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-297"></a><span class="sd">        """</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-298"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-298" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-298"></a>        <span class="n">dynamics_dict</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"q"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_qd</span><span class="p">}</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-299"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-299" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-299"></a>        <span class="n">byof_dict</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-300"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-300" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-300"></a>            <span class="s2">"dynamics"</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-301"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-301" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-301"></a>                <span class="s2">"qd"</span><span class="p">:</span> <span class="n">frax_dynamics</span><span class="p">(</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-302"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-302" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-302"></a>                    <span class="bp">self</span><span class="o">.</span><span class="n">_robot</span><span class="p">,</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-303"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-303" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-303"></a>                    <span class="n">q</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_q</span><span class="p">,</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-304"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-304" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-304"></a>                    <span class="n">qd</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_qd</span><span class="p">,</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-305"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-305" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-305"></a>                    <span class="n">tau</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_tau</span><span class="p">,</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-306"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-306" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-306"></a>                <span class="p">)</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-307"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-307" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-307"></a>            <span class="p">}</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-308"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-308" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-308"></a>        <span class="p">}</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics--source--__span-0-309"><a id="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-309" name="openscvx.integrations.frax.FraxDynamics--source--__codelineno-0-309"></a>        <span class="k">return</span> <span class="n">dynamics_dict</span><span class="p">,</span> <span class="n">byof_dict</span>
 </span></code></pre></div></td></tr></table></div>
               </details>
 
@@ -12787,43 +12787,43 @@ acceleration goes through BYOF.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>openscvx/integrations/frax.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-291">291</a></span>
-<span class="normal"><a href="#__codelineno-0-292">292</a></span>
-<span class="normal"><a href="#__codelineno-0-293">293</a></span>
-<span class="normal"><a href="#__codelineno-0-294">294</a></span>
-<span class="normal"><a href="#__codelineno-0-295">295</a></span>
-<span class="normal"><a href="#__codelineno-0-296">296</a></span>
-<span class="normal"><a href="#__codelineno-0-297">297</a></span>
-<span class="normal"><a href="#__codelineno-0-298">298</a></span>
-<span class="normal"><a href="#__codelineno-0-299">299</a></span>
-<span class="normal"><a href="#__codelineno-0-300">300</a></span>
-<span class="normal"><a href="#__codelineno-0-301">301</a></span>
-<span class="normal"><a href="#__codelineno-0-302">302</a></span>
-<span class="normal"><a href="#__codelineno-0-303">303</a></span>
-<span class="normal"><a href="#__codelineno-0-304">304</a></span>
-<span class="normal"><a href="#__codelineno-0-305">305</a></span>
-<span class="normal"><a href="#__codelineno-0-306">306</a></span>
-<span class="normal"><a href="#__codelineno-0-307">307</a></span>
-<span class="normal"><a href="#__codelineno-0-308">308</a></span>
-<span class="normal"><a href="#__codelineno-0-309">309</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-291"><a id="__codelineno-0-291" name="__codelineno-0-291"></a><span class="k">def</span><span class="w"> </span><span class="nf">expand</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">dict</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]:</span>
-</span><span id="__span-0-292"><a id="__codelineno-0-292" name="__codelineno-0-292"></a><span class="w">    </span><span class="sd">"""Return ``(dynamics_dict, byof_dict)`` for this frax robot.</span>
-</span><span id="__span-0-293"><a id="__codelineno-0-293" name="__codelineno-0-293"></a>
-</span><span id="__span-0-294"><a id="__codelineno-0-294" name="__codelineno-0-294"></a><span class="sd">    frax always has ``nq == nv`` (no quaternion floating-base split), so</span>
-</span><span id="__span-0-295"><a id="__codelineno-0-295" name="__codelineno-0-295"></a><span class="sd">    ``dynamics_dict`` is always ``{"q": qd}`` and the full joint</span>
-</span><span id="__span-0-296"><a id="__codelineno-0-296" name="__codelineno-0-296"></a><span class="sd">    acceleration goes through BYOF.</span>
-</span><span id="__span-0-297"><a id="__codelineno-0-297" name="__codelineno-0-297"></a><span class="sd">    """</span>
-</span><span id="__span-0-298"><a id="__codelineno-0-298" name="__codelineno-0-298"></a>    <span class="n">dynamics_dict</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"q"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_qd</span><span class="p">}</span>
-</span><span id="__span-0-299"><a id="__codelineno-0-299" name="__codelineno-0-299"></a>    <span class="n">byof_dict</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="__span-0-300"><a id="__codelineno-0-300" name="__codelineno-0-300"></a>        <span class="s2">"dynamics"</span><span class="p">:</span> <span class="p">{</span>
-</span><span id="__span-0-301"><a id="__codelineno-0-301" name="__codelineno-0-301"></a>            <span class="s2">"qd"</span><span class="p">:</span> <span class="n">frax_dynamics</span><span class="p">(</span>
-</span><span id="__span-0-302"><a id="__codelineno-0-302" name="__codelineno-0-302"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">_robot</span><span class="p">,</span>
-</span><span id="__span-0-303"><a id="__codelineno-0-303" name="__codelineno-0-303"></a>                <span class="n">q</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_q</span><span class="p">,</span>
-</span><span id="__span-0-304"><a id="__codelineno-0-304" name="__codelineno-0-304"></a>                <span class="n">qd</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_qd</span><span class="p">,</span>
-</span><span id="__span-0-305"><a id="__codelineno-0-305" name="__codelineno-0-305"></a>                <span class="n">tau</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_tau</span><span class="p">,</span>
-</span><span id="__span-0-306"><a id="__codelineno-0-306" name="__codelineno-0-306"></a>            <span class="p">)</span>
-</span><span id="__span-0-307"><a id="__codelineno-0-307" name="__codelineno-0-307"></a>        <span class="p">}</span>
-</span><span id="__span-0-308"><a id="__codelineno-0-308" name="__codelineno-0-308"></a>    <span class="p">}</span>
-</span><span id="__span-0-309"><a id="__codelineno-0-309" name="__codelineno-0-309"></a>    <span class="k">return</span> <span class="n">dynamics_dict</span><span class="p">,</span> <span class="n">byof_dict</span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-291">291</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-292">292</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-293">293</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-294">294</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-295">295</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-296">296</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-297">297</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-298">298</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-299">299</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-300">300</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-301">301</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-302">302</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-303">303</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-304">304</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-305">305</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-306">306</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-307">307</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-308">308</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-309">309</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-291"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-291" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-291"></a><span class="k">def</span><span class="w"> </span><span class="nf">expand</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">dict</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]:</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-292"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-292" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-292"></a><span class="w">    </span><span class="sd">"""Return ``(dynamics_dict, byof_dict)`` for this frax robot.</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-293"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-293" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-293"></a>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-294"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-294" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-294"></a><span class="sd">    frax always has ``nq == nv`` (no quaternion floating-base split), so</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-295"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-295" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-295"></a><span class="sd">    ``dynamics_dict`` is always ``{"q": qd}`` and the full joint</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-296"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-296" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-296"></a><span class="sd">    acceleration goes through BYOF.</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-297"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-297" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-297"></a><span class="sd">    """</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-298"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-298" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-298"></a>    <span class="n">dynamics_dict</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"q"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_qd</span><span class="p">}</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-299"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-299" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-299"></a>    <span class="n">byof_dict</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-300"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-300" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-300"></a>        <span class="s2">"dynamics"</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-301"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-301" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-301"></a>            <span class="s2">"qd"</span><span class="p">:</span> <span class="n">frax_dynamics</span><span class="p">(</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-302"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-302" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-302"></a>                <span class="bp">self</span><span class="o">.</span><span class="n">_robot</span><span class="p">,</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-303"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-303" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-303"></a>                <span class="n">q</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_q</span><span class="p">,</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-304"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-304" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-304"></a>                <span class="n">qd</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_qd</span><span class="p">,</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-305"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-305" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-305"></a>                <span class="n">tau</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_tau</span><span class="p">,</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-306"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-306" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-306"></a>            <span class="p">)</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-307"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-307" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-307"></a>        <span class="p">}</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-308"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-308" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-308"></a>    <span class="p">}</span>
+</span><span id="openscvx.integrations.frax.FraxDynamics.expand--source--__span-0-309"><a id="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-309" name="openscvx.integrations.frax.FraxDynamics.expand--source--__codelineno-0-309"></a>    <span class="k">return</span> <span class="n">dynamics_dict</span><span class="p">,</span> <span class="n">byof_dict</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -13015,185 +13015,185 @@ Length must equal <code>robot.num_actuated_joints</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>openscvx/integrations/frax.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-121">121</a></span>
-<span class="normal"><a href="#__codelineno-0-122">122</a></span>
-<span class="normal"><a href="#__codelineno-0-123">123</a></span>
-<span class="normal"><a href="#__codelineno-0-124">124</a></span>
-<span class="normal"><a href="#__codelineno-0-125">125</a></span>
-<span class="normal"><a href="#__codelineno-0-126">126</a></span>
-<span class="normal"><a href="#__codelineno-0-127">127</a></span>
-<span class="normal"><a href="#__codelineno-0-128">128</a></span>
-<span class="normal"><a href="#__codelineno-0-129">129</a></span>
-<span class="normal"><a href="#__codelineno-0-130">130</a></span>
-<span class="normal"><a href="#__codelineno-0-131">131</a></span>
-<span class="normal"><a href="#__codelineno-0-132">132</a></span>
-<span class="normal"><a href="#__codelineno-0-133">133</a></span>
-<span class="normal"><a href="#__codelineno-0-134">134</a></span>
-<span class="normal"><a href="#__codelineno-0-135">135</a></span>
-<span class="normal"><a href="#__codelineno-0-136">136</a></span>
-<span class="normal"><a href="#__codelineno-0-137">137</a></span>
-<span class="normal"><a href="#__codelineno-0-138">138</a></span>
-<span class="normal"><a href="#__codelineno-0-139">139</a></span>
-<span class="normal"><a href="#__codelineno-0-140">140</a></span>
-<span class="normal"><a href="#__codelineno-0-141">141</a></span>
-<span class="normal"><a href="#__codelineno-0-142">142</a></span>
-<span class="normal"><a href="#__codelineno-0-143">143</a></span>
-<span class="normal"><a href="#__codelineno-0-144">144</a></span>
-<span class="normal"><a href="#__codelineno-0-145">145</a></span>
-<span class="normal"><a href="#__codelineno-0-146">146</a></span>
-<span class="normal"><a href="#__codelineno-0-147">147</a></span>
-<span class="normal"><a href="#__codelineno-0-148">148</a></span>
-<span class="normal"><a href="#__codelineno-0-149">149</a></span>
-<span class="normal"><a href="#__codelineno-0-150">150</a></span>
-<span class="normal"><a href="#__codelineno-0-151">151</a></span>
-<span class="normal"><a href="#__codelineno-0-152">152</a></span>
-<span class="normal"><a href="#__codelineno-0-153">153</a></span>
-<span class="normal"><a href="#__codelineno-0-154">154</a></span>
-<span class="normal"><a href="#__codelineno-0-155">155</a></span>
-<span class="normal"><a href="#__codelineno-0-156">156</a></span>
-<span class="normal"><a href="#__codelineno-0-157">157</a></span>
-<span class="normal"><a href="#__codelineno-0-158">158</a></span>
-<span class="normal"><a href="#__codelineno-0-159">159</a></span>
-<span class="normal"><a href="#__codelineno-0-160">160</a></span>
-<span class="normal"><a href="#__codelineno-0-161">161</a></span>
-<span class="normal"><a href="#__codelineno-0-162">162</a></span>
-<span class="normal"><a href="#__codelineno-0-163">163</a></span>
-<span class="normal"><a href="#__codelineno-0-164">164</a></span>
-<span class="normal"><a href="#__codelineno-0-165">165</a></span>
-<span class="normal"><a href="#__codelineno-0-166">166</a></span>
-<span class="normal"><a href="#__codelineno-0-167">167</a></span>
-<span class="normal"><a href="#__codelineno-0-168">168</a></span>
-<span class="normal"><a href="#__codelineno-0-169">169</a></span>
-<span class="normal"><a href="#__codelineno-0-170">170</a></span>
-<span class="normal"><a href="#__codelineno-0-171">171</a></span>
-<span class="normal"><a href="#__codelineno-0-172">172</a></span>
-<span class="normal"><a href="#__codelineno-0-173">173</a></span>
-<span class="normal"><a href="#__codelineno-0-174">174</a></span>
-<span class="normal"><a href="#__codelineno-0-175">175</a></span>
-<span class="normal"><a href="#__codelineno-0-176">176</a></span>
-<span class="normal"><a href="#__codelineno-0-177">177</a></span>
-<span class="normal"><a href="#__codelineno-0-178">178</a></span>
-<span class="normal"><a href="#__codelineno-0-179">179</a></span>
-<span class="normal"><a href="#__codelineno-0-180">180</a></span>
-<span class="normal"><a href="#__codelineno-0-181">181</a></span>
-<span class="normal"><a href="#__codelineno-0-182">182</a></span>
-<span class="normal"><a href="#__codelineno-0-183">183</a></span>
-<span class="normal"><a href="#__codelineno-0-184">184</a></span>
-<span class="normal"><a href="#__codelineno-0-185">185</a></span>
-<span class="normal"><a href="#__codelineno-0-186">186</a></span>
-<span class="normal"><a href="#__codelineno-0-187">187</a></span>
-<span class="normal"><a href="#__codelineno-0-188">188</a></span>
-<span class="normal"><a href="#__codelineno-0-189">189</a></span>
-<span class="normal"><a href="#__codelineno-0-190">190</a></span>
-<span class="normal"><a href="#__codelineno-0-191">191</a></span>
-<span class="normal"><a href="#__codelineno-0-192">192</a></span>
-<span class="normal"><a href="#__codelineno-0-193">193</a></span>
-<span class="normal"><a href="#__codelineno-0-194">194</a></span>
-<span class="normal"><a href="#__codelineno-0-195">195</a></span>
-<span class="normal"><a href="#__codelineno-0-196">196</a></span>
-<span class="normal"><a href="#__codelineno-0-197">197</a></span>
-<span class="normal"><a href="#__codelineno-0-198">198</a></span>
-<span class="normal"><a href="#__codelineno-0-199">199</a></span>
-<span class="normal"><a href="#__codelineno-0-200">200</a></span>
-<span class="normal"><a href="#__codelineno-0-201">201</a></span>
-<span class="normal"><a href="#__codelineno-0-202">202</a></span>
-<span class="normal"><a href="#__codelineno-0-203">203</a></span>
-<span class="normal"><a href="#__codelineno-0-204">204</a></span>
-<span class="normal"><a href="#__codelineno-0-205">205</a></span>
-<span class="normal"><a href="#__codelineno-0-206">206</a></span>
-<span class="normal"><a href="#__codelineno-0-207">207</a></span>
-<span class="normal"><a href="#__codelineno-0-208">208</a></span>
-<span class="normal"><a href="#__codelineno-0-209">209</a></span>
-<span class="normal"><a href="#__codelineno-0-210">210</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-121"><a id="__codelineno-0-121" name="__codelineno-0-121"></a><span class="k">def</span><span class="w"> </span><span class="nf">frax_dynamics</span><span class="p">(</span>
-</span><span id="__span-0-122"><a id="__codelineno-0-122" name="__codelineno-0-122"></a>    <span class="n">robot</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-</span><span id="__span-0-123"><a id="__codelineno-0-123" name="__codelineno-0-123"></a>    <span class="o">*</span><span class="p">,</span>
-</span><span id="__span-0-124"><a id="__codelineno-0-124" name="__codelineno-0-124"></a>    <span class="n">q</span><span class="p">:</span> <span class="s2">"State | slice"</span><span class="p">,</span>
-</span><span id="__span-0-125"><a id="__codelineno-0-125" name="__codelineno-0-125"></a>    <span class="n">qd</span><span class="p">:</span> <span class="s2">"State | slice"</span><span class="p">,</span>
-</span><span id="__span-0-126"><a id="__codelineno-0-126" name="__codelineno-0-126"></a>    <span class="n">tau</span><span class="p">:</span> <span class="s2">"Control | slice"</span><span class="p">,</span>
-</span><span id="__span-0-127"><a id="__codelineno-0-127" name="__codelineno-0-127"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
-</span><span id="__span-0-128"><a id="__codelineno-0-128" name="__codelineno-0-128"></a><span class="w">    </span><span class="sd">"""Wrap a ``frax.Robot`` as a BYOF dynamics function.</span>
-</span><span id="__span-0-129"><a id="__codelineno-0-129" name="__codelineno-0-129"></a>
-</span><span id="__span-0-130"><a id="__codelineno-0-130" name="__codelineno-0-130"></a><span class="sd">    Returns a callable ``f(x, u, node, params) -&gt; qdd`` (shape</span>
-</span><span id="__span-0-131"><a id="__codelineno-0-131" name="__codelineno-0-131"></a><span class="sd">    ``(robot.num_joints,)``) suitable for ``byof["dynamics"]["qd"]``.</span>
-</span><span id="__span-0-132"><a id="__codelineno-0-132" name="__codelineno-0-132"></a>
-</span><span id="__span-0-133"><a id="__codelineno-0-133" name="__codelineno-0-133"></a><span class="sd">    For floating-base robots (``robot.includes_floating_dof = True``), the</span>
-</span><span id="__span-0-134"><a id="__codelineno-0-134" name="__codelineno-0-134"></a><span class="sd">    ``tau`` control covers only the ``num_actuated_joints`` actuated DOFs.</span>
-</span><span id="__span-0-135"><a id="__codelineno-0-135" name="__codelineno-0-135"></a><span class="sd">    Internally, the callable prepends six zeros to form the full</span>
-</span><span id="__span-0-136"><a id="__codelineno-0-136" name="__codelineno-0-136"></a><span class="sd">    ``(num_joints,)`` torque vector before calling</span>
-</span><span id="__span-0-137"><a id="__codelineno-0-137" name="__codelineno-0-137"></a><span class="sd">    ``robot.forward_dynamics``. The floating-base DOFs are assumed to appear</span>
-</span><span id="__span-0-138"><a id="__codelineno-0-138" name="__codelineno-0-138"></a><span class="sd">    first in the joint ordering (standard robotics convention, verified for</span>
-</span><span id="__span-0-139"><a id="__codelineno-0-139" name="__codelineno-0-139"></a><span class="sd">    ``frax.load_g1``).</span>
-</span><span id="__span-0-140"><a id="__codelineno-0-140" name="__codelineno-0-140"></a>
-</span><span id="__span-0-141"><a id="__codelineno-0-141" name="__codelineno-0-141"></a><span class="sd">    ``robot`` is captured in the closure safely because ``frax.Robot`` is</span>
-</span><span id="__span-0-142"><a id="__codelineno-0-142" name="__codelineno-0-142"></a><span class="sd">    decorated with ``@jax.tree_util.register_static``, making it a hashable</span>
-</span><span id="__span-0-143"><a id="__codelineno-0-143" name="__codelineno-0-143"></a><span class="sd">    JAX static type.</span>
-</span><span id="__span-0-144"><a id="__codelineno-0-144" name="__codelineno-0-144"></a>
-</span><span id="__span-0-145"><a id="__codelineno-0-145" name="__codelineno-0-145"></a><span class="sd">    Args:</span>
-</span><span id="__span-0-146"><a id="__codelineno-0-146" name="__codelineno-0-146"></a><span class="sd">        robot: A ``frax.Robot`` (or subclass) instance.</span>
-</span><span id="__span-0-147"><a id="__codelineno-0-147" name="__codelineno-0-147"></a><span class="sd">        q: Position state (or slice into the unified ``x`` vector).</span>
-</span><span id="__span-0-148"><a id="__codelineno-0-148" name="__codelineno-0-148"></a><span class="sd">            Length must equal ``robot.num_joints``.</span>
-</span><span id="__span-0-149"><a id="__codelineno-0-149" name="__codelineno-0-149"></a><span class="sd">        qd: Velocity state (or slice). Length must equal ``robot.num_joints``.</span>
-</span><span id="__span-0-150"><a id="__codelineno-0-150" name="__codelineno-0-150"></a><span class="sd">        tau: Control variable (or slice into the unified ``u`` vector).</span>
-</span><span id="__span-0-151"><a id="__codelineno-0-151" name="__codelineno-0-151"></a><span class="sd">            Length must equal ``robot.num_actuated_joints``.</span>
-</span><span id="__span-0-152"><a id="__codelineno-0-152" name="__codelineno-0-152"></a>
-</span><span id="__span-0-153"><a id="__codelineno-0-153" name="__codelineno-0-153"></a><span class="sd">    Returns:</span>
-</span><span id="__span-0-154"><a id="__codelineno-0-154" name="__codelineno-0-154"></a><span class="sd">        A function ``f(x, u, node, params) -&gt; jnp.ndarray`` matching the BYOF</span>
-</span><span id="__span-0-155"><a id="__codelineno-0-155" name="__codelineno-0-155"></a><span class="sd">        dynamics signature. The output is ``qdd``, the joint acceleration</span>
-</span><span id="__span-0-156"><a id="__codelineno-0-156" name="__codelineno-0-156"></a><span class="sd">        vector of shape ``(robot.num_joints,)``.</span>
-</span><span id="__span-0-157"><a id="__codelineno-0-157" name="__codelineno-0-157"></a>
-</span><span id="__span-0-158"><a id="__codelineno-0-158" name="__codelineno-0-158"></a><span class="sd">    Example:</span>
-</span><span id="__span-0-159"><a id="__codelineno-0-159" name="__codelineno-0-159"></a><span class="sd">        Franka Panda joint-space dynamics::</span>
-</span><span id="__span-0-160"><a id="__codelineno-0-160" name="__codelineno-0-160"></a>
-</span><span id="__span-0-161"><a id="__codelineno-0-161" name="__codelineno-0-161"></a><span class="sd">            from frax.robots.franka_panda import load_panda</span>
-</span><span id="__span-0-162"><a id="__codelineno-0-162" name="__codelineno-0-162"></a><span class="sd">            import openscvx as ox</span>
-</span><span id="__span-0-163"><a id="__codelineno-0-163" name="__codelineno-0-163"></a><span class="sd">            from openscvx.integrations import frax_dynamics</span>
-</span><span id="__span-0-164"><a id="__codelineno-0-164" name="__codelineno-0-164"></a>
-</span><span id="__span-0-165"><a id="__codelineno-0-165" name="__codelineno-0-165"></a><span class="sd">            robot = load_panda()</span>
-</span><span id="__span-0-166"><a id="__codelineno-0-166" name="__codelineno-0-166"></a><span class="sd">            q   = ox.State("q",   shape=(robot.num_joints,))</span>
-</span><span id="__span-0-167"><a id="__codelineno-0-167" name="__codelineno-0-167"></a><span class="sd">            qd  = ox.State("qd",  shape=(robot.num_joints,))</span>
-</span><span id="__span-0-168"><a id="__codelineno-0-168" name="__codelineno-0-168"></a><span class="sd">            tau = ox.Control("tau", shape=(robot.num_actuated_joints,))</span>
-</span><span id="__span-0-169"><a id="__codelineno-0-169" name="__codelineno-0-169"></a>
-</span><span id="__span-0-170"><a id="__codelineno-0-170" name="__codelineno-0-170"></a><span class="sd">            qdd = frax_dynamics(robot, q=q, qd=qd, tau=tau)</span>
-</span><span id="__span-0-171"><a id="__codelineno-0-171" name="__codelineno-0-171"></a>
-</span><span id="__span-0-172"><a id="__codelineno-0-172" name="__codelineno-0-172"></a><span class="sd">            problem = ox.Problem(</span>
-</span><span id="__span-0-173"><a id="__codelineno-0-173" name="__codelineno-0-173"></a><span class="sd">                dynamics={"q": qd},</span>
-</span><span id="__span-0-174"><a id="__codelineno-0-174" name="__codelineno-0-174"></a><span class="sd">                byof={"dynamics": {"qd": qdd}},</span>
-</span><span id="__span-0-175"><a id="__codelineno-0-175" name="__codelineno-0-175"></a><span class="sd">                states=[q, qd],</span>
-</span><span id="__span-0-176"><a id="__codelineno-0-176" name="__codelineno-0-176"></a><span class="sd">                controls=[tau],</span>
-</span><span id="__span-0-177"><a id="__codelineno-0-177" name="__codelineno-0-177"></a><span class="sd">                ...</span>
-</span><span id="__span-0-178"><a id="__codelineno-0-178" name="__codelineno-0-178"></a><span class="sd">            )</span>
-</span><span id="__span-0-179"><a id="__codelineno-0-179" name="__codelineno-0-179"></a><span class="sd">    """</span>
-</span><span id="__span-0-180"><a id="__codelineno-0-180" name="__codelineno-0-180"></a>    <span class="n">_q_arg</span> <span class="o">=</span> <span class="n">q</span>
-</span><span id="__span-0-181"><a id="__codelineno-0-181" name="__codelineno-0-181"></a>    <span class="n">_qd_arg</span> <span class="o">=</span> <span class="n">qd</span>
-</span><span id="__span-0-182"><a id="__codelineno-0-182" name="__codelineno-0-182"></a>    <span class="n">_tau_arg</span> <span class="o">=</span> <span class="n">tau</span>
-</span><span id="__span-0-183"><a id="__codelineno-0-183" name="__codelineno-0-183"></a>    <span class="c1"># Populated lazily on first call so the factory can be called before</span>
-</span><span id="__span-0-184"><a id="__codelineno-0-184" name="__codelineno-0-184"></a>    <span class="c1"># Problem preprocessing assigns .slice to the State/Control objects.</span>
-</span><span id="__span-0-185"><a id="__codelineno-0-185" name="__codelineno-0-185"></a>    <span class="n">_resolved</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="__span-0-186"><a id="__codelineno-0-186" name="__codelineno-0-186"></a>
-</span><span id="__span-0-187"><a id="__codelineno-0-187" name="__codelineno-0-187"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">params</span><span class="p">):</span>
-</span><span id="__span-0-188"><a id="__codelineno-0-188" name="__codelineno-0-188"></a>        <span class="k">del</span> <span class="n">node</span><span class="p">,</span> <span class="n">params</span>
-</span><span id="__span-0-189"><a id="__codelineno-0-189" name="__codelineno-0-189"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">_resolved</span><span class="p">:</span>
-</span><span id="__span-0-190"><a id="__codelineno-0-190" name="__codelineno-0-190"></a>            <span class="n">_resolved</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_resolve_slice</span><span class="p">(</span><span class="n">_q_arg</span><span class="p">,</span> <span class="s2">"q"</span><span class="p">))</span>
-</span><span id="__span-0-191"><a id="__codelineno-0-191" name="__codelineno-0-191"></a>            <span class="n">_resolved</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_resolve_slice</span><span class="p">(</span><span class="n">_qd_arg</span><span class="p">,</span> <span class="s2">"qd"</span><span class="p">))</span>
-</span><span id="__span-0-192"><a id="__codelineno-0-192" name="__codelineno-0-192"></a>            <span class="n">_resolved</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_resolve_slice</span><span class="p">(</span><span class="n">_tau_arg</span><span class="p">,</span> <span class="s2">"tau"</span><span class="p">))</span>
-</span><span id="__span-0-193"><a id="__codelineno-0-193" name="__codelineno-0-193"></a>        <span class="n">q_sl</span><span class="p">,</span> <span class="n">qd_sl</span><span class="p">,</span> <span class="n">tau_sl</span> <span class="o">=</span> <span class="n">_resolved</span>
-</span><span id="__span-0-194"><a id="__codelineno-0-194" name="__codelineno-0-194"></a>
-</span><span id="__span-0-195"><a id="__codelineno-0-195" name="__codelineno-0-195"></a>        <span class="n">q_val</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="n">q_sl</span><span class="p">]</span>
-</span><span id="__span-0-196"><a id="__codelineno-0-196" name="__codelineno-0-196"></a>        <span class="n">qd_val</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="n">qd_sl</span><span class="p">]</span>
-</span><span id="__span-0-197"><a id="__codelineno-0-197" name="__codelineno-0-197"></a>        <span class="n">tau_val</span> <span class="o">=</span> <span class="n">u</span><span class="p">[</span><span class="n">tau_sl</span><span class="p">]</span>
-</span><span id="__span-0-198"><a id="__codelineno-0-198" name="__codelineno-0-198"></a>
-</span><span id="__span-0-199"><a id="__codelineno-0-199" name="__codelineno-0-199"></a>        <span class="k">if</span> <span class="n">robot</span><span class="o">.</span><span class="n">includes_floating_dof</span><span class="p">:</span>
-</span><span id="__span-0-200"><a id="__codelineno-0-200" name="__codelineno-0-200"></a>            <span class="c1"># First 6 DOF are the unactuated floating base; user ctrl covers</span>
-</span><span id="__span-0-201"><a id="__codelineno-0-201" name="__codelineno-0-201"></a>            <span class="c1"># only the remaining num_actuated_joints.</span>
-</span><span id="__span-0-202"><a id="__codelineno-0-202" name="__codelineno-0-202"></a>            <span class="n">tau_full</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">tau_val</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span> <span class="n">tau_val</span><span class="p">])</span>
-</span><span id="__span-0-203"><a id="__codelineno-0-203" name="__codelineno-0-203"></a>        <span class="k">else</span><span class="p">:</span>
-</span><span id="__span-0-204"><a id="__codelineno-0-204" name="__codelineno-0-204"></a>            <span class="n">tau_full</span> <span class="o">=</span> <span class="n">tau_val</span>
-</span><span id="__span-0-205"><a id="__codelineno-0-205" name="__codelineno-0-205"></a>
-</span><span id="__span-0-206"><a id="__codelineno-0-206" name="__codelineno-0-206"></a>        <span class="c1"># frax's forward_dynamics declares fext with no default; pass it</span>
-</span><span id="__span-0-207"><a id="__codelineno-0-207" name="__codelineno-0-207"></a>        <span class="c1"># explicitly.</span>
-</span><span id="__span-0-208"><a id="__codelineno-0-208" name="__codelineno-0-208"></a>        <span class="k">return</span> <span class="n">robot</span><span class="o">.</span><span class="n">forward_dynamics</span><span class="p">(</span><span class="n">q_val</span><span class="p">,</span> <span class="n">qd_val</span><span class="p">,</span> <span class="n">tau_full</span><span class="p">,</span> <span class="n">fext</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-</span><span id="__span-0-209"><a id="__codelineno-0-209" name="__codelineno-0-209"></a>
-</span><span id="__span-0-210"><a id="__codelineno-0-210" name="__codelineno-0-210"></a>    <span class="k">return</span> <span class="n">f</span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-121">121</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-122">122</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-123">123</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-124">124</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-125">125</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-126">126</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-127">127</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-128">128</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-129">129</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-130">130</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-131">131</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-132">132</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-133">133</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-134">134</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-135">135</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-136">136</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-137">137</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-138">138</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-139">139</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-140">140</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-141">141</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-142">142</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-143">143</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-144">144</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-145">145</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-146">146</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-147">147</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-148">148</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-149">149</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-150">150</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-151">151</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-152">152</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-153">153</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-154">154</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-155">155</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-156">156</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-157">157</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-158">158</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-159">159</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-160">160</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-161">161</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-162">162</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-163">163</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-164">164</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-165">165</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-166">166</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-167">167</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-168">168</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-169">169</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-170">170</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-171">171</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-172">172</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-173">173</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-174">174</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-175">175</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-176">176</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-177">177</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-178">178</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-179">179</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-180">180</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-181">181</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-182">182</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-183">183</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-184">184</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-185">185</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-186">186</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-187">187</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-188">188</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-189">189</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-190">190</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-191">191</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-192">192</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-193">193</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-194">194</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-195">195</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-196">196</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-197">197</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-198">198</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-199">199</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-200">200</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-201">201</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-202">202</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-203">203</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-204">204</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-205">205</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-206">206</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-207">207</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-208">208</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-209">209</a></span>
+<span class="normal"><a href="#openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-210">210</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-121"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-121" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-121"></a><span class="k">def</span><span class="w"> </span><span class="nf">frax_dynamics</span><span class="p">(</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-122"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-122" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-122"></a>    <span class="n">robot</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-123"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-123" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-123"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-124"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-124" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-124"></a>    <span class="n">q</span><span class="p">:</span> <span class="s2">"State | slice"</span><span class="p">,</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-125"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-125" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-125"></a>    <span class="n">qd</span><span class="p">:</span> <span class="s2">"State | slice"</span><span class="p">,</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-126"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-126" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-126"></a>    <span class="n">tau</span><span class="p">:</span> <span class="s2">"Control | slice"</span><span class="p">,</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-127"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-127" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-127"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-128"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-128" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-128"></a><span class="w">    </span><span class="sd">"""Wrap a ``frax.Robot`` as a BYOF dynamics function.</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-129"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-129" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-129"></a>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-130"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-130" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-130"></a><span class="sd">    Returns a callable ``f(x, u, node, params) -&gt; qdd`` (shape</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-131"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-131" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-131"></a><span class="sd">    ``(robot.num_joints,)``) suitable for ``byof["dynamics"]["qd"]``.</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-132"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-132" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-132"></a>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-133"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-133" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-133"></a><span class="sd">    For floating-base robots (``robot.includes_floating_dof = True``), the</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-134"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-134" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-134"></a><span class="sd">    ``tau`` control covers only the ``num_actuated_joints`` actuated DOFs.</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-135"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-135" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-135"></a><span class="sd">    Internally, the callable prepends six zeros to form the full</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-136"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-136" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-136"></a><span class="sd">    ``(num_joints,)`` torque vector before calling</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-137"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-137" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-137"></a><span class="sd">    ``robot.forward_dynamics``. The floating-base DOFs are assumed to appear</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-138"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-138" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-138"></a><span class="sd">    first in the joint ordering (standard robotics convention, verified for</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-139"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-139" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-139"></a><span class="sd">    ``frax.load_g1``).</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-140"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-140" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-140"></a>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-141"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-141" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-141"></a><span class="sd">    ``robot`` is captured in the closure safely because ``frax.Robot`` is</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-142"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-142" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-142"></a><span class="sd">    decorated with ``@jax.tree_util.register_static``, making it a hashable</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-143"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-143" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-143"></a><span class="sd">    JAX static type.</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-144"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-144" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-144"></a>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-145"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-145" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-145"></a><span class="sd">    Args:</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-146"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-146" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-146"></a><span class="sd">        robot: A ``frax.Robot`` (or subclass) instance.</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-147"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-147" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-147"></a><span class="sd">        q: Position state (or slice into the unified ``x`` vector).</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-148"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-148" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-148"></a><span class="sd">            Length must equal ``robot.num_joints``.</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-149"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-149" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-149"></a><span class="sd">        qd: Velocity state (or slice). Length must equal ``robot.num_joints``.</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-150"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-150" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-150"></a><span class="sd">        tau: Control variable (or slice into the unified ``u`` vector).</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-151"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-151" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-151"></a><span class="sd">            Length must equal ``robot.num_actuated_joints``.</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-152"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-152" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-152"></a>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-153"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-153" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-153"></a><span class="sd">    Returns:</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-154"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-154" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-154"></a><span class="sd">        A function ``f(x, u, node, params) -&gt; jnp.ndarray`` matching the BYOF</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-155"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-155" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-155"></a><span class="sd">        dynamics signature. The output is ``qdd``, the joint acceleration</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-156"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-156" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-156"></a><span class="sd">        vector of shape ``(robot.num_joints,)``.</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-157"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-157" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-157"></a>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-158"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-158" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-158"></a><span class="sd">    Example:</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-159"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-159" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-159"></a><span class="sd">        Franka Panda joint-space dynamics::</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-160"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-160" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-160"></a>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-161"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-161" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-161"></a><span class="sd">            from frax.robots.franka_panda import load_panda</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-162"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-162" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-162"></a><span class="sd">            import openscvx as ox</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-163"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-163" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-163"></a><span class="sd">            from openscvx.integrations import frax_dynamics</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-164"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-164" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-164"></a>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-165"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-165" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-165"></a><span class="sd">            robot = load_panda()</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-166"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-166" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-166"></a><span class="sd">            q   = ox.State("q",   shape=(robot.num_joints,))</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-167"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-167" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-167"></a><span class="sd">            qd  = ox.State("qd",  shape=(robot.num_joints,))</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-168"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-168" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-168"></a><span class="sd">            tau = ox.Control("tau", shape=(robot.num_actuated_joints,))</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-169"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-169" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-169"></a>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-170"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-170" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-170"></a><span class="sd">            qdd = frax_dynamics(robot, q=q, qd=qd, tau=tau)</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-171"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-171" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-171"></a>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-172"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-172" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-172"></a><span class="sd">            problem = ox.Problem(</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-173"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-173" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-173"></a><span class="sd">                dynamics={"q": qd},</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-174"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-174" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-174"></a><span class="sd">                byof={"dynamics": {"qd": qdd}},</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-175"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-175" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-175"></a><span class="sd">                states=[q, qd],</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-176"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-176" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-176"></a><span class="sd">                controls=[tau],</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-177"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-177" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-177"></a><span class="sd">                ...</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-178"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-178" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-178"></a><span class="sd">            )</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-179"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-179" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-179"></a><span class="sd">    """</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-180"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-180" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-180"></a>    <span class="n">_q_arg</span> <span class="o">=</span> <span class="n">q</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-181"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-181" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-181"></a>    <span class="n">_qd_arg</span> <span class="o">=</span> <span class="n">qd</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-182"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-182" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-182"></a>    <span class="n">_tau_arg</span> <span class="o">=</span> <span class="n">tau</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-183"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-183" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-183"></a>    <span class="c1"># Populated lazily on first call so the factory can be called before</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-184"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-184" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-184"></a>    <span class="c1"># Problem preprocessing assigns .slice to the State/Control objects.</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-185"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-185" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-185"></a>    <span class="n">_resolved</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-186"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-186" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-186"></a>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-187"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-187" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-187"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">params</span><span class="p">):</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-188"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-188" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-188"></a>        <span class="k">del</span> <span class="n">node</span><span class="p">,</span> <span class="n">params</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-189"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-189" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-189"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">_resolved</span><span class="p">:</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-190"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-190" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-190"></a>            <span class="n">_resolved</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_resolve_slice</span><span class="p">(</span><span class="n">_q_arg</span><span class="p">,</span> <span class="s2">"q"</span><span class="p">))</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-191"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-191" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-191"></a>            <span class="n">_resolved</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_resolve_slice</span><span class="p">(</span><span class="n">_qd_arg</span><span class="p">,</span> <span class="s2">"qd"</span><span class="p">))</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-192"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-192" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-192"></a>            <span class="n">_resolved</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_resolve_slice</span><span class="p">(</span><span class="n">_tau_arg</span><span class="p">,</span> <span class="s2">"tau"</span><span class="p">))</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-193"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-193" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-193"></a>        <span class="n">q_sl</span><span class="p">,</span> <span class="n">qd_sl</span><span class="p">,</span> <span class="n">tau_sl</span> <span class="o">=</span> <span class="n">_resolved</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-194"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-194" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-194"></a>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-195"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-195" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-195"></a>        <span class="n">q_val</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="n">q_sl</span><span class="p">]</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-196"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-196" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-196"></a>        <span class="n">qd_val</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="n">qd_sl</span><span class="p">]</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-197"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-197" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-197"></a>        <span class="n">tau_val</span> <span class="o">=</span> <span class="n">u</span><span class="p">[</span><span class="n">tau_sl</span><span class="p">]</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-198"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-198" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-198"></a>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-199"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-199" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-199"></a>        <span class="k">if</span> <span class="n">robot</span><span class="o">.</span><span class="n">includes_floating_dof</span><span class="p">:</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-200"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-200" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-200"></a>            <span class="c1"># First 6 DOF are the unactuated floating base; user ctrl covers</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-201"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-201" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-201"></a>            <span class="c1"># only the remaining num_actuated_joints.</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-202"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-202" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-202"></a>            <span class="n">tau_full</span> <span class="o">=</span> <span class="n">jnp</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">jnp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">tau_val</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span> <span class="n">tau_val</span><span class="p">])</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-203"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-203" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-203"></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-204"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-204" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-204"></a>            <span class="n">tau_full</span> <span class="o">=</span> <span class="n">tau_val</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-205"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-205" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-205"></a>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-206"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-206" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-206"></a>        <span class="c1"># frax's forward_dynamics declares fext with no default; pass it</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-207"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-207" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-207"></a>        <span class="c1"># explicitly.</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-208"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-208" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-208"></a>        <span class="k">return</span> <span class="n">robot</span><span class="o">.</span><span class="n">forward_dynamics</span><span class="p">(</span><span class="n">q_val</span><span class="p">,</span> <span class="n">qd_val</span><span class="p">,</span> <span class="n">tau_full</span><span class="p">,</span> <span class="n">fext</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-209"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-209" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-209"></a>
+</span><span id="openscvx.integrations.frax.frax_dynamics--source--__span-0-210"><a id="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-210" name="openscvx.integrations.frax.frax_dynamics--source--__codelineno-0-210"></a>    <span class="k">return</span> <span class="n">f</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -13229,7 +13229,7 @@ Length must equal <code>robot.num_actuated_joints</code>.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 10, 2026 05:01:51 UTC">October 10, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 8, 2026 05:06:00 UTC">November 8, 2026</span>
   </span>
 
     
@@ -13239,7 +13239,7 @@ Length must equal <code>robot.num_actuated_joints</code>.</p>
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 10, 2026 05:01:51 UTC">October 10, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="November 8, 2026 05:06:00 UTC">November 8, 2026</span>
   </span>
 
     
@@ -13356,10 +13356,10 @@ Length must equal <code>robot.num_actuated_joints</code>.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.code.select", "content.footnote.tooltips", "content.tooltips", "header.autohide", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.sections", "navigation.tabs", "navigation.top", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.code.select", "content.footnote.tooltips", "content.tooltips", "header.autohide", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.instant.progress", "navigation.sections", "navigation.tabs", "navigation.top", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
       
         <script src="../../../javascripts/mathjax.js"></script>
       
