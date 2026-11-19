@@ -160,4 +160,5 @@ markers = [
     "cvxpygen: requires cvxpygen + qocogen (openscvx[cvxpygen])",
     "lie: requires jaxlie (openscvx[lie])",
     "moreau: requires moreau (openscvx[moreau])",
+    "icore: requires icore (clone github.com/sametuzun781/ICORE onto PYTHONPATH)",
 ]

@@ -169,20 +169,30 @@ This means JAX-lowered dynamics and constraints could be used with alternative s
 ## Convex Subproblem Backends
 
 The convex subproblem at each SCP iteration is solved by a concrete subclass
-of the abstract `PTRSolver` base. Three backends ship today:
+of the abstract `PTRSolver` base. Four backends ship today:
 
 | Backend | Class | Selector | Notes |
 |---------|-------|----------|-------|
 | CVXPy (default) | `CVXPyPTRSolver` | `solver={"backend": "cvxpy"}` (default) | DCP graph via CVXPy, dispatched to QOCO / CLARABEL / etc. Supports user `.convex()` constraints, cross-node constraints, CTCS, and impulsive controls. Optional cvxpygen code generation. |
 | QPAX | `QPAXPTRSolver` | `solver={"backend": "qpax"}` | JAX-native QP via `qpax.solve_qp`. Flat `(Q, q, A, b, G, h)` assembly. Supports box / dynamics (continuous and impulsive) / CTCS / boundary-Fix; **rejects** user `.convex()` and cross-node at `initialize()` with a clear "use `CVXPyPTRSolver`" message. The `iteration_callback` uses `qpax.solve_qp`, whose convergence flag maps to a `status_code` so a diverged solve fails loudly (chosen over the differentiable `solve_qp_primal`, which exposes no such flag). |
 | Moreau | `MoreauPTRSolver` | `solver={"backend": "moreau"}` | JAX-native conic solver (`moreau.jax.Solver`). Sparse CSR assembly; SOC epigraphs for the L1 / pos PTR penalties (fewer variables and rows than QPAX). Warm-starts between SCP iterations. Same supported subset as QPAX (continuous and impulsive dynamics). Paves the way for user `.convex()` SOC support in a follow-up. |
+| ICORE | `ICOREPTRSolver` | `solver={"backend": "icore"}` | Riccati-structured conic IPM (`icore.jax.core.make_solver`). Stage-wise assembly: augmented state `[x, u, t_vb]`, equalities eliminated through the dynamics, uniform per-stage cones; the `\|ν\| ≤ t_vc` epigraphs use ICORE's `epigraph_controls` so they are eliminated analytically. Supports user `.convex()` nonneg / SOC; rejects zero-cone, cross-node and L1 equalities. float64 only; cold-start. |
 
 Each backend exposes two per-iteration entry points: the historical NumPy
 `update_*` + `solve()` stages (kept for direct / interactive solver use), and a
 JAX-pure `iteration_callback()` built once at `initialize()`. The callback
-returns a `(state, SubproblemData) -> SubproblemSolution` callable; all three
+returns a `(state, SubproblemData) -> SubproblemSolution` callable; all
 backends emit the same input/output pytree shape (CVXPy host-calls via
 `jax.pure_callback`).
+
+The three pure-JAX backends inherit from `JaxPTRSolver`
+(`openscvx/solvers/ptr_solver.py`), which owns everything they share: the
+named-argument / `solver_args` merge, the `x = S z + c` scaling, the
+supported-subset guards, the NumPy `update_*` stash (with `D_d` absorbed into
+`A_d` / `B_d` / `C_d`), packing that stash into a `SubproblemData`, and vmapped
+linearization of user `.convex()` cone functions. A new JAX backend implements
+only `create_variables`, `initialize`, `iteration_callback` and `solve` (which
+can simply be `_solve_via_callback()`).
 
 `Problem.initialize()` fuses that callback with discretization, constraint
 linearization, the SCP metrics, and the autotuner into one JAX function —
@@ -231,5 +241,5 @@ many problems but caps the QP's conditioning.
 - `openscvx/lowered/` — Dataclass definitions
 - `openscvx/symbolic/lowerers/jax.py` — JAX visitor implementation
 - `openscvx/symbolic/lowerers/cvxpy.py` — CVXPy visitor implementation
-- `openscvx/solvers/ptr_solver.py` — Abstract `PTRSolver` contract
-- `openscvx/solvers/cvxpy_ptr_solver.py` / `qpax_ptr_solver.py` — Concrete backends
+- `openscvx/solvers/ptr_solver.py` — Abstract `PTRSolver` contract and the shared `JaxPTRSolver` base
+- `openscvx/solvers/cvxpy_ptr_solver.py` / `qpax_ptr_solver.py` / `moreau_ptr_solver.py` / `icore_ptr_solver.py` — Concrete backends

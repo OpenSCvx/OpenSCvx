@@ -2,7 +2,7 @@
 
 The PTR formulation — its variables, slack structure, cost terms, and
 linearization contract — is shared across backends. This module defines that
-contract; concrete backends (CVXPy, QPAX, Moreau) live in sibling modules and
+contract; concrete backends (CVXPy, QPAX, Moreau, ICORE) live in sibling modules and
 implement the assembly/dispatch that each backend's modeling layer requires.
 
 Two per-iteration entry points coexist:
@@ -35,6 +35,15 @@ Backends:
         which returns ``(solution, info)`` and does not warm-start. Uses SOC
         epigraphs for the L1 / pos
         PTR penalties instead of QPAX-style slack expansion.
+    :class:`openscvx.solvers.icore_ptr_solver.ICOREPTRSolver`
+        Stage-wise conic OCP (augmented state ``[x, u, t_vb]``, uniform
+        per-stage cones, equalities eliminated through the dynamics) solved
+        with ICORE's Riccati-structured JAX interior-point kernel. Cold-start;
+        float64 only.
+
+QPAX, Moreau and ICORE share their non-assembly plumbing (argument merging,
+scaling, guards, the ``update_*`` stash and its packing into
+:class:`SubproblemData`) through :class:`JaxPTRSolver`.
 """
 
 from abc import abstractmethod
@@ -64,6 +73,8 @@ from .cones import ConeConstraint
 if TYPE_CHECKING:
     import hashlib
 
+    from openscvx.lowered import LoweredProblem
+    from openscvx.lowered.jax_constraints import LoweredJaxConstraints
     from openscvx.lowered.unified import UnifiedControl, UnifiedState
     from openscvx.symbolic.constraint_set import ConstraintSet
 
@@ -633,3 +644,355 @@ class PTRSolver(ConvexSolver):
             dtype=float,
         )
         return get_affine_scaling_matrices(n, lower, upper)
+
+
+# ---------------------------------------------------------------------------
+# Shared base for the pure-JAX backends
+# ---------------------------------------------------------------------------
+
+
+class JaxPTRSolver(PTRSolver):
+    """Shared plumbing for PTR backends whose subproblem solve is pure JAX.
+
+    QPAX, Moreau and ICORE differ only in how they assemble, dispatch and
+    unpack the subproblem. This class owns everything else they have in
+    common:
+
+    * named-argument / ``solver_args`` merging (:meth:`_merge_solver_args`);
+    * the affine ``x = S z + c`` scaling, in NumPy and JAX form
+      (:meth:`_setup_scaling`);
+    * the supported-subset guards (:meth:`_reject_nodal_equalities`,
+      :meth:`_check_initialize`);
+    * the four NumPy ``update_*`` hooks, which stash their inputs (with
+      ``D_d`` absorbed into ``A_d`` / ``B_d`` / ``C_d``) for :meth:`solve`;
+    * packing that stash into a :class:`SubproblemData`
+      (:meth:`_subproblem_data_from_stash`), so a backend can implement
+      :meth:`solve` by running its own :meth:`iteration_callback`
+      (:meth:`_solve_via_callback`);
+    * vmapped linearization of user ``.convex()`` cone functions
+      (:meth:`_linearize_at_nodes`).
+
+    Subclasses provide ``layout`` (any object with ``N``, ``n_x``, ``n_u`` and
+    ``n_nodal``), :meth:`create_variables`, :meth:`initialize`,
+    :meth:`iteration_callback` and :meth:`solve`.
+    """
+
+    def __init__(self, solver_args: Dict[str, Any]):
+        self.solver_args = solver_args
+
+        self.layout: Any = None
+        self._settings = None
+        self._jax_constraints = None
+
+        # Populated by PTRSolver.lower_convex_constraints.
+        self._impulsive_pins: List[Tuple[List[int], slice]] = []
+        self._user_cone_constraints: List[ConeConstraint] = []
+        self._parameters_dict: Dict[str, Any] = {}
+
+        # Per-iteration NumPy stash, written by the update_* hooks.
+        self._dyn: dict = {}
+        self._cons: dict = {}
+        self._pen: dict = {}
+        self._x_init: Optional[np.ndarray] = None
+        self._x_term: Optional[np.ndarray] = None
+
+    # ------------------------------------------------------------------
+    # Construction / setup helpers
+    # ------------------------------------------------------------------
+
+    def _merge_solver_args(
+        self,
+        named: Dict[str, Any],
+        solver_args: Optional[Dict[str, Any]],
+        defaults: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Merge ``defaults``, explicitly passed named arguments and ``solver_args``.
+
+        ``None`` values in ``named`` mean "not passed". A key that is both
+        passed by name and present in ``solver_args`` is ambiguous and raises.
+        """
+        named = {k: v for k, v in named.items() if v is not None}
+        extra = dict(solver_args) if solver_args else {}
+        overlap = named.keys() & extra.keys()
+        if overlap:
+            raise ValueError(
+                f"{type(self).__name__} settings {sorted(overlap)} appear as both named "
+                "arguments and inside solver_args; use one or the other."
+            )
+        return {**(defaults or {}), **named, **extra}
+
+    def _setup_scaling(
+        self, x_unified: "UnifiedState", u_unified: "UnifiedControl"
+    ) -> Tuple[int, int]:
+        """Store the affine scaling in NumPy and JAX form; return ``(n_x, n_u)``.
+
+        The JAX copies use ``float64`` when ``jax_enable_x64`` is on and
+        ``float32`` otherwise, so assembled arrays land in the dtype the
+        backend kernel expects.
+        """
+        self._S_x, self._c_x = self._scaling(x_unified)
+        self._S_u, self._c_u = self._scaling(u_unified)
+        self._S_x_diag = np.diag(self._S_x)
+        self._S_u_diag = np.diag(self._S_u)
+        self._inv_S_x_diag = 1.0 / self._S_x_diag
+        self._inv_S_u_diag = 1.0 / self._S_u_diag
+
+        f = jnp.float64 if jax.config.read("jax_enable_x64") else jnp.float32
+        self._jax_dtype = f
+        self._S_x_diag_j = jnp.asarray(self._S_x_diag, dtype=f)
+        self._S_u_diag_j = jnp.asarray(self._S_u_diag, dtype=f)
+        self._inv_S_x_diag_j = jnp.asarray(self._inv_S_x_diag, dtype=f)
+        self._inv_S_u_diag_j = jnp.asarray(self._inv_S_u_diag, dtype=f)
+        self._c_x_j = jnp.asarray(self._c_x, dtype=f)
+        self._c_u_j = jnp.asarray(self._c_u, dtype=f)
+        self._x_unified = x_unified
+        return len(x_unified.max), len(u_unified.max)
+
+    def _reject_nodal_equalities(self, jax_constraints: "LoweredJaxConstraints") -> None:
+        """Raise if any nodal constraint is an L1-penalized equality."""
+        if any(c.is_equality for c in jax_constraints.nodal):
+            raise NotImplementedError(
+                f"{type(self).__name__} does not support L1-penalized equality "
+                "constraints. Use CVXPyPTRSolver."
+            )
+
+    def _check_initialize(self, lowered: "LoweredProblem") -> None:
+        """Common :meth:`initialize` preconditions.
+
+        Raises:
+            RuntimeError: If :meth:`create_variables` was not called first.
+            NotImplementedError: If cross-node constraints are present.
+        """
+        name = type(self).__name__
+        if self.layout is None:
+            raise RuntimeError(
+                f"{name}.initialize() called before create_variables(). "
+                "Call create_variables() first."
+            )
+        if lowered.jax_constraints.cross_node:
+            raise NotImplementedError(
+                f"{name} does not support cross-node constraints "
+                f"({len(lowered.jax_constraints.cross_node)} defined). "
+                "Use CVXPyPTRSolver."
+            )
+
+    def _check_callback_ready(self) -> None:
+        """Raise unless :meth:`initialize` has run."""
+        if self.layout is None or self._settings is None:
+            raise RuntimeError(
+                f"{type(self).__name__}.iteration_callback() requires initialize() to "
+                "have been called first."
+            )
+
+    # ------------------------------------------------------------------
+    # NumPy update_* hooks (stash for solve())
+    # ------------------------------------------------------------------
+
+    def update_dynamics_linearization(
+        self,
+        x_bar: np.ndarray,
+        u_bar: np.ndarray,
+        A_d: np.ndarray,
+        B_d: np.ndarray,
+        C_d: np.ndarray,
+        x_prop: np.ndarray,
+        x_prop_plus: Optional[np.ndarray] = None,
+        D_d: Optional[np.ndarray] = None,
+        E_d: Optional[np.ndarray] = None,
+    ) -> None:
+        A_eff = np.asarray(A_d, dtype=float)
+        B_eff = np.asarray(B_d, dtype=float)
+        C_eff = np.asarray(C_d, dtype=float)
+
+        # Absorb the impulsive state Jacobian into the continuous step
+        # matrices so the assembly keeps a single A_d·dx + B_d·du term (same
+        # recipe as CVXPyPTRSolver.update_dynamics_linearization).
+        if D_d is not None:
+            D_arr = np.asarray(D_d, dtype=float)
+            n_steps = A_eff.shape[0]
+            if D_arr.ndim == 3 and D_arr.shape[0] in (n_steps, n_steps + 1):
+                D_steps = D_arr[D_arr.shape[0] - n_steps :]
+            else:
+                raise ValueError(
+                    "Unexpected D_d shape for dynamics update: "
+                    f"{D_arr.shape}, expected "
+                    f"{(n_steps + 1, A_eff.shape[1], A_eff.shape[2])} "
+                    f"or {(n_steps, A_eff.shape[1], A_eff.shape[2])}."
+                )
+            A_eff = np.einsum("kij,kjl->kil", D_steps, A_eff)
+            B_eff = np.einsum("kij,kjl->kil", D_steps, B_eff)
+            C_eff = np.einsum("kij,kjl->kil", D_steps, C_eff)
+
+        self._dyn = {
+            "x_bar": np.asarray(x_bar, dtype=float),
+            "u_bar": np.asarray(u_bar, dtype=float),
+            "A_d": A_eff,
+            "B_d": B_eff,
+            "C_d": C_eff,
+            "x_prop": np.asarray(x_prop, dtype=float),
+            "x_prop_plus": (
+                np.asarray(x_prop_plus, dtype=float) if x_prop_plus is not None else None
+            ),
+            "E_d": np.asarray(E_d, dtype=float) if E_d is not None else None,
+        }
+
+    def update_constraint_linearizations(
+        self,
+        nodal: Optional[List[dict]] = None,
+        cross_node: Optional[List[dict]] = None,
+    ) -> None:
+        if cross_node:
+            raise NotImplementedError(
+                f"{type(self).__name__} received cross-node linearization data; "
+                "cross-node constraints are not supported. Use CVXPyPTRSolver."
+            )
+        self._cons = {
+            "nodal": [
+                {
+                    "g": np.asarray(d["g"], dtype=float),
+                    "grad_g_x": np.asarray(d["grad_g_x"], dtype=float),
+                    "grad_g_u": np.asarray(d["grad_g_u"], dtype=float),
+                }
+                for d in (nodal or [])
+            ],
+        }
+
+    def update_penalties(
+        self,
+        lam_prox: np.ndarray,
+        lam_cost: Union[float, np.ndarray],
+        lam_vc: np.ndarray,
+        lam_vb_nodal: np.ndarray,
+        lam_vb_cross: np.ndarray,
+    ) -> None:
+        del lam_vb_cross  # cross-node constraints are rejected at initialize()
+        self._pen = {
+            "lam_prox": np.asarray(lam_prox, dtype=float),
+            "lam_cost": np.asarray(lam_cost, dtype=float),
+            "lam_vc": np.asarray(lam_vc, dtype=float),
+            "lam_vb_nodal": np.asarray(lam_vb_nodal, dtype=float),
+        }
+
+    def update_boundary_conditions(
+        self,
+        x_init: Optional[np.ndarray] = None,
+        x_term: Optional[np.ndarray] = None,
+    ) -> None:
+        if x_init is not None:
+            self._x_init = np.asarray(x_init, dtype=float)
+        if x_term is not None:
+            self._x_term = np.asarray(x_term, dtype=float)
+
+    # ------------------------------------------------------------------
+    # Stash → SubproblemData, and solve() through the JAX callback
+    # ------------------------------------------------------------------
+
+    def _subproblem_data_from_stash(self) -> SubproblemData:
+        """Pack the ``update_*`` stash into the :class:`SubproblemData` pytree.
+
+        ``D_d`` was absorbed into ``A_d`` / ``B_d`` / ``C_d`` at update time,
+        so the packed ``D_d`` is the identity.
+        """
+        if not (self._dyn and self._cons and self._pen):
+            raise RuntimeError(
+                f"{type(self).__name__}.solve() requires update_dynamics_linearization, "
+                "update_constraint_linearizations, and update_penalties to all "
+                "have been called this iteration."
+            )
+        L = self.layout
+        N, n_x, n_u, C = L.N, L.n_x, L.n_u, L.n_nodal
+        dyn, pen = self._dyn, self._pen
+
+        # Nodal linearizations stacked to (N, C, ...), zero outside each
+        # constraint's node set.
+        nodal_g = np.zeros((N, C))
+        nodal_grad_x = np.zeros((N, C, n_x))
+        nodal_grad_u = np.zeros((N, C, n_u))
+        for c, (constraint, entry) in enumerate(
+            zip(self._jax_constraints.nodal, self._cons["nodal"])
+        ):
+            nodes = list(constraint.nodes)
+            nodal_g[nodes, c] = entry["g"][nodes]
+            nodal_grad_x[nodes, c] = entry["grad_g_x"][nodes]
+            nodal_grad_u[nodes, c] = entry["grad_g_u"][nodes]
+
+        def _or(value, shape, fill=0.0):
+            return value if value is not None else np.full(shape, fill)
+
+        return SubproblemData(
+            x_bar=jnp.asarray(dyn["x_bar"]),
+            u_bar=jnp.asarray(dyn["u_bar"]),
+            A_d=jnp.asarray(dyn["A_d"]),
+            B_d=jnp.asarray(dyn["B_d"]),
+            C_d=jnp.asarray(dyn["C_d"]),
+            x_prop=jnp.asarray(dyn["x_prop"]),
+            x_prop_plus=jnp.asarray(_or(dyn["x_prop_plus"], (N, n_x))),
+            D_d=jnp.broadcast_to(jnp.eye(n_x), (N, n_x, n_x)),
+            E_d=jnp.asarray(_or(dyn["E_d"], (N, n_x, n_u))),
+            nodal_g=jnp.asarray(nodal_g),
+            nodal_grad_x=jnp.asarray(nodal_grad_x),
+            nodal_grad_u=jnp.asarray(nodal_grad_u),
+            cross_g=jnp.zeros((0,)),
+            cross_grad_X=jnp.zeros((0, N, n_x)),
+            cross_grad_U=jnp.zeros((0, N, n_u)),
+            lam_prox=jnp.asarray(pen["lam_prox"]),
+            lam_cost=jnp.asarray(pen["lam_cost"]),
+            lam_vc=jnp.asarray(pen["lam_vc"]),
+            lam_vb_nodal=jnp.asarray(pen["lam_vb_nodal"]),
+            lam_vb_cross=jnp.zeros((0,)),
+            x_init=jnp.asarray(_or(self._x_init, n_x, np.nan)),
+            x_term=jnp.asarray(_or(self._x_term, n_x, np.nan)),
+            params=self._parameters_dict,
+        )
+
+    def _solve_via_callback(self) -> PTRSolveResult:
+        """Implement :meth:`solve` by running :meth:`iteration_callback` on the stash.
+
+        Lets a backend share one assembly between the NumPy and JAX-pure
+        entry points instead of maintaining a separate NumPy path.
+        """
+        sol = self.iteration_callback()(None, self._subproblem_data_from_stash())
+        ok = int(sol.status_code) == int(StatusCode.OPTIMAL)
+        nu_vb = np.asarray(sol.nu_vb)
+        return PTRSolveResult(
+            x=np.asarray(sol.x),
+            u=np.asarray(sol.u),
+            nu=np.asarray(sol.nu),
+            nu_vb=list(nu_vb.T),
+            nu_vb_cross=[],
+            cost=float(sol.cost),
+            status="optimal" if ok else "infeasible",
+        )
+
+    # ------------------------------------------------------------------
+    # User cone linearization
+    # ------------------------------------------------------------------
+
+    def _linearize_at_nodes(
+        self, fn: Callable, nodes: Tuple[int, ...], data: SubproblemData, rows: int
+    ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+        """Value and *scaled* Jacobians of a per-node function at ``nodes``.
+
+        ``fn(x, u, node, params)`` is evaluated and differentiated (one
+        forward-mode pass for both arguments) at every node in a single
+        ``jax.vmap``, instead of one trace per node. Jacobians are
+        right-multiplied by ``S_x`` / ``S_u`` so they act on scaled variables.
+
+        Returns:
+            ``(val, J_x, J_u)`` with shapes ``(K, rows)``, ``(K, rows, n_x)``
+            and ``(K, rows, n_u)`` for ``K = len(nodes)``.
+        """
+        idx = np.asarray(nodes, dtype=np.int32)
+        params = data.params
+
+        def at_node(x, u, k):
+            f = lambda x_, u_: jnp.reshape(fn(x_, u_, k, params), (rows,))  # noqa: E731
+            J_x, J_u = jax.jacfwd(f, argnums=(0, 1))(x, u)
+            return f(x, u), J_x, J_u
+
+        val, J_x, J_u = jax.vmap(at_node)(data.x_bar[idx], data.u_bar[idx], jnp.asarray(idx))
+        return (
+            val,
+            J_x * self._S_x_diag_j[None, None, :],
+            J_u * self._S_u_diag_j[None, None, :],
+        )

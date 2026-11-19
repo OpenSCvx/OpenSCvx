@@ -58,14 +58,14 @@ Note:
 """
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 import numpy as np
 from scipy import sparse as sp
 
 from .cones import NonnegConeConstraint, SOCConstraint, ZeroConeConstraint
 from .ptr_solver import (
-    PTRSolver,
+    JaxPTRSolver,
     PTRSolveResult,
     StatusCode,
     SubproblemData,
@@ -254,7 +254,7 @@ class _ConicLayout:
 # ---------------------------------------------------------------------------
 
 
-class MoreauPTRSolver(PTRSolver):
+class MoreauPTRSolver(JaxPTRSolver):
     """JAX-native conic backend for the PTR convex subproblem.
 
     Assembles each SCP subproblem as a sparse conic program and dispatches to
@@ -349,29 +349,11 @@ class MoreauPTRSolver(PTRSolver):
                 "Install it with: pip install openscvx[moreau]"
             )
 
-        # None sentinels at the signature surface let us distinguish
-        # "user explicitly passed this" from "default applied" — only the
-        # former should collide with the same key inside solver_args.
-        _named = {
-            k: v
-            for k, v in (
-                ("max_iter", max_iter),
-                ("verbose", verbose),
-                ("device", device),
-            )
-            if v is not None
-        }
-        _extra = dict(solver_args) if solver_args else {}
-        _overlap = _named.keys() & _extra.keys()
-        if _overlap:
-            raise ValueError(
-                f"Moreau settings {sorted(_overlap)} appear as both named arguments "
-                "and inside solver_args; use one or the other."
-            )
-        merged = {**_named, **_extra}
-        merged.setdefault("max_iter", 200)
-        merged.setdefault("verbose", False)
-        merged.setdefault("device", "auto")
+        merged = self._merge_solver_args(
+            {"max_iter": max_iter, "verbose": verbose, "device": device},
+            solver_args,
+            {"max_iter": 200, "verbose": False, "device": "auto"},
+        )
 
         _ipm = {
             k: v for k, v in [("tol_gap_abs", tol_gap_abs), ("tol_feas", tol_feas)] if v is not None
@@ -391,19 +373,8 @@ class MoreauPTRSolver(PTRSolver):
                 )
             merged["ipm_settings"] = {**_ipm, **existing_ipm}
 
-        self.solver_args = merged
-
+        super().__init__(merged)
         self.layout: Optional[_ConicLayout] = None
-        self._S_x: Optional[np.ndarray] = None
-        self._c_x: Optional[np.ndarray] = None
-        self._S_u: Optional[np.ndarray] = None
-        self._c_u: Optional[np.ndarray] = None
-        self._S_x_diag: Optional[np.ndarray] = None
-        self._S_u_diag: Optional[np.ndarray] = None
-        self._inv_S_x_diag: Optional[np.ndarray] = None
-        self._inv_S_u_diag: Optional[np.ndarray] = None
-        self._settings: Optional["Config"] = None
-        self._jax_constraints: Optional["LoweredJaxConstraints"] = None
 
         # moreau.jax.Solver constructed at initialize().
         self._moreau: Optional[_MoreauJaxSolver] = None
@@ -414,18 +385,6 @@ class MoreauPTRSolver(PTRSolver):
         self._coo_rows: Optional[np.ndarray] = None
         self._coo_cols: Optional[np.ndarray] = None
         self._n_con: int = 0
-
-        # Populated by PTRSolver.lower_convex_constraints.
-        self._impulsive_pins: List[Tuple[List[int], slice]] = []
-        self._user_cone_constraints: List = []
-        self._parameters_dict: dict = {}
-
-        # Per-iteration data, set by update_* methods.
-        self._dyn: dict = {}
-        self._cons: dict = {}
-        self._pen: dict = {}
-        self._x_init: Optional[np.ndarray] = None
-        self._x_term: Optional[np.ndarray] = None
 
         # Warm-start carry; reset to None when problem structure changes.
         self._warm_start = None
@@ -461,44 +420,10 @@ class MoreauPTRSolver(PTRSolver):
             constraint_sparsity: Ignored.
         """
         del dynamics_sparsity, constraint_sparsity
-
-        n_x = len(x_unified.max)
-        n_u = len(u_unified.max)
-
-        S_x, c_x = self._scaling(x_unified)
-        S_u, c_u = self._scaling(u_unified)
-
-        self._S_x = S_x
-        self._c_x = c_x
-        self._S_u = S_u
-        self._c_u = c_u
-        self._S_x_diag = np.diag(S_x)
-        self._S_u_diag = np.diag(S_u)
-        self._inv_S_x_diag = 1.0 / self._S_x_diag
-        self._inv_S_u_diag = 1.0 / self._S_u_diag
-
-        # JAX-side scaling diagonals for ``iteration_callback``. The dtype
-        # tracks the global ``jax_enable_x64`` setting so the assembled
-        # ``(P_data, A_data, q, b)`` lands in the dtype Moreau's functional
-        # solver expects.
-        f = jnp.float64 if jax.config.read("jax_enable_x64") else jnp.float32
-        self._S_x_diag_j = jnp.asarray(self._S_x_diag, dtype=f)
-        self._S_u_diag_j = jnp.asarray(self._S_u_diag, dtype=f)
-        self._inv_S_x_diag_j = jnp.asarray(self._inv_S_x_diag, dtype=f)
-        self._inv_S_u_diag_j = jnp.asarray(self._inv_S_u_diag, dtype=f)
-        self._c_x_j = jnp.asarray(self._c_x, dtype=f)
-        self._c_u_j = jnp.asarray(self._c_u, dtype=f)
-        self._jax_dtype = f
-
-        if any(c.is_equality for c in jax_constraints.nodal):
-            raise NotImplementedError(
-                "MoreauPTRSolver does not support L1-penalized equality "
-                "constraints. Use CVXPyPTRSolver."
-            )
-
+        n_x, n_u = self._setup_scaling(x_unified, u_unified)
+        self._reject_nodal_equalities(jax_constraints)
         self.layout = _ConicLayout(N=N, n_x=n_x, n_u=n_u, n_nodal=len(jax_constraints.nodal))
         self._jax_constraints = jax_constraints
-        self._x_unified = x_unified
 
     def initialize(self, lowered: "LoweredProblem", settings: "Config") -> None:
         """Build the static conic structure and construct ``moreau.jax.Solver``.
@@ -516,19 +441,7 @@ class MoreauPTRSolver(PTRSolver):
             RuntimeError: If :meth:`create_variables` was not called first.
             NotImplementedError: If cross-node constraints are present.
         """
-        if self.layout is None:
-            raise RuntimeError(
-                "MoreauPTRSolver.initialize() called before create_variables(). "
-                "Call create_variables() first."
-            )
-
-        if lowered.jax_constraints.cross_node:
-            raise NotImplementedError(
-                "MoreauPTRSolver does not yet support cross-node constraints "
-                f"({len(lowered.jax_constraints.cross_node)} defined). "
-                "Use CVXPyPTRSolver."
-            )
-
+        self._check_initialize(lowered)
         self._settings = settings
         # Reset warm-start on new initialization (problem structure may change).
         self._warm_start = None
@@ -606,107 +519,6 @@ class MoreauPTRSolver(PTRSolver):
             cones=cones,
             settings=moreau_settings,
         )
-
-    # ------------------------------------------------------------------
-    # Per-iteration update hooks
-    # ------------------------------------------------------------------
-
-    def update_dynamics_linearization(
-        self,
-        x_bar: np.ndarray,
-        u_bar: np.ndarray,
-        A_d: np.ndarray,
-        B_d: np.ndarray,
-        C_d: np.ndarray,
-        x_prop: np.ndarray,
-        x_prop_plus: Optional[np.ndarray] = None,
-        D_d: Optional[np.ndarray] = None,
-        E_d: Optional[np.ndarray] = None,
-    ) -> None:
-        A_eff = np.asarray(A_d, dtype=float)
-        B_eff = np.asarray(B_d, dtype=float)
-        C_eff = np.asarray(C_d, dtype=float)
-
-        # Absorb the impulsive state Jacobian into the continuous step
-        # matrices so the assembly row keeps a single A_d·dx + B_d·du term,
-        # matching the recipe in CVXPyPTRSolver.update_dynamics_linearization
-        # at openscvx/solvers/cvxpy_ptr_solver.py:636-654.
-        if D_d is not None:
-            D_arr = np.asarray(D_d, dtype=float)
-            if D_arr.ndim == 3 and D_arr.shape[0] == A_eff.shape[0] + 1:
-                D_steps = D_arr[1:]
-            elif D_arr.ndim == 3 and D_arr.shape[0] == A_eff.shape[0]:
-                D_steps = D_arr
-            else:
-                raise ValueError(
-                    "Unexpected D_d shape for dynamics update: "
-                    f"{D_arr.shape}, expected "
-                    f"{(A_eff.shape[0] + 1, A_eff.shape[1], A_eff.shape[2])} "
-                    f"or {(A_eff.shape[0], A_eff.shape[1], A_eff.shape[2])}."
-                )
-            A_eff = np.einsum("kij,kjl->kil", D_steps, A_eff)
-            B_eff = np.einsum("kij,kjl->kil", D_steps, B_eff)
-            C_eff = np.einsum("kij,kjl->kil", D_steps, C_eff)
-
-        self._dyn = {
-            "x_bar": np.asarray(x_bar, dtype=float),
-            "u_bar": np.asarray(u_bar, dtype=float),
-            "A_d": A_eff,
-            "B_d": B_eff,
-            "C_d": C_eff,
-            "x_prop": np.asarray(x_prop, dtype=float),
-            "x_prop_plus": (
-                np.asarray(x_prop_plus, dtype=float) if x_prop_plus is not None else None
-            ),
-            "E_d": np.asarray(E_d, dtype=float) if E_d is not None else None,
-        }
-
-    def update_constraint_linearizations(
-        self,
-        nodal: Optional[List[dict]] = None,
-        cross_node: Optional[List[dict]] = None,
-    ) -> None:
-        if cross_node:
-            raise NotImplementedError(
-                "MoreauPTRSolver received cross-node linearization data; "
-                "cross-node constraints are not supported. Use CVXPyPTRSolver."
-            )
-        self._cons = {
-            "nodal": [
-                {
-                    "g": np.asarray(d["g"], dtype=float),
-                    "grad_g_x": np.asarray(d["grad_g_x"], dtype=float),
-                    "grad_g_u": np.asarray(d["grad_g_u"], dtype=float),
-                }
-                for d in (nodal or [])
-            ],
-        }
-
-    def update_penalties(
-        self,
-        lam_prox: np.ndarray,
-        lam_cost: Union[float, np.ndarray],
-        lam_vc: np.ndarray,
-        lam_vb_nodal: np.ndarray,
-        lam_vb_cross: np.ndarray,
-    ) -> None:
-        del lam_vb_cross  # cross-node rejected at initialize()
-        self._pen = {
-            "lam_prox": np.asarray(lam_prox, dtype=float),
-            "lam_cost": np.asarray(lam_cost, dtype=float),
-            "lam_vc": np.asarray(lam_vc, dtype=float),
-            "lam_vb_nodal": np.asarray(lam_vb_nodal, dtype=float),
-        }
-
-    def update_boundary_conditions(
-        self,
-        x_init: Optional[np.ndarray] = None,
-        x_term: Optional[np.ndarray] = None,
-    ) -> None:
-        if x_init is not None:
-            self._x_init = np.asarray(x_init, dtype=float)
-        if x_term is not None:
-            self._x_term = np.asarray(x_term, dtype=float)
 
     # ------------------------------------------------------------------
     # Structural pass (called once at initialize)
@@ -1395,11 +1207,7 @@ class MoreauPTRSolver(PTRSolver):
         per-iteration linearization arrays, penalty weights, and boundary
         conditions.
         """
-        if self.layout is None or self._settings is None:
-            raise RuntimeError(
-                "MoreauPTRSolver.iteration_callback() requires initialize() to "
-                "have been called first."
-            )
+        self._check_callback_ready()
 
         # Public ``Solver.solve`` returns only the solution. The jitted kernel
         # it calls still returns ``(JaxSolution, JaxSolveInfo)``, which is

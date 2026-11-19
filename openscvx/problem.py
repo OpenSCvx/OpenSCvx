@@ -461,7 +461,7 @@ class Problem:
                 - ``None`` — uses ``CVXPyPTRSolver()`` with defaults (QOCO backend).
                 - A ``ConvexSolver`` instance — used directly.
                 - A ``dict`` — validated as ``PTRSolverSpec``; the ``backend``
-                  field (``"cvxpy"``, ``"qpax"``, or ``"moreau"``) selects the
+                  field (``"cvxpy"``, ``"qpax"``, ``"moreau"``, or ``"icore"``) selects the
                   concrete backend.
 
                 Examples::
@@ -481,10 +481,14 @@ class Problem:
                     # JAX-native Moreau conic backend (SOC epigraphs, warm-start)
                     solver={"backend": "moreau"}
 
+                    # JAX-native ICORE Riccati conic backend (float64 only)
+                    solver={"backend": "icore"}
+
                     # Instance
                     solver=ox.CVXPyPTRSolver(cvx_solver="CLARABEL")
                     solver=ox.QPAXPTRSolver()
                     solver=ox.MoreauPTRSolver()
+                    solver=ox.ICOREPTRSolver()
             byof (ByofSpec, optional): Expert mode only. Raw JAX functions to
                 bypass symbolic layer. See :class:`openscvx.expert.ByofSpec` for
                 detailed documentation.
@@ -1719,7 +1723,7 @@ class Problem:
                         f"solve_batched(save_compiled=True) cannot export the "
                         f"{type(self._solver).__name__} backend: its solve runs through a "
                         f"jax.pure_callback, which jax.export cannot serialize. Use an "
-                        f"exportable backend (QPAXPTRSolver or MoreauPTRSolver), or set "
+                        f"exportable backend (QPAXPTRSolver, MoreauPTRSolver, or ICOREPTRSolver), or set "
                         f"save_compiled=False to run B sequential in-process solves."
                     )
                 cache_file = get_solve_batched_cache_path(
@@ -1781,8 +1785,8 @@ class Problem:
         :meth:`solve`.
 
         With the CVXPy backend, ``jax.vmap(problem.solve_jax)`` runs ``B``
-        sequential CVXPy solves (host CVXPy is not thread-safe); the QPAX
-        and Moreau backends run in parallel under vmap.
+        sequential CVXPy solves (host CVXPy is not thread-safe); the QPAX,
+        Moreau, and ICORE backends run in parallel under vmap.
 
         Args:
             x_initial: Initial-state boundary pin, shape ``(n_states,)``.

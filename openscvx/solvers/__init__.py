@@ -26,7 +26,7 @@ class ConvexSolver(ABC):
         ...
 ```
 
-The Penalized Trust-Region (PTR) subproblem ships with three concrete backends:
+The Penalized Trust-Region (PTR) subproblem ships with four concrete backends:
 
 - :class:`CVXPyPTRSolver` — DCP graph via CVXPy, dispatched to any of its
   supported conic solvers (QOCO, CLARABEL, ...). Optional code generation
@@ -39,8 +39,12 @@ The Penalized Trust-Region (PTR) subproblem ships with three concrete backends:
   as CSR JAX arrays and solved with ``moreau.jax.Solver``.  Uses SOC
   epigraphs for the PTR penalties instead of QPAX-style slack expansion;
   warm-starts between iterations.  Requires the ``moreau`` optional extra.
+- :class:`ICOREPTRSolver` — stage-wise conic OCP (augmented state, uniform
+  per-stage cones) solved with ICORE's Riccati-structured JAX interior-point
+  kernel.  Requires ``icore`` (https://github.com/sametuzun781/ICORE) on
+  ``PYTHONPATH``.
 
-All three share the abstract :class:`PTRSolver` contract.
+All four share the abstract :class:`PTRSolver` contract.
 
 Note:
     Solvers own their optimization variables (e.g., ``CVXPySolver.ocp_vars``).
@@ -85,6 +89,10 @@ def __getattr__(name: str):
         from .moreau_ptr_solver import MoreauPTRSolver
 
         return MoreauPTRSolver
+    if name == "ICOREPTRSolver":
+        from .icore_ptr_solver import ICOREPTRSolver
+
+        return ICOREPTRSolver
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -97,6 +105,7 @@ __all__ = [
     "CVXPyPTRSolver",
     "QPAXPTRSolver",
     "MoreauPTRSolver",
+    "ICOREPTRSolver",
     # Config
     "PTRSolverSpec",
     "resolve_solver_config",

@@ -322,6 +322,7 @@ def test_monolithic():
         "cvxpy",
         pytest.param("qpax", marks=pytest.mark.qpax),
         pytest.param("moreau", marks=pytest.mark.moreau),
+        pytest.param("icore", marks=pytest.mark.icore),
     ],
 )
 def test_backend(backend, constraint_type, with_parameters):
@@ -439,7 +440,7 @@ def test_backend(backend, constraint_type, with_parameters):
     # per-process JIT compilation cache means the first iteration's compile
     # cost dominates under parallel test execution. Nodal constraints add a
     # few extra slots (nu_vb / s_pos per nodal group) on top of that.
-    if backend in ("qpax", "moreau"):
+    if backend in ("qpax", "moreau", "icore"):
         solve_budget = 4.5 if constraint_type == "nodal" else 3.5
     else:
         solve_budget = 1.2

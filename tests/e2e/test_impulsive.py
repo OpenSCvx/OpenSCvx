@@ -136,6 +136,7 @@ def _build_hohmann_problem(backend: str):
         "cvxpy",
         pytest.param("qpax", marks=pytest.mark.qpax),
         pytest.param("moreau", marks=pytest.mark.moreau),
+        pytest.param("icore", marks=pytest.mark.icore),
     ],
 )
 def test_hohmann_transfer(backend):

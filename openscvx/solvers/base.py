@@ -289,8 +289,9 @@ class PTRSolverSpec(BaseModel):
     ``"cvxpy"`` (the default,
     :class:`openscvx.solvers.cvxpy_ptr_solver.CVXPyPTRSolver`),
     ``"qpax"`` (:class:`openscvx.solvers.qpax_ptr_solver.QPAXPTRSolver`),
-    or ``"moreau"``
-    (:class:`openscvx.solvers.moreau_ptr_solver.MoreauPTRSolver`).
+    ``"moreau"``
+    (:class:`openscvx.solvers.moreau_ptr_solver.MoreauPTRSolver`), or
+    ``"icore"`` (:class:`openscvx.solvers.icore_ptr_solver.ICOREPTRSolver`).
 
     Backend-specific fields mirror the constructor parameters of each class.
     Fields that don't belong to the active backend are a configuration error
@@ -299,13 +300,13 @@ class PTRSolverSpec(BaseModel):
     CVXPy-only:
         ``cvx_solver``, ``cvxpygen``, ``cvxpygen_override``.
 
-    QPAX-only:
-        ``solver_tol``.
-
     Moreau-only:
         ``verbose``, ``device``, ``tol_gap_abs``, ``tol_feas``.
 
-    Shared between QPAX and Moreau:
+    Shared between QPAX and ICORE:
+        ``solver_tol``.
+
+    Shared between QPAX, Moreau, and ICORE:
         ``max_iter``.
 
     All backends:
@@ -319,17 +320,17 @@ class PTRSolverSpec(BaseModel):
     """
 
     type: Literal["PTRSolver"] = "PTRSolver"
-    backend: Literal["cvxpy", "qpax", "moreau"] = "cvxpy"
+    backend: Literal["cvxpy", "qpax", "moreau", "icore"] = "cvxpy"
 
     # CVXPy-only
     cvx_solver: Optional[str] = None
     cvxpygen: bool = False
     cvxpygen_override: bool = False
 
-    # QPAX-specific
+    # Shared between QPAX and ICORE
     solver_tol: Optional[float] = None
 
-    # Shared between QPAX and Moreau
+    # Shared between QPAX, Moreau, and ICORE
     max_iter: Optional[int] = None
 
     # Moreau-specific
@@ -345,7 +346,7 @@ class PTRSolverSpec(BaseModel):
 
     @model_validator(mode="after")
     def _check_backend_fields(self):
-        if self.backend in ("qpax", "moreau"):
+        if self.backend in ("qpax", "moreau", "icore"):
             offenders = [
                 name
                 for name, value in (
@@ -376,9 +377,9 @@ class PTRSolverSpec(BaseModel):
             if offenders:
                 raise ValueError(
                     f"{offenders} not valid for backend='cvxpy'; pass these "
-                    "via solver_args or switch to the qpax / moreau backend."
+                    "via solver_args or switch to the qpax / moreau / icore backend."
                 )
-        if self.backend == "qpax":
+        if self.backend in ("qpax", "icore"):
             offenders = [
                 name
                 for name, value in (
@@ -396,14 +397,25 @@ class PTRSolverSpec(BaseModel):
                 )
         if self.backend == "moreau" and self.solver_tol is not None:
             raise ValueError(
-                "solver_tol is only valid for backend='qpax'; "
-                "remove this field or set backend='qpax'."
+                "solver_tol is only valid for backend='qpax' or backend='icore'; "
+                "remove this field or switch backends."
             )
         return self
 
     def build(self) -> ConvexSolver:
-        # Local imports keep CVXPy / qpax / moreau out of the import path until
-        # the corresponding backend is actually requested.
+        # Local imports keep CVXPy / qpax / moreau / icore out of the import
+        # path until the corresponding backend is actually requested.
+        if self.backend == "icore":
+            from .icore_ptr_solver import ICOREPTRSolver
+
+            kwargs: Dict[str, Any] = {}
+            if self.solver_tol is not None:
+                kwargs["solver_tol"] = self.solver_tol
+            if self.max_iter is not None:
+                kwargs["max_iter"] = self.max_iter
+            if self.solver_args is not None:
+                kwargs["solver_args"] = self.solver_args
+            return ICOREPTRSolver(**kwargs)
         if self.backend == "cvxpy":
             from .cvxpy_ptr_solver import CVXPyPTRSolver
 
