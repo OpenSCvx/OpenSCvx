@@ -48,7 +48,7 @@ both inequalities); each ``pos(ν_vbᵢ)`` becomes ``sᵢ ≥ νᵢ`` *and*
 """
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import numpy as np
 
@@ -56,7 +56,7 @@ from openscvx.config import Config
 
 from .cones import NonnegConeConstraint, ZeroConeConstraint
 from .ptr_solver import (
-    PTRSolver,
+    JaxPTRSolver,
     PTRSolveResult,
     StatusCode,
     SubproblemData,
@@ -161,7 +161,7 @@ class _QPLayout:
         return self.sl_s_pos[c].start + k
 
 
-class QPAXPTRSolver(PTRSolver):
+class QPAXPTRSolver(JaxPTRSolver):
     """JAX-native QP backend for the PTR convex subproblem.
 
     Assembles each SCP subproblem as a flat ``(Q, q, A, b, G, h)`` and
@@ -226,53 +226,17 @@ class QPAXPTRSolver(PTRSolver):
                 "Install it with: pip install openscvx[qpax]"
             )
 
-        # None sentinels at the signature surface let us distinguish
-        # "user explicitly passed this" from "default applied" — only the
-        # former should collide with the same key inside solver_args.
-        _named = {
-            k: v for k, v in (("solver_tol", solver_tol), ("max_iter", max_iter)) if v is not None
-        }
-        _extra = dict(solver_args) if solver_args else {}
-        _overlap = _named.keys() & _extra.keys()
-        if _overlap:
-            raise ValueError(
-                f"QPAX settings {sorted(_overlap)} appear as both named arguments "
-                "and inside solver_args; use one or the other."
+        super().__init__(
+            self._merge_solver_args(
+                {"solver_tol": solver_tol, "max_iter": max_iter},
+                solver_args,
+                {"solver_tol": 1e-5, "max_iter": 30},
             )
-        merged = {**_named, **_extra}
-        merged.setdefault("solver_tol", 1e-5)
-        merged.setdefault("max_iter", 30)
-        self.solver_args = merged
-
-        # Populated by create_variables / initialize.
+        )
         self.layout: Optional[_QPLayout] = None
-        self._S_x: Optional[np.ndarray] = None
-        self._c_x: Optional[np.ndarray] = None
-        self._S_u: Optional[np.ndarray] = None
-        self._c_u: Optional[np.ndarray] = None
-        self._inv_S_x_diag: Optional[np.ndarray] = None
-        self._inv_S_u_diag: Optional[np.ndarray] = None
-        self._S_x_diag: Optional[np.ndarray] = None
-        self._S_u_diag: Optional[np.ndarray] = None
-        self._settings: Optional[Config] = None
-        self._jax_constraints: Optional["LoweredJaxConstraints"] = None
         # Static QP row count, computed in initialize() once the constraint
         # set, impulsive pins, and settings are all available.
         self._n_constraints: int = 0
-
-        # Populated by lower_convex_constraints. Auto-augmented impulsive
-        # zero-pin constraints land here; genuine user .convex() constraints
-        # land in _user_cone_constraints after canonicalization.
-        self._impulsive_pins: List[Tuple[List[int], slice]] = []
-        self._user_cone_constraints: List = []
-        self._parameters_dict: dict = {}
-
-        # Per-iteration data, set by update_* methods.
-        self._dyn: dict = {}
-        self._cons: dict = {}
-        self._pen: dict = {}
-        self._x_init: Optional[np.ndarray] = None
-        self._x_term: Optional[np.ndarray] = None
 
         # Last solve diagnostics (populated by solve()).
         self._last_iters: Optional[int] = None
@@ -298,46 +262,10 @@ class QPAXPTRSolver(PTRSolver):
         — QPAX consumes dense arrays.
         """
         del dynamics_sparsity, constraint_sparsity  # QPAX consumes dense arrays
-
-        n_x = len(x_unified.max)
-        n_u = len(u_unified.max)
-
-        S_x, c_x = self._scaling(x_unified)
-        S_u, c_u = self._scaling(u_unified)
-
-        self._S_x = S_x
-        self._c_x = c_x
-        self._S_u = S_u
-        self._c_u = c_u
-        # S_x / S_u are diagonal — keep the diagonals around for fast scalar
-        # arithmetic in the assembly loops.
-        self._S_x_diag = np.diag(S_x)
-        self._S_u_diag = np.diag(S_u)
-        self._inv_S_x_diag = 1.0 / self._S_x_diag
-        self._inv_S_u_diag = 1.0 / self._S_u_diag
-
-        # JAX-side scaling diagonals for ``iteration_callback``. The dtype
-        # tracks the global ``jax_enable_x64`` setting so the assembled
-        # ``(Q, q, A, b, G, h)`` lands in the dtype ``qpax.solve_qp``
-        # expects.
-        f = jnp.float64 if jax.config.read("jax_enable_x64") else jnp.float32
-        self._S_x_diag_j = jnp.asarray(self._S_x_diag, dtype=f)
-        self._S_u_diag_j = jnp.asarray(self._S_u_diag, dtype=f)
-        self._inv_S_x_diag_j = jnp.asarray(self._inv_S_x_diag, dtype=f)
-        self._inv_S_u_diag_j = jnp.asarray(self._inv_S_u_diag, dtype=f)
-        self._c_x_j = jnp.asarray(self._c_x, dtype=f)
-        self._c_u_j = jnp.asarray(self._c_u, dtype=f)
-        self._jax_dtype = f
-
-        if any(c.is_equality for c in jax_constraints.nodal):
-            raise NotImplementedError(
-                "QPAXPTRSolver does not support L1-penalized equality "
-                "constraints. Use CVXPyPTRSolver."
-            )
-
+        n_x, n_u = self._setup_scaling(x_unified, u_unified)
+        self._reject_nodal_equalities(jax_constraints)
         self.layout = _QPLayout(N=N, n_x=n_x, n_u=n_u, n_nodal=len(jax_constraints.nodal))
         self._jax_constraints = jax_constraints
-        self._x_unified = x_unified
 
     def initialize(self, lowered: "LoweredProblem", settings: "Config") -> None:
         """Validate the constraint subset QPAX supports and stash settings.
@@ -348,19 +276,7 @@ class QPAXPTRSolver(PTRSolver):
         upstream by :meth:`lower_convex_constraints`, which absorbs the
         auto-generated impulsive zero-pins and refuses anything else.
         """
-        if self.layout is None:
-            raise RuntimeError(
-                "QPAXPTRSolver.initialize() called before create_variables(). "
-                "Call create_variables() first."
-            )
-
-        if lowered.jax_constraints.cross_node:
-            raise NotImplementedError(
-                "QPAXPTRSolver does not yet support cross-node constraints "
-                f"({len(lowered.jax_constraints.cross_node)} defined). "
-                "Use CVXPyPTRSolver."
-            )
-
+        self._check_initialize(lowered)
         self._settings = settings
         self._n_constraints = self._count_rows(lowered.jax_constraints, settings)
 
@@ -410,109 +326,6 @@ class QPAXPTRSolver(PTRSolver):
                 n_ineq += len(cc.nodes) * cc.m
 
         return n_eq + n_ineq
-
-    # ------------------------------------------------------------------
-    # Per-iteration update hooks
-    # ------------------------------------------------------------------
-
-    def update_dynamics_linearization(
-        self,
-        x_bar: np.ndarray,
-        u_bar: np.ndarray,
-        A_d: np.ndarray,
-        B_d: np.ndarray,
-        C_d: np.ndarray,
-        x_prop: np.ndarray,
-        x_prop_plus: np.ndarray | None = None,
-        D_d: np.ndarray | None = None,
-        E_d: np.ndarray | None = None,
-    ) -> None:
-        A_eff = np.asarray(A_d, dtype=float)
-        B_eff = np.asarray(B_d, dtype=float)
-        C_eff = np.asarray(C_d, dtype=float)
-
-        # Absorb the impulsive state Jacobian into the continuous step
-        # matrices so the assembly row keeps a single A_d·dx + B_d·du term,
-        # matching the recipe in CVXPyPTRSolver.update_dynamics_linearization
-        # at openscvx/solvers/cvxpy_ptr_solver.py:636-654.
-        if D_d is not None:
-            D_arr = np.asarray(D_d, dtype=float)
-            if D_arr.ndim == 3 and D_arr.shape[0] == A_eff.shape[0] + 1:
-                D_steps = D_arr[1:]
-            elif D_arr.ndim == 3 and D_arr.shape[0] == A_eff.shape[0]:
-                D_steps = D_arr
-            else:
-                raise ValueError(
-                    "Unexpected D_d shape for dynamics update: "
-                    f"{D_arr.shape}, expected "
-                    f"{(A_eff.shape[0] + 1, A_eff.shape[1], A_eff.shape[2])} "
-                    f"or {(A_eff.shape[0], A_eff.shape[1], A_eff.shape[2])}."
-                )
-            A_eff = np.einsum("kij,kjl->kil", D_steps, A_eff)
-            B_eff = np.einsum("kij,kjl->kil", D_steps, B_eff)
-            C_eff = np.einsum("kij,kjl->kil", D_steps, C_eff)
-
-        self._dyn = {
-            "x_bar": np.asarray(x_bar, dtype=float),
-            "u_bar": np.asarray(u_bar, dtype=float),
-            "A_d": A_eff,
-            "B_d": B_eff,
-            "C_d": C_eff,
-            "x_prop": np.asarray(x_prop, dtype=float),
-            "x_prop_plus": (
-                np.asarray(x_prop_plus, dtype=float) if x_prop_plus is not None else None
-            ),
-            "E_d": np.asarray(E_d, dtype=float) if E_d is not None else None,
-        }
-
-    def update_constraint_linearizations(
-        self,
-        nodal: List[dict] = None,
-        cross_node: List[dict] = None,
-    ) -> None:
-        if cross_node:
-            # Defensive — initialize() already rejected, but the algorithm
-            # may still pass an empty list.
-            raise NotImplementedError(
-                "QPAXPTRSolver received cross-node linearization data; "
-                "cross-node constraints are not supported."
-            )
-        self._cons = {
-            "nodal": [
-                {
-                    "g": np.asarray(d["g"], dtype=float),
-                    "grad_g_x": np.asarray(d["grad_g_x"], dtype=float),
-                    "grad_g_u": np.asarray(d["grad_g_u"], dtype=float),
-                }
-                for d in (nodal or [])
-            ],
-        }
-
-    def update_penalties(
-        self,
-        lam_prox: np.ndarray,
-        lam_cost: Union[float, np.ndarray],
-        lam_vc: np.ndarray,
-        lam_vb_nodal: np.ndarray,
-        lam_vb_cross: np.ndarray,
-    ) -> None:
-        del lam_vb_cross  # cross-node constraints rejected at initialize()
-        self._pen = {
-            "lam_prox": np.asarray(lam_prox, dtype=float),
-            "lam_cost": np.asarray(lam_cost, dtype=float),
-            "lam_vc": np.asarray(lam_vc, dtype=float),
-            "lam_vb_nodal": np.asarray(lam_vb_nodal, dtype=float),
-        }
-
-    def update_boundary_conditions(
-        self,
-        x_init: np.ndarray = None,
-        x_term: np.ndarray = None,
-    ) -> None:
-        if x_init is not None:
-            self._x_init = np.asarray(x_init, dtype=float)
-        if x_term is not None:
-            self._x_term = np.asarray(x_term, dtype=float)
 
     # ------------------------------------------------------------------
     # Assembly
@@ -930,11 +743,7 @@ class QPAXPTRSolver(PTRSolver):
         per-iteration linearization arrays, penalty weights, and boundary
         conditions.
         """
-        if self.layout is None or self._settings is None:
-            raise RuntimeError(
-                "QPAXPTRSolver.iteration_callback() requires initialize() to "
-                "have been called first."
-            )
+        self._check_callback_ready()
 
         solver_args = self.solver_args
 

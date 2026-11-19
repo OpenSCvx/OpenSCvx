@@ -62,6 +62,21 @@ Extras are installed with the `openscvx[extra1,extra2]` syntax shown above.
 | `mjx` | MuJoCo MJX dynamics (`mujoco`, `mujoco-mjx`). |
 | `frax` | Fractal / `frax` dynamics support. |
 
+### ICORE solver backend
+
+The [ICORE](https://github.com/sametuzun781/ICORE) backend
+(`solver={"backend": "icore"}` or `ox.ICOREPTRSolver()`) is not yet published
+on PyPI, so there is no `icore` extra. Clone the repository and put it on
+`PYTHONPATH`; ICORE's JAX kernel needs only JAX and NumPy:
+
+```bash
+git clone https://github.com/sametuzun781/ICORE.git
+export PYTHONPATH="$PWD/ICORE:$PYTHONPATH"
+```
+
+ICORE runs in double precision only, so construct problems with
+`float_dtype="float64"`.
+
 ## Next steps
 
 - Follow the [Users Guide](UsersGuide/00_introduction.md) from a first model to a solve.

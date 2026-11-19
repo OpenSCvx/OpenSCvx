@@ -205,75 +205,15 @@ def populate_numpy_stash(prob) -> None:
 
 
 def subproblem_data_from_numpy_stash(solver) -> SubproblemData:
-    """Reconstruct :class:`SubproblemData` from QPAX/Moreau's NumPy stash.
+    """Reconstruct :class:`SubproblemData` from a JAX backend's NumPy stash.
 
     After one ``update_*`` cycle the solver has every per-iteration array on
-    hand (``solver._dyn`` / ``solver._cons`` / ``solver._pen``). This helper
-    rebuilds the stacked-array layout the JAX callback expects so both
-    assembly paths see the same iterate.
-
-    The NumPy path absorbs ``D_d`` into ``A_d`` / ``B_d`` / ``C_d`` at update
-    time, so we pass a zero ``D_d`` here — the JAX path's ``has_impulsive``
-    branch is statically False for brachistochrone and the absorption einsum
-    is skipped.
+    hand (``solver._dyn`` / ``solver._cons`` / ``solver._pen``). QPAX, Moreau
+    and ICORE share :class:`~openscvx.solvers.ptr_solver.JaxPTRSolver`, whose
+    ``_subproblem_data_from_stash`` rebuilds the stacked-array layout the JAX
+    callback expects, so both assembly paths see the same iterate.
 
     CVXPy stores the same data on its CVXPy parameters and has its own reader
     that lives in ``test_iteration_callback_cvxpy.py``.
     """
-    L = solver.layout
-    N, n_x, n_u = L.N, L.n_x, L.n_u
-
-    dyn = solver._dyn
-    cons = solver._cons
-    pen = solver._pen
-    n_nodal = L.n_nodal
-
-    # Stack nodal linearizations into (N, n_nodal*) layout with zero-fill for
-    # nodes outside each constraint's static ``nodes`` tuple.
-    nodal_g = np.zeros((N, max(n_nodal, 1)), dtype=float)
-    nodal_grad_x = np.zeros((N, max(n_nodal, 1), n_x), dtype=float)
-    nodal_grad_u = np.zeros((N, max(n_nodal, 1), n_u), dtype=float)
-    for c_idx, (constraint, entry) in enumerate(
-        zip(solver._jax_constraints.nodal, cons.get("nodal", []))
-    ):
-        for node in constraint.nodes:
-            nodal_g[node, c_idx] = entry["g"][node]
-            nodal_grad_x[node, c_idx] = entry["grad_g_x"][node]
-            nodal_grad_u[node, c_idx] = entry["grad_g_u"][node]
-    if n_nodal == 0:
-        nodal_g = np.zeros((N, 0))
-        nodal_grad_x = np.zeros((N, 0, n_x))
-        nodal_grad_u = np.zeros((N, 0, n_u))
-
-    x_prop_plus = dyn["x_prop_plus"] if dyn["x_prop_plus"] is not None else np.zeros((N, n_x))
-    E_d = dyn["E_d"] if dyn["E_d"] is not None else np.zeros((N, n_x, n_u))
-    D_d = np.zeros((N, n_x, n_x))
-
-    x_init = solver._x_init if solver._x_init is not None else np.full(n_x, np.nan)
-    x_term = solver._x_term if solver._x_term is not None else np.full(n_x, np.nan)
-
-    return SubproblemData(
-        x_bar=jnp.asarray(dyn["x_bar"]),
-        u_bar=jnp.asarray(dyn["u_bar"]),
-        A_d=jnp.asarray(dyn["A_d"]),
-        B_d=jnp.asarray(dyn["B_d"]),
-        C_d=jnp.asarray(dyn["C_d"]),
-        x_prop=jnp.asarray(dyn["x_prop"]),
-        x_prop_plus=jnp.asarray(x_prop_plus),
-        D_d=jnp.asarray(D_d),
-        E_d=jnp.asarray(E_d),
-        nodal_g=jnp.asarray(nodal_g),
-        nodal_grad_x=jnp.asarray(nodal_grad_x),
-        nodal_grad_u=jnp.asarray(nodal_grad_u),
-        cross_g=jnp.zeros((0,)),
-        cross_grad_X=jnp.zeros((0, N, n_x)),
-        cross_grad_U=jnp.zeros((0, N, n_u)),
-        lam_prox=jnp.asarray(pen["lam_prox"]),
-        lam_cost=jnp.asarray(pen["lam_cost"]),
-        lam_vc=jnp.asarray(pen["lam_vc"]),
-        lam_vb_nodal=jnp.asarray(pen["lam_vb_nodal"]),
-        lam_vb_cross=jnp.zeros((0,)),
-        x_init=jnp.asarray(x_init),
-        x_term=jnp.asarray(x_term),
-        params=solver._parameters_dict,
-    )
+    return solver._subproblem_data_from_stash()

@@ -25,6 +25,14 @@ OPTIONAL_DEPS = {
     "cvxpygen": lambda: _installed("cvxpygen") and _installed("qocogen"),
     "lie": lambda: _installed("jaxlie"),
     "moreau": lambda: _installed("moreau"),
+    # Not a pip extra: ICORE is not on PyPI yet, so it is used from a clone on
+    # PYTHONPATH (see openscvx.solvers.icore_ptr_solver).
+    "icore": lambda: _installed("icore"),
+}
+
+# Install hint shown in the skip reason; defaults to the pip extra.
+_INSTALL_HINTS = {
+    "icore": "clone https://github.com/sametuzun781/ICORE onto PYTHONPATH",
 }
 
 _E2E_DIR = Path(__file__).parent / "e2e"
@@ -42,6 +50,6 @@ def pytest_collection_modifyitems(config, items):
                     item.add_marker(
                         pytest.mark.skip(
                             reason=f"requires optional dependency '{dep}' "
-                            f"(pip install openscvx[{dep}])"
+                            f"({_INSTALL_HINTS.get(dep, f'pip install openscvx[{dep}]')})"
                         )
                     )

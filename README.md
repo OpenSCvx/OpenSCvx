@@ -215,6 +215,7 @@ OpenSCvx integrates with several optional third-party packages. Each installs as
 | [qpax](https://github.com/qpax-solver/qpax) | `qpax` | JAX-native QP solver backend | [![qpax](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-qpax.yml/badge.svg?branch=main)](https://github.com/OpenSCvx/OpenSCvx/issues/550) |
 | [CVXPYGen](https://github.com/cvxgrp/cvxpygen) | `cvxpygen` | Generated C solver code for the convex subproblem | [![cvxpygen](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-cvxpygen.yml/badge.svg?branch=main)](https://github.com/OpenSCvx/OpenSCvx/issues/551) |
 | [moreau](https://pypi.org/project/moreau/) | `moreau` | Open Source SOCP solver backend | [![moreau](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-moreau.yml/badge.svg?branch=main)](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-moreau.yml) |
+| [ICORE](https://github.com/sametuzun781/ICORE) | — (clone onto `PYTHONPATH`) | Riccati-structured conic OCP solver backend | ![icore](https://img.shields.io/badge/icore-not%20on%20PyPI%20yet-lightgrey) |
 | [stljax](https://github.com/UW-CTRL/stljax) | `stl` | Signal Temporal Logic robustness bridge | ![stljax](https://img.shields.io/badge/stljax-no%20tests%20yet-lightgrey) |
 | [frax](https://github.com/danielpmorton/frax) | `frax` | Robot dynamics for the manipulator examples | [![frax](https://img.shields.io/badge/frax-weekly%20examples%20sweep-blue)](https://github.com/OpenSCvx/OpenSCvx/actions/workflows/tests-examples.yml) |
 
