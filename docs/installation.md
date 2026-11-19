@@ -67,15 +67,38 @@ Extras are installed with the `openscvx[extra1,extra2]` syntax shown above.
 The [ICORE](https://github.com/sametuzun781/ICORE) backend
 (`solver={"backend": "icore"}` or `ox.ICOREPTRSolver()`) is not yet published
 on PyPI, so there is no `icore` extra. Clone the repository and put it on
-`PYTHONPATH`; ICORE's JAX kernel needs only JAX and NumPy:
+`PYTHONPATH`. The revision below is pinned by OpenSCvx's ICORE CI job:
 
 ```bash
 git clone https://github.com/sametuzun781/ICORE.git
-export PYTHONPATH="$PWD/ICORE:$PYTHONPATH"
+git -C ICORE checkout a63ebffb005725a02d2c3e4247fb73aec453e590
+export PYTHONPATH="$PWD/ICORE${PYTHONPATH:+:$PYTHONPATH}"
 ```
 
 ICORE runs in double precision only, so construct problems with
-`float_dtype="float64"`.
+`float_dtype="float64"`. The default ICORE implementation is JAX; select
+the native C or C++ implementation through `solver_args`:
+
+```python
+solver = {"backend": "icore", "solver_args": {"backend": "cpp"}}  # or "c"
+problem = ox.Problem(..., solver=solver, float_dtype="float64")
+```
+
+The JAX implementation needs JAX and NumPy. Native execution additionally needs
+a C/C++ compiler, `make`, and the build tools described in
+[ICORE's build guide](https://github.com/sametuzun781/ICORE/blob/a63ebffb005725a02d2c3e4247fb73aec453e590/docs/BUILDING.md).
+For the tested source revision, install CMake with:
+
+```bash
+python -m pip install "cmake>=3.18,<4"
+```
+
+Use your system's development toolchain on Linux, Xcode Command Line Tools on
+macOS, or WSL on Windows. ICORE builds and caches its native library on first
+use. Native solves run on the CPU, including when called from JAX.
+
+See [ICORE solver backends](UnderTheHood/icore_backend.md) for the supported
+model class, workspace reuse, batching, and export limits.
 
 ## Next steps
 

@@ -176,16 +176,17 @@ of the abstract `PTRSolver` base. Four backends ship today:
 | CVXPy (default) | `CVXPyPTRSolver` | `solver={"backend": "cvxpy"}` (default) | DCP graph via CVXPy, dispatched to QOCO / CLARABEL / etc. Supports user `.convex()` constraints, cross-node constraints, CTCS, and impulsive controls. Optional cvxpygen code generation. |
 | QPAX | `QPAXPTRSolver` | `solver={"backend": "qpax"}` | JAX-native QP via `qpax.solve_qp`. Flat `(Q, q, A, b, G, h)` assembly. Supports box / dynamics (continuous and impulsive) / CTCS / boundary-Fix; **rejects** user `.convex()` and cross-node at `initialize()` with a clear "use `CVXPyPTRSolver`" message. The `iteration_callback` uses `qpax.solve_qp`, whose convergence flag maps to a `status_code` so a diverged solve fails loudly (chosen over the differentiable `solve_qp_primal`, which exposes no such flag). |
 | Moreau | `MoreauPTRSolver` | `solver={"backend": "moreau"}` | JAX-native conic solver (`moreau.jax.Solver`). Sparse CSR assembly; SOC epigraphs for the L1 / pos PTR penalties (fewer variables and rows than QPAX). Warm-starts between SCP iterations. Same supported subset as QPAX (continuous and impulsive dynamics). Paves the way for user `.convex()` SOC support in a follow-up. |
-| ICORE | `ICOREPTRSolver` | `solver={"backend": "icore"}` | Riccati-structured conic IPM (`icore.jax.core.make_solver`). Stage-wise assembly: augmented state `[x, u, t_vb]`, equalities eliminated through the dynamics, uniform per-stage cones; the `\|ν\| ≤ t_vc` epigraphs use ICORE's `epigraph_controls` so they are eliminated analytically. Supports user `.convex()` nonneg / SOC; rejects zero-cone, cross-node and L1 equalities. float64 only; cold-start. |
+| ICORE | `ICOREPTRSolver` | `solver={"backend": "icore"}` | Riccati-structured conic IPM. JAX by default; `solver_args={"backend": "c"}` or `{"backend": "cpp"}` selects native CPU execution. All three share the stage assembly: augmented state `[x, u, t_vb]`, equalities eliminated through dynamics, uniform per-stage cones. The adapter certifies a safe native L1 epigraph prefix from the static CTCS layout. Supports user `.convex()` nonneg / SOC; rejects zero-cone, cross-node and L1 equalities. float64 only; cold-start. [Details](icore_backend.md). |
 
 Each backend exposes two per-iteration entry points: the historical NumPy
 `update_*` + `solve()` stages (kept for direct / interactive solver use), and a
-JAX-pure `iteration_callback()` built once at `initialize()`. The callback
+JAX-compatible `iteration_callback()` built once at `initialize()`. The callback
 returns a `(state, SubproblemData) -> SubproblemSolution` callable; all
-backends emit the same input/output pytree shape (CVXPy host-calls via
-`jax.pure_callback`).
+backends emit the same input/output pytree shape. CVXPy and native ICORE call
+their host solvers through `jax.pure_callback`; those solves remain CPU work
+inside a JIT-compiled loop.
 
-The three pure-JAX backends inherit from `JaxPTRSolver`
+QPAX, Moreau, and ICORE inherit from `JaxPTRSolver`
 (`openscvx/solvers/ptr_solver.py`), which owns everything they share: the
 named-argument / `solver_args` merge, the `x = S z + c` scaling, the
 supported-subset guards, the NumPy `update_*` stash (with `D_d` absorbed into
@@ -228,12 +229,20 @@ problem = ox.Problem(..., solver={"backend": "qpax"})
 
 # JAX-native Moreau conic (requires the `moreau` extra: pip install openscvx[moreau]).
 problem = ox.Problem(..., solver={"backend": "moreau"})
+
+# Native ICORE C++ (requires an ICORE checkout and native build tools).
+problem = ox.Problem(
+    ...,
+    solver={"backend": "icore", "solver_args": {"backend": "cpp"}},
+    float_dtype="float64",
+)
 ```
 
-Both JAX backends consume the global JAX dtype — pass `float_dtype="float64"`
-to `Problem` if you need tight inner-solver tolerances; the default `float32`
-is enough for
-many problems but caps the QP's conditioning.
+QPAX and Moreau consume the global JAX dtype — pass `float_dtype="float64"`
+to `Problem` if you need tight inner-solver tolerances. ICORE requires
+`float64` for every implementation. Native ICORE supports JIT and sequential
+batching through its host callback, but does not support whole-solve export
+or differentiation through the native solve.
 
 ## Further Reading
 

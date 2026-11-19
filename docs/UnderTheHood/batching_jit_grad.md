@@ -214,16 +214,21 @@ The exported artifact is closed and deployable, not composable: it is the
 `call_exported`-has-no-outer-`vmap`-rule wall again. Use `solve_jax` for
 user-driven `jax.vmap` / `jax.grad`; `solve_batched` for a cached batched solve.
 
-### CVXPy cannot be exported
+### Host solver callbacks cannot be exported
 
 Export requires every op in the loop — the backend solve included — to lower to
-serializable XLA. CVXPy's `iteration_callback` is a `jax.pure_callback`, and
-`jax.export` cannot serialize host callbacks. So `PTRSolver.exportable` is
-`False` for CVXPy (and `True` for QPAX / Moreau), and
-`solve_batched(save_compiled=True)` on the CVXPy backend **raises a teaching
-error** pointing at QPAX / Moreau rather than silently degrading to an uncached
-in-process solve. With `save_compiled=False`, CVXPy still runs `B` sequential
-in-process solves.
+serializable XLA. CVXPy and ICORE's native C/C++ implementations use
+`jax.pure_callback`, which `jax.export` cannot serialize. Their
+`PTRSolver.exportable` is `False`; `solve_batched(save_compiled=True)` raises
+an error explaining the unsupported export. Select QPAX, Moreau, or ICORE
+with `solver_args={"backend": "jax"}` for an exportable backend.
+
+With `save_compiled=False`, CVXPy and native ICORE support in-process batches.
+Their host callback uses `vmap_method="sequential"`, so each batch element's
+convex subproblem is solved serially on the CPU. JIT still compiles the JAX
+assembly and outer loop. It does not turn the native solver into a GPU kernel
+or supply a derivative rule for it. See [ICORE solver backends](icore_backend.md)
+for the shared model adapter and native workspace lifecycle.
 
 ### Cache invalidation is correctness, not just freshness
 
