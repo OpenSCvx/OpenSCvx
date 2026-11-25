@@ -138,3 +138,56 @@ jobs:
           .pytest_cache/
           test-results/
         retention-days: 7
+
+  icore:
+    needs: unit
+    name: ICORE Tests (Python 3.13, ubuntu-latest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # ICORE is not on PyPI, so it is not a pip extra: check out a pinned
+      # revision and put it on PYTHONPATH (see openscvx.solvers.icore_ptr_solver).
+      # Bump deliberately when adopting a new ICORE release.
+      ICORE_REF: a63ebffb005725a02d2c3e4247fb73aec453e590
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Checkout ICORE
+      uses: actions/checkout@v4
+      with:
+        repository: sametuzun781/ICORE
+        ref: ${{ env.ICORE_REF }}
+        path: _icore
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        enable-cache: true
+
+    - name: Install dependencies
+      run: |
+        uv pip install --system -e ".[test]"
+
+    - name: Run ICORE tests
+      env:
+        PYTHONPATH: ${{ github.workspace }}/_icore
+      run: |
+        python -c "import icore.jax.core"  # fail loudly instead of skipping
+        pytest tests -v -m "icore and not examples" --durations=10 --tb=short -n auto
+
+    - name: Upload test results on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: icore-test-results
+        path: |
+          .pytest_cache/
+          test-results/
+        retention-days: 7

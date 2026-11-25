@@ -25,7 +25,6 @@ import numpy as np
 import pytest
 
 import openscvx as ox
-from openscvx import Problem
 from openscvx.solvers import ICOREPTRSolver, PTRSolver, PTRSolveResult
 from openscvx.solvers.ptr_solver import StatusCode, SubproblemSolution
 from tests.solvers._iteration_callback_helpers import (
@@ -65,7 +64,7 @@ def _make_double_integrator_problem(n=6, backend="icore", k_max=20, constraints=
     time = ox.Time(initial=0.0, final=("minimize", 2.0), min=0.0, max=10.0, uniform_time_grid=True)
     cons = [c(pos, vel, u) for c in constraints]
 
-    prob = Problem(
+    prob = ox.Problem(
         dynamics={"pos": vel, "vel": u},
         states=[pos, vel],
         controls=[u],
@@ -256,6 +255,47 @@ def test_icore_numpy_solve_matches_iteration_callback():
     np.testing.assert_allclose(res.u, np.asarray(sol.u), atol=1e-10)
     np.testing.assert_allclose(res.nu, np.asarray(sol.nu), atol=1e-10)
     assert len(res.nu_vb) == solver.layout.n_nodal
+
+
+def test_icore_numpy_solve_reports_non_optimal_status_verbatim():
+    """An iteration limit is not an infeasibility certificate: ``solve()``
+    must report the callback's status label, not collapse it to infeasible."""
+    prob = _make_double_integrator_problem(k_max=1, max_iter=0)
+    prob.initialize()
+    populate_numpy_stash(prob)
+    solver = prob.solver
+
+    sol = solver.iteration_callback()(None, subproblem_data_from_numpy_stash(solver))
+    assert int(sol.status_code) == int(StatusCode.UNKNOWN)
+    assert solver.solve().status == "unknown"
+
+
+@pytest.mark.parametrize(
+    "field, value, expected",
+    [
+        ("x_term", 20.0, StatusCode.INFEASIBLE),  # above pos.max = 10
+        ("x_term", 10.0, StatusCode.OPTIMAL),  # exactly on the bound
+        ("x_init", -20.0, StatusCode.INFEASIBLE),  # below pos.min = -10
+        ("x_init", -10.0, StatusCode.OPTIMAL),  # exactly on the bound
+    ],
+)
+def test_icore_fixed_boundary_values_are_checked_against_bounds(field, value, expected):
+    """Fixed initial / terminal components carry no box rows in the stage
+    OCP, so the backend must validate the runtime x_init / x_term against
+    the state bounds itself, and agree with CVXPy on feasibility."""
+    prob_i = _make_double_integrator_problem(k_max=1)
+    prob_i.initialize()
+    populate_numpy_stash(prob_i)
+    data = subproblem_data_from_numpy_stash(prob_i.solver)
+    data = dataclasses.replace(data, **{field: getattr(data, field).at[0].set(value)})
+
+    prob_c = _make_double_integrator_problem(backend="cvxpy", k_max=1)
+    prob_c.initialize()
+
+    si = prob_i.solver.iteration_callback()(None, data)
+    sc = prob_c.solver.iteration_callback()(None, _cvxpy_data(data))
+    assert int(si.status_code) == int(expected)
+    assert int(sc.status_code) == int(expected)
 
 
 def test_icore_iteration_callback_jit_and_vmap():

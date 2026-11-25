@@ -952,7 +952,6 @@ class JaxPTRSolver(PTRSolver):
         entry points instead of maintaining a separate NumPy path.
         """
         sol = self.iteration_callback()(None, self._subproblem_data_from_stash())
-        ok = int(sol.status_code) == int(StatusCode.OPTIMAL)
         nu_vb = np.asarray(sol.nu_vb)
         return PTRSolveResult(
             x=np.asarray(sol.x),
@@ -961,7 +960,7 @@ class JaxPTRSolver(PTRSolver):
             nu_vb=list(nu_vb.T),
             nu_vb_cross=[],
             cost=float(sol.cost),
-            status="optimal" if ok else "infeasible",
+            status=status_code_to_str(sol.status_code),
         )
 
     # ------------------------------------------------------------------

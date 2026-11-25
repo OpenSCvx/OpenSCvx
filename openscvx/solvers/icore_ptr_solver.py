@@ -90,7 +90,7 @@ Note:
     so loading OpenSCvx never silently changes the global JAX dtype.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import jax
@@ -443,7 +443,9 @@ class ICOREPTRSolver(JaxPTRSolver):
         # Box rows on components with no freedom (fixed initial states other
         # than the impulsive post-jump state, terminal Fix states, pinned
         # controls) are padded: a fixed value at its bound would give a
-        # zero-slack row with no strict interior.
+        # zero-slack row with no strict interior. The fixed initial and
+        # terminal values are runtime data (x_init / x_term), so the omitted
+        # bounds are instead checked on every call by _boundary_in_bounds.
         x_box_on = np.ones((N, n_x), dtype=bool)
         x_box_on[0] = free0 | (init_fix & has_impulsive)
         x_box_on[N - 1] &= ~fixN
@@ -518,6 +520,8 @@ class ICOREPTRSolver(JaxPTRSolver):
             "imp0": np.flatnonzero(init_fix & has_impulsive),
             "ctcs0": np.flatnonzero(ctcs0),
             "fixN": np.flatnonzero(fixN),
+            "x_max_phys": np.asarray(sim.x.max, dtype=float),
+            "x_min_phys": np.asarray(sim.x.min, dtype=float),
             "F": F,
             "init_sign": init_sign,
             "final_sign": final_sign,
@@ -565,10 +569,35 @@ class ICOREPTRSolver(JaxPTRSolver):
             def step(state, data: SubproblemData) -> SubproblemSolution:
                 del state  # ICORE solves cold.
                 result = solve_fn(self._assemble_ocp_jax(data))
-                return self._build_solution_jax(result, data)
+                sol = self._build_solution_jax(result, data)
+                status = jnp.where(
+                    self._boundary_in_bounds(data),
+                    sol.status_code,
+                    jnp.int32(int(StatusCode.INFEASIBLE)),
+                )
+                return replace(sol, status_code=status)
 
             self._callback = jax.jit(step)
         return self._callback
+
+    def _boundary_in_bounds(self, data: SubproblemData) -> "jnp.ndarray":
+        """Whether the fixed boundary values lie within the state bounds.
+
+        The stage OCP carries no box rows on fixed initial (non-impulsive)
+        and terminal ``Fix`` components (see :meth:`_build_static`), so ICORE
+        would otherwise return ``OPTIMAL`` with ``x_0`` / ``x_{N-1}`` outside
+        ``[x.min, x.max]``. The check runs in physical units on every call so
+        changed ``x_init`` / ``x_term`` values are validated too; a value
+        exactly on a bound is feasible.
+        """
+        st = self._static
+        x_min, x_max = st["x_min_phys"], st["x_max_phys"]
+        ok = jnp.asarray(True)
+        for idx, val in ((st["fix0"], data.x_init), (st["fixN"], data.x_term)):
+            if idx.size:
+                v = val[idx]
+                ok = ok & jnp.all((v >= x_min[idx]) & (v <= x_max[idx]))
+        return ok
 
     # ------------------------------------------------------------------
     # JAX-pure assembly
