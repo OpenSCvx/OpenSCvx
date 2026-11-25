@@ -111,6 +111,10 @@ def __getattr__(name: str):
         from openscvx.solvers.moreau_ptr_solver import MoreauPTRSolver
 
         return MoreauPTRSolver
+    if name == "ICOREPTRSolver":
+        from openscvx.solvers.icore_ptr_solver import ICOREPTRSolver
+
+        return ICOREPTRSolver
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -223,6 +227,7 @@ __all__ = [
     "CVXPyPTRSolver",
     "QPAXPTRSolver",
     "MoreauPTRSolver",
+    "ICOREPTRSolver",
     # Algorithm & Autotuning
     "PenalizedTrustRegion",
     "AugmentedLagrangian",
