@@ -10,9 +10,12 @@ conic program) and :class:`openscvx.solvers.qpax_ptr_solver.QPAXPTRSolver`
 (dense QP), and shares their plumbing through
 :class:`~openscvx.solvers.ptr_solver.JaxPTRSolver`.
 
-ICORE's JAX kernel (``icore.jax.core.make_solver``) is a pure ``jax.jit``
-function of the stage arrays, so :meth:`ICOREPTRSolver.iteration_callback`
-composes with ``jax.jit`` / ``jax.vmap`` exactly like the Moreau backend.
+The default JAX kernel (``icore.jax.core.make_solver``) is a pure ``jax.jit``
+function of the stage arrays. ``solver_args={"backend": "c"}`` or
+``{"backend": "cpp"}`` selects ICORE's native CPU solver instead, using a
+persistent workspace behind ``jax.pure_callback``. All three choices compose
+with ``jax.jit`` / ``jax.vmap``; native solves in a batch run sequentially and
+cannot be serialized by ``jax.export`` or automatically differentiated.
 
 ICORE problem form:
     For stages ``k = 0, ..., K-1`` with stage variable ``w_k = [v_k, x̃_k]``
@@ -41,10 +44,10 @@ Mapping the PTR subproblem onto that form:
       ``x_{k+1} = A(x_k − x̄_k) + B(u_k − ū_k) + C(u_{k+1} − ū_{k+1}) + ν_k + r_k``,
       which is affine in ``(x̃_k, v_k)``.
     * **Epigraph controls.** ``t_vc`` comes first in ``v`` and appears only in
-      the two rows ``±ν − t_vc ≤ 0``, which is exactly ICORE's
-      ``epigraph_controls`` contract. ICORE then eliminates the ``n_x``
-      ``t_vc`` slots analytically instead of carrying them through the
-      Riccati recursion.
+      the two rows ``±ν − t_vc ≤ 0``. The JAX kernel eliminates all ``n_x``
+      ``t_vc`` slots analytically. Native ICORE additionally requires each
+      paired ``ν`` to be absent from other inequalities, so its eliminated
+      prefix stops before the first state with an active CTCS difference row.
     * **Pre-stage.** ICORE fixes ``x̃_0`` entirely, so stage 0 starts from a
       dummy zero state and its control chooses the free components of
       ``x̃_1 = [x_0, u_0, t_vb_0]``. Free initial states enter as
@@ -61,7 +64,8 @@ Mapping the PTR subproblem onto that form:
       trivially-satisfied ``0 ≤ 1`` (orthant) or ``(1, 0, …)`` (SOC). Box
       rows on structurally fixed components are padded too: a fixed value
       sitting exactly on its bound would otherwise produce a zero-slack row
-      with no strict interior.
+      with no strict interior. A runtime guard checks those fixed values
+      against their original physical bounds before solving.
     * Penalties: ``λ_vc t_vc`` with ``|ν| ≤ t_vc``; ``λ_vb t_vb`` with
       ``g + ∇g·Δ ≤ t_vb``, ``t_vb ≥ 0``. CTCS difference rows
       ``|x_{k+1} − x_k|`` substitute ``x_{k+1}`` from the stage dynamics so
@@ -90,7 +94,10 @@ Note:
     so loading OpenSCvx never silently changes the global JAX dtype.
 """
 
-from dataclasses import dataclass, field, replace
+from copy import copy
+from dataclasses import dataclass, field
+from numbers import Integral, Real
+from threading import Lock
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import jax
@@ -108,10 +115,12 @@ from .ptr_solver import (
 
 _x64_before_import = jax.config.read("jax_enable_x64")
 try:
+    from icore import Solver as _ICORENativeSolver
     from icore.jax.core import make_solver as _icore_make_solver
 
     _ICORE_AVAILABLE = True
 except ImportError:  # pragma: no cover — exercised by the install-error test
+    _ICORENativeSolver = None  # type: ignore[assignment]
     _icore_make_solver = None  # type: ignore[assignment]
     _ICORE_AVAILABLE = False
 finally:
@@ -145,9 +154,10 @@ _UNUSED_SLOT_HESS = 1.0
 # Row padding for inactive orthant rows: h − G w = 1 > 0 with G = 0.
 _PAD_H = 1.0
 
-# Native ICORE settings accepted in ``solver_args`` and their defaults (the
-# same defaults as ``icore.Solver``).
+# Execution selector plus ICORE numerical settings. Numerical defaults match
+# ``icore.Solver``; the OpenSCvx default remains the pure-JAX implementation.
 _ICORE_DEFAULTS: Dict[str, Any] = {
+    "backend": "jax",
     "tolerance": 1e-8,
     "max_iterations": 200,
     "refinement_steps": 5,
@@ -158,6 +168,100 @@ _ICORE_DEFAULTS: Dict[str, Any] = {
     "step_policy": "auto",
 }
 _STEP_POLICIES = {"auto": 0, "fixed": 1, "adaptive": 2}
+
+
+def _validate_solver_args(args):
+    """Reject static option errors before building a JAX host callback."""
+    unknown = args.keys() - _ICORE_DEFAULTS.keys()
+    if unknown:
+        raise ValueError(
+            f"Unknown ICORE settings {sorted(unknown)} in solver_args; "
+            f"valid keys are {sorted(_ICORE_DEFAULTS)}."
+        )
+    if args["backend"] not in ("jax", "c", "cpp"):
+        raise ValueError("ICORE backend must be 'jax', 'c' or 'cpp'.")
+    for name in ("max_iterations", "refinement_steps"):
+        if not isinstance(args[name], Integral) or args[name] < 0:
+            raise ValueError(f"{name} must be a nonnegative integer.")
+    if not isinstance(args["riccati_mode"], Integral) or args["riccati_mode"] not in (0, 1, 2):
+        raise ValueError("riccati_mode must be 0, 1 or 2.")
+    for name in ("tolerance", "regularization", "refinement_tolerance", "step_fraction"):
+        value = args[name]
+        if not isinstance(value, Real) or not np.isfinite(value) or value < 0:
+            raise ValueError(f"{name} must be finite and nonnegative.")
+    if args["tolerance"] == 0:
+        raise ValueError("tolerance must be positive.")
+    if not 0 < args["step_fraction"] < 1:
+        raise ValueError("step_fraction must be strictly between zero and one.")
+    policy = args["step_policy"]
+    if not (
+        (isinstance(policy, str) and policy in _STEP_POLICIES)
+        or (isinstance(policy, Integral) and policy in (0, 1, 2))
+    ):
+        raise ValueError("step_policy must be 'auto', 'fixed', 'adaptive', or 0, 1, 2.")
+
+
+class _NativeWorkspace:
+    """One cold-start native solver, serialized across concurrent callbacks.
+
+    Workspace reuse only caches model storage and factors; the public ICORE
+    API starts every solve cold, so results do not depend on callback order.
+    Settings belong to this initialization and are never read from the mutable
+    OpenSCvx solver instance during a callback.
+    """
+
+    def __init__(self, x_shape, u_shape, **solver_args):
+        self._x_shape = x_shape
+        self._u_shape = u_shape
+        self._solver_args = dict(solver_args)
+        self._factory = _ICORENativeSolver
+        self._solver = None
+        self._lock = Lock()
+        self._closed = False
+
+    def __call__(self, problem):
+        arrays = {
+            key: np.ascontiguousarray(value, dtype=np.float64) for key, value in problem.items()
+        }
+        with self._lock:
+            if self._closed:
+                raise RuntimeError("ICORE native workspace is closed; initialize the solver again.")
+            try:
+                if self._solver is None:
+                    self._solver = self._factory(arrays, **self._solver_args)
+                    result = self._solver.solve()
+                else:
+                    result = self._solver.solve(arrays)
+            except ValueError as exc:
+                # ICORE's public native API reports rejected coefficients by
+                # ValueError. Configuration, compiler and loader failures must
+                # still reach the caller with their actionable original error.
+                if str(exc) not in {
+                    "Model coefficients must be finite",
+                    "Invalid convex model or workspace allocation failed",
+                    "Coefficient update rejected (status 3)",
+                }:
+                    raise
+                return {
+                    "x": np.zeros(self._x_shape, dtype=np.float64),
+                    "u": np.zeros(self._u_shape, dtype=np.float64),
+                    "status": np.asarray(3, dtype=np.int32),
+                }
+
+            # The public native API already returns owned copies of x and u.
+            return {
+                "x": result["x"],
+                "u": result["u"],
+                "status": np.asarray(result["status"], dtype=np.int32),
+            }
+
+    def close(self):
+        """Release native storage after any in-flight solve completes."""
+        with self._lock:
+            self._closed = True
+            if self._solver is not None:
+                self._solver.close()
+                self._solver = None
 
 
 def _icore_status_to_code(status: "jnp.ndarray") -> "jnp.ndarray":
@@ -248,13 +352,11 @@ class _StageLayout:
 class ICOREPTRSolver(JaxPTRSolver):
     """Riccati-structured conic backend for the PTR convex subproblem.
 
-    Recasts each SCP subproblem as a stage-wise conic OCP and solves it with
-    ICORE's JAX interior-point kernel. See the module docstring for the
-    augmented-state mapping.
-
-    Because the solve is a pure ``jax.jit`` function, the backend composes
-    with ``jax.jit`` / ``jax.vmap`` and is exportable via ``jax.export``.
-    Each solve starts cold (ICORE has no warm start).
+    Recasts each SCP subproblem as a stage-wise conic OCP. The default JAX
+    kernel is exportable through ``jax.export``. The optional native C/C++
+    implementations execute on the CPU through a host callback, with a
+    persistent workspace and sequential ``vmap`` solves. All implementations
+    start cold. See the module docstring for the augmented-state mapping.
 
     Class attributes:
         SUPPORTED_CONE_TYPES: Accepts
@@ -269,7 +371,11 @@ class ICOREPTRSolver(JaxPTRSolver):
             gap falls below it. Defaults to ``1e-8``.
         max_iter: Maximum IPM iterations (ICORE ``max_iterations``).
             Defaults to ``200``.
-        solver_args: Further ICORE settings, using ICORE's native names:
+        solver_args: ``backend`` selects ``"jax"`` (default), ``"c"`` or
+            ``"cpp"``; the outer OpenSCvx solver backend remains ``"icore"``.
+            Native builds need a C/C++ compiler and cannot be exported or
+            automatically differentiated. Further numerical settings use
+            ICORE's native names:
             ``refinement_steps``, ``regularization``, ``step_fraction``,
             ``refinement_tolerance``, ``riccati_mode`` (0 auto, 1 classical,
             2 square-root) and ``step_policy`` (``"auto"``, ``"fixed"``,
@@ -293,25 +399,33 @@ class ICOREPTRSolver(JaxPTRSolver):
         if not _ICORE_AVAILABLE:
             raise ImportError(_INSTALL_HINT)
 
-        unknown = (solver_args or {}).keys() - _ICORE_DEFAULTS.keys()
-        if unknown:
-            raise ValueError(
-                f"Unknown ICORE settings {sorted(unknown)} in solver_args; "
-                f"valid keys are {sorted(_ICORE_DEFAULTS)}."
-            )
         merged = self._merge_solver_args(
             {"tolerance": solver_tol, "max_iterations": max_iter}, solver_args, _ICORE_DEFAULTS
         )
-        policy = merged["step_policy"]
-        if isinstance(policy, str) and policy not in _STEP_POLICIES:
-            raise ValueError(
-                f"step_policy must be one of {sorted(_STEP_POLICIES)}; got {policy!r}."
-            )
+        _validate_solver_args(merged)
         super().__init__(merged)
 
+        self._backend = merged["backend"]
         self._static: Dict[str, Any] = {}
         self._solve_fn = None
         self._callback = None
+        self._native_workspace = None
+        self._closed = False
+
+    @property
+    def exportable(self) -> bool:
+        """Only ICORE's JAX kernel can be serialized by ``jax.export``."""
+        return self._backend == "jax"
+
+    def close(self) -> None:
+        """Release native resources; call ``initialize`` before solving again.
+
+        Previously compiled native callbacks retain their closed workspace
+        and cannot accidentally access a later initialization's model.
+        """
+        if self._native_workspace is not None:
+            self._native_workspace.close()
+        self._closed = True
 
     # ------------------------------------------------------------------
     # Setup
@@ -348,26 +462,51 @@ class ICOREPTRSolver(JaxPTRSolver):
         self._jax_constraints = jax_constraints
 
     def initialize(self, lowered: "LoweredProblem", settings: "Config") -> None:
-        """Precompute every static stage block and build ICORE's jitted kernel.
+        """Precompute stage blocks and capture an independent solver configuration.
 
         Raises:
             RuntimeError: If :meth:`create_variables` was not called first.
             NotImplementedError: If cross-node constraints are present.
         """
         self._check_initialize(lowered)
+        args = dict(self.solver_args)
+        _validate_solver_args(args)
+        self.close()
         self._settings = settings
         self._static = self._build_static(settings)
-
-        args = dict(self.solver_args)
+        self._backend = args.pop("backend")
         policy = args["step_policy"]
-        args["step_policy"] = _STEP_POLICIES[policy] if isinstance(policy, str) else int(policy)
-        self._solve_fn = _icore_make_solver(
-            self._static["n_orth"],
-            self._static["soc_sizes"],
-            epigraph_controls=self.layout.n_x,
-            **args,
-        )
+        policy = _STEP_POLICIES[policy] if isinstance(policy, str) else int(policy)
+        self._native_workspace = None
+        self._solve_fn = None
+        if self._backend == "jax":
+            args["step_policy"] = policy
+            self._solve_fn = _icore_make_solver(
+                self._static["n_orth"],
+                self._static["soc_sizes"],
+                epigraph_controls=self.layout.n_x,
+                **args,
+            )
+        else:
+            args["step_policy"] = ("auto", "fixed", "adaptive")[policy]
+            # Only CTCS rows reference virtual controls outside their ±nu-t
+            # pair. Their activity is static and B contains identity in those
+            # columns, so this prefix stays safe across parameter updates.
+            active = np.any(self._static["ctcs_active"], axis=0)
+            ctcs = self._static["ctcs_idx"][active]
+            ne = int(np.min(ctcs, initial=self.layout.n_x))
+            self._native_workspace = _NativeWorkspace(
+                (self.layout.N + 1, self.layout.n_xa),
+                (self.layout.N, self.layout.n_v),
+                backend=self._backend,
+                nonnegative=self._static["n_orth"],
+                soc_sizes=self._static["soc_sizes"],
+                epigraph_controls=ne,
+                structural_presolve=False,
+                **args,
+            )
         self._callback = None
+        self._closed = False
 
     # ------------------------------------------------------------------
     # Static structure
@@ -443,9 +582,8 @@ class ICOREPTRSolver(JaxPTRSolver):
         # Box rows on components with no freedom (fixed initial states other
         # than the impulsive post-jump state, terminal Fix states, pinned
         # controls) are padded: a fixed value at its bound would give a
-        # zero-slack row with no strict interior. The fixed initial and
-        # terminal values are runtime data (x_init / x_term), so the omitted
-        # bounds are instead checked on every call by _boundary_in_bounds.
+        # zero-slack row with no strict interior. The omitted bounds are
+        # checked on every call by _fixed_box_status.
         x_box_on = np.ones((N, n_x), dtype=bool)
         x_box_on[0] = free0 | (init_fix & has_impulsive)
         x_box_on[N - 1] &= ~fixN
@@ -512,6 +650,20 @@ class ICOREPTRSolver(JaxPTRSolver):
         F = np.zeros((int(fixN.sum()), L.n_xa))
         F[np.arange(F.shape[0]), L.sx.start + np.flatnonzero(fixN)] = 1.0
 
+        # These rows were padded above because their variables are fixed.
+        # Check their original bounds separately, including runtime boundary
+        # values. Free x_init/x_term entries may be NaN and are not inspected.
+        fixed_state_idx = np.concatenate(
+            [np.flatnonzero(init_fix & ~has_impulsive), np.flatnonzero(fixN), np.flatnonzero(ctcs0)]
+        )
+        pinned_idx = np.flatnonzero(np.any(pinned, axis=0))
+        fixed_box_lower = np.concatenate(
+            [np.asarray(sim.x.min)[fixed_state_idx], np.asarray(sim.u.min)[pinned_idx]]
+        )
+        fixed_box_upper = np.concatenate(
+            [np.asarray(sim.x.max)[fixed_state_idx], np.asarray(sim.u.max)[pinned_idx]]
+        )
+
         return {
             "has_impulsive": has_impulsive,
             "imp_mask": imp_mask,
@@ -520,8 +672,6 @@ class ICOREPTRSolver(JaxPTRSolver):
             "imp0": np.flatnonzero(init_fix & has_impulsive),
             "ctcs0": np.flatnonzero(ctcs0),
             "fixN": np.flatnonzero(fixN),
-            "x_max_phys": np.asarray(sim.x.max, dtype=float),
-            "x_min_phys": np.asarray(sim.x.min, dtype=float),
             "F": F,
             "init_sign": init_sign,
             "final_sign": final_sign,
@@ -540,6 +690,9 @@ class ICOREPTRSolver(JaxPTRSolver):
             "socs": socs,
             "n_orth": int(n_orth),
             "soc_sizes": tuple(int(c.m_arg) + 1 for c in socs),
+            "fixed_box_lower": fixed_box_lower,
+            "fixed_box_upper": fixed_box_upper,
+            "fixed_box_constant_count": int(ctcs0.sum() + pinned_idx.size),
         }
 
     # ------------------------------------------------------------------
@@ -555,49 +708,95 @@ class ICOREPTRSolver(JaxPTRSolver):
         return self._solve_via_callback()
 
     def iteration_callback(self):
-        """JAX-pure ``(state, SubproblemData) -> SubproblemSolution``.
+        """JAX-compatible ``(state, SubproblemData) -> SubproblemSolution``.
 
-        Composes :meth:`_assemble_ocp_jax`, ICORE's jitted kernel and
-        :meth:`_build_solution_jax` into a single ``jax.jit`` closure, built
-        once and cached. ICORE has no warm start, so ``state`` is accepted
-        only for cross-backend signature uniformity.
+        Assembly and unpacking stay in JAX. Native execution crosses one host
+        callback between them and reuses a locked workspace. The callback
+        captures this initialization's structure and numerical settings; call
+        ``initialize`` again to apply changes. ICORE starts cold, so ``state``
+        is accepted only for cross-backend signature uniformity.
         """
         self._check_callback_ready()
+        if self._closed:
+            raise RuntimeError("ICOREPTRSolver is closed; call initialize() before solving again.")
         if self._callback is None:
             solve_fn = self._solve_fn
+            workspace = self._native_workspace
+            # Bound assembly methods must not observe a different layout if
+            # this solver is later reinitialized before an old callback traces.
+            assembly = copy(self)
+            assembly.layout = copy(self.layout)
+            assembly._static = dict(self._static)
+            L = assembly.layout
+            native_shapes = {
+                "x": jax.ShapeDtypeStruct((L.N + 1, L.n_xa), jnp.float64),
+                "u": jax.ShapeDtypeStruct((L.N, L.n_v), jnp.float64),
+                "status": jax.ShapeDtypeStruct((), jnp.int32),
+            }
 
             def step(state, data: SubproblemData) -> SubproblemSolution:
                 del state  # ICORE solves cold.
-                result = solve_fn(self._assemble_ocp_jax(data))
-                sol = self._build_solution_jax(result, data)
-                status = jnp.where(
-                    self._boundary_in_bounds(data),
-                    sol.status_code,
-                    jnp.int32(int(StatusCode.INFEASIBLE)),
+                box_status = assembly._fixed_box_status(data)
+
+                def solve(_):
+                    problem = assembly._assemble_ocp_jax(data)
+                    if workspace is None:
+                        result = solve_fn(problem)
+                    else:
+                        result = jax.pure_callback(
+                            workspace, native_shapes, problem, vmap_method="sequential"
+                        )
+                    # Invalid coefficients have no meaningful iterate to
+                    # unpack. In particular, do not turn NaN inputs into a
+                    # NaN objective after a native validation failure.
+                    return jax.lax.cond(
+                        result["status"] == 3,
+                        lambda _: assembly._empty_solution(StatusCode.UNKNOWN),
+                        lambda _: assembly._build_solution_jax(result, data),
+                        operand=None,
+                    )
+
+                return jax.lax.cond(
+                    box_status == int(StatusCode.OPTIMAL),
+                    solve,
+                    lambda _: assembly._empty_solution(box_status),
+                    operand=None,
                 )
-                return replace(sol, status_code=status)
 
             self._callback = jax.jit(step)
         return self._callback
 
-    def _boundary_in_bounds(self, data: SubproblemData) -> "jnp.ndarray":
-        """Whether the fixed boundary values lie within the state bounds.
+    def _empty_solution(self, status_code) -> SubproblemSolution:
+        """Return finite shape-correct placeholders for a rejected subproblem."""
+        L = self.layout
+        return SubproblemSolution(
+            x=jnp.zeros((L.N, L.n_x), dtype=jnp.float64),
+            u=jnp.zeros((L.N, L.n_u), dtype=jnp.float64),
+            nu=jnp.zeros((L.N - 1, L.n_x), dtype=jnp.float64),
+            nu_vb=jnp.zeros((L.N, L.n_nodal), dtype=jnp.float64),
+            nu_vb_cross=jnp.zeros((0,), dtype=jnp.float64),
+            cost=jnp.asarray(0.0, dtype=jnp.float64),
+            status_code=jnp.asarray(status_code, dtype=jnp.int32),
+        )
 
-        The stage OCP carries no box rows on fixed initial (non-impulsive)
-        and terminal ``Fix`` components (see :meth:`_build_static`), so ICORE
-        would otherwise return ``OPTIMAL`` with ``x_0`` / ``x_{N-1}`` outside
-        ``[x.min, x.max]``. The check runs in physical units on every call so
-        changed ``x_init`` / ``x_term`` values are validated too; a value
-        exactly on a bound is feasible.
-        """
+    def _fixed_box_status(self, data: SubproblemData):
+        """Check the box rows omitted for structurally fixed variables."""
         st = self._static
-        x_min, x_max = st["x_min_phys"], st["x_max_phys"]
-        ok = jnp.asarray(True)
-        for idx, val in ((st["fix0"], data.x_init), (st["fixN"], data.x_term)):
-            if idx.size:
-                v = val[idx]
-                ok = ok & jnp.all((v >= x_min[idx]) & (v <= x_max[idx]))
-        return ok
+        values = jnp.concatenate(
+            [
+                data.x_init[st["fix0"]],
+                data.x_term[st["fixN"]],
+                jnp.zeros((st["fixed_box_constant_count"],), dtype=jnp.float64),
+            ]
+        )
+        lower, upper = jnp.asarray(st["fixed_box_lower"]), jnp.asarray(st["fixed_box_upper"])
+        valid = jnp.all(jnp.isfinite(values)) & jnp.all(~jnp.isnan(lower) & ~jnp.isnan(upper))
+        inside = jnp.all((lower <= values) & (values <= upper))
+        return jnp.where(
+            valid,
+            jnp.where(inside, jnp.int32(StatusCode.OPTIMAL), jnp.int32(StatusCode.INFEASIBLE)),
+            jnp.int32(StatusCode.UNKNOWN),
+        )
 
     # ------------------------------------------------------------------
     # JAX-pure assembly

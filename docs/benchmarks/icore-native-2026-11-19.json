@@ -1,0 +1,1840 @@
+{
+  "schema": "openscvx-icore-backends-v1",
+  "created_utc": "2026-11-19T23:48:49.769166+00:00",
+  "openscvx_commit": "02d2c26cb1f8a7b3cc27c3a66028e4ff108b5653",
+  "icore_commit": "52764b7a7e0d13ba41d68adcb7da6a9365c75b43",
+  "openscvx_sha256": {
+    "scripts/benchmark_icore_backends.py": "fbb87387bd32271374d7ce94942d73d3a04fe47e81a0092b4b7d312484d38eb6",
+    "openscvx/solvers/icore_ptr_solver.py": "afd6cec5251597eec64d69dfc1eb73c1a611438e472dece3dca18a9ee313ed84",
+    "openscvx/solvers/ptr_solver.py": "539ac3c38a4a1f65a193b704471efe6f0e930823106dfd7203ad9199fa18b5b9",
+    "openscvx/solvers/base.py": "0cdb6c9da30417f33986744a42605f9ac714ad804af8a1afa30c75899c19e4be",
+    "openscvx/problem.py": "c6702c12c0a17055bba94f414c284230465acf643204ab1a3cd62b86387085d9",
+    "openscvx/algorithms/scvx/iteration.py": "3d354a69727beae4d2b331e1101f4656199666ba790ed9ce06351809447e3a8c",
+    "openscvx/algorithms/loop.py": "4b4dca956ff3e2159dacfe74adf1335a60d168e3a5ed71e6973226a64297197e",
+    "openscvx/algorithms/state.py": "fa8a03aa03decccf86c1c5a3f18e2aef207f1901a396f56e7087866e5f36ef54",
+    "openscvx/algorithms/optimization_results.py": "0558952f7f58d909aa23ea9f18de4dad98fd0b2f432b572f8c99ca7dfdc1cdc9",
+    "tests/solvers/_iteration_callback_helpers.py": "9fee904ea79b882f1929c8b88b71e3199b45ae7878dd7de80aec58e8d25d9f07"
+  },
+  "icore_sha256": {
+    "icore/__init__.py": "37f4615a65e6e98e2fbc2a4ce5271c19b20e7790157a9bb3c45830efa1e09e68",
+    "icore/_blasfeo_build.py": "87f39a6bf8377bae6ba6886c133e31339352300a3583a74bbce8f95e864e2eed",
+    "icore/_build.py": "6889c7d8dd07a24666b272610b2ea4764c6bedb2dfc94a7fa8ebf34e76400962",
+    "icore/_comparators.py": "c9a03c4c5f4ba6fa1a519c87f0968d92a4354c3dc943a0b2e95d896a58245198",
+    "icore/_jax.py": "d723ab577e061f02454ca4504ae1f54fb379ad1c80ec6bd89e28fda98935ff9e",
+    "icore/_native.py": "0383a3962a9e2e1428d856c6ccb7282c2eea8ed181e7d9e1d6bb3d6930a806c4",
+    "icore/api.py": "a982e3ba387e353879bd4c46321e16c33dc4b2cabc8dfc1ec36b9d078da00159",
+    "icore/benchmark.py": "4f85c4a523bc6df9a9be81f1ee684b9e75e9622631bd67b57cf8fc69ac63c795",
+    "icore/jax/__init__.py": "218af9a2b4158cca6099f1a33e1a16cbab52763ffdf93d67caf5c2d659dd292e",
+    "icore/jax/_linalg.py": "dc962d3c3709e8f6433cbb32ee1efb86642e52782d4d60597bd1a155511014ac",
+    "icore/jax/chain.py": "0372ecbc189b9fa4033c561686ea052c982b070e016c352c5e900cc7a1508435",
+    "icore/jax/core.py": "15defa0ced65527d8a662d57a93fedc197f37985e1121624a922867b6e21222e",
+    "icore/jax/jax_engine.py": "878a2cefe35a973cd68399b2de741253b9c7ea97f363c2112769281c3085cf40",
+    "icore/model.py": "8cf66a6dcc8d7fa203fa883e18054c1fd7d62ac9087b1b0e09a6c5e000b485d3",
+    "icore/presolve.py": "e0acb0ee930b91d5c985eea3de3728970a65f210dca37d1e59b78cf61c64f759",
+    "icore/src/api.c": "a8433a8f4bcc3b1438f09cbde7a32616d52a6aa43b8c1e88ecd4a8194fafb8c0",
+    "icore/src/build_cache.c": "17a3c0ed41ff3324b0534f0498d154d629d85f374ad7609792ff88ae66a83ec3",
+    "icore/src/chain.c": "7165d1289f438b990d61af724685d9d5205cb8489cb165a43333674e600b4f65",
+    "icore/src/chain.h": "d7638704c5d3d15d3539d1c583b4d7ff57dee6a0a2b6ba01e94c54ba7f665fb0",
+    "icore/src/chain_driver.h": "c2d1f89ebd33d781a3e402e008687525667c9b0bd099895bd2ba1e56067c5e81",
+    "icore/src/chain_model.h": "774da533b265540c7c7b475f9ccfda4b8b1ffd06dcc63cd639a631999aae91c7",
+    "icore/src/chain_sparse/amd/SuiteSparse_config.c": "755aee9e2fb07638e8f9bbca3a0df94760c78ab74bcc6e595bfd373c738a3258",
+    "icore/src/chain_sparse/amd/SuiteSparse_config.h": "2e861c3e1a51ac56a1f1b0e0ec74a830897a72e26a521e009c4f916969f50717",
+    "icore/src/chain_sparse/amd/amd.h": "862d106162aa36457648ddd4677f4553c4f4028b93fb1ae477d9af7ce4870c1d",
+    "icore/src/chain_sparse/amd/amd_1.c": "aa4228b17911da6f29671cc4891ea829c07deea826489ef1dac5702711cb12ea",
+    "icore/src/chain_sparse/amd/amd_2.c": "448bb667b2e96256fd28d70fa6832bd170a4fef76bf69705b2dc174afb32019b",
+    "icore/src/chain_sparse/amd/amd_aat.c": "8f16f25c3c5123a930a46638567cf7c6246086aef19da41b353e22c1b6262a41",
+    "icore/src/chain_sparse/amd/amd_control.c": "4a3e1fa3238a83d527a5d476c6f843b751c4cc98a82e6d15603a84bd8fc12b09",
+    "icore/src/chain_sparse/amd/amd_defaults.c": "f0d00f85c089049619624889a7999acade0061a67afe5f80e0f4201a2d06da01",
+    "icore/src/chain_sparse/amd/amd_dump.c": "1b437c3c7db7a64f5f7393c01145ec490d3d599b4489e7731113989e2b33f9f3",
+    "icore/src/chain_sparse/amd/amd_info.c": "17633205284425ec5a6d2ba0866b35a922b6edd6ff0d19b9ece59b441990c5c5",
+    "icore/src/chain_sparse/amd/amd_internal.h": "0e6c1d9cb489de8b7a91ec2795d1c559e826cdad79209bc1ba82ffeae364ed7b",
+    "icore/src/chain_sparse/amd/amd_order.c": "c950f74be057e6e3b5e6086fa3dbc466a1cb0ca4a9e64073aaf71eb63c73f8bf",
+    "icore/src/chain_sparse/amd/amd_post_tree.c": "91a5c7984c9bf58c8fc105a4c4ee743244421e406eb9f5555eb74f0e90186526",
+    "icore/src/chain_sparse/amd/amd_postorder.c": "6be1fa81a47979253e402eece58e0605607962cf09fc5615ad76df77e2515151",
+    "icore/src/chain_sparse/amd/amd_preprocess.c": "5e5b3ecbf936c338c72db414aeff5e91b7e4e12ff88b7083547b8a6f24661ba7",
+    "icore/src/chain_sparse/amd/amd_valid.c": "e876275da7becc47f28152d658430b8dcbf78075edd9c37097319944c430a699",
+    "icore/src/chain_sparse/amd/amd_version.c": "0b5a5f8f5f765cc563add6fb3a00ef37ebbd8aa41d643501b1b6ad025c254c17",
+    "icore/src/chain_sparse/amd/chain_sparse_namespace.h": "b6a6e2433d3038237bf9cd671dd149fe0c0d89928985dc73f906410db4b40a2a",
+    "icore/src/chain_sparse/qdldl/qdldl.c": "537dae998da017dda8507c820ad4eb61cde7cd5782b2133a1c340f2ed49bc340",
+    "icore/src/chain_sparse/qdldl/qdldl.h": "e8dc0f6bf0084a99a0b24ce401603e17ee38a6f42488e46508fdb6aa5af1e733",
+    "icore/src/chain_sparse/qdldl/qdldl_types.h": "a8642646e211eaab1f4e78c80619b04b7a48b1ec19c1365018087813d0a5f527",
+    "icore/src/chain_sparse/qdldl/qdldl_version.h": "58c91271658c917db7189b6a0915fa2078096f2f50a934aa340a2c26c3b72f8e",
+    "icore/src/dense_bound_pairs.h": "f44b3ef0f252aeb1dbb791d1d6fafd04d9caf3e8aa26b11cf3e993cc416a213b",
+    "icore/src/dense_la.c": "f3b60b367ac5d28eb5013a5db61adeee6690bf5ce51bc24f63c73ac313e7d767",
+    "icore/src/dense_la.h": "22a96c005ac3f5abe1974df9b5c97f0e5014da945632294eae12cf52aecbe8e0",
+    "icore/src/dense_qp.h": "6155a3cafb0aa51381a12654f5e92f7868e421d6b230a5af40ca1fffbf442cc7",
+    "icore/src/dense_qp_model.h": "8f792537fa784323cf89baddc236210d414aa908f278bf7255a1e671f531ea75",
+    "icore/src/driver.c": "4fe44de817078fe2a559011def3fbc357f5b1538a01bc6dd5d43cc5cad496d51",
+    "icore/src/driver.h": "aef29518f9311d9a2d4888d7124ed86cd0fa8f1f81d1f494f3d31dc3ba6efd25",
+    "icore/src/driver_loop.h": "4c2829a6d715811d403926ed99197d98e2f354cac2eaa5e02f6bb682a38b2812",
+    "icore/src/icore.h": "201b9b33c44137d38b864125131d63fa1c8f06122b352c37fc0159800342562a",
+    "icore/src/icore_ocp.h": "863d459505f4b33c5be1f6b110c9526f6e8abfadb9cb74ca8d42ca92ab861897",
+    "icore/src/mixed_factor.h": "b4d16acf95b0b5e951747cfc554cad6660960138d410ce0ae320d74d201dfc01",
+    "icore/src/mixed_factor_impl.h": "c99663a86c79ca8b6b7237ef2bec4f20c27df039870c3967d292712502299f3d",
+    "icore/src/mixed_solver_impl.h": "1e519aad335454ae5c53ed80ce0157b4ca170129b48bc34ec734590bbf053d7e",
+    "icore/src/mixed_sweep_impl.h": "cbd2fbfcf39efaa36a30754102fb76e71b1a5329583260f41dd4d92f04eea6d5",
+    "icore/src/mixed_sweep_stubs.h": "8b304d465508a34b7dc80a04d4c36846aec72cd0e56467b267e195bf2aef4f7a",
+    "icore/src/ocp.c": "337665e764071fc80dd6a3f7a3104930a6653c47f1fcdc876540abf7de1c1e5a",
+    "icore/src/ocp_cones.h": "614e3492e72a63d54a1058a29a172b8ec2f123a76f1c30dc40b7374c9ed26575",
+    "icore/src/ocp_driver.h": "692bc448b6e40d6b0efc3d1ef68f81df06ac8c1f3ac0c58b005492daaada58d6",
+    "icore/src/ocp_dual_recovery.h": "4c803a98a871c2a746fd573675cac89ff70b586d63500bd30880b9f561da23b4",
+    "icore/src/ocp_factor.h": "606c56e1af29529df412e0c5283831398e44ffefacc62f7a477c2ad34a87f9ff",
+    "icore/src/ocp_initialize.h": "158d46a828de324c7be539cff2c3ed6a0a22cc78e9b91ef9ae7a5a442d1a12c4",
+    "icore/src/ocp_la.c": "970c22521bfb50b71a61b6c839719c4d2820eb03c1d3d1fcbeaf766ea985c445",
+    "icore/src/ocp_la.h": "e2bc9e9bd374facb6aa9401e1cdee9cb877cfd0fc23892e7928525fa7491e6c5",
+    "icore/src/ocp_la_stubs.h": "f14367833567843a6188dfe2f0e957182c1974c6c3cf1cf3cb98c7abc5b0d3fc",
+    "icore/src/ocp_model.h": "3ab765299071a0b18a5623b04c295a226376574ffcec74429e51b920175571fe",
+    "icore/src/ocp_newton.h": "20a3686936dadc51ac333081c2fc8d619749e011c590a3520cb7446cc743af34",
+    "icore/src/ocp_vectors.h": "567731e30388eafca08c883d170e1a559eb326d916d8fc6f28d2ed03dac3d360",
+    "icore/src/ocp_workspace.h": "e91e177c6ea5b3f1ba395fc68054f3232d1d9c32ab91873f8f6561a980bb44ea",
+    "icore/src/orthant.h": "bc58b1663086f3cc0349bca35f20861104ece94b503d5fab28d6206e2da21ad9",
+    "example_tools/audit.py": "1e05ff84829bcb2201c970bd721970dcc02313a9311d51e280b98c54ba8d1601"
+  },
+  "source_note": "OpenSCvx changes were uncommitted; the file hashes identify tested source.",
+  "environment": {
+    "python": "3.12.14",
+    "jax": "0.12.1",
+    "jaxlib": "0.12.1",
+    "numpy": "2.5.5",
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+    "affinity": [
+      8
+    ],
+    "devices": [
+      "cpu:0"
+    ],
+    "thread_environment": {
+      "OPENBLAS_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "XLA_FLAGS": "--xla_cpu_multi_thread_eigen=false"
+    }
+  },
+  "protocol": "Same changed input, all six backend call permutations; synchronize every result",
+  "repetitions": 100,
+  "warmup": 5,
+  "tolerance": 1e-08,
+  "native_library_present_before_run": {
+    "c": true,
+    "cpp": true
+  },
+  "native_library_files_before_run": {
+    "c": [
+      {
+        "name": "libicore_5dfc96b497d483298b98.so",
+        "bytes": 1593192,
+        "mtime_ns": 1795131918957343829
+      }
+    ],
+    "cpp": [
+      {
+        "name": "libicore_322181afb5e001fd717c.so",
+        "bytes": 1588872,
+        "mtime_ns": 1795131950668485056
+      }
+    ]
+  },
+  "cold_note": "XLA compilation excludes execution. First native execution may build/load native code. Initialization/cache reuse differs by call order; not a fresh-machine startup test.",
+  "cases": [
+    {
+      "name": "brachistochrone_ctcs_n6",
+      "kind": "iteration_callback",
+      "scope": "assembly + solve (including native pure_callback) + unpack; all leaves blocked",
+      "variants": "A_d +/- 1e-4 I and lam_prox times 0.99/1.01; same inputs for every backend",
+      "shapes": {
+        "A": [
+          6,
+          7,
+          7
+        ],
+        "B": [
+          6,
+          7,
+          12
+        ],
+        "F": [
+          2,
+          7
+        ],
+        "G": [
+          7,
+          26,
+          19
+        ],
+        "H": [
+          7,
+          19,
+          19
+        ],
+        "b": [
+          6,
+          7
+        ],
+        "c": [
+          7,
+          19
+        ],
+        "f": [
+          2
+        ],
+        "h": [
+          7,
+          26
+        ],
+        "x0": [
+          7
+        ]
+      },
+      "settings": {
+        "tolerance": 1e-08,
+        "max_iterations": 200,
+        "refinement_steps": 5,
+        "regularization": 1e-11,
+        "step_fraction": 0.99,
+        "refinement_tolerance": 0.0,
+        "riccati_mode": 0,
+        "step_policy": "auto"
+      },
+      "epigraph_controls": {
+        "jax": 5,
+        "c": 4,
+        "cpp": 4
+      },
+      "cold": {
+        "jax": {
+          "initialize_seconds": 20.069162468000286,
+          "callback_compile_seconds": 9.81978368899945,
+          "first_execution_seconds": 0.003434199,
+          "first_status": 0
+        },
+        "c": {
+          "initialize_seconds": 7.381584667997231,
+          "callback_compile_seconds": 0.8658331900005578,
+          "first_execution_seconds": 0.002176307,
+          "first_status": 0
+        },
+        "cpp": {
+          "initialize_seconds": 7.538932659001148,
+          "callback_compile_seconds": 0.7984066509998229,
+          "first_execution_seconds": 0.002148194,
+          "first_status": 0
+        }
+      },
+      "changing_inputs": {
+        "jax": {
+          "count": 100,
+          "median_ms": 1.056197,
+          "mean_ms": 1.1698774,
+          "min_ms": 0.853137,
+          "max_ms": 3.36016,
+          "samples_ms": [
+            1.069285,
+            1.007995,
+            1.016217,
+            1.00484,
+            0.969559,
+            1.286866,
+            0.959703,
+            1.01094,
+            1.118678,
+            0.979113,
+            1.098228,
+            0.966433,
+            0.879545,
+            0.949388,
+            1.014415,
+            1.007003,
+            0.976038,
+            1.001295,
+            0.86157,
+            1.024519,
+            0.944111,
+            0.935838,
+            0.914367,
+            1.22895,
+            0.853137,
+            1.052111,
+            0.977931,
+            1.028896,
+            0.97734,
+            0.982988,
+            0.853818,
+            0.886006,
+            0.933566,
+            0.935348,
+            0.901498,
+            0.921528,
+            0.872796,
+            0.898824,
+            0.945113,
+            0.937801,
+            0.938683,
+            1.292324,
+            0.948648,
+            1.104217,
+            1.226987,
+            1.01179,
+            1.226848,
+            1.110356,
+            1.000824,
+            1.209191,
+            0.997129,
+            1.010669,
+            0.940305,
+            1.102905,
+            0.975777,
+            0.960135,
+            0.997359,
+            1.028014,
+            0.947676,
+            1.401715,
+            0.988386,
+            1.094252,
+            1.12681,
+            1.076877,
+            0.953324,
+            3.36016,
+            1.245355,
+            2.047747,
+            1.573749,
+            1.246987,
+            0.946635,
+            1.483325,
+            1.467963,
+            1.369818,
+            1.415305,
+            1.273667,
+            1.100772,
+            1.512308,
+            1.327215,
+            2.07003,
+            1.159408,
+            1.251033,
+            1.327626,
+            1.932517,
+            1.587439,
+            1.114542,
+            1.446461,
+            1.372982,
+            1.587308,
+            1.556523,
+            1.183474,
+            1.284142,
+            1.393143,
+            1.397709,
+            1.163133,
+            1.298963,
+            1.060283,
+            1.463686,
+            1.654507,
+            1.457027
+          ],
+          "all_checks_passed": true
+        },
+        "c": {
+          "count": 100,
+          "median_ms": 1.245185,
+          "mean_ms": 1.3353586,
+          "min_ms": 1.016608,
+          "max_ms": 2.393497,
+          "samples_ms": [
+            1.24164,
+            1.097177,
+            1.043157,
+            1.24873,
+            1.233578,
+            1.094172,
+            1.331712,
+            1.298603,
+            1.20855,
+            1.34361,
+            1.26224,
+            1.236381,
+            1.114622,
+            1.081694,
+            1.090106,
+            1.082234,
+            1.175322,
+            1.253998,
+            1.232386,
+            1.16057,
+            1.209162,
+            1.07883,
+            1.074593,
+            1.132258,
+            1.236822,
+            1.156163,
+            1.029657,
+            1.081413,
+            1.0933,
+            1.041314,
+            1.18132,
+            1.133199,
+            1.019943,
+            1.083326,
+            1.05896,
+            1.072429,
+            1.097677,
+            1.057678,
+            1.040784,
+            1.016608,
+            1.47989,
+            2.393497,
+            1.73065,
+            1.228539,
+            1.345572,
+            1.092449,
+            1.138737,
+            1.226387,
+            1.195081,
+            1.264824,
+            1.370539,
+            1.187419,
+            1.169553,
+            1.814893,
+            1.288899,
+            1.13336,
+            1.073572,
+            1.076747,
+            1.260297,
+            1.433512,
+            1.356598,
+            1.219837,
+            1.097106,
+            1.159718,
+            1.25598,
+            1.949051,
+            2.299137,
+            1.759142,
+            1.725812,
+            1.20174,
+            1.295769,
+            1.374926,
+            1.631284,
+            1.798569,
+            1.337881,
+            1.336188,
+            1.564685,
+            1.935331,
+            1.74431,
+            1.340184,
+            1.182042,
+            1.311913,
+            1.38435,
+            1.283551,
+            2.099524,
+            1.411139,
+            1.607578,
+            1.639375,
+            1.461804,
+            1.831368,
+            1.697721,
+            1.559828,
+            1.632915,
+            1.234298,
+            1.597844,
+            1.298964,
+            1.619967,
+            1.450086,
+            1.474021,
+            1.743989
+          ],
+          "all_checks_passed": true
+        },
+        "cpp": {
+          "count": 100,
+          "median_ms": 1.2351495,
+          "mean_ms": 1.33861976,
+          "min_ms": 1.03229,
+          "max_ms": 2.722059,
+          "samples_ms": [
+            1.094502,
+            1.125127,
+            1.189522,
+            1.055615,
+            1.253036,
+            1.444238,
+            1.170635,
+            1.170254,
+            1.320606,
+            1.248199,
+            1.134161,
+            1.188141,
+            1.148893,
+            1.09282,
+            1.081364,
+            1.094372,
+            1.089835,
+            1.28365,
+            1.216603,
+            1.286175,
+            1.084708,
+            1.036027,
+            1.050548,
+            1.119239,
+            1.311061,
+            1.277122,
+            1.205256,
+            1.05869,
+            1.265895,
+            1.198826,
+            1.115944,
+            1.136264,
+            1.07904,
+            1.04522,
+            1.080592,
+            1.032471,
+            1.179057,
+            1.065159,
+            1.03229,
+            1.074773,
+            1.190583,
+            1.284161,
+            1.315107,
+            1.267427,
+            1.266325,
+            1.2221,
+            1.433432,
+            1.071348,
+            1.275849,
+            1.133199,
+            1.204204,
+            1.212597,
+            1.126199,
+            1.154831,
+            1.213428,
+            1.197705,
+            1.123806,
+            1.091118,
+            1.11336,
+            1.366252,
+            1.407112,
+            1.22192,
+            1.159949,
+            1.090696,
+            1.112759,
+            1.731676,
+            2.722059,
+            2.171128,
+            1.706644,
+            1.696068,
+            1.553989,
+            1.166418,
+            1.665514,
+            1.770678,
+            1.541691,
+            2.177918,
+            1.292844,
+            1.962722,
+            1.530575,
+            2.467836,
+            1.426342,
+            1.146659,
+            1.278854,
+            1.297582,
+            1.487702,
+            1.884827,
+            2.063039,
+            1.384279,
+            1.776618,
+            1.594289,
+            1.657792,
+            1.822495,
+            1.732863,
+            1.404069,
+            1.361506,
+            1.403107,
+            1.314827,
+            1.557414,
+            1.321587,
+            1.396968
+          ],
+          "all_checks_passed": true
+        }
+      },
+      "validation": {
+        "jax": [
+          {
+            "input_variant": 0,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 9,
+            "reported_residuals": [
+              2.220446049250313e-16,
+              3.752553823233029e-14,
+              3.035918330162325e-11
+            ],
+            "independent_audit": {
+              "primal": 2.220446049250313e-16,
+              "dual": 3.752553823233029e-14,
+              "gap": 3.035918330162326e-11,
+              "objective": -12.249790023797333,
+              "objective_error": null,
+              "dynamics": 2.220446049250313e-16,
+              "terminal": 5.1884935028319255e-21,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 1.7763568394002505e-15,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          },
+          {
+            "input_variant": 1,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 10,
+            "reported_residuals": [
+              2.220446049250313e-16,
+              1.3433698597964394e-14,
+              3.2788735357423543e-13
+            ],
+            "independent_audit": {
+              "primal": 2.220446049250313e-16,
+              "dual": 1.3433698597964394e-14,
+              "gap": 3.278873535742353e-13,
+              "objective": -12.11638828840547,
+              "objective_error": null,
+              "dynamics": 2.220446049250313e-16,
+              "terminal": 5.55322852164975e-26,
+              "slack_equation": 1.1102230246251565e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 0.0,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          },
+          {
+            "input_variant": 2,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 9,
+            "reported_residuals": [
+              2.220446049250313e-16,
+              1.8096635301390052e-14,
+              2.5795376957647552e-11
+            ],
+            "independent_audit": {
+              "primal": 4.440892098500626e-16,
+              "dual": 1.8096635301390052e-14,
+              "gap": 2.5795376957647556e-11,
+              "objective": -12.383266970476864,
+              "objective_error": null,
+              "dynamics": 4.440892098500626e-16,
+              "terminal": 2.9652366160724675e-21,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 1.7763568394002505e-15,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          }
+        ],
+        "c": [
+          {
+            "input_variant": 0,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 9,
+            "reported_residuals": [
+              2.220446049250313e-16,
+              9.999990893757234e-11,
+              3.119528046821308e-11
+            ],
+            "independent_audit": {
+              "primal": 2.220446049250313e-16,
+              "dual": 9.999990893757234e-11,
+              "gap": 3.119528046821308e-11,
+              "objective": -12.249787848242253,
+              "objective_error": null,
+              "dynamics": 2.220446049250313e-16,
+              "terminal": 8.842695486585887e-22,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 8.881784197001252e-16,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          },
+          {
+            "input_variant": 1,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 10,
+            "reported_residuals": [
+              3.3306690738754696e-16,
+              9.951081801829272e-11,
+              4.8673142310445966e-11
+            ],
+            "independent_audit": {
+              "primal": 4.440892098500626e-16,
+              "dual": 9.951081801829272e-11,
+              "gap": 4.867314231044598e-11,
+              "objective": -12.11638827850903,
+              "objective_error": null,
+              "dynamics": 4.440892098500626e-16,
+              "terminal": 6.419604024410538e-26,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 2.220446049250313e-16,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          },
+          {
+            "input_variant": 2,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 9,
+            "reported_residuals": [
+              2.220446049250313e-16,
+              9.999992390482164e-11,
+              2.6588344505391385e-11
+            ],
+            "independent_audit": {
+              "primal": 2.220446049250313e-16,
+              "dual": 9.999992390482165e-11,
+              "gap": 2.6588344505391385e-11,
+              "objective": -12.383264940474703,
+              "objective_error": null,
+              "dynamics": 2.220446049250313e-16,
+              "terminal": 1.0221936649219308e-21,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 1.7763568394002505e-15,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          }
+        ],
+        "cpp": [
+          {
+            "input_variant": 0,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 9,
+            "reported_residuals": [
+              2.220446049250313e-16,
+              9.999990893757244e-11,
+              3.119528043163315e-11
+            ],
+            "independent_audit": {
+              "primal": 2.220446049250313e-16,
+              "dual": 9.999990893757243e-11,
+              "gap": 3.119528043163316e-11,
+              "objective": -12.24978784824225,
+              "objective_error": null,
+              "dynamics": 2.220446049250313e-16,
+              "terminal": 2.966625680258673e-21,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 0.0,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          },
+          {
+            "input_variant": 1,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 10,
+            "reported_residuals": [
+              2.220446049250313e-16,
+              9.95108180181475e-11,
+              4.867314232115735e-11
+            ],
+            "independent_audit": {
+              "primal": 2.220446049250313e-16,
+              "dual": 9.951081801814751e-11,
+              "gap": 4.8673142321157354e-11,
+              "objective": -12.11638827850903,
+              "objective_error": null,
+              "dynamics": 2.220446049250313e-16,
+              "terminal": 3.46261769826057e-26,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 9.644416678927845e-26,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 1.7763568394002505e-15,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 4.440892098500626e-16
+            },
+            "accepted": true
+          },
+          {
+            "input_variant": 2,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 9,
+            "reported_residuals": [
+              2.220446049250313e-16,
+              9.999992390482174e-11,
+              2.6588344469969272e-11
+            ],
+            "independent_audit": {
+              "primal": 2.220446049250313e-16,
+              "dual": 9.999992390482174e-11,
+              "gap": 2.6588344469969275e-11,
+              "objective": -12.383264940474703,
+              "objective_error": null,
+              "dynamics": 2.220446049250313e-16,
+              "terminal": 5.012579973778427e-22,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 1.7763568394002505e-15,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          }
+        ]
+      },
+      "native_vs_jax": {
+        "c": [
+          {
+            "input_variant": 0,
+            "x_max_abs": 1.013766848245723e-11,
+            "u_max_abs": 1.4641621248756564e-12,
+            "nu_max_abs": 3.178124430291973e-12,
+            "cost_max_abs": 1.41886502547095e-13,
+            "accepted": true
+          },
+          {
+            "input_variant": 1,
+            "x_max_abs": 3.552713678800501e-15,
+            "u_max_abs": 2.220446049250313e-16,
+            "nu_max_abs": 6.106226635438361e-16,
+            "cost_max_abs": 2.220446049250313e-16,
+            "accepted": true
+          },
+          {
+            "input_variant": 2,
+            "x_max_abs": 6.390887818952251e-12,
+            "u_max_abs": 9.234835118832052e-13,
+            "nu_max_abs": 2.0446422333009195e-12,
+            "cost_max_abs": 1.7275070263167436e-13,
+            "accepted": true
+          }
+        ],
+        "cpp": [
+          {
+            "input_variant": 0,
+            "x_max_abs": 1.013766848245723e-11,
+            "u_max_abs": 1.4641621248756564e-12,
+            "nu_max_abs": 3.178138308079781e-12,
+            "cost_max_abs": 1.4166445794216997e-13,
+            "accepted": true
+          },
+          {
+            "input_variant": 1,
+            "x_max_abs": 1.7763568394002505e-15,
+            "u_max_abs": 2.220446049250313e-16,
+            "nu_max_abs": 3.7470027081099033e-16,
+            "cost_max_abs": 0.0,
+            "accepted": true
+          },
+          {
+            "input_variant": 2,
+            "x_max_abs": 6.391331908162101e-12,
+            "u_max_abs": 9.234835118832052e-13,
+            "nu_max_abs": 2.0447393778155742e-12,
+            "cost_max_abs": 1.7275070263167436e-13,
+            "accepted": true
+          }
+        ]
+      },
+      "accepted": true
+    },
+    {
+      "name": "brachistochrone_ctcs_n20",
+      "kind": "iteration_callback",
+      "scope": "assembly + solve (including native pure_callback) + unpack; all leaves blocked",
+      "variants": "A_d +/- 1e-4 I and lam_prox times 0.99/1.01; same inputs for every backend",
+      "shapes": {
+        "A": [
+          20,
+          7,
+          7
+        ],
+        "B": [
+          20,
+          7,
+          12
+        ],
+        "F": [
+          2,
+          7
+        ],
+        "G": [
+          21,
+          26,
+          19
+        ],
+        "H": [
+          21,
+          19,
+          19
+        ],
+        "b": [
+          20,
+          7
+        ],
+        "c": [
+          21,
+          19
+        ],
+        "f": [
+          2
+        ],
+        "h": [
+          21,
+          26
+        ],
+        "x0": [
+          7
+        ]
+      },
+      "settings": {
+        "tolerance": 1e-08,
+        "max_iterations": 200,
+        "refinement_steps": 5,
+        "regularization": 1e-11,
+        "step_fraction": 0.99,
+        "refinement_tolerance": 0.0,
+        "riccati_mode": 0,
+        "step_policy": "auto"
+      },
+      "epigraph_controls": {
+        "jax": 5,
+        "c": 4,
+        "cpp": 4
+      },
+      "cold": {
+        "jax": {
+          "initialize_seconds": 22.36266839799646,
+          "callback_compile_seconds": 10.755885282000236,
+          "first_execution_seconds": 0.0055055,
+          "first_status": 0
+        },
+        "c": {
+          "initialize_seconds": 9.522815315998741,
+          "callback_compile_seconds": 0.8726115690005827,
+          "first_execution_seconds": 0.002945699,
+          "first_status": 0
+        },
+        "cpp": {
+          "initialize_seconds": 8.908031949998986,
+          "callback_compile_seconds": 0.864202414999454,
+          "first_execution_seconds": 0.002938018,
+          "first_status": 0
+        }
+      },
+      "changing_inputs": {
+        "jax": {
+          "count": 100,
+          "median_ms": 2.3333174999999997,
+          "mean_ms": 2.34212523,
+          "min_ms": 2.065964,
+          "max_ms": 2.974231,
+          "samples_ms": [
+            2.372615,
+            2.360918,
+            2.542165,
+            2.584357,
+            2.25399,
+            2.379966,
+            2.140843,
+            2.298206,
+            2.746596,
+            2.974231,
+            2.391523,
+            2.578839,
+            2.177328,
+            2.445443,
+            2.344083,
+            2.358154,
+            2.384392,
+            2.257295,
+            2.065964,
+            2.21999,
+            2.235633,
+            2.374308,
+            2.114214,
+            2.258798,
+            2.114484,
+            2.383902,
+            2.474255,
+            2.617666,
+            2.286408,
+            2.426124,
+            2.164939,
+            2.431862,
+            2.546622,
+            2.406926,
+            2.6339,
+            2.666138,
+            2.201083,
+            2.584056,
+            2.401037,
+            2.399705,
+            2.189215,
+            2.31518,
+            2.093154,
+            2.283815,
+            2.318415,
+            2.22009,
+            2.115517,
+            2.303443,
+            2.099323,
+            2.275021,
+            2.514714,
+            2.598629,
+            2.333027,
+            2.361359,
+            2.099904,
+            2.440465,
+            2.438262,
+            2.33511,
+            2.352936,
+            2.39635,
+            2.272277,
+            2.241412,
+            2.635442,
+            2.351254,
+            2.251897,
+            2.6276,
+            2.408939,
+            2.603835,
+            2.380247,
+            2.479272,
+            2.224006,
+            2.314079,
+            2.426564,
+            2.193441,
+            2.191018,
+            2.235333,
+            2.211178,
+            2.307589,
+            2.068527,
+            2.202535,
+            2.130518,
+            2.368489,
+            2.119842,
+            2.211838,
+            2.082838,
+            2.461496,
+            2.180482,
+            2.276174,
+            2.156837,
+            2.58009,
+            2.370802,
+            2.279018,
+            2.370592,
+            2.319577,
+            2.227422,
+            2.333608,
+            2.102978,
+            2.306628,
+            2.590036,
+            2.433926
+          ],
+          "all_checks_passed": true
+        },
+        "c": {
+          "count": 100,
+          "median_ms": 1.7795860000000001,
+          "mean_ms": 1.8180838,
+          "min_ms": 1.539348,
+          "max_ms": 2.44417,
+          "samples_ms": [
+            2.010892,
+            1.88666,
+            1.999095,
+            1.957714,
+            1.877035,
+            1.631564,
+            1.863255,
+            1.856105,
+            1.63568,
+            1.753112,
+            2.363762,
+            1.83308,
+            2.269804,
+            1.84636,
+            1.595571,
+            1.639055,
+            1.776827,
+            1.635439,
+            1.890375,
+            1.707886,
+            1.627999,
+            1.638203,
+            1.699253,
+            1.567299,
+            2.052974,
+            1.848003,
+            1.731291,
+            1.759171,
+            1.970032,
+            1.719403,
+            2.072693,
+            1.95504,
+            2.029399,
+            1.908111,
+            2.199029,
+            2.160062,
+            2.44417,
+            1.895433,
+            1.612355,
+            1.933909,
+            1.781003,
+            1.707305,
+            1.863576,
+            1.740634,
+            1.603913,
+            1.617493,
+            1.699493,
+            1.607548,
+            2.026906,
+            1.742908,
+            1.599186,
+            1.68303,
+            2.050621,
+            1.682348,
+            1.847181,
+            1.879539,
+            1.999626,
+            1.827943,
+            1.78587,
+            1.654407,
+            1.928871,
+            1.78522,
+            2.008159,
+            1.957794,
+            2.125391,
+            1.756969,
+            2.034357,
+            2.038693,
+            1.778169,
+            1.783938,
+            1.971575,
+            1.706815,
+            1.90038,
+            1.681727,
+            1.58181,
+            1.598075,
+            1.625645,
+            1.539348,
+            1.831078,
+            1.733133,
+            1.566037,
+            1.586828,
+            1.720664,
+            1.617543,
+            1.741946,
+            1.627367,
+            1.706223,
+            2.324123,
+            1.75831,
+            1.590824,
+            2.136126,
+            1.764339,
+            1.753954,
+            1.712072,
+            1.789847,
+            1.579987,
+            1.819039,
+            1.802475,
+            1.679545,
+            1.910354
+          ],
+          "all_checks_passed": true
+        },
+        "cpp": {
+          "count": 100,
+          "median_ms": 1.7370185,
+          "mean_ms": 1.78055259,
+          "min_ms": 1.534961,
+          "max_ms": 2.66747,
+          "samples_ms": [
+            1.71699,
+            1.768305,
+            1.835463,
+            1.702408,
+            1.801984,
+            1.738841,
+            1.735196,
+            1.861823,
+            1.797759,
+            1.643582,
+            2.66747,
+            1.914941,
+            1.878117,
+            1.931676,
+            1.742658,
+            1.618204,
+            1.759963,
+            1.654577,
+            1.728256,
+            1.72448,
+            1.709939,
+            1.644192,
+            1.659535,
+            1.539889,
+            1.864667,
+            2.026415,
+            1.864606,
+            1.70366,
+            1.871937,
+            1.711942,
+            2.021307,
+            1.979076,
+            1.848263,
+            1.625364,
+            1.777308,
+            2.394707,
+            2.045794,
+            1.990222,
+            1.724811,
+            1.682128,
+            1.816596,
+            1.612635,
+            1.820943,
+            1.746783,
+            1.740123,
+            1.660907,
+            1.668017,
+            1.572747,
+            1.790477,
+            1.802535,
+            1.76512,
+            1.99596,
+            2.077901,
+            1.668708,
+            1.947129,
+            1.825679,
+            1.777348,
+            1.635119,
+            1.648578,
+            1.620897,
+            1.771189,
+            1.865328,
+            1.909052,
+            1.726924,
+            1.967809,
+            2.32152,
+            2.128135,
+            1.966557,
+            1.763268,
+            1.655679,
+            1.718772,
+            1.671913,
+            1.776658,
+            1.778029,
+            1.628259,
+            1.534961,
+            1.565316,
+            1.588781,
+            1.702088,
+            1.708567,
+            1.809526,
+            1.614168,
+            1.640366,
+            1.588299,
+            1.660696,
+            1.948911,
+            1.596662,
+            1.644533,
+            1.699214,
+            1.632565,
+            1.728216,
+            1.895843,
+            1.679334,
+            1.651172,
+            1.66343,
+            1.728937,
+            1.636211,
+            1.864477,
+            1.892828,
+            1.628409
+          ],
+          "all_checks_passed": true
+        }
+      },
+      "validation": {
+        "jax": [
+          {
+            "input_variant": 0,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 11,
+            "reported_residuals": [
+              2.220446049250313e-16,
+              4.536926390130702e-12,
+              3.867875181763137e-09
+            ],
+            "independent_audit": {
+              "primal": 2.220446049250313e-16,
+              "dual": 4.536926390130702e-12,
+              "gap": 3.867875181763139e-09,
+              "objective": -36.33027854075962,
+              "objective_error": null,
+              "dynamics": 2.220446049250313e-16,
+              "terminal": 5.477469297510368e-23,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 1.7763568394002505e-15,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          },
+          {
+            "input_variant": 1,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 11,
+            "reported_residuals": [
+              3.3306690738754696e-16,
+              2.7290392168310973e-12,
+              4.128397781403602e-09
+            ],
+            "independent_audit": {
+              "primal": 3.3306690738754696e-16,
+              "dual": 2.7290392168310973e-12,
+              "gap": 4.1283977814036035e-09,
+              "objective": -35.948737748083055,
+              "objective_error": null,
+              "dynamics": 3.3306690738754696e-16,
+              "terminal": 1.0794239672928616e-23,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 1.7763568394002505e-15,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          },
+          {
+            "input_variant": 2,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 11,
+            "reported_residuals": [
+              3.3306690738754696e-16,
+              4.829470157119431e-12,
+              3.4341595251746967e-09
+            ],
+            "independent_audit": {
+              "primal": 2.220446049250313e-16,
+              "dual": 4.829470157119431e-12,
+              "gap": 3.4341595251746984e-09,
+              "objective": -36.711870916585866,
+              "objective_error": null,
+              "dynamics": 2.220446049250313e-16,
+              "terminal": 2.0658074392337826e-23,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 1.7763568394002505e-15,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 4.440892098500626e-16
+            },
+            "accepted": true
+          }
+        ],
+        "c": [
+          {
+            "input_variant": 0,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 11,
+            "reported_residuals": [
+              2.220446049250313e-16,
+              9.84038106171519e-11,
+              3.949630260658964e-09
+            ],
+            "independent_audit": {
+              "primal": 2.220446049250313e-16,
+              "dual": 9.84038106171519e-11,
+              "gap": 3.949630260658965e-09,
+              "objective": -36.33027853050351,
+              "objective_error": null,
+              "dynamics": 2.220446049250313e-16,
+              "terminal": 7.29304518373554e-23,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 1.7763568394002505e-15,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          },
+          {
+            "input_variant": 1,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 11,
+            "reported_residuals": [
+              2.220446049250313e-16,
+              9.848861275352416e-11,
+              4.203087271448173e-09
+            ],
+            "independent_audit": {
+              "primal": 3.3306690738754696e-16,
+              "dual": 9.848861275352415e-11,
+              "gap": 4.203087271448173e-09,
+              "objective": -35.948737737372625,
+              "objective_error": null,
+              "dynamics": 3.3306690738754696e-16,
+              "terminal": 2.8840463594281327e-22,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 8.881784197001252e-16,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          },
+          {
+            "input_variant": 2,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 11,
+            "reported_residuals": [
+              2.220446049250313e-16,
+              9.838798509352666e-11,
+              3.5197871459572782e-09
+            ],
+            "independent_audit": {
+              "primal": 2.220446049250313e-16,
+              "dual": 9.838798509352665e-11,
+              "gap": 3.5197871459572774e-09,
+              "objective": -36.71187090666689,
+              "objective_error": null,
+              "dynamics": 2.220446049250313e-16,
+              "terminal": 3.7563845082526976e-22,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 1.7763568394002505e-15,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          }
+        ],
+        "cpp": [
+          {
+            "input_variant": 0,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 11,
+            "reported_residuals": [
+              2.220446049250313e-16,
+              9.84038106171472e-11,
+              3.949630260758109e-09
+            ],
+            "independent_audit": {
+              "primal": 2.220446049250313e-16,
+              "dual": 9.84038106171472e-11,
+              "gap": 3.949630260758109e-09,
+              "objective": -36.33027853050352,
+              "objective_error": null,
+              "dynamics": 2.220446049250313e-16,
+              "terminal": 1.962965845721724e-22,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 1.7763568394002505e-15,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          },
+          {
+            "input_variant": 1,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 11,
+            "reported_residuals": [
+              2.220446049250313e-16,
+              9.848861275349162e-11,
+              4.20308727156708e-09
+            ],
+            "independent_audit": {
+              "primal": 2.220446049250313e-16,
+              "dual": 9.848861275349162e-11,
+              "gap": 4.203087271567079e-09,
+              "objective": -35.948737737372625,
+              "objective_error": null,
+              "dynamics": 2.220446049250313e-16,
+              "terminal": 3.242884641831803e-23,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 9.711492325022218e-24,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 8.881784197001252e-16,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          },
+          {
+            "input_variant": 2,
+            "status": 0,
+            "raw_status": 0,
+            "ipm_iterations": 11,
+            "reported_residuals": [
+              3.3306690738754696e-16,
+              9.838798509352392e-11,
+              3.5197871459620035e-09
+            ],
+            "independent_audit": {
+              "primal": 2.220446049250313e-16,
+              "dual": 9.838798509352392e-11,
+              "gap": 3.519787145962004e-09,
+              "objective": -36.71187090666689,
+              "objective_error": null,
+              "dynamics": 2.220446049250313e-16,
+              "terminal": 1.529836404857221e-22,
+              "slack_equation": 2.220446049250313e-16,
+              "primal_cone": 0.0,
+              "dual_cone": 0.0,
+              "accepted": true
+            },
+            "raw_callback_difference": {
+              "x_max_abs": 1.7763568394002505e-15,
+              "u_max_abs": 0.0,
+              "nu_max_abs": 0.0,
+              "cost_max_abs": 0.0
+            },
+            "accepted": true
+          }
+        ]
+      },
+      "native_vs_jax": {
+        "c": [
+          {
+            "input_variant": 0,
+            "x_max_abs": 9.334827355544917e-10,
+            "u_max_abs": 1.143980465911909e-10,
+            "nu_max_abs": 9.825072170103585e-10,
+            "cost_max_abs": 9.626077712709957e-12,
+            "accepted": true
+          },
+          {
+            "input_variant": 1,
+            "x_max_abs": 9.93051640918452e-10,
+            "u_max_abs": 1.217472789249996e-10,
+            "nu_max_abs": 1.0453510896880272e-09,
+            "cost_max_abs": 1.0174971976084635e-11,
+            "accepted": true
+          },
+          {
+            "input_variant": 2,
+            "x_max_abs": 8.440320664604428e-10,
+            "u_max_abs": 1.0324030519370808e-10,
+            "nu_max_abs": 8.884496582059986e-10,
+            "cost_max_abs": 8.690825836765725e-12,
+            "accepted": true
+          }
+        ],
+        "cpp": [
+          {
+            "input_variant": 0,
+            "x_max_abs": 9.334828465767941e-10,
+            "u_max_abs": 1.143980465911909e-10,
+            "nu_max_abs": 9.825072127537797e-10,
+            "cost_max_abs": 9.626521801919807e-12,
+            "accepted": true
+          },
+          {
+            "input_variant": 1,
+            "x_max_abs": 9.930515298961495e-10,
+            "u_max_abs": 1.217472789249996e-10,
+            "nu_max_abs": 1.0453510863091334e-09,
+            "cost_max_abs": 1.0175860154504335e-11,
+            "accepted": true
+          },
+          {
+            "input_variant": 2,
+            "x_max_abs": 8.440320664604428e-10,
+            "u_max_abs": 1.0324030519370808e-10,
+            "nu_max_abs": 8.884496571698655e-10,
+            "cost_max_abs": 8.691714015185426e-12,
+            "accepted": true
+          }
+        ]
+      },
+      "accepted": true
+    },
+    {
+      "name": "brachistochrone_ctcs_n6_solve_jax",
+      "kind": "solve_jax",
+      "scope": "public solve_jax including state/result construction and all SCP iterations",
+      "thresholds": {
+        "ep_tr": 0.0,
+        "ep_vb": 0.0,
+        "ep_vc": 0.0
+      },
+      "note": "Fixed iteration workload; not a time-to-convergence claim",
+      "cold": {
+        "jax": {
+          "initialize_seconds": 19.95313705800072,
+          "first_solve_jax_seconds": 14.990838123
+        },
+        "c": {
+          "initialize_seconds": 8.954428883000219,
+          "first_solve_jax_seconds": 4.596759251000001
+        },
+        "cpp": {
+          "initialize_seconds": 7.127780582999549,
+          "first_solve_jax_seconds": 4.429495119
+        }
+      },
+      "warm": {
+        "jax": {
+          "count": 10,
+          "median_ms": 11.750936500000002,
+          "mean_ms": 11.8991753,
+          "min_ms": 10.330329,
+          "max_ms": 15.221886,
+          "samples_ms": [
+            10.57546,
+            12.126256,
+            10.648949,
+            10.330329,
+            15.221886,
+            11.543596,
+            12.304968,
+            13.588138,
+            11.958277,
+            10.693894
+          ],
+          "all_checks_passed": true
+        },
+        "c": {
+          "count": 10,
+          "median_ms": 12.240714,
+          "mean_ms": 12.3179666,
+          "min_ms": 10.837075,
+          "max_ms": 14.234441,
+          "samples_ms": [
+            12.170931,
+            14.234441,
+            11.41648,
+            11.4779,
+            12.310497,
+            11.121024,
+            13.685642,
+            13.435354,
+            12.490322,
+            10.837075
+          ],
+          "all_checks_passed": true
+        },
+        "cpp": {
+          "count": 10,
+          "median_ms": 12.0927005,
+          "mean_ms": 12.222055,
+          "min_ms": 10.698531,
+          "max_ms": 13.837235,
+          "samples_ms": [
+            11.201673,
+            13.837235,
+            10.72435,
+            10.698531,
+            13.497405,
+            12.032306,
+            12.461269,
+            13.818277,
+            12.153095,
+            11.796409
+          ],
+          "all_checks_passed": true
+        }
+      },
+      "validation": {
+        "jax": {
+          "scp_iterations": 3,
+          "subproblem_statuses": [
+            0,
+            0,
+            0
+          ],
+          "subproblem_objectives": [
+            1.6973105630456953,
+            0.7655362986325227,
+            0.5456025318748688
+          ],
+          "nonlinear_objective": 0.0,
+          "t_final": [
+            1.842646923899637
+          ],
+          "converged": false,
+          "public_vs_audited_final_max_abs": 0.0,
+          "accepted": true
+        },
+        "c": {
+          "scp_iterations": 3,
+          "subproblem_statuses": [
+            0,
+            0,
+            0
+          ],
+          "subproblem_objectives": [
+            1.6973105630455534,
+            0.7655362986339811,
+            0.5456025318767284
+          ],
+          "nonlinear_objective": 0.0,
+          "t_final": [
+            1.8426469239003382
+          ],
+          "converged": false,
+          "public_vs_audited_final_max_abs": 0.0,
+          "accepted": true
+        },
+        "cpp": {
+          "scp_iterations": 3,
+          "subproblem_statuses": [
+            0,
+            0,
+            0
+          ],
+          "subproblem_objectives": [
+            1.6973105630455536,
+            0.7655362986339804,
+            0.5456025318766904
+          ],
+          "nonlinear_objective": 0.0,
+          "t_final": [
+            1.8426469239003365
+          ],
+          "converged": false,
+          "public_vs_audited_final_max_abs": 0.0,
+          "accepted": true
+        }
+      },
+      "native_vs_jax": {
+        "c": {
+          "x_max_abs": 4.785616347646737e-12,
+          "u_max_abs": 6.87672141452822e-13,
+          "subproblem_objective_max_abs": 1.8595125439446747e-12,
+          "accepted": true
+        },
+        "cpp": {
+          "x_max_abs": 4.976019596369952e-12,
+          "u_max_abs": 6.865619184281968e-13,
+          "subproblem_objective_max_abs": 1.8215429165024943e-12,
+          "accepted": true
+        }
+      },
+      "accepted": true
+    }
+  ],
+  "complete": true,
+  "native_builds": {
+    "c": {
+      "compiler": "cc (Debian 14.2.0-19) 14.2.0",
+      "target": "X64_INTEL_HASWELL",
+      "blasfeo": true,
+      "lto": true
+    },
+    "cpp": {
+      "compiler": "c++ (Debian 14.2.0-19) 14.2.0",
+      "target": "X64_INTEL_HASWELL",
+      "blasfeo": true,
+      "lto": true
+    }
+  },
+  "source_unchanged": true,
+  "all_accepted": true
+}

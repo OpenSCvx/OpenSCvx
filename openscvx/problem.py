@@ -1724,8 +1724,8 @@ class Problem:
                         f"{type(self._solver).__name__} backend: its solve runs through a "
                         f"jax.pure_callback, which jax.export cannot serialize. Use an "
                         f"exportable backend (QPAXPTRSolver, MoreauPTRSolver, or "
-                        f"ICOREPTRSolver), or set save_compiled=False to run B sequential "
-                        f"in-process solves."
+                        f"ICOREPTRSolver with backend='jax' in solver_args), or set "
+                        f"save_compiled=False for in-process execution."
                     )
                 cache_file = get_solve_batched_cache_path(
                     self.symbolic,
