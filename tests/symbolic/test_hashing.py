@@ -1135,3 +1135,17 @@ def test_byof_hash_same_function_same_hash():
     )
 
     assert _hash_byof(byof1) == _hash_byof(byof2)
+
+
+def test_byof_hash_changes_with_captured_value():
+    """A changed closure/global value must change the hash (it is baked into the solver)."""
+    from openscvx.expert.byof import ByofSpec, NodalConstraintSpec
+    from openscvx.utils.caching import _hash_byof
+
+    def make(k):
+        return ByofSpec(
+            nodal_constraints=[NodalConstraintSpec(constraint_fn=lambda x, u, n, p: x[0] - k)]
+        )
+
+    assert _hash_byof(make(10.0)) != _hash_byof(make(20.0))
+    assert _hash_byof(make(10.0)) == _hash_byof(make(10.0))

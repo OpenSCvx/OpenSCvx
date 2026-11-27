@@ -1067,6 +1067,10 @@ class CVXPyPTRSolver(PTRSolver):
             )
 
         self._solve_fn()
+        # Some solvers (e.g. CLARABEL) report infeasible/unbounded by status
+        # with ``value=None`` instead of raising; raise so callers see it.
+        if self._problem.var_dict["x"].value is None:
+            raise cp.error.SolverError(f"subproblem status {self._problem.status!r}")
 
         # Get scaling matrices
         S_x = self._ocp_vars.S_x

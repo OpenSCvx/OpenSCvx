@@ -894,6 +894,14 @@ def validate_bounds(variables: List[Variable]) -> None:
             raise ValueError(
                 f"Variable '{var.name}' is missing max bound. Please set {var.name}.max"
             )
+        # Scaling is built from these bounds; an infinite one makes it NaN.
+        lo = var.min if getattr(var, "scaling_min", None) is None else var.scaling_min
+        hi = var.max if getattr(var, "scaling_max", None) is None else var.scaling_max
+        if not (np.all(np.isfinite(lo)) and np.all(np.isfinite(hi))):
+            raise ValueError(
+                f"Variable '{var.name}' has an infinite bound. Set finite "
+                f"{var.name}.min/.max, or finite {var.name}.scaling_min/.scaling_max."
+            )
 
 
 def validate_input_types(

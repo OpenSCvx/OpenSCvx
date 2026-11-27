@@ -426,6 +426,8 @@ def intermediate(print_queue: queue.Queue, params: Any, columns: list[Column]) -
         t_start = time.time()
         try:
             data = print_queue.get(timeout=1.0 / hz)
+            if data is None:  # stop sentinel from Problem.initialize()
+                return
 
             # Truncate prob_stat if it's a longer string (e.g., "infeasible" -> "i")
             prob_stat = data.get("prob_stat", "")

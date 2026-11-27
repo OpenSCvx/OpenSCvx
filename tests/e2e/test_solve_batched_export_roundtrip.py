@@ -134,7 +134,43 @@ def test_cache_key_invalidates_on_artifact_changing_state(tmp_path):
     prob.settings.sim.inv_S_x = saved
     assert path(prob) == base
 
+    # Shifting a bound window without changing its width moves only the center.
+    saved = prob.settings.sim.c_x
+    prob.settings.sim.c_x = saved + 5.0
+    assert path(prob) != base
+    prob.settings.sim.c_x = saved
+
     # A different convex backend is a different exported program.
     other = build_brachistochrone("cvxpy", n=8, k_max=20)
     other.initialize()
     assert path(other) != base
+
+
+def test_solver_cache_key_invalidates_on_baked_in_settings(tmp_path):
+    """The per-solver (discretization/propagation) key covers what they bake in."""
+    from openscvx.utils.caching import get_solver_cache_paths
+
+    prob = build_brachistochrone("cvxpy", n=4, k_max=1)
+    prob.initialize()
+
+    def key():
+        return get_solver_cache_paths(
+            prob.symbolic, prob.settings, prob._discretizer, cache_dir=tmp_path
+        )
+
+    base = key()
+    assert key() == base
+
+    for obj, attr, bump in [
+        (prob.settings.sim, "c_x", lambda v: v + 5.0),  # state bounds shifted
+        (prob.settings.sim, "S_u", lambda v: v * 2.0),  # control bounds widened
+        (prob.settings.prp, "max_tau_len", lambda v: v + 1),
+        (prob.settings.prp, "atol", lambda v: v / 10),
+        (prob._discretizer, "dis_type", lambda v: "ZOH" if v == "FOH" else "FOH"),
+        (prob._discretizer, "diffrax_kwargs", lambda v: {**v, "atol": 1e-12}),
+    ]:
+        saved = getattr(obj, attr)
+        setattr(obj, attr, bump(saved))
+        assert key() != base, attr
+        setattr(obj, attr, saved)
+        assert key() == base, attr

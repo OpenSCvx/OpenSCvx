@@ -1,4 +1,7 @@
 import hashlib
+import inspect
+import os
+import types
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
@@ -13,36 +16,60 @@ if TYPE_CHECKING:
     from openscvx.symbolic.problem import SymbolicProblem
 
 
+def _write_atomic(path: Path, data: bytes) -> None:
+    """Write via temp file + rename so an interrupted write never leaves a truncated cache."""
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    tmp.write_bytes(data)
+    os.replace(tmp, path)
+
+
+def _value_bytes(v: Any) -> bytes:
+    """Deterministic bytes for a constant or captured value (no memory addresses)."""
+    if isinstance(v, types.CodeType):
+        return v.co_code
+    if isinstance(v, types.FunctionType):
+        return v.__code__.co_code
+    if hasattr(v, "shape") and hasattr(v, "dtype"):
+        a = np.ascontiguousarray(v)  # full bytes: repr() elides big arrays
+        return f"{a.shape}:{a.dtype}:".encode() + a.tobytes()
+    return repr(v).encode()
+
+
+def _fn_bytes(f: callable) -> bytes:
+    """Bytecode, constants, and captured closure/global values of ``f``.
+
+    Captured values matter: ``k = 2.0; f = lambda x: k * x`` has the same
+    bytecode for every ``k``, but the compiled solver bakes ``k`` in.
+    """
+    code = f.__code__
+    parts = [code.co_code] + [_value_bytes(c) for c in code.co_consts]
+    captured = inspect.getclosurevars(f)
+    for name, v in sorted({**captured.globals, **captured.nonlocals}.items()):
+        if not isinstance(v, types.ModuleType):
+            parts += [name.encode(), _value_bytes(v)]
+    return b"|".join(parts)
+
+
 def _hash_byof(byof: Optional["ByofSpec"]) -> bytes:
-    """Hash BYOF functions by their bytecode and constants.
+    """Hash BYOF functions by their bytecode, constants and captured values.
 
     Args:
         byof: Optional ByofSpec containing raw JAX functions
 
     Returns:
-        Concatenated bytecode and constants of all functions, or empty bytes if no byof
+        Concatenated bytes of all functions, or empty bytes if no byof
     """
     if not byof:
         return b""
 
-    codes = []
-    for f in byof.dynamics.values():
-        codes.append(f.__code__.co_code)
-        codes.append(repr(f.__code__.co_consts).encode())
-    for f in byof.dynamics_discrete.values():
-        codes.append(f.__code__.co_code)
-        codes.append(repr(f.__code__.co_consts).encode())
-    for c in byof.nodal_constraints:
-        codes.append(c.constraint_fn.__code__.co_code)
-        codes.append(repr(c.constraint_fn.__code__.co_consts).encode())
-    for f in byof.cross_nodal_constraints:
-        codes.append(f.__code__.co_code)
-        codes.append(repr(f.__code__.co_consts).encode())
-    for c in byof.ctcs_constraints:
-        codes.append(c.constraint_fn.__code__.co_code)
-        codes.append(repr(c.constraint_fn.__code__.co_consts).encode())
-
-    return b"".join(codes)
+    fns = [
+        *byof.dynamics.values(),
+        *byof.dynamics_discrete.values(),
+        *(c.constraint_fn for c in byof.nodal_constraints),
+        *byof.cross_nodal_constraints,
+        *(c.constraint_fn for c in byof.ctcs_constraints),
+    ]
+    return b"".join(_fn_bytes(f) for f in fns)
 
 
 def hash_value_into(hasher: "hashlib._Hash", value: Any) -> None:
@@ -68,8 +95,8 @@ def hash_value_into(hasher: "hashlib._Hash", value: Any) -> None:
 
 def get_solver_cache_paths(
     symbolic_problem: "SymbolicProblem",
-    dt: float,
-    total_time: float,
+    settings: Any,
+    discretizer: Any,
     cache_dir: Optional[Path] = None,
     byof: Optional["ByofSpec"] = None,
 ) -> Tuple[Path, Path]:
@@ -81,8 +108,14 @@ def get_solver_cache_paths(
 
     Args:
         symbolic_problem: The preprocessed SymbolicProblem
-        dt: Time step for propagation
-        total_time: Total simulation time
+        settings: Problem :class:`~openscvx.config.Config`. The scaling
+            matrices (derived from variable bounds, which the symbolic hash
+            skips), ``total_time`` and the whole ``prp`` block (``dt``,
+            solver, tolerances, ``max_tau_len``) are baked into the compiled
+            solvers, so they are hashed. ``prp.max_tau_len`` must already be
+            set.
+        discretizer: The dynamics discretizer; its scheme is baked into the
+            compiled discretization solver.
         cache_dir: Directory to store cached solvers. If None, uses the default
             cache directory (see :func:`openscvx.get_cache_dir`).
         byof: Optional ByofSpec containing raw JAX functions. If provided,
@@ -99,8 +132,11 @@ def get_solver_cache_paths(
     # Include runtime config in the hash
     final_hasher = hashlib.sha256()
     final_hasher.update(problem_hash.encode())
-    final_hasher.update(f"dt:{dt}".encode())
-    final_hasher.update(f"total_time:{total_time}".encode())
+    final_hasher.update(f"total_time:{settings.sim.total_time}".encode())
+    for value in (settings.sim.S_x, settings.sim.c_x, settings.sim.S_u, settings.sim.c_u):
+        hash_value_into(final_hasher, value)
+    hash_value_into(final_hasher, settings.prp.model_dump())
+    discretizer._hash_into(final_hasher)
 
     # Include BYOF function bytecode in the hash
     final_hasher.update(_hash_byof(byof))
@@ -139,8 +175,8 @@ def get_solve_batched_cache_path(
     * the algorithm + autotuner + initial penalty weights (via
       ``algorithm._hash_into``),
     * the discretizer scheme (via ``discretizer._hash_into``),
-    * the state/control scaling matrices ``inv_S_x`` / ``inv_S_u`` (settings-
-      derived, not covered by any subsystem hash),
+    * the state/control scaling ``inv_S_x`` / ``inv_S_u`` / ``c_x`` / ``c_u``
+      (settings-derived, not covered by any subsystem hash),
     * the fixed batch size ``B`` (the artifact is exported at one ``B``),
     * the per-parameter batch axes ``param_axes`` — the shared/batched split is
       baked into the ``jax.vmap`` program, so an artifact traced for one split
@@ -181,6 +217,8 @@ def get_solve_batched_cache_path(
     discretizer._hash_into(hasher)
     hash_value_into(hasher, settings.sim.inv_S_x)
     hash_value_into(hasher, settings.sim.inv_S_u)
+    hash_value_into(hasher, settings.sim.c_x)
+    hash_value_into(hasher, settings.sim.c_u)
     hasher.update(f"B:{B}".encode())
     hasher.update(f"param_axes:{tuple(sorted(param_axes.items()))}".encode())
     hasher.update(f"jax:{jax.__version__}".encode())
@@ -251,8 +289,7 @@ def load_or_compile_discretization_solver(
         params,
     )
 
-    with open(cache_file, "wb") as f:
-        f.write(compiled_solver.serialize())
+    _write_atomic(cache_file, compiled_solver.serialize())
     print(f"✓ {name} discretization solver compiled and saved")
 
     return compiled_solver
@@ -307,8 +344,7 @@ def load_or_export_solve_batched(
 
     wrapper = export.export(jax.jit(batched_fn))(sample_state, sample_params)
 
-    with open(cache_file, "wb") as f:
-        f.write(wrapper.serialize())
+    _write_atomic(cache_file, wrapper.serialize())
     print("✓ Batched solve exported and saved")
 
     return wrapper
@@ -368,8 +404,7 @@ def load_or_compile_propagation_solver(
     )
 
     if save_compiled:
-        with open(cache_file, "wb") as f:
-            f.write(compiled_solver.serialize())
+        _write_atomic(cache_file, compiled_solver.serialize())
         print("✓ Propagation solver compiled and saved")
 
     return compiled_solver

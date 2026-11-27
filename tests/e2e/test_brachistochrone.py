@@ -880,6 +880,8 @@ def test_autotuning(autotuner_spec):
         "infeasible-nonconvex",
         "feasible-convex",
         "infeasible-convex",
+        # CLARABEL reports infeasibility by status with value=None, not by raising.
+        "infeasible-convex-clarabel",
     ],
 )
 def test_cross_nodal(test_case):
@@ -893,7 +895,7 @@ def test_cross_nodal(test_case):
 
     # Parse test case
     is_feasible = test_case.startswith("feasible")
-    is_convex = test_case.endswith("-convex")
+    is_convex = "-convex" in test_case
     should_converge = is_feasible
 
     # Set max_step based on feasibility
@@ -982,6 +984,9 @@ def test_cross_nodal(test_case):
 
     problem.settings.prp.dt = 0.01
     problem.solver.solver_args = {"abstol": 1e-6, "reltol": 1e-9, "warm_start": False}
+    if test_case.endswith("-clarabel"):
+        problem.solver.cvx_solver = "CLARABEL"
+        problem.solver.solver_args = {}
     problem.settings.sim.save_compiled = False
 
     # Disable printing for cleaner test output
@@ -995,7 +1000,7 @@ def test_cross_nodal(test_case):
     # and ``step()``'s status gate turns it into a clean RuntimeError.
     # For infeasible non-convex problems, SCP will fail to converge.
     if is_convex and not should_converge:
-        with pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError, match="did not solve to optimality"):
             problem.initialize()
             problem.solve()
     else:

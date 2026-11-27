@@ -169,6 +169,8 @@ class Discretizer(ABC):
         hasher.update(type(self).__name__.encode())
         hash_value_into(hasher, self.dis_type)
         hash_value_into(hasher, self.ode_solver)
+        # Tolerances etc. are baked into the compiled integrator too.
+        hash_value_into(hasher, getattr(self, "diffrax_kwargs", None))
 
     @abstractmethod
     def get_solver(self, dynamics: "Dynamics", settings: "Config") -> callable:

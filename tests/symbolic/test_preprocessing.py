@@ -957,6 +957,19 @@ def test_validate_bounds_raises_missing():
         validate_bounds([u])
 
 
+def test_validate_bounds_rejects_infinite_without_scaling():
+    """Infinite bounds give NaN scaling unless finite scaling bounds are set."""
+    v = State("velocity", shape=(1,))
+    v.min = np.array([-np.inf])
+    v.max = np.array([np.inf])
+    with pytest.raises(ValueError, match="'velocity' has an infinite bound"):
+        validate_bounds([v])
+
+    v.scaling_min = np.array([-5.0])
+    v.scaling_max = np.array([5.0])
+    validate_bounds([v])
+
+
 # =============================================================================
 # validate_guesses Tests
 # =============================================================================

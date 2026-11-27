@@ -1203,12 +1203,18 @@ class Problem:
             self._discretizer,
         )
 
+        # Propagation buffer width; set before hashing since it is baked into
+        # the compiled propagation solver.
+        dtau = 1.0 / (self.settings.sim.n - 1)
+        dt_max = self.settings.sim.u.max[self.settings.sim.time_dilation_slice][0] * dtau
+        self.settings.prp.max_tau_len = int(dt_max / self.settings.prp.dt) + 2
+
         # Get cache file paths using symbolic AST hashing
         # This is more stable than hashing lowered JAX code
         dis_solver_file, prop_solver_file = get_solver_cache_paths(
             self.symbolic,
-            dt=self.settings.prp.dt,
-            total_time=self.settings.sim.total_time,
+            self.settings,
+            self._discretizer,
             byof=self._byof,
         )
 
@@ -1241,11 +1247,6 @@ class Problem:
             debug=self.settings.dev.debug,
             name="discrete",
         )
-
-        # Setup propagation solver parameters
-        dtau = 1.0 / (self.settings.sim.n - 1)
-        dt_max = self.settings.sim.u.max[self.settings.sim.time_dilation_slice][0] * dtau
-        self.settings.prp.max_tau_len = int(dt_max / self.settings.prp.dt) + 2
 
         # Compile the propagation solver
         self._propagation_solver = load_or_compile_propagation_solver(
@@ -1324,6 +1325,11 @@ class Problem:
         warmup_state = self._default_state()
         jax.block_until_ready(self._iteration_fn(warmup_state, self._parameters))
         print("✓ SCvx Subproblem Solver initialized")
+
+        # Stop a printer from an earlier initialize(): two would race on the queue.
+        if self.print_thread is not None and self.print_thread.is_alive():
+            self.print_queue.put(None)
+            self.print_thread.join()
 
         # Get columns from algorithm (now that autotuner is set) and start print thread
         if self.settings.dev.printing:
@@ -1539,11 +1545,10 @@ class Problem:
             name: np.array(value) for name, value in self._parameters.items()
         }
 
-        timed_out = t_max is not None and self.timing_solve >= t_max
         result = self._format_result(
             self._state,
             self._history,
-            int(self._state.k) <= k_max and not timed_out,
+            bool(self._algorithm.converged(self._state)),
         )
         result.parameters = self._solution_parameters
         return result
@@ -2129,7 +2134,7 @@ class Problem:
         result = self._format_result(
             self._solution,
             self._solution_history,
-            int(self._solution.k) <= self._algorithm.k_max,
+            bool(self._algorithm.converged(self._solution)),
         )
 
         result.parameters = self._solution_parameters
